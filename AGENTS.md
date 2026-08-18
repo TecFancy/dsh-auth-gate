@@ -38,6 +38,10 @@ tables).
 
 - Development happens on `development`; `main` only receives merges from
   `development`. CI runs on both branches (push + PR).
+- PRs merge into `main` with **squash** (`gh pr merge <n> --squash`): one
+  conventional commit (the PR title) per PR, so release-please emits one
+  CHANGELOG entry per change. Merge commits double-count (see
+  `docs/development.md` "Releases").
 - Never commit or push to `main` directly unless the user says otherwise —
   always work on `development`.
 

@@ -141,6 +141,15 @@ Versioning is fully automated from conventional commits on `main`
   publishes to npm (`dsh-auth-gate`, MIT-licensed); consumers can additionally
   install from git or a local tarball (`npm pack`).
 
+**Merge policy.** Feature/PR workflows merge into `main` with **squash** —
+each PR lands as exactly one conventional commit (the PR title):
+`gh pr merge <n> --squash`. Squash is required, not optional: release-please
+parses the merged branch's commits _and_ (for a merge commit) the merge
+commit's linked PR title, so a merge-commit merge records every change twice
+in the CHANGELOG — the 0.6.0–0.6.4 notes each show the same `client:`/`fix:`
+change under two SHAs (branch commit + merge commit). With squash there is no
+merge commit and each PR contributes exactly one changelog entry.
+
 `docs:`/`chore:`/`ci:`/`test:` commits do not trigger a release. 0.x
 semantics: `fix:` → 0.0.x, `feat:` → 0.x.0.
 
