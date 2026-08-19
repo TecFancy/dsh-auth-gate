@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.1...v0.7.2) (2026-08-19)
+
+
+### Bug Fixes
+
+* **client:** show the sign-out on the blank new-session page ([#41](https://github.com/TecFancy/dsh-auth-gate/issues/41)) ([732b5d6](https://github.com/TecFancy/dsh-auth-gate/commit/732b5d6d4f5faefe6d0007fe2dfd29221a3f74a0))
+
 ## [0.7.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.0...v0.7.1) (2026-08-19)
 
 
