@@ -19,27 +19,31 @@
 "web"`）+ `exports["./client"]` 指向 `lib/client.js`；产物为
   `window.__ModuleLoader__.load({ id, factory })` 格式（tsdown 构建，CJS closure，
   模块表外部化 react 等平台模块）。参考实现：`dsh-better-sidebar`（生产已部署）。
-- **挂载点**：`conversation.session.header.utilities` —— list 槽位、session
-  作用域（会话打开时在）恒显示、`replaceRisk: none`（可追加，不替换任何 shipped
-  UI）。注册契约 `{ id, order, label }`；owner props 为空
-  （`ConversationHeaderActionOwnerProps {}`），头部按钮只从 standard session
-  kit 取数。
+- **挂载点（两处，作用域互补）**：
+  - `conversation.session.header.utilities` —— list 槽位、session 作用域（会话打开
+    时在）恒显示、`replaceRisk: none`；注册契约 `{ id, order, label }`；owner
+    props 为空（`ConversationHeaderActionOwnerProps {}`）。**会话页**右上角
+    （Session log 右侧）显示。
+  - `shell.overlay` —— root 作用域、frame-wide 浮动层（list、`replaceRisk:
+none`，点击穿透由条目自行恢复）。**新会话页**（hero 空态，无会话头部）时在
+    窗口右上角浮动显示同一按钮；门控 = `useSessions` 快照 `current ===
+undefined` 且已认证，与会话页入口互斥不重复。
 - **端点约束**：`POST /auth/logout?next=/`（GET → 405，M22：next 仅从 query 取，
   校验回落 `/`）；`GET /auth/status` → `{"authenticated":true|false}`（只认 cookie，
   Bearer 不参与）。两者均走包装前捕获的原始 register，属 gate 白名单路径。
 
 ## 2. 冻结决策
 
-| #   | 决策                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| D1  | 挂载点 `conversation.session.header.utilities`，entry id `dsh-auth-gate-logout`，`order: 10`（位于 shipped 的 Session log 入口右侧），`label: "Sign out"`（i18n 延后，暂英文）                                                                                                                                                                                                                                                             |
-| D2  | 登出走原生 `<form method="post" action="/auth/logout?next=/">`（零 JS 依赖；302 回落 `/` → 门禁 → 登录页）                                                                                                                                                                                                                                                                                                                                 |
-| D3  | 会话状态：组件挂载时 `fetch("/auth/status")` 一次；`authenticated: true` 才渲染，否则渲染 null（无残留 UI）                                                                                                                                                                                                                                                                                                                                |
-| D4  | 视觉：会话头部右上角 32px 圆形**纯图标**按钮（无文字，`aria-label`/`title` 提供可访问名）——边框 `--dsw-alias-border-l2`、图标色 `--dsw-alias-label-primary`、hover 背景 `var(--dsw-alias-interactive-bg-hover)`（浅 `rgba(38,49,72,.06)` / 深 `rgba(255,255,255,.08)`，随主题自适应），与 Session log/图标按钮同表面语言。内联 SVG（logout 图标，`stroke="currentColor"`），样式用内联 style，不引 CSS 文件、不引 primitives（依赖最小化） |
-| D5  | 类型：本地结构镜像（`src/client/context.ts`），不 import 任何 `@deepseek-ai/*` 运行时值；manifest `inject: ["@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-ui-slots"]`；bundle 外部化 `react`、`react/jsx-runtime`                                                                                                                                                                                                            |
-| D6  | 构建：`tsdown`（devDep ^0.22）单入口 `src/client/index.tsx` → `lib/client.js`（banner/footer 包 ModuleLoader，id = 包名 `dsh-auth-gate`）；`lib/client/index.d.ts` 由独立 tsc 声明通道（`tsconfig.client.json`，emitDeclarationOnly）生成；主构建（tsconfig.build.json）排除 `src/client`                                                                                                                                                  |
-| D7  | 测试：jsdom（`@vitest-environment jsdom` pragma）单测覆盖组件分支（authenticated 真/假、纯图标无文字、form action/method、可访问名）与 apply 注册参数；fetch mock                                                                                                                                                                                                                                                                          |
-| D8  | 范围外：i18n、暗色模式、登出确认弹窗、`/auth/status` 轮询（仅挂载时一次）、client 登出后半边 UI 的 SPA 内无痕刷新（302 整页跳转）                                                                                                                                                                                                                                                                                                          |
+| #   | 决策                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | 两处注册：① 会话页 `conversation.session.header.utilities`，id `dsh-auth-gate-logout`，`order: 10`（Session log 右侧）；② 新会话页 `shell.overlay`，id `dsh-auth-gate-logout-hero`，`order: 10`，门控 `useSessions().current === undefined`。`label` 均 "Sign out"（i18n 延后，暂英文）                                                                                                                                                                                                                                                                                     |
+| D2  | 登出走原生 `<form method="post" action="/auth/logout?next=/">`（零 JS 依赖；302 回落 `/` → 门禁 → 登录页）                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| D3  | 会话状态：组件挂载时 `fetch("/auth/status")` 一次；`authenticated: true` 才渲染，否则渲染 null（无残留 UI）                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| D4  | 视觉：32px 圆形**纯图标**按钮（无文字，`aria-label`/`title` 提供可访问名）——边框 `--dsw-alias-border-l2`、图标色 `--dsw-alias-label-primary`、hover 背景 `var(--dsw-alias-interactive-bg-hover)`（浅 `rgba(38,49,72,.06)` / 深 `rgba(255,255,255,.08)`，随主题自适应），与 Session log/图标按钮同表面语言。会话页入口内联在头部工具栏；hero 入口为 `position: fixed; top: 14px; right: 16px` 浮动按钮（复用同一按钮组件，`pointerEvents: auto` 恢复点击）。内联 SVG（logout 图标，`stroke="currentColor"`），样式用内联 style，不引 CSS 文件、不引 primitives（依赖最小化） |
+| D5  | 类型：本地结构镜像（`src/client/context.ts`），不 import 任何 `@deepseek-ai/*` 运行时值；manifest `inject: ["@deepseek-ai/dsh-client-runtime", "@deepseek-ai/dsh-client-ui-slots"]`；bundle 外部化 `react`、`react/jsx-runtime`                                                                                                                                                                                                                                                                                                                                             |
+| D6  | 构建：`tsdown`（devDep ^0.22）单入口 `src/client/index.tsx` → `lib/client.js`（banner/footer 包 ModuleLoader，id = 包名 `dsh-auth-gate`）；`lib/client/index.d.ts` 由独立 tsc 声明通道（`tsconfig.client.json`，emitDeclarationOnly）生成；主构建（tsconfig.build.json）排除 `src/client`                                                                                                                                                                                                                                                                                   |
+| D7  | 测试：jsdom（`@vitest-environment jsdom` pragma）单测覆盖组件分支（authenticated 真/假、纯图标无文字、form action/method、可访问名）与 apply 注册参数；fetch mock                                                                                                                                                                                                                                                                                                                                                                                                           |
+| D8  | 范围外：i18n、暗色模式、登出确认弹窗、`/auth/status` 轮询（仅挂载时一次）、client 登出后半边 UI 的 SPA 内无痕刷新（302 整页跳转）                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## 3. 文件蓝图
 
@@ -51,7 +55,7 @@
 | `tsconfig.json` / `tsconfig.build.json`  | 改       | exclude `src/client`（主构建是 node 通道）                                                                                                                                                                                                    |
 | `vitest.config.ts`                       | 改       | include `src/**/*.test.{ts,tsx}`；coverage include `src/**/*.{ts,tsx}`                                                                                                                                                                        |
 | `src/client/context.ts`                  | 新       | 本地结构镜像：`AuthSlotsService`、`AuthContext`（slots + effect）                                                                                                                                                                             |
-| `src/client/index.tsx`                   | 新       | client 插件：`export const inject = ["slots"]`；`apply(ctx)` 内 `ctx.slots.inject("conversation.session.header.utilities", () => ctx.slots.register({...}, LogoutAction))`                                                                    |
+| `src/client/index.tsx`                   | 新       | client 插件：`export const inject = ["slots"]`；`apply(ctx)` 内注册两处——`ctx.slots.inject("conversation.session.header.utilities", ... LogoutAction)` + `ctx.slots.inject("shell.overlay", ... HeroLogoutAction)`                            |
 | `src/client/logout-action.tsx`           | 新       | `LogoutAction()`：useEffect fetch `/auth/status` → 门控渲染；`<form method="post" action="/auth/logout?next=/">` + 纯图标按钮（32px 圆形、主题 token hover）+ 可访问名                                                                        |
 | `src/client/logout-action.test.tsx`      | 新       | jsdom 单测（见 D7）                                                                                                                                                                                                                           |
 | `docs/impl-client-logout.md`             | 新       | 本规格                                                                                                                                                                                                                                        |
@@ -67,8 +71,9 @@
 3. `npm run build`：`tsc -p tsconfig.build.json` + `tsdown` + client 声明通道；
    `git diff --exit-code -- lib` 通过（产物同批提交）。
 4. 部署到生产（tencent-cloud，`dsh-web.service`）后真实浏览器验证：登录 →
-   会话头部右上角（Session log 右侧）出现 Sign out 图标 → 点击 → 302 回落登录页
-   → 未带 cookie 的 SPA 请求被
+   会话头部右上角（Session log 右侧）出现 Sign out 图标；**新会话页**（无当前
+   会话）右上角也出现同一浮动图标 → 点击 → 302 回落登录页 → 未带 cookie 的
+   SPA 请求被
    门禁拦截。按 `docs/development.md` "GUI demos"约定配演示（截图 + 说明证明了什么）。
 5. 提交 development → PR → main（`feat:` → release-please 0.6.0）→ 生产切正式版。
 

@@ -57,9 +57,11 @@ After signing in, they land on your instance:
 
 ![dsh instance](docs/demo/dashboard.png)
 
-A Sign out icon button sits at the **top-right of the session header**, right
-of the Session log button — icon-only, with a theme-aware hover background
-(light/dark follow the active theme), matching the header's other icon buttons.
+A Sign out icon button sits at the **top-right**: inside a session, at the
+right of the Session log button in the session header; on the new-session
+page (no session open), at the window's top-right corner. Icon-only, with a
+theme-aware hover background (light/dark follow the active theme), matching
+the header's other icon buttons.
 
 > GUI demo screenshots in `docs/demo/logout-sidebar-*.png` predate this
 > placement (they show the button at the sidebar foot) and will be refreshed.
@@ -116,8 +118,9 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
   valid until they expire.
 - Login rate limiting resets when the server restarts.
 - Behind a reverse proxy, rate limiting counts by the proxy's address.
-- Sign out from the GUI: a Sign out icon button sits at the top-right of the
-  session header, right of the Session log button (client half, requires the
+- Sign out from the GUI: a Sign out icon button sits at the top-right — in
+  the session header right of the Session log button inside a session, and at
+  the window's top-right on the new-session page (client half, requires the
   web app's client bundle — dsh 0.1.0-rc.6+); the direct `/auth/logout?next=/`
   URL always works as a fallback.
 - The plugin only protects dsh's web surface. It is not a replacement for

@@ -54,13 +54,11 @@ const formStyle: CSSProperties = {
 };
 
 /**
- * 会话头部右上角的登出入口（conversation.session.header.utilities，session 作用域），
- * 纯图标。挂载时 fetch /auth/status 一次（只认 cookie），仅 authenticated:true 时
- * 渲染；登出走原生 form POST（零 JS 依赖，302 回落 / → 门禁 → 登录页）。
+ * 会话状态门控：挂载时 fetch /auth/status 一次（只认 cookie）。
+ * @returns authenticated：null = 未知（第一次请求前），true/false。
  */
-export function LogoutAction() {
+function useAuthenticated(): boolean | null {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  const [hovered, setHovered] = useState(false);
   useEffect(() => {
     let cancelled = false;
     fetch("/auth/status")
@@ -75,7 +73,12 @@ export function LogoutAction() {
       cancelled = true;
     };
   }, []);
-  if (authenticated !== true) return null;
+  return authenticated;
+}
+
+/** 可复用的登出提交按钮：原生 form POST（零 JS 依赖）+ 纯图标 + 主题 hover。 */
+function LogoutSubmitButton() {
+  const [hovered, setHovered] = useState(false);
   return (
     <form method="post" action={LOGOUT_TARGET} style={formStyle}>
       <button
@@ -92,5 +95,43 @@ export function LogoutAction() {
         {renderLogoutIcon()}
       </button>
     </form>
+  );
+}
+
+/** 会话头部右上角登出入口（conversation.session.header.utilities，session 作用域）。 */
+export function LogoutAction() {
+  const authenticated = useAuthenticated();
+  if (authenticated !== true) return null;
+  return <LogoutSubmitButton />;
+}
+
+/**
+ * 新会话页（hero 空态）右上角的浮动登出入口：root 级 shell.overlay 注册，
+ * 仅当没有当前会话（SessionListState.current === undefined）且已认证时渲染，
+ * 与会话头部入口互斥、不重复。
+ */
+export interface HeroLogoutActionProps {
+  /** root 槽位 standard hook：selector 读取会话快照。缺席或非函数时按"无当前会话"处理。 */
+  useSessions?: (
+    selector: (state: { current?: string }) => string | undefined,
+  ) => string | undefined;
+}
+
+export function HeroLogoutAction({ useSessions }: HeroLogoutActionProps) {
+  const authenticated = useAuthenticated();
+  const current =
+    typeof useSessions === "function" ? useSessions((state) => state.current) : undefined;
+  if (authenticated !== true || current !== undefined) return null;
+  const floatingWrap: CSSProperties = {
+    position: "fixed",
+    top: 14,
+    right: 16,
+    zIndex: 1,
+    pointerEvents: "auto",
+  };
+  return (
+    <div style={floatingWrap}>
+      <LogoutSubmitButton />
+    </div>
   );
 }
