@@ -1,18 +1,18 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
-/** 登出按钮的可访问名（rail 模式文字视觉隐藏，按钮仍以 aria-label 命名）。 */
+/** 登出按钮的可访问名（纯图标、无可见文字，按钮以 aria-label 命名）。 */
 const SIGN_OUT_LABEL = "Sign out";
 
 /** 登出目标：POST-only（M22：next 仅从 query 取，校验回落 /）。 */
 const LOGOUT_TARGET = "/auth/logout?next=/";
 
-/** 登出图标：尺寸随 wide/rail 两态变化（16px / 18px），对齐 settings.trigger 图标尺寸节奏。 */
-function renderLogoutIcon(size: number) {
+/** 登出图标：16px，与对话头部工具栏（Session log）图标尺寸一致。 */
+function renderLogoutIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width={size}
-      height={size}
+      width={16}
+      height={16}
       fill="none"
       stroke="currentColor"
       strokeWidth={2}
@@ -27,81 +27,38 @@ function renderLogoutIcon(size: number) {
   );
 }
 
-/** sidebar.footer.action 的 owner props（契约见 Slots 目录：wide=false 为 56px rail）。 */
-export interface LogoutActionProps {
-  wide: boolean;
-}
+/**
+ * hover 态背景色：引用 shell 交互元素的 hover token
+ * `var(--dsw-alias-interactive-bg-hover)`（浅色主题解析为 rgba(38, 49, 72, .06)，
+ * 深色主题为 rgba(255, 255, 255, .08)），与 Session log / 图标按钮随主题一致。
+ */
+const HOVER_BACKGROUND = "var(--dsw-alias-interactive-bg-hover)";
+
+/** 与对话头部 Session log 按钮同一套 surface 语言：32px 圆形图标按钮。 */
+const BUTTON_STYLE: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 32,
+  height: 32,
+  padding: 0,
+  border: "1px solid var(--dsw-alias-border-l2)",
+  borderRadius: "50%",
+  color: "var(--dsw-alias-label-primary)",
+  cursor: "pointer",
+  boxSizing: "border-box",
+};
 
 const formStyle: CSSProperties = {
   display: "contents",
 };
 
 /**
- * hover 态背景色：引用 shell 交互元素的 hover token
- * `var(--dsw-alias-interactive-bg-hover)`（浅色主题解析为 rgba(38, 49, 72, .06)，
- * 深色主题为 rgba(255, 255, 255, .08)），与 settings.trigger / 侧边栏图标按钮一致。
- * 不再硬编码浅色实测值——固定 6% 深色叠层在深色主题下几乎不可见。
+ * 会话头部右上角的登出入口（conversation.session.header.utilities，session 作用域），
+ * 纯图标。挂载时 fetch /auth/status 一次（只认 cookie），仅 authenticated:true 时
+ * 渲染；登出走原生 form POST（零 JS 依赖，302 回落 / → 门禁 → 登录页）。
  */
-const HOVER_BACKGROUND = "var(--dsw-alias-interactive-bg-hover)";
-
-/** 与 settings.trigger 两态实测样式对齐：wide 为通栏行按钮，rail 为 36px 圆形图标按钮。 */
-function getButtonStyle(wide: boolean, hovered: boolean): CSSProperties {
-  const shared: CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    border: 0,
-    background: hovered ? HOVER_BACKGROUND : "transparent",
-    color: "inherit",
-    cursor: "pointer",
-    font: "inherit",
-    fontSize: 14,
-    lineHeight: "22px",
-    boxSizing: "border-box",
-  };
-  if (wide) {
-    return {
-      ...shared,
-      gap: 8,
-      height: 34,
-      // settings.trigger 的 width 是 auto（负 margin 拉伸 = 容器 + 8px）；
-      // 本按钮在 flex 行里 width:auto 只会 fit-content，故用 calc 等效拉伸，
-      // 与 settings 的视觉几何完全一致（实测 264px 对 256px 差 8px）。
-      width: "calc(100% + 8px)",
-      padding: "6px 2px 6px 10px",
-      margin: "4px -4px",
-      borderRadius: 12,
-    };
-  }
-  return {
-    ...shared,
-    gap: 0,
-    justifyContent: "center",
-    height: 36,
-    width: 36,
-    padding: 0,
-    margin: "8px 0 10px",
-    borderRadius: "50%",
-  };
-}
-
-const visuallyHiddenStyle: CSSProperties = {
-  position: "absolute",
-  width: 1,
-  height: 1,
-  padding: 0,
-  margin: -1,
-  overflow: "hidden",
-  clip: "rect(0 0 0 0)",
-  whiteSpace: "nowrap",
-  border: 0,
-};
-
-/**
- * 侧边栏底部登出入口。挂载时 fetch /auth/status 一次（只认 cookie），仅
- * authenticated:true 时渲染；登出走原生 form POST（零 JS 依赖，302 回落
- * / → 门禁 → 登录页）。
- */
-export function LogoutAction({ wide }: LogoutActionProps) {
+export function LogoutAction() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   const [hovered, setHovered] = useState(false);
   useEffect(() => {
@@ -125,12 +82,14 @@ export function LogoutAction({ wide }: LogoutActionProps) {
         type="submit"
         aria-label={SIGN_OUT_LABEL}
         title={SIGN_OUT_LABEL}
-        style={getButtonStyle(wide, hovered)}
+        style={{
+          ...BUTTON_STYLE,
+          background: hovered ? HOVER_BACKGROUND : "transparent",
+        }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {renderLogoutIcon(wide ? 16 : 18)}
-        <span style={wide ? undefined : visuallyHiddenStyle}>{SIGN_OUT_LABEL}</span>
+        {renderLogoutIcon()}
       </button>
     </form>
   );

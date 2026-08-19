@@ -57,12 +57,12 @@ After signing in, they land on your instance:
 
 ![dsh instance](docs/demo/dashboard.png)
 
-A Sign out button sits at the sidebar foot, next to Settings — expanded
-sidebar and collapsed rail states:
+A Sign out icon button sits at the **top-right of the session header**, right
+of the Session log button — icon-only, with a theme-aware hover background
+(light/dark follow the active theme), matching the header's other icon buttons.
 
-![Sign out button, expanded sidebar](docs/demo/logout-sidebar-wide.png)
-
-![Sign out button, collapsed sidebar rail](docs/demo/logout-sidebar-rail.png)
+> GUI demo screenshots in `docs/demo/logout-sidebar-*.png` predate this
+> placement (they show the button at the sidebar foot) and will be refreshed.
 
 ## Configuration
 
@@ -116,9 +116,10 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
   valid until they expire.
 - Login rate limiting resets when the server restarts.
 - Behind a reverse proxy, rate limiting counts by the proxy's address.
-- Sign out from the GUI: a Sign out button sits at the sidebar foot (client
-  half, requires the web app's client bundle — dsh 0.1.0-rc.6+); the direct
-  `/auth/logout?next=/` URL always works as a fallback.
+- Sign out from the GUI: a Sign out icon button sits at the top-right of the
+  session header, right of the Session log button (client half, requires the
+  web app's client bundle — dsh 0.1.0-rc.6+); the direct `/auth/logout?next=/`
+  URL always works as a fallback.
 - The plugin only protects dsh's web surface. It is not a replacement for
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with

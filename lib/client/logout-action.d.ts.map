@@ -1,1 +1,1 @@
-{"version":3,"file":"logout-action.d.ts","sourceRoot":"","sources":["../../src/client/logout-action.tsx"],"names":[],"mappings":"AA6BA,gFAAgF;AAChF,MAAM,WAAW,iBAAiB;IAChC,IAAI,EAAE,OAAO,CAAC;CACf;AAkED;;;;GAIG;AACH,wBAAgB,YAAY,CAAC,EAAE,IAAI,EAAE,EAAE,iBAAiB,sCAiCvD"}
+{"version":3,"file":"logout-action.d.ts","sourceRoot":"","sources":["../../src/client/logout-action.tsx"],"names":[],"mappings":"AAuDA;;;;GAIG;AACH,wBAAgB,YAAY,uCAmC3B"}

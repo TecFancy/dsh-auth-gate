@@ -15,19 +15,19 @@ async function flushMicrotasks(): Promise<void> {
 }
 
 /** 渲染 LogoutAction 到独立容器（jsdom），返回 root 供卸载。 */
-async function renderAction(wide: boolean): Promise<{ root: Root; container: HTMLDivElement }> {
+async function renderAction(): Promise<{ root: Root; container: HTMLDivElement }> {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(createElement(LogoutAction, { wide }));
+    root.render(createElement(LogoutAction));
     await flushMicrotasks();
   });
   return { root, container };
 }
 
 describe("apply", () => {
-  it("registers the sign-out entry in sidebar.footer.action", () => {
+  it("registers the sign-out entry in conversation.session.header.utilities", () => {
     let captured: (() => () => void) | undefined;
     const inject = vi.fn((_key: string, callback: () => () => void) => {
       captured = callback;
@@ -36,13 +36,16 @@ describe("apply", () => {
     const register = vi.fn(() => undefined);
     const ctx = { slots: { inject, register } } as unknown as AuthContext;
     apply(ctx);
-    expect(inject).toHaveBeenCalledWith("sidebar.footer.action", expect.any(Function));
+    expect(inject).toHaveBeenCalledWith(
+      "conversation.session.header.utilities",
+      expect.any(Function),
+    );
     captured?.();
     expect(register).toHaveBeenCalledWith(
       {
-        name: "sidebar.footer.action",
+        name: "conversation.session.header.utilities",
         id: "dsh-auth-gate-logout",
-        order: 0,
+        order: 10,
         label: "Sign out",
       },
       LogoutAction,
@@ -67,23 +70,24 @@ describe("LogoutAction", () => {
     return { json: () => Promise.resolve({ authenticated }) };
   }
 
-  it("renders the logout form when /auth/status says authenticated", async () => {
+  it("renders an icon-only logout form when /auth/status says authenticated", async () => {
     fetchMock.mockResolvedValue(statusResponse(true));
-    const { root, container } = await renderAction(true);
+    const { root, container } = await renderAction();
     const form = container.querySelector("form");
     expect(form).not.toBeNull();
     expect(form?.getAttribute("action")).toBe("/auth/logout?next=/");
     expect(form?.getAttribute("method")).toBe("post");
     const button = container.querySelector("button");
     expect(button?.getAttribute("aria-label")).toBe("Sign out");
-    expect(button?.textContent).toContain("Sign out");
+    expect(button?.querySelector("svg")).not.toBeNull();
+    expect(button?.textContent).toBe("");
     root.unmount();
     container.remove();
   });
 
   it("renders nothing when unauthenticated", async () => {
     fetchMock.mockResolvedValue(statusResponse(false));
-    const { root, container } = await renderAction(true);
+    const { root, container } = await renderAction();
     expect(container.querySelector("form")).toBeNull();
     expect(container.textContent).toBe("");
     root.unmount();
@@ -92,27 +96,15 @@ describe("LogoutAction", () => {
 
   it("renders nothing when the status fetch fails", async () => {
     fetchMock.mockRejectedValue(new Error("network"));
-    const { root, container } = await renderAction(true);
+    const { root, container } = await renderAction();
     expect(container.querySelector("form")).toBeNull();
-    root.unmount();
-    container.remove();
-  });
-
-  it("hides the label in rail mode but keeps the accessible name", async () => {
-    fetchMock.mockResolvedValue(statusResponse(true));
-    const { root, container } = await renderAction(false);
-    const button = container.querySelector("button");
-    expect(button?.getAttribute("aria-label")).toBe("Sign out");
-    const label = container.querySelector("button span");
-    expect(label?.textContent).toBe("Sign out");
-    expect((label as HTMLElement).style.position).toBe("absolute");
     root.unmount();
     container.remove();
   });
 
   it("shows the theme token hover background and clears it on leave", async () => {
     fetchMock.mockResolvedValue(statusResponse(true));
-    const { root, container } = await renderAction(true);
+    const { root, container } = await renderAction();
     const button = container.querySelector("button")!;
     expect(button.style.background).toBe("transparent");
     act(() => {

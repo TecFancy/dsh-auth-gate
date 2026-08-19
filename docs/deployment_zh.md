@@ -116,8 +116,8 @@ for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code}\n" -d "username=a
 curl -s -i -d "username=admin&password=<口令>" http://127.0.0.1:3081/auth/login | head -3  # 429 + retry-after
 
 # I. 浏览器通路（可选，须 https 环境）：无痕窗口访问 → 302 到 /auth/login →
-#    登录 → 进入实例；侧边栏底部有 Sign out 按钮（client 半边，0.6.0+），
-#    也可 URL 访问 /auth/logout?next=/ 登出。
+#    登录 → 进入实例；会话头部右上角（Session log 按钮右侧）有 Sign out 纯图标按钮
+#    （client 半边，0.6.5+），也可 URL 访问 /auth/logout?next=/ 登出。
 ```
 
 预期全绿 = 部署验收通过。**全部失败路径必须是失败**（401/403 语义不吞错）——任何"静默放行"

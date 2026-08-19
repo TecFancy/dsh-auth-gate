@@ -5,7 +5,7 @@
  */
 /** `ctx.slots.register` 的注册选项（本插件用到的子集）。 */
 export interface AuthSlotRegisterOptions {
-    /** 槽位名（slot map key），如 "sidebar.footer.action"。 */
+    /** 槽位名（slot map key），如 "conversation.session.header.utilities"。 */
     name: string;
     /** list 槽位的 entry id：自用 id = 追加新格；复用 shipped id = 替换该格。 */
     id?: string;
