@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.6.4...v0.7.0) (2026-08-19)
+
+
+### Features
+
+* **client:** move sign-out to the session header (top-right, icon-only) ([#37](https://github.com/TecFancy/dsh-auth-gate/issues/37)) ([613fd72](https://github.com/TecFancy/dsh-auth-gate/commit/613fd7250b086e11e05e889ac21e153e4fe5bd14))
+
 ## [0.6.4](https://github.com/TecFancy/dsh-auth-gate/compare/v0.6.3...v0.6.4) (2026-08-18)
 
 
