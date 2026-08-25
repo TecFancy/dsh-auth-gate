@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.2...v0.8.0) (2026-08-25)
+
+
+### Features
+
+* **client:** move sign-out into the settings panel as a centered CTA ([#45](https://github.com/TecFancy/dsh-auth-gate/issues/45)) ([65e232b](https://github.com/TecFancy/dsh-auth-gate/commit/65e232b862ab58a2ad5ca0cfd7f10c9b5e27adb1))
+
 ## [0.7.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.1...v0.7.2) (2026-08-19)
 
 
