@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.9.0...v0.9.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **proxy:** relay upgrade/connection headers on WebSocket handshake ([#50](https://github.com/TecFancy/dsh-auth-gate/issues/50)) ([d6790b7](https://github.com/TecFancy/dsh-auth-gate/commit/d6790b7d7c002f6477b89d29d07849ffb78ad621))
+
 ## [0.9.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.8.0...v0.9.0) (2026-08-26)
 
 

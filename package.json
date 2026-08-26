@@ -1,6 +1,6 @@
 {
   "name": "dsh-auth-gate",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Application-layer authentication plugin for the dsh web surface",
   "type": "module",
   "license": "MIT",
