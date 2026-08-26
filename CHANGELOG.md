@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.8.0...v0.9.0) (2026-08-26)
+
+
+### Features
+
+* authenticated local proxy for the dsh configuration plane + X-Dsh-Proxy deny-list ([6a889c7](https://github.com/TecFancy/dsh-auth-gate/commit/6a889c710b203835bd99eedb09049a23aaf1220d))
+
 ## [0.8.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.2...v0.8.0) (2026-08-25)
 
 
