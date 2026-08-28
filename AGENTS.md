@@ -25,7 +25,7 @@ tables).
   password flow: users.yaml + scrypt + rate limiting + `dsh-auth user` CLI).
   **M3 execution starts by reading `docs/handoff-m2.md`** (environment facts
   still valid) and finishes by writing `docs/handoff-m3.md` for M4.
-- **Agent skills** (`skills/`, auto-discovered):
+- **Agent skills** (`.agents/skills/`, auto-discovered by dsh):
   - `dsh-auth-code-review` — review checklist for changes here: enforcement,
     lifecycle, disposal, real-entry-path tests, prose contracts.
   - `dsh-auth-pre-push` — smallest relevant evidence before a push;
