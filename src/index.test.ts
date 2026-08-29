@@ -18,6 +18,7 @@ function cfg(): AuthConfig {
     tokenRef: "DSH_AUTH_TOKEN",
     cookieSecure: true,
     usersFile: "",
+    logoutOrder: 1000,
   };
 }
 function makeFakeServer(): WrappableServer {

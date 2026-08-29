@@ -9,6 +9,8 @@ import { buildSetCookie } from "./session-store.js";
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
   /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
   register(route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): () => void;
+  /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
+  logoutOrder: number;
 }
 
 /**
@@ -112,7 +114,7 @@ function handleStatus(
     store.getByToken(token) !== undefined;
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ authenticated }));
+  res.end(JSON.stringify({ authenticated, logoutOrder: deps.logoutOrder }));
 }
 
 function queryOf(req: IncomingMessage): URLSearchParams {

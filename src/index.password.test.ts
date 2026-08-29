@@ -25,6 +25,7 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     tokenRef: "DSH_AUTH_TOKEN",
     cookieSecure: true,
     usersFile,
+    logoutOrder: 1000,
   };
 }
 

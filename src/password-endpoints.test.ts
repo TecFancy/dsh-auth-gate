@@ -104,7 +104,7 @@ interface Harness {
   setStore(value: SessionStore | undefined): void;
 }
 
-function makeHarness(options?: { cookieSecure?: boolean }): Harness {
+function makeHarness(options?: { cookieSecure?: boolean; logoutOrder?: number }): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
   const logs: Harness["logs"] = [];
@@ -129,6 +129,7 @@ function makeHarness(options?: { cookieSecure?: boolean }): Harness {
       cookieName: "dsh_auth",
       cookieSecure: options?.cookieSecure ?? true,
       sessionTtl: 604800,
+      logoutOrder: options?.logoutOrder ?? 1000,
       usersPath: "/tmp/users.yaml",
       loadUsers: () =>
         Promise.resolve({
@@ -231,37 +232,5 @@ describe("POST /auth/logout", () => {
     expect(res.status).toBe(302);
     expect(res.headers["location"]).toBe("/");
     expect(res.headers["set-cookie"]).toMatch(/Max-Age=0/);
-  });
-});
-
-describe("GET /auth/status", () => {
-  it("reports true with a valid session cookie only", async () => {
-    const harness = makeHarness();
-    registerPasswordEndpoints(harness.deps);
-    const store = harness.deps.sessions()!;
-    const { token } = await store.create("alice", 60_000);
-    const res = makeRes();
-    await handlerOf(
-      harness,
-      "exact",
-      "/auth/status",
-    )(makeReq({ method: "GET", url: "/auth/status", cookie: `dsh_auth=${token}` }), res.res);
-    expect(res.status).toBe(200);
-    expect(res.body).toBe('{"authenticated":true}');
-  });
-
-  it("ignores a Bearer header (cookie only)", async () => {
-    const harness = makeHarness();
-    registerPasswordEndpoints(harness.deps);
-    const res = makeRes();
-    await handlerOf(
-      harness,
-      "exact",
-      "/auth/status",
-    )(
-      makeReq({ method: "GET", url: "/auth/status", authorization: "Bearer some-session-token" }),
-      res.res,
-    );
-    expect(res.body).toBe('{"authenticated":false}');
   });
 });

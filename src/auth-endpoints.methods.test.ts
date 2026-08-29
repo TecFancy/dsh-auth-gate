@@ -100,6 +100,7 @@ function makeHarness(): {
       cookieName: "dsh_auth",
       cookieSecure: true,
       sessionTtl: 604800,
+      logoutOrder: 1000,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: () => undefined,

@@ -2,8 +2,8 @@ import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { HttpHandler } from "./guard.js";
-import { registerPasswordEndpoints, type PasswordEndpointsDeps } from "./password-endpoints.js";
 import { LoginRateLimiter } from "./rate-limit.js";
+import { registerPasswordEndpoints, type PasswordEndpointsDeps } from "./password-endpoints.js";
 import { SessionStore, type Session } from "./session-store.js";
 
 class MemTable implements KvTable<string, Session> {
@@ -73,9 +73,26 @@ function makeRes(): FakeRes {
   return Object.assign(state, { res });
 }
 
-interface VerifyCall {
-  storedHash: string;
-  password: string;
+function makeReq(options: {
+  method?: string;
+  url?: string;
+  cookie?: string;
+  authorization?: string;
+  body?: Buffer;
+}): IncomingMessage {
+  return {
+    method: options.method ?? "GET",
+    url: options.url ?? "/",
+    headers: {
+      cookie: options.cookie,
+      authorization: options.authorization,
+      "content-type": "application/x-www-form-urlencoded",
+    },
+    socket: { remoteAddress: "127.0.0.1" },
+    *[Symbol.asyncIterator](): Generator<Buffer> {
+      if (options.body !== undefined) yield options.body;
+    },
+  } as unknown as IncomingMessage;
 }
 
 interface Harness {
@@ -83,42 +100,23 @@ interface Harness {
   routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[];
   table: MemTable;
   logs: { level: string; message: unknown }[];
-  verifyCalls: VerifyCall[];
+  sessions(): SessionStore | undefined;
   setStore(value: SessionStore | undefined): void;
-  setUsers(users: Map<string, { passwordHash: string; disabled: boolean }>): void;
-  setLoadError(error: Error): void;
-  setMissing(): void;
-  limiter: LoginRateLimiter;
 }
 
-function makeHarness(): Harness {
+function makeHarness(options?: { cookieSecure?: boolean; logoutOrder?: number }): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
   const logs: Harness["logs"] = [];
-  const verifyCalls: VerifyCall[] = [];
   let store: SessionStore | undefined = new SessionStore(table);
-  let users = new Map([["alice", { passwordHash: "h-alice", disabled: false }]]);
-  let loadError: Error | undefined;
-  let missing = false;
-  const limiter = new LoginRateLimiter({ now: () => 1_000_000 });
   return {
     routes,
     table,
     logs,
-    verifyCalls,
+    sessions: () => store,
     setStore: (value) => {
       store = value;
     },
-    setUsers: (value) => {
-      users = value;
-    },
-    setLoadError: (error) => {
-      loadError = error;
-    },
-    setMissing: () => {
-      missing = true;
-    },
-    limiter,
     deps: {
       register: (route) => {
         routes.push(route);
@@ -129,23 +127,19 @@ function makeHarness(): Harness {
       },
       sessions: () => store,
       cookieName: "dsh_auth",
-      cookieSecure: false,
+      cookieSecure: options?.cookieSecure ?? true,
       sessionTtl: 604800,
-      logoutOrder: 1000,
+      logoutOrder: options?.logoutOrder ?? 1000,
       usersPath: "/tmp/users.yaml",
-      loadUsers: () => {
-        if (loadError !== undefined) return Promise.reject(loadError);
-        const empty = new Map<string, { passwordHash: string; disabled: boolean }>();
-        return Promise.resolve({
-          snapshot: { users: missing ? empty : users },
-          missing,
-        });
-      },
-      verify: (password, storedHash) => {
-        verifyCalls.push({ storedHash, password });
-        return Promise.resolve(password === "pw" && storedHash === "h-alice");
-      },
-      limiter,
+      loadUsers: () =>
+        Promise.resolve({
+          snapshot: {
+            users: new Map([["alice", { passwordHash: "h", disabled: false }]]),
+          },
+          missing: false,
+        }),
+      verify: () => Promise.resolve(true),
+      limiter: new LoginRateLimiter(),
       logger: {
         error: (message) => logs.push({ level: "error", message }),
         info: (message) => logs.push({ level: "info", message }),
@@ -161,49 +155,47 @@ function handlerOf(harness: Harness, kind: "exact" | "prefix", path: string): Ht
   return route.handler;
 }
 
-function loginReq(body: string, remoteAddress = "127.0.0.1"): IncomingMessage {
-  return {
-    method: "POST",
-    url: "/auth/login",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    socket: { remoteAddress },
-    *[Symbol.asyncIterator](): Generator<Buffer> {
-      yield Buffer.from(body);
-    },
-  } as unknown as IncomingMessage;
-}
-
-describe("POST /auth/login: disabled and next", () => {
-  it("still verifies the real hash for disabled users before rejecting", async () => {
+describe("GET /auth/status", () => {
+  it("reports true with a valid session cookie only", async () => {
     const harness = makeHarness();
-    harness.setUsers(new Map([["alice", { passwordHash: "h-alice", disabled: true }]]));
+    registerPasswordEndpoints(harness.deps);
+    const store = harness.deps.sessions()!;
+    const { token } = await store.create("alice", 60_000);
+    const res = makeRes();
+    await handlerOf(
+      harness,
+      "exact",
+      "/auth/status",
+    )(makeReq({ method: "GET", url: "/auth/status", cookie: `dsh_auth=${token}` }), res.res);
+    expect(res.status).toBe(200);
+    expect(res.body).toBe('{"authenticated":true,"logoutOrder":1000}');
+  });
+
+  it("echoes the configured logoutOrder for the client logout CTA", async () => {
+    const harness = makeHarness({ logoutOrder: 777 });
     registerPasswordEndpoints(harness.deps);
     const res = makeRes();
     await handlerOf(
       harness,
       "exact",
-      "/auth/login",
-    )(loginReq("username=alice&password=pw"), res.res);
-    expect(res.status).toBe(401);
-    expect(harness.verifyCalls).toEqual([{ storedHash: "h-alice", password: "pw" }]);
+      "/auth/status",
+    )(makeReq({ method: "GET", url: "/auth/status" }), res.res);
+    expect(res.status).toBe(200);
+    expect(res.body).toBe('{"authenticated":false,"logoutOrder":777}');
   });
 
-  it("validates next: //evil.com and /auth/* fall back to /", async () => {
+  it("ignores a Bearer header (cookie only)", async () => {
     const harness = makeHarness();
     registerPasswordEndpoints(harness.deps);
-    for (const [next, expected] of [
-      ["//evil.com", "/"],
-      ["/ok/path", "/ok/path"],
-      ["/auth/login", "/"],
-      ["/auth/x", "/"],
-    ] as const) {
-      const res = makeRes();
-      await handlerOf(
-        harness,
-        "exact",
-        "/auth/login",
-      )(loginReq(`username=alice&password=pw&next=${encodeURIComponent(next)}`), res.res);
-      expect(res.headers["location"]).toBe(expected);
-    }
+    const res = makeRes();
+    await handlerOf(
+      harness,
+      "exact",
+      "/auth/status",
+    )(
+      makeReq({ method: "GET", url: "/auth/status", authorization: "Bearer some-session-token" }),
+      res.res,
+    );
+    expect(res.body).toBe('{"authenticated":false,"logoutOrder":1000}');
   });
 });

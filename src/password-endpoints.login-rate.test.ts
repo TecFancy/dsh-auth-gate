@@ -97,6 +97,7 @@ function makeHarness(): Harness {
       cookieName: "dsh_auth",
       cookieSecure: false,
       sessionTtl: 604800,
+      logoutOrder: 1000,
       usersPath: "/tmp/users.yaml",
       loadUsers: () => {
         if (loadError !== undefined) return Promise.reject(loadError);

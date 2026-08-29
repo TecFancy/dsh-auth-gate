@@ -96,14 +96,15 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
     cookieSecure: true # keep true when you use https
 ```
 
-| Option         | Default            | What it does                                                                       |
-| -------------- | ------------------ | ---------------------------------------------------------------------------------- |
-| `mode`         | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret              |
-| `sessionTtl`   | `604800`           | How long a login lasts (seconds) before you must sign in again                     |
-| `cookieName`   | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                 |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                |
-| `cookieSecure` | `true`             | Set to `false` only if you are testing over plain http                             |
-| `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml` |
+| Option         | Default            | What it does                                                                                                                                |
+| -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`         | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                       |
+| `sessionTtl`   | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                              |
+| `cookieName`   | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                          |
+| `tokenRef`     | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                         |
+| `cookieSecure` | `true`             | Set to `false` only if you are testing over plain http                                                                                      |
+| `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                          |
+| `logoutOrder`  | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order |
 
 ## Troubleshooting
 

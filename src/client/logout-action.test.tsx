@@ -54,9 +54,28 @@ function makeApplyHarness() {
 }
 
 describe("apply", () => {
-  it("registers zh/en logout dicts and adds the CTA to the settings General item slot", () => {
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    fetchMock.mockReset();
+  });
+
+  /** 通用 status 探针响应：默认 logoutOrder 1000（与 host Config 一致，不触发重注册）。 */
+  function defaultStatus(): unknown {
+    return { json: () => Promise.resolve({ authenticated: false, logoutOrder: 1000 }) };
+  }
+
+  it("registers zh/en logout dicts and adds the CTA to the settings General item slot", async () => {
+    fetchMock.mockResolvedValue(defaultStatus());
     const h = makeApplyHarness();
     apply(h.ctx);
+    for (const [, callback] of h.injectCalls) callback();
+    await flushMicrotasks();
     expect(h.localeRegisters).toEqual([
       ["auth", "zh", { logout: "退出登录" }],
       ["auth", "en", { logout: "Sign out" }],
@@ -65,7 +84,7 @@ describe("apply", () => {
       "settings.general.item",
     ]);
     const register = h.slots.register as ReturnType<typeof vi.fn>;
-    for (const [, callback] of h.injectCalls) callback();
+    expect(register).toHaveBeenCalledTimes(1);
     const call = register.mock.calls[0] as unknown as [
       { name: string; id: string; locale: string; order: number; label: unknown },
       unknown,
@@ -74,10 +93,49 @@ describe("apply", () => {
     expect(opts.name).toBe("settings.general.item");
     expect(opts.id).toBe("dsh-auth-gate-logout");
     expect(opts.locale).toBe("auth");
-    expect(opts.order).toBe(30);
+    expect(opts.order).toBe(1000);
     expect(typeof opts.label).toBe("function");
     expect((opts.label as () => string)()).toBe("Sign out");
     expect(component).toBe(SettingsLogoutAction);
+  });
+
+  it("re-registers the CTA with the host-configured logoutOrder when it differs from the default", async () => {
+    fetchMock.mockResolvedValue({
+      json: () => Promise.resolve({ authenticated: true, logoutOrder: 5000 }),
+    });
+    const h = makeApplyHarness();
+    apply(h.ctx);
+    for (const [, callback] of h.injectCalls) callback();
+    const register = h.slots.register as ReturnType<typeof vi.fn>;
+    await flushMicrotasks();
+    expect(register).toHaveBeenCalledTimes(2);
+    const first = register.mock.calls[0]![0] as { order: number };
+    const second = register.mock.calls[1]![0] as { order: number };
+    expect(first.order).toBe(1000);
+    expect(second.order).toBe(5000);
+  });
+
+  it("keeps a single default-order registration when the status probe fails", async () => {
+    fetchMock.mockRejectedValue(new Error("network"));
+    const h = makeApplyHarness();
+    apply(h.ctx);
+    for (const [, callback] of h.injectCalls) callback();
+    const register = h.slots.register as ReturnType<typeof vi.fn>;
+    await flushMicrotasks();
+    expect(register).toHaveBeenCalledTimes(1);
+    expect((register.mock.calls[0]![0] as { order: number }).order).toBe(1000);
+  });
+
+  it("keeps a single default-order registration when the probe returns a non-numeric order", async () => {
+    fetchMock.mockResolvedValue({
+      json: () => Promise.resolve({ authenticated: true, logoutOrder: "late" }),
+    });
+    const h = makeApplyHarness();
+    apply(h.ctx);
+    for (const [, callback] of h.injectCalls) callback();
+    const register = h.slots.register as ReturnType<typeof vi.fn>;
+    await flushMicrotasks();
+    expect(register).toHaveBeenCalledTimes(1);
   });
 });
 

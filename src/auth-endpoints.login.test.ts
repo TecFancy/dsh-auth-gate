@@ -103,7 +103,11 @@ interface Harness {
   setStore(value: SessionStore | undefined): void;
 }
 
-function makeHarness(options?: { sessionTtl?: number; cookieSecure?: boolean }): Harness {
+function makeHarness(options?: {
+  sessionTtl?: number;
+  cookieSecure?: boolean;
+  logoutOrder?: number;
+}): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
   const logs: Harness["logs"] = [];
@@ -128,6 +132,7 @@ function makeHarness(options?: { sessionTtl?: number; cookieSecure?: boolean }):
       cookieName: "dsh_auth",
       cookieSecure: options?.cookieSecure ?? true,
       sessionTtl: options?.sessionTtl ?? 604800,
+      logoutOrder: options?.logoutOrder ?? 1000,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: (message) => logs.push({ level: "error", message }),

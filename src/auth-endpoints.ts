@@ -14,6 +14,8 @@ export interface AuthEndpointsDeps {
   cookieName: string;
   cookieSecure: boolean;
   sessionTtl: number; // 秒
+  /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
+  logoutOrder: number;
   validateToken: (token: string) => Promise<boolean>; // 恒时校验（index.ts 注入 safeEqual 闭包）
   logger: { error(message: unknown): void; info(message: unknown): void };
 }
@@ -167,7 +169,7 @@ function handleStatus(deps: AuthEndpointsDeps, req: IncomingMessage, res: Server
     store.getByToken(token) !== undefined;
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ authenticated }));
+  res.end(JSON.stringify({ authenticated, logoutOrder: deps.logoutOrder }));
 }
 
 function queryOf(req: IncomingMessage): URLSearchParams {

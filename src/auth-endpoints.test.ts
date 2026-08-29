@@ -103,7 +103,11 @@ interface Harness {
   setStore(value: SessionStore | undefined): void;
 }
 
-function makeHarness(options?: { sessionTtl?: number; cookieSecure?: boolean }): Harness {
+function makeHarness(options?: {
+  sessionTtl?: number;
+  cookieSecure?: boolean;
+  logoutOrder?: number;
+}): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
   const logs: Harness["logs"] = [];
@@ -128,6 +132,7 @@ function makeHarness(options?: { sessionTtl?: number; cookieSecure?: boolean }):
       cookieName: "dsh_auth",
       cookieSecure: options?.cookieSecure ?? true,
       sessionTtl: options?.sessionTtl ?? 604800,
+      logoutOrder: options?.logoutOrder ?? 1000,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: (message) => logs.push({ level: "error", message }),
@@ -230,34 +235,5 @@ describe("POST /auth/logout", () => {
     await handlerOf(harness, "exact", "/auth/logout")(makeReq({ method: "POST" }), res.res);
     expect(res.status).toBe(302);
     expect(res.headers["location"]).toBe("/");
-  });
-});
-
-describe("GET /auth/status", () => {
-  it("reports authentication from the session cookie only", async () => {
-    const harness = makeHarness();
-    registerAuthEndpoints(harness.deps);
-    const issued = await harness.sessions()!.create("token", 60_000);
-
-    const authed = makeRes();
-    await handlerOf(
-      harness,
-      "exact",
-      "/auth/status",
-    )(makeReq({ cookie: `dsh_auth=${issued.token}` }), authed.res);
-    expect(authed.status).toBe(200);
-    expect(authed.body).toBe('{"authenticated":true}');
-
-    const anonymous = makeRes();
-    await handlerOf(harness, "exact", "/auth/status")(makeReq({}), anonymous.res);
-    expect(anonymous.body).toBe('{"authenticated":false}');
-
-    const bearerOnly = makeRes();
-    await handlerOf(
-      harness,
-      "exact",
-      "/auth/status",
-    )(makeReq({ authorization: "Bearer good-token" }), bearerOnly.res);
-    expect(bearerOnly.body).toBe('{"authenticated":false}');
   });
 });

@@ -7,6 +7,8 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
         path: string;
         handler: HttpHandler;
     }): () => void;
+    /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
+    logoutOrder: number;
 }
 /**
  * 注册 prefix `/auth` 兜底 + 三个 exact 端点（password 模式，P16）。返回合并 disposer。

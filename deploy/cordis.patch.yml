@@ -24,3 +24,4 @@
     # usersFile: ""          # 默认 $DSH_HOME/auth/users.yaml
     # sessionTtl: 604800     # 秒，自创建起固定过期
     # cookieName: dsh_auth
+    # logoutOrder: 1000      # 退出按钮在设置→通用设置的槽位顺序，越大越靠底

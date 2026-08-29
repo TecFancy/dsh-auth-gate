@@ -59,6 +59,7 @@ function makeDeps(): PasswordEndpointsDeps {
     cookieName: "dsh_auth",
     cookieSecure: false,
     sessionTtl: 604800,
+    logoutOrder: 1000,
     usersPath: "/tmp/users.yaml",
     loadUsers: () =>
       Promise.resolve({

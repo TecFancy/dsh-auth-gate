@@ -12,6 +12,8 @@ export interface AuthEndpointsDeps {
     cookieName: string;
     cookieSecure: boolean;
     sessionTtl: number;
+    /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
+    logoutOrder: number;
     validateToken: (token: string) => Promise<boolean>;
     logger: {
         error(message: unknown): void;

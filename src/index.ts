@@ -31,6 +31,12 @@ export interface AuthConfig {
   cookieSecure: boolean;
   /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
   usersFile: string;
+  /**
+   * 「退出登录」按钮在设置 → 通用设置 页的槽位 order（升序渲染，越大越靠底部）。
+   * 默认 1000 已大于 dsh 自带条目（-25~20）与绝大多数第三方插件；如确有插件
+   * 注册更大的 order，可在此显式调大。经 `/auth/status` 透传给 client 半边。
+   */
+  logoutOrder: number;
 }
 
 export const Config: z<AuthConfig> = z.object({
@@ -44,6 +50,7 @@ export const Config: z<AuthConfig> = z.object({
     .default("DSH_AUTH_TOKEN"),
   cookieSecure: z.boolean().default(true),
   usersFile: z.string().default(""),
+  logoutOrder: z.natural().max(10000).default(1000),
 });
 
 /** 本插件提供的 auth 服务：门（可换流/测试注入）+ 会话层。 */
@@ -170,6 +177,7 @@ function mountAuthEndpoints(
         loadUsers: () => loadUsersFile(usersPath),
         verify: verifyPassword,
         limiter,
+        logoutOrder: config.logoutOrder,
         logger: log,
       })
     : registerAuthEndpoints({
@@ -178,6 +186,7 @@ function mountAuthEndpoints(
         cookieName: config.cookieName,
         cookieSecure: config.cookieSecure,
         sessionTtl: config.sessionTtl,
+        logoutOrder: config.logoutOrder,
         validateToken: async (token) => {
           const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
           return stored !== undefined && safeEqual(token, stored);

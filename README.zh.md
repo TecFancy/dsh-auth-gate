@@ -87,14 +87,15 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
     cookieSecure: true # 使用 https 时保持 true
 ```
 
-| 选项           | 默认值             | 作用                                                         |
-| -------------- | ------------------ | ------------------------------------------------------------ |
-| `mode`         | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密      |
-| `sessionTtl`   | `604800`           | 一次登录持续多久（秒），到期需重新登录                       |
-| `cookieName`   | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                             |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                       |
-| `cookieSecure` | `true`             | 只在纯 http 测试环境设为 `false`                             |
-| `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml` |
+| 选项           | 默认值             | 作用                                                                                                      |
+| -------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
+| `mode`         | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                   |
+| `sessionTtl`   | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                    |
+| `cookieName`   | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                          |
+| `tokenRef`     | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                    |
+| `cookieSecure` | `true`             | 只在纯 http 测试环境设为 `false`                                                                          |
+| `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                              |
+| `logoutOrder`  | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值 |
 
 ## 故障排查
 
