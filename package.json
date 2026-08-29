@@ -74,6 +74,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "lock:check": "node scripts/check-lockfile-registry.mjs",
+    "gates": "node scripts/run-gates.mjs",
     "verify": "npm run format:check && npm run lint && npm run type-check && npm run test:coverage && npm run lock:check",
     "prepack": "npm run build",
     "prepare": "node -e \"try { require.resolve('husky') } catch { process.exit(0) } require('node:child_process').execSync('husky', { stdio: 'inherit' })\""

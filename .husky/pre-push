@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# Pre-push: run the full type-check so push-blocking type errors surface
-# locally instead of in CI. Pre-commit stays cheap (lint-staged only); the
-# slower full project check moves here, where it runs at most once per push
-# and benefits from tsbuildinfo caching after the first run.
-npm run type-check
+# Pre-push: scenario gate run. `run-gates.mjs` auto-detects the change
+# surface against the upstream ref and runs the minimal evidence set — the
+# full suite stays CI's job, this stays fast enough to actually run every
+# push. Falls back to HEAD when there is no upstream yet.
+npm run gates -- --base @{u}

@@ -8,12 +8,15 @@ on:
   pull_request:
 
 jobs:
-  check:
+  # Static/hygiene gates: fast, no build needed. Parallel purpose per job
+  # (M3): failures surface in the owning job instead of a monolithic run.
+  hygiene:
+    name: hygiene (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,8 +27,38 @@ jobs:
       - run: npm run lock:check
       - run: npm run format:check
       - run: npm run lint
+
+  quality:
+    name: quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm run type-check
       - run: npm run test:coverage
+
+  build:
+    name: build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - run: npm run build
       - name: Verify committed lib/ matches a fresh build
         run: git diff --exit-code -- lib

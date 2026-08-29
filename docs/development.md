@@ -7,16 +7,17 @@ through one command.
 
 ## Commands
 
-| Task        | Command                                                                       |
-| ----------- | ----------------------------------------------------------------------------- |
-| Type-check  | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                        |
-| Lint        | `npm run lint` (flat ESLint, type-checked)                                    |
-| Format      | `npm run format` / `npm run format:check`                                     |
-| Tests       | `npm run test` (Vitest, `vitest run`)                                         |
-| Watch tests | `npm run test:watch`                                                          |
-| Coverage    | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)         |
-| Build       | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps) |
-| Full gate   | `npm run verify` (format:check + lint + type-check + test:coverage)           |
+| Task           | Command                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------- |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                  |
+| Lint           | `npm run lint` (flat ESLint, type-checked)                                                              |
+| Format         | `npm run format` / `npm run format:check`                                                               |
+| Tests          | `npm run test` (Vitest, `vitest run`)                                                                   |
+| Watch tests    | `npm run test:watch`                                                                                    |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                   |
+| Build          | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps)                           |
+| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                   |
+| Full gate      | `npm run verify` (format:check + lint + type-check + test:coverage; full set - CI, not every local run) |
 
 Run a single test file: `npm run test -- src/guard.test.ts`
 Run tests by name: `npm run test -- -t "guard"`
@@ -26,7 +27,9 @@ Run tests by name: `npm run test -- -t "guard"`
 - `pre-commit`: lint-staged (Prettier + `eslint --fix` on staged files).
 - `commit-msg`: commitlint — Conventional Commits, pinned type set
   (`feat/fix/docs/style/refactor/perf/test/build/ci/chore/revert`).
-- `pre-push`: full `npm run type-check` — type errors surface locally, not in CI.
+- `pre-push`: `npm run gates -- --base @{u}` — picks the minimal evidence set
+  for the change surface (unpushed commits + uncommitted changes); full
+  coverage is CI's job.
 
 ## Structure
 
