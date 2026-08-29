@@ -1,7 +1,7 @@
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main, type CliIo } from "./cli.js";
 import { verifyPassword } from "./password.js";
 import { loadUsersFile } from "./users-file.js";
@@ -197,6 +197,54 @@ describe("dsh-auth arg handling", () => {
   it("fails when --file has no value", async () => {
     const { io, err } = makeIo();
     const code = await main(["user", "list", "--file"], io);
+    expect(code).toBe(1);
+    expect(err.join("\n")).toContain("Usage:");
+  });
+});
+
+describe("dsh-auth skill install", () => {
+  let dir: string;
+
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-cli-skill-"));
+    // 隔离目标：userSkillDir 读 DSH_HOME；源从包内 .agents/skills 读（仓库根存在）。
+    vi.stubEnv("DSH_HOME", dir);
+  });
+
+  afterEach(async () => {
+    vi.unstubAllEnvs();
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  it("installs the bundled config skill into $DSH_HOME/skills", async () => {
+    const { io, out, err } = makeIo();
+    const code = await main(["skill", "install"], io);
+    expect(code).toBe(0);
+    expect(err).toEqual([]);
+    expect(out.join("\n")).toContain(
+      `installed to ${path.join(dir, "skills", "dsh-auth-gate-config")}`,
+    );
+    await expect(
+      fs.readFile(path.join(dir, "skills", "dsh-auth-gate-config", "SKILL.md"), "utf8"),
+    ).resolves.toContain("dsh-auth-gate 配置速查");
+  });
+
+  it("reports up-to-date on a second run and updates with --force", async () => {
+    await main(["skill", "install"], makeIo().io);
+    const second = makeIo();
+    const code = await main(["skill", "install"], second.io);
+    expect(code).toBe(0);
+    expect(second.out.join("\n")).toContain("already installed");
+
+    const forced = makeIo();
+    const forcedCode = await main(["skill", "install", "--force"], forced.io);
+    expect(forcedCode).toBe(0);
+    expect(forced.out.join("\n")).toContain("installed to");
+  });
+
+  it("prints usage for unknown skill commands", async () => {
+    const { io, err } = makeIo();
+    const code = await main(["skill", "explode"], io);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("Usage:");
   });

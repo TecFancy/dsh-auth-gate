@@ -97,6 +97,18 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
 | `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                              |
 | `logoutOrder`  | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值 |
 
+## 内置配置技能
+
+本包随附一份配置速查技能（`.agents/skills/dsh-auth-gate-config/`，即本页内容）。
+把它安装到用户级技能目录后，部署侧的 dsh agent 就能直接回答「auth-gate 支持哪些配置」：
+
+```sh
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]
+```
+
+该命令把技能复制到 `$DSH_HOME/skills/dsh-auth-gate-config/`，dsh 技能发现机制会自动
+加载。重复执行不带 `--force` 会保留你对技能的本地修改；`--force` 从包内刷新。
+
 ## 故障排查
 
 ### `dsh-auth: command not found`

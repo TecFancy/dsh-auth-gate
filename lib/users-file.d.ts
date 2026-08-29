@@ -17,6 +17,8 @@ export interface UsersLoadResult {
 /** users 文件不可用（语法/schema/权限）。message 面向操作员，可落日志。 */
 export declare class UsersFileError extends Error {
 }
+/** P6：DSH_HOME env → `~/.dsh` 兜底。CLI 与插件共享。 */
+export declare function dshHomeDir(): string;
 /** P6：DSH_HOME env → `~/.dsh` 兜底，拼 `auth/users.yaml`。CLI 与插件共享。 */
 export declare function defaultUsersFilePath(): string;
 /** 每次登录现读（P7）。ENOENT → `{ snapshot: 空, missing: true }`（不抛）。 */

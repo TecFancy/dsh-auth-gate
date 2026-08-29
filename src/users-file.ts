@@ -42,10 +42,14 @@ const usersFileSchema = z
   })
   .strict();
 
+/** P6：DSH_HOME env → `~/.dsh` 兜底。CLI 与插件共享。 */
+export function dshHomeDir(): string {
+  return process.env["DSH_HOME"] ?? path.join(os.homedir(), ".dsh");
+}
+
 /** P6：DSH_HOME env → `~/.dsh` 兜底，拼 `auth/users.yaml`。CLI 与插件共享。 */
 export function defaultUsersFilePath(): string {
-  const home = process.env["DSH_HOME"] ?? path.join(os.homedir(), ".dsh");
-  return path.join(home, "auth", "users.yaml");
+  return path.join(dshHomeDir(), "auth", "users.yaml");
 }
 
 /** 每次登录现读（P7）。ENOENT → `{ snapshot: 空, missing: true }`（不抛）。 */

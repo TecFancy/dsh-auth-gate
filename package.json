@@ -53,6 +53,7 @@
     "lib",
     "deploy",
     "docs/demo",
+    ".agents/skills",
     "cordis.patch.yml"
   ],
   "sideEffects": false,

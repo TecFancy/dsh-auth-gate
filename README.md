@@ -106,6 +106,22 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
 | `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                          |
 | `logoutOrder`  | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order |
 
+## Bundled configuration skill
+
+The package ships a configuration quick-reference skill at
+`.agents/skills/dsh-auth-gate-config/` (this page). Install it into the
+user-level dsh skill root so agents on the deployment side can answer
+"what configuration does auth-gate support?" directly:
+
+```sh
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]
+```
+
+It copies the skill to `$DSH_HOME/skills/dsh-auth-gate-config/`, which
+dsh's skill discovery picks up automatically. Re-running without
+`--force` keeps any local edits to the skill; use `--force` to refresh it
+from the package.
+
 ## Troubleshooting
 
 ### `dsh-auth: command not found`

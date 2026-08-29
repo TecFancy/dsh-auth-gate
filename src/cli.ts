@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { hashPassword } from "./password.js";
+import { bundledSkillDir, installSkill, userSkillDir, SKILL_NAME } from "./skill-install.js";
 import {
   compareNames,
   defaultUsersFilePath,
@@ -23,7 +24,8 @@ export interface CliIo {
 const USAGE = `Usage:
   dsh-auth user add <name> --password-stdin [--disabled] [--file <path>]
   dsh-auth user list [--file <path>]
-  dsh-auth user disable <name> [--file <path>]`;
+  dsh-auth user disable <name> [--file <path>]
+  dsh-auth skill install [--force]`;
 
 const defaultIo: CliIo = {
   out: (line) => process.stdout.write(`${line}\n`),
@@ -46,6 +48,12 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
   }
   const tokens = argv.filter((token) => token !== "--file");
   const sub = tokens[0];
+  if (sub === "skill") {
+    const command = tokens[1];
+    if (command === "install") return installSkillCommand(io, argv.includes("--force"));
+    io.err(USAGE);
+    return 1;
+  }
   if (sub !== "user") {
     io.err(USAGE);
     return 1;
@@ -119,6 +127,22 @@ async function listUsers(file: string, io: CliIo): Promise<number> {
     const user = snapshot.users.get(name);
     io.out(user?.disabled === true ? `${name} (disabled)` : name);
   }
+  return 0;
+}
+
+/** `dsh-auth skill install [--force]`：把包内配置速查技能装到 $DSH_HOME/skills/。 */
+async function installSkillCommand(io: CliIo, force: boolean): Promise<number> {
+  const target = userSkillDir();
+  const result = await installSkill({ sourceDir: bundledSkillDir(), targetDir: target, force });
+  if (result.status === "source-missing") {
+    io.err("bundled skill not found (package layout changed?)");
+    return 1;
+  }
+  if (result.status === "up-to-date") {
+    io.out(`skill ${SKILL_NAME} already installed at ${target} (use --force to update)`);
+    return 0;
+  }
+  io.out(`skill ${SKILL_NAME} installed to ${target}`);
   return 0;
 }
 
