@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.10.0...v0.11.0) (2026-08-30)
+
+
+### Features
+
+* M4 TOTP two-stage login (RFC 6238 + challenge cookie + replay guard + user totp CLI) ([#60](https://github.com/TecFancy/dsh-auth-gate/issues/60)) ([320cdd0](https://github.com/TecFancy/dsh-auth-gate/commit/320cdd01941945e1b7398d7ddb43597603af550d))
+
 ## [0.10.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.9.1...v0.10.0) (2026-08-30)
 
 
