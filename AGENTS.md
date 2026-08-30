@@ -44,6 +44,10 @@ tables).
   `docs/development.md` "Releases").
 - Never commit or push to `main` directly unless the user says otherwise —
   always work on `development`.
+- Merging promotion PRs (head = `development`): **never** pass
+  `--delete-branch` — it deletes the remote `development` branch (recreate it
+  immediately with `git push origin development` if it happens anyway). See
+  `docs/development.md` "Branch hygiene".
 
 ## Commit conventions
 

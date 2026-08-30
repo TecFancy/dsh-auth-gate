@@ -191,6 +191,27 @@ merge commit and each PR contributes exactly one changelog entry.
 `docs:`/`chore:`/`ci:`/`test:` commits do not trigger a release. 0.x
 semantics: `fix:` → 0.0.x, `feat:` → 0.x.0.
 
+## Branch hygiene
+
+Two mistakes from 2026-08-30 promotion runs that cost a fix cycle — both are
+now documented so nobody re-learns them:
+
+- **`--delete-branch` on a promotion PR deletes remote `development`.** When
+  the PR's head branch is `development` (the normal development→main path),
+  `gh pr merge <n> --squash --delete-branch` deletes the remote
+  `development` branch after merging. Consequences: the next
+  `git push origin development` prints `[new branch]`, and any fetch/pull of
+  `development` fails with `couldn't find remote ref development`. → Never
+  pass `--delete-branch` on promotion PRs; merge with plain
+  `gh pr merge <n> --squash`. If it happens anyway, recreate immediately:
+  `git push origin development` (local branch history is intact).
+- **A commit can land on local `main` by accident** (e.g. you are on `main`
+  without noticing). `main` only receives squash merges, so move the commit
+  back and reset the local pointer:
+  `git checkout development && git cherry-pick <sha> && git branch -f main origin/main`.
+  The stale commit stays in the reflog; `origin/main` is untouched until you
+  push — never push `main` while it deviates.
+
 ## Dependency notes
 
 - **Registry discipline**: `package-lock.json` is generated strictly against
