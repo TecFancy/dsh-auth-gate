@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.9.1...v0.10.0) (2026-08-30)
+
+
+### Features
+
+* configurable logout CTA order + bundled configuration skill ([#54](https://github.com/TecFancy/dsh-auth-gate/issues/54)) ([786c9c0](https://github.com/TecFancy/dsh-auth-gate/commit/786c9c0da1b25f51f10a7a593ff9739839eda1b3))
+
 ## [0.9.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.9.0...v0.9.1) (2026-08-26)
 
 
