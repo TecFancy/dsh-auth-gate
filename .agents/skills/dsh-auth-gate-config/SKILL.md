@@ -1,6 +1,9 @@
 ---
 name: dsh-auth-gate-config
 description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder), how to configure them, the dsh-auth CLI, login trouble, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`.
+# 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
+# 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
+disable-model-invocation: true
 ---
 
 # dsh-auth-gate 配置速查

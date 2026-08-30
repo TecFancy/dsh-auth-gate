@@ -109,6 +109,11 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 该命令把技能复制到 `$DSH_HOME/skills/dsh-auth-gate-config/`，dsh 技能发现机制会自动
 加载。重复执行不带 `--force` 会保留你对技能的本地修改；`--force` 从包内刷新。
 
+该技能是**仅用户可用技能**（frontmatter 里 `disable-model-invocation: true`）：
+它不会出现在模型的可自动调用技能目录中（不常驻每一轮 agent 上下文），需要查配置时
+在技能面板显式打开即可（UI 会标记 `user-only`）。若希望 agent 自动回答配置问题，
+安装后移除该 frontmatter 字段即可。
+
 ## 故障排查
 
 ### `dsh-auth: command not found`

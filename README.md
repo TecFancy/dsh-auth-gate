@@ -122,6 +122,13 @@ dsh's skill discovery picks up automatically. Re-running without
 `--force` keeps any local edits to the skill; use `--force` to refresh it
 from the package.
 
+The skill is a **user-only skill** (`disable-model-invocation: true` in its
+frontmatter): it stays out of the model's auto-invocable skill catalog so it
+does not sit in every agent turn, and you open it explicitly from the skill
+panel whenever you need the config reference (the UI marks it `user-only`).
+If you prefer the agent to answer configuration questions automatically,
+remove that frontmatter field after installation.
+
 ## Troubleshooting
 
 ### `dsh-auth: command not found`
