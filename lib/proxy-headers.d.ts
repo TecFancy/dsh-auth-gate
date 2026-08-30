@@ -28,6 +28,12 @@ export declare function filterRequestHeaders(headers: Record<string, string | st
 /** 过滤响应头：去掉 hop-by-hop；Set-Cookie 按需去掉 `Secure`。 */
 export declare function filterResponseHeaders(headers: Record<string, string | string[] | undefined>, stripSecureCookie: boolean): Record<string, string | string[] | undefined>;
 /**
+ * 升级响应的头过滤：`upgrade`/`connection` 是 101 协商的必要部分，必须保留；
+ * 其余 hop-by-hop 头（transfer-encoding 等）仍剔除，Set-Cookie 适配同
+ * {@link filterResponseHeaders}。
+ */
+export declare function filterUpgradeResponseHeaders(headers: Record<string, string | string[] | undefined>, stripSecureCookie: boolean): Record<string, string | string[] | undefined>;
+/**
  * 去掉 Set-Cookie 值里的 `Secure` 属性（仅回环一跳，用于明文 http 浏览器的
  * Safari 兜底；HttpOnly/SameSite/Path/Max-Age 原样保留）。
  */

@@ -4,6 +4,7 @@ import {
   bearerOf,
   filterRequestHeaders,
   filterResponseHeaders,
+  filterUpgradeResponseHeaders,
   isLoopbackHostname,
   parseListen,
   rewriteSetCookie,
@@ -113,5 +114,20 @@ describe("rewriteSetCookie / filterResponseHeaders", () => {
       true,
     );
     expect(out).toEqual({ age: "1" });
+  });
+});
+
+describe("filterUpgradeResponseHeaders", () => {
+  it("keeps upgrade and connection but still drops other hop-by-hop headers", () => {
+    const out = filterUpgradeResponseHeaders(
+      { upgrade: "websocket", connection: "Upgrade", "transfer-encoding": "chunked", age: "1" },
+      false,
+    );
+    expect(out).toEqual({ upgrade: "websocket", connection: "Upgrade", age: "1" });
+  });
+
+  it("adapts set-cookie like filterResponseHeaders", () => {
+    const out = filterUpgradeResponseHeaders({ "set-cookie": ["a=1; Secure; HttpOnly"] }, true);
+    expect(out["set-cookie"]).toEqual(["a=1; HttpOnly"]);
   });
 });

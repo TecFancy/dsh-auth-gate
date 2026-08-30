@@ -111,8 +111,8 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 
 该技能是**仅用户可用技能**（frontmatter 里 `disable-model-invocation: true`）：
 它不会出现在模型的可自动调用技能目录中（不常驻每一轮 agent 上下文），需要查配置时
-在技能面板显式打开即可（UI 会标记 `user-only`）。若希望 agent 自动回答配置问题，
-安装后移除该 frontmatter 字段即可。
+在技能面板显式打开即可（输入框 `/` 菜单里标记 `仅用户`）。若希望 agent 自动回答配置
+问题，安装后移除该 frontmatter 字段即可。
 
 ## 故障排查
 
@@ -161,6 +161,13 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 - [docs/deployment_zh.md](docs/deployment_zh.md) —— 运维清单、验收步骤（A–I）与故障诊断。
 
 ## 认证本地代理（可选，dsh-auth-proxy)
+
+> ⚠️ **已知限制（重要，任何 auth-gate 版本都不改变）**：dsh 的设置页（"设置 → 模型"等）
+> 只允许在**页面 origin 为回环**（`localhost`/`127.x`）时编辑。这是 dsh 客户端
+> （`isLoopback` 检查）的设计边界，与认证正交——**域名页面打开设置弹框会显示
+> "settings are unavailable in this browser"，无法编辑提供方/凭据，升级 dsh-auth-gate
+> 也无法改变**。要编辑配置，请用本节的本地代理，或直接在服务器上访问
+> `http://127.0.0.1:3080`。域名页面的聊天与模型选择不受影响。
 
 > 半外壳解决服务端 `/api` 栅栏后，dsh **客户端**还要求"页面 origin 必须回环"：域名页面下
 > 设置页报 "settings are unavailable in this browser"（与认证无关）。`dsh-auth-proxy`

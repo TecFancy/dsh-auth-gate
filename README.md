@@ -170,6 +170,47 @@ Whichever way you call it, the CLI manages the same shared user list
 (`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
 reads — the global copy is just a launcher.
 
+## Troubleshooting
+
+### `dsh-auth: command not found`
+
+`dsh plugin --profile web add dsh-auth-gate` installs the package into the
+profile's `node_modules` (`$DSH_HOME/profiles/web/node_modules/dsh-auth-gate`,
+default `~/.dsh/...`), but nothing is added to your shell's `PATH`, so the CLI
+binary is not callable by name. This only affects the CLI — the plugin itself
+runs fine. Pick one:
+
+1. **Call it through the profile (recommended).** `dsh plugin` already requires
+   pnpm, so the CLI resolves from the same place the plugin lives:
+
+   ```sh
+   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user add admin --password-stdin
+   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user list
+   ```
+
+   Optionally, once per shell session:
+
+   ```sh
+   alias dsh-auth='pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth'
+   ```
+
+2. **Direct node invocation** (no pnpm needed at runtime):
+
+   ```sh
+   node "$DSH_HOME/profiles/web/node_modules/dsh-auth-gate/lib/cli.js" user add admin --password-stdin
+   ```
+
+3. **Install the package globally**, then `dsh-auth` is on your PATH:
+
+   ```sh
+   npm install -g dsh-auth-gate
+   dsh-auth user add admin --password-stdin
+   ```
+
+Whichever way you call it, the CLI manages the same shared user list
+(`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
+reads — the global copy is just a launcher.
+
 ## Deployment
 
 - [Reverse-proxy deployment guide](docs/reverse-proxy.md) — Caddy/nginx
@@ -179,6 +220,40 @@ reads — the global copy is just a launcher.
 - [`docs/deployment.md`](docs/deployment.md) — ops checklist, acceptance steps
   (A–I) and troubleshooting. Chinese version:
   [`docs/deployment_zh.md`](docs/deployment_zh.md).
+
+## Authenticated local proxy (optional, dsh-auth-proxy)
+
+> ⚠️ **Known limitation (unaffected by any auth-gate release)**: dsh's settings pages
+> ("Settings -> Models", etc.) are editable only when the page origin is loopback
+> (`localhost`/`127.x`). This is a dsh client-side boundary (`isLoopback`), orthogonal to
+> authentication — on a domain page the settings dialog reports
+> "settings are unavailable in this browser" and providers/credentials cannot be edited;
+> upgrading dsh-auth-gate does not change that. To edit configuration, use this local proxy,
+> or open `http://127.0.0.1:3080` on the server itself. Chatting and model selection on the
+> domain page are unaffected.
+
+> After the semi-shell fixed the server-side `/api` fence, dsh's **client** still requires
+> "page origin must be loopback"; the local proxy provides a loopback page entry on the user's
+> machine, composing with auth-gate for "remote config editing with authentication throughout",
+> without touching dsh sources. Full design: [docs/local-proxy.md](docs/local-proxy.md)
+> (Chinese: [docs/local-proxy_zh.md](docs/local-proxy_zh.md)).
+
+- Zero-dependency Node bin (`dsh-auth-proxy`): strictly bound to `127.0.0.1`, stateless
+  pass-through for pages/API, `events.mux`/`events.host` WebSocket tunneling, and a
+  `Set-Cookie` `Secure`-attribute adaption (Safari fallback).
+- Authentication reuses auth-gate (password and token modes): the login page and session
+  cookies pass through untouched.
+- **Security boundary (deny-list, Phase 2.1)**: combined with `--mark-proxy`, the server-side
+  guard answers `403` for marked requests hitting `host.pickDirectory`/`host.openPath`/
+  `settings.openDocument`/`llm.discoverModels`; unmarked traffic behaves exactly as if the
+  proxy were not deployed.
+
+```sh
+dsh-auth-proxy --listen 127.0.0.1:8443 --target https://your-domain.example --mark-proxy
+# Open http://127.0.0.1:8443 in the browser -> log in -> "Settings -> Models" is editable
+```
+
+systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 
 ## Requirements
 

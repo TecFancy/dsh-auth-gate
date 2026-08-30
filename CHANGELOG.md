@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.9.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.9.0...v0.9.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **proxy:** relay upgrade/connection headers on WebSocket handshake ([#50](https://github.com/TecFancy/dsh-auth-gate/issues/50)) ([d6790b7](https://github.com/TecFancy/dsh-auth-gate/commit/d6790b7d7c002f6477b89d29d07849ffb78ad621))
+
+## [0.9.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.8.0...v0.9.0) (2026-08-26)
+
+
+### Features
+
+* authenticated local proxy for the dsh configuration plane + X-Dsh-Proxy deny-list ([6a889c7](https://github.com/TecFancy/dsh-auth-gate/commit/6a889c710b203835bd99eedb09049a23aaf1220d))
+
+## [0.8.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.2...v0.8.0) (2026-08-25)
+
+
+### Features
+
+* **client:** move sign-out into the settings panel as a centered CTA ([#45](https://github.com/TecFancy/dsh-auth-gate/issues/45)) ([65e232b](https://github.com/TecFancy/dsh-auth-gate/commit/65e232b862ab58a2ad5ca0cfd7f10c9b5e27adb1))
+
 ## [0.7.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.7.1...v0.7.2) (2026-08-19)
 
 

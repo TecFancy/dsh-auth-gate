@@ -87,6 +87,28 @@ export function filterResponseHeaders(
 }
 
 /**
+ * 升级响应的头过滤：`upgrade`/`connection` 是 101 协商的必要部分，必须保留；
+ * 其余 hop-by-hop 头（transfer-encoding 等）仍剔除，Set-Cookie 适配同
+ * {@link filterResponseHeaders}。
+ */
+export function filterUpgradeResponseHeaders(
+  headers: Record<string, string | string[] | undefined>,
+  stripSecureCookie: boolean,
+): Record<string, string | string[] | undefined> {
+  const out: Record<string, string | string[] | undefined> = {};
+  for (const [name, value] of Object.entries(headers)) {
+    if (value === undefined) continue;
+    const lower = name.toLowerCase();
+    if (HOP_BY_HOP_HEADERS.has(lower) && lower !== "upgrade" && lower !== "connection") continue;
+    out[name] =
+      lower === "set-cookie" && stripSecureCookie
+        ? rewriteSetCookie([value].flat().filter((v): v is string => typeof v === "string"))
+        : value;
+  }
+  return out;
+}
+
+/**
  * 去掉 Set-Cookie 值里的 `Secure` 属性（仅回环一跳，用于明文 http 浏览器的
  * Safari 兜底；HttpOnly/SameSite/Path/Max-Age 原样保留）。
  */

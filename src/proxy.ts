@@ -22,6 +22,7 @@ import {
   bearerOf,
   filterRequestHeaders,
   filterResponseHeaders,
+  filterUpgradeResponseHeaders,
 } from "./proxy-headers.js";
 
 export interface ProxyOptions {
@@ -182,7 +183,7 @@ function forwardUpgrade(
     const statusLine = `HTTP/1.1 ${up.statusCode ?? 101} ${up.statusMessage ?? "Switching Protocols"}\r\n`;
     clientSocket.write(statusLine);
     for (const [name, value] of Object.entries(
-      filterResponseHeaders(up.headers, options.stripSecureCookie),
+      filterUpgradeResponseHeaders(up.headers, options.stripSecureCookie),
     )) {
       if (value === undefined) continue;
       clientSocket.write(`${name}: ${value instanceof Array ? value.join(", ") : value}\r\n`);
@@ -200,7 +201,7 @@ function forwardUpgrade(
     const statusLine = `HTTP/1.1 ${up.statusCode ?? 502} ${up.statusMessage ?? ""}\r\n`;
     clientSocket.write(statusLine);
     for (const [name, value] of Object.entries(
-      filterResponseHeaders(up.headers, options.stripSecureCookie),
+      filterUpgradeResponseHeaders(up.headers, options.stripSecureCookie),
     )) {
       if (value === undefined) continue;
       clientSocket.write(`${name}: ${value instanceof Array ? value.join(", ") : value}\r\n`);
