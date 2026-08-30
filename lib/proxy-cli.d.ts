@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { type ProxyOptions } from "./proxy.js";
+import { type ProxyOptions } from "./features/proxy/index.js";
 export interface CliIo {
     out(line: string): void;
     err(line: string): void;

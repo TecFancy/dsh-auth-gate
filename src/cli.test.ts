@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main, type CliIo } from "./cli.js";
-import { verifyPassword } from "./password.js";
-import { loadUsersFile } from "./users-file.js";
+import { verifyPassword } from "./features/password/index.js";
+import { loadUsersFile } from "./shared/index.js";
 
 function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];

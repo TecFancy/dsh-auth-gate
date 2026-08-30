@@ -9,7 +9,7 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { WrappableServer } from "./guard.js";
+import type { WrappableServer } from "./gate/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "./index.js";
 
 type RealServer = WrappableServer & { readonly port: number };

@@ -1,7 +1,7 @@
 import type { Context } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
-import type { Gate } from "./gate.js";
-import { SessionStore } from "./session-store.js";
+import { type Gate } from "./gate/index.js";
+import { SessionStore } from "./session/index.js";
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export declare const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
