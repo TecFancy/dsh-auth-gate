@@ -82,3 +82,13 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 注入复用 M3 既有模式。
 → [zh](decisions/implemented/2026-08-30-totp-slice-and-injection.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-slice-and-injection.en.md)
+
+## D10. TOTP 挑战 cookie 加 HMAC 签名（取代 D6 的「不签名」）
+
+挑战 cookie 值加第三段 MAC（HMAC-SHA256，进程级随机密钥，无新配置/依赖）：伪造 cookie
+不再能跳过密码阶段。D6 的其余决定（无状态、TTL 300s、SameSite=Lax）不变；代价是重启/
+插件重载后在途挑战失效（≤5 分钟，README 已写明）。**替代方案**：维持不签名只文档化；
+服务端 pending 挑战。**为什么**：「跳过密码」把 TOTP 从第二因素降成唯一因素，单门公网
+不可接受；进程级 HMAC 与内存限速/防重放同一寿命模型。
+→ [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
+[en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)

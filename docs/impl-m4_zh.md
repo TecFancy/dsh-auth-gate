@@ -1,5 +1,25 @@
 # dsh-auth M4 实施规格（executable spec）
 
+> ## 修订注记（0.11.1，2026-08-30）——TOTP 加固评审
+>
+> M4 之后的评审（Grok 4.6）发现已在本文档基础上闭环修复；下文正文是历史 M4 契约，按以下修订：
+>
+> - **T5 / §3.3**：挑战 cookie 现为 **HMAC 签名**（`<username>.<expiresEpochMs>.<mac>`，进程级密钥；
+>   MAC 无效视为「无挑战」）。见 ADR D10（取代 D6 的「不签名」）。
+> - **T4**：`off` 同时闸住提交路径与 GET 渲染（残留/伪造挑战 cookie 在 off 下失效）；
+>   提交路径拒绝 `user.disabled`（均在恒时验证之后检查，对齐密码路径）。
+> - **T7**：防重放按 `(用户, counter)` 键控——同窗口的不同验证码同样拒绝（一个窗口恰有一个合法码）。
+> - **T8**：`recordSuccess` 移至会话存储可用之后（503 保留失败桶）；`required` 无 secret 只计
+>   `recordFailure`（不重置失败桶）。
+> - **§3.4**：TOTP 失败返回 401 + 挑战页 HTML（error 槽位），不再是纯文本。
+> - **T10**：实际装配为同步 `verifyTotp: (secretB32, code, nowMs) => number | undefined`
+>   （返回匹配 counter）+ `replayCheck(username, counter, code)`；deps 增加
+>   `challengeMacKey: Uint8Array`。
+> - **T13**：`src/` 中三个复查点已留 `TODO(auth-m5):` 标记。
+> - **§3.3**：按**最后一个** `.` 切分（用户名可含 `.`，P5）。
+> - 新增文件：`src/features/password/challenge-cookie.ts`、
+>   `src/integration-totp-helpers.ts` / `src/integration.totp-hardening.test.ts`（集成加固套件）。
+
 > 读者：执行本规格的编码代理（预期 deepseek v4 flash，**新 session**）。本文档是**决策完备的可执行规格**：
 > 所有决策点均已预先关闭；执行者只做翻译，不做设计。
 > 基线：`docs/impl-m3_zh.md`（M3 已交付：users.yaml + scrypt + 限速 + `dsh-auth user` CLI——M4 在其上叠加）。

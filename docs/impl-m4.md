@@ -1,5 +1,29 @@
 # dsh-auth M4 Implementation Spec (executable spec)
 
+> ## Amendment (0.11.1, 2026-08-30) — TOTP hardening review
+>
+> Post-M4 security review (Grok 4.6) findings closed on top of this frozen spec; the body
+> below is the historical M4 contract, amended as follows:
+>
+> - **T5 / §3.3**: challenge cookie is now **HMAC-signed** (`<username>.<expiresEpochMs>.<mac>`,
+>   process-level key; invalid MAC = "no challenge"). See ADR D10 (replaces D6's "not signed").
+> - **T4**: `off` also gates the submit path and GET rendering (leftover/forged challenge
+>   cookies are inert under `off`); submit path rejects `user.disabled` (both checked after the
+>   constant-time verification, mirroring the password path).
+> - **T7**: replay guard keys on `(user, counter)` — a different code in the same window is
+>   also rejected (one window has exactly one valid code).
+> - **T8**: `recordSuccess` moves after session-store availability (503 keeps the failure
+>   bucket); `required` + no-secret failure records only `recordFailure` (no bucket reset).
+> - **§3.4**: TOTP failures respond 401 with the challenge-page HTML (error slot), not plain
+>   text.
+> - **T10**: actual assembly is synchronous `verifyTotp: (secretB32, code, nowMs) => number | undefined`
+>   (matched counter) plus `replayCheck(username, counter, code)`, and deps gain
+>   `challengeMacKey: Uint8Array`.
+> - **T13**: `TODO(auth-m5):` markers are present in `src/` at the three revisit points.
+> - **§3.3**: value is split on the **last** `.` (usernames may contain dots, P5).
+> - Files: `src/features/password/challenge-cookie.ts` (new), `src/integration-totp-helpers.ts` /
+>   `src/integration.totp-hardening.test.ts` (integration hardening suite).
+
 > Reader: the coding agent implementing this (expected deepseek v4 flash, **new session**). This document is a
 > **decision-complete spec**: all decision points are already closed; the executor only translates, it does not
 > design.
