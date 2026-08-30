@@ -6,73 +6,110 @@ description: Use when the user asks about dsh-auth-gate configuration - supporte
 disable-model-invocation: true
 ---
 
-# dsh-auth-gate 配置速查
+# dsh-auth-gate Configuration Quick Reference / dsh-auth-gate 配置速查
 
-随 dsh-auth-gate 分发的配置技能：用户/部署者问登录门支持哪些配置、怎么配、CLI 用法、常见故障时使用。
+Configuration skill shipped with dsh-auth-gate: use when a user or deployer asks
+which options the login door supports, how to configure them, CLI usage, or how
+to fix common failures.
+随 dsh-auth-gate 分发的配置技能：用户/部署者问登录门支持哪些配置、怎么配、
+CLI 用法、常见故障时使用。
 
-## 触发词
+## Triggers / 触发词
 
+auth-gate / login door / logout button / cookieSecure / usersFile / logoutOrder /
+mode / dsh-auth commands / login failures / rate-limit 429 / config 403
 auth-gate / 登录门 / 退出登录按钮 / cookieSecure / usersFile / logoutOrder / mode /
 dsh-auth 命令 / 登录不上 / 限速锁定 429 / 配置面 403
 
-## 一句话定位
+## What it is / 一句话定位
 
+Application-layer login door for a dsh web instance (Cordis plugin,
+TecFancy/dsh-auth-gate, MIT). Typical deployed shape: main instance in password
+mode behind an HTTPS reverse proxy.
 dsh web 实例的应用层登录门（Cordis 插件，TecFancy/dsh-auth-gate，MIT）。
 已部署形态示例：主实例 password 模式 + HTTPS 反代。
 
-## 配置项全表（在 $DSH_HOME/cordis.patch.yml 里按 id 覆盖）
+## Configuration options / 配置项全表
+
+Override by `id` in `$DSH_HOME/cordis.patch.yml`:
+在 `$DSH_HOME/cordis.patch.yml` 里按 id 覆盖：
 
 ```yaml
 - id: dsh-auth-gate
   config:
-    mode: "password" # "password"（推荐）或 "token"
-    cookieSecure: true # HTTPS 必须 true；纯 http 测试 false（否则浏览器不收 cookie）
-    usersFile: "" # 密码模式用户文件；默认 $DSH_HOME/auth/users.yaml
-    sessionTtl: 604800 # 会话秒数
-    cookieName: dsh_auth # 会话 cookie 名
-    tokenRef: DSH_AUTH_TOKEN # token 模式的凭证引用（环境变量名）
-    logoutOrder: 1000 # 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
+    mode: "password" # "password"（推荐）or "token" / "password"（推荐）或 "token"
+    cookieSecure: true # HTTPS requires true; plain-http testing false (browser rejects cookie) / HTTPS 必须 true；纯 http 测试 false（否则浏览器不收 cookie）
+    usersFile: "" # password-mode user file; default $DSH_HOME/auth/users.yaml / 密码模式用户文件；默认 $DSH_HOME/auth/users.yaml
+    sessionTtl: 604800 # session TTL in seconds / 会话秒数
+    cookieName: dsh_auth # session cookie name / 会话 cookie 名
+    tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
+    logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
 ```
 
-- 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
-- 改为 token 模式时不用建用户文件，把共享秘密放进 `.credentials.yaml`（`DSH_AUTH_TOKEN`）。
-- users.yaml / .credentials.yaml 均 0600。
+- Override **without** `insert` — the bundle row is already mounted; adding one
+  double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
+- Token mode needs no user file; put the shared secret in `.credentials.yaml`
+  (`DSH_AUTH_TOKEN`). / 改为 token 模式时不用建用户文件，把共享秘密放进
+  `.credentials.yaml`（`DSH_AUTH_TOKEN`）。
+- `users.yaml` / `.credentials.yaml` must be `0600`. / 均 0600。
 
-## CLI（`dsh-auth`）
+## CLI (`dsh-auth`)
 
 ```sh
+# CLI installed inside a profile is not on PATH; forward through pnpm:
 # profile 内安装的 CLI 不在 PATH，走 pnpm 转发：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user add admin --password-stdin
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user list
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user disable <name>
+# Install this quick-reference skill into $DSH_HOME/skills/ for the dsh agent:
 # 技能安装（本包内置的配置速查，装进 $DSH_HOME/skills/ 供 dsh agent 加载）：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]
 ```
 
-- 指定用户文件（多实例隔离）：`--file <path>`。
-- 禁用只挡新登录，已登录会话等过期。
+- Pick a per-instance user file with `--file <path>` (multi-instance isolation). /
+  指定用户文件（多实例隔离）：`--file <path>`。
+- Disable only blocks new logins; existing sessions expire naturally. /
+  禁用只挡新登录，已登录会话等过期。
 
-## 常见问题速查
+## Common failures / 常见问题速查
 
-| 现象                                                    | 原因/处理                                                                                                                     |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `dsh-auth: command not found`                           | 插件装在 profile 内，CLI 不在 PATH → 用 pnpm 转发                                                                             |
-| 设置→模型页「settings are unavailable in this browser」 | 远程浏览器 origin 非 loopback，配置面被 fence 挡 → 用 `dsh-auth-proxy --listen 127.0.0.1:8443 --target <https 地址>` 本地代理 |
-| 连续输错被锁 429                                        | 限速：5 次失败锁 30s（重启清零）；`retry-after` 头部有提示                                                                    |
-| 登录页能开但登录 401                                    | password 模式查 users.yaml（路径/权限）；CLI add 与插件读同一个文件                                                           |
-| 退出按钮不在通用设置最底部                              | 其他插件注册了更大 order/priority 的条目 → `logoutOrder` 调大                                                                 |
-| 改动配置不生效                                          | 改了 `$DSH_HOME/cordis.patch.yml` 后重启 dsh；`dsh --profile <p> --dump-config` 查组合结果                                    |
+| Symptom / 现象                                                | Cause / fix / 原因/处理                                                                                                                                                                                                    |
+| ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dsh-auth: command not found`                                 | CLI lives inside the profile, not on PATH - forward through pnpm. / 插件装在 profile 内，CLI 不在 PATH → 用 pnpm 转发                                                                                                      |
+| Settings > Models: "settings are unavailable in this browser" | Remote browser origin is not loopback, the config surface is fenced - use `dsh-auth-proxy --listen 127.0.0.1:8443 --target <https url>`. / 远程浏览器 origin 非 loopback，配置面被 fence 挡 → 用 `dsh-auth-proxy` 本地代理 |
+| Repeated failures locked with 429                             | Rate limit: 5 failures locks for 30s (resets on restart); `retry-after` header tells you. / 限速：5 次失败锁 30s（重启清零）；`retry-after` 头部有提示                                                                     |
+| Login page renders but login returns 401                      | Password mode reads `users.yaml` (path/permissions); the CLI and the plugin read the same file. / password 模式查 users.yaml（路径/权限）；CLI add 与插件读同一个文件                                                      |
+| Logout button not at the bottom of General settings           | Another plugin registered a larger order/priority - raise `logoutOrder`. / 其他插件注册了更大 order/priority 的条目 → `logoutOrder` 调大                                                                                   |
+| Config changes have no effect                                 | Restart dsh after editing `$DSH_HOME/cordis.patch.yml`; `dsh --profile <p> --dump-config` shows the composed result. / 改了 `$DSH_HOME/cordis.patch.yml` 后重启 dsh；`dsh --profile <p> --dump-config` 查组合结果          |
 
-## 验证技巧（隔离测试实例上）
+## Verification tips / 验证技巧
 
-- 登录页：GET /auth/login → 200 含 username/password 表单；API 未认证一律 401、HTML 302 到登录页。
-- `curl http://127.0.0.1:<port>/auth/status` → `{"authenticated":false,"logoutOrder":1000}`（status 只认 cookie，Bearer 不参与）。
-- 登录后设置 → 通用设置：`[data-slot="settings.general.item"]` 的最后一个子元素应是「退出登录」（form POST /auth/logout?next=/）。
-- logoutOrder 生效验证：patch 配 5200 → status 返回 5200，按钮仍在最后。
-- 多实例隔离：CLI `--file` 指定独立 users.yaml，避免共享 `$DSH_HOME/auth/users.yaml`。
+Run on an isolated test instance. / 隔离测试实例上验证：
 
-## 关键文件位置
+- Login page: `GET /auth/login` → 200 with a username/password form; unauthenticated
+  API calls always get 401, HTML requests get 302 to login. / 登录页：
+  GET /auth/login → 200 含 username/password 表单；API 未认证一律 401、HTML 302 到登录页。
+- `curl http://127.0.0.1:<port>/auth/status` → `{"authenticated":false,"logoutOrder":1000}`
+  (status only accepts cookies; Bearer does not participate). / `curl .../auth/status`
+  返回该 JSON（status 只认 cookie，Bearer 不参与）。
+- After login, Settings > General: the last child of
+  `[data-slot="settings.general.item"]` should be "Sign out" (form POST
+  `/auth/logout?next=/`). / 登录后设置 → 通用设置：`[data-slot="settings.general.item"]`
+  的最后一个子元素应是「退出登录」（form POST /auth/logout?next=/）。
+- `logoutOrder` check: patch it to 5200 → status returns 5200 and the button stays
+  last. / logoutOrder 生效验证：patch 配 5200 → status 返回 5200，按钮仍在最后。
+- Multi-instance isolation: give each instance its own users.yaml via `--file`,
+  avoiding the shared `$DSH_HOME/auth/users.yaml`. / 多实例隔离：CLI `--file` 指定
+  独立 users.yaml，避免共享 `$DSH_HOME/auth/users.yaml`。
 
-- 源码仓库：TecFancy/dsh-auth-gate（README 配置表、docs/deployment.md 部署清单、docs/dsh-auth-plan.md 路线图）。
-- 本技能随包分发：`<包根>/.agents/skills/dsh-auth-gate-config/`；安装目标 `$DSH_HOME/skills/dsh-auth-gate-config/`，
-  与主工作区 `.dsh/skills/dsh-auth-gate-config/` 同源（改一处同步另一处）。
+## Key file locations / 关键文件位置
+
+- Source repo: TecFancy/dsh-auth-gate (README config table, docs/deployment.md,
+  docs/dsh-auth-plan.md). / 源码仓库：TecFancy/dsh-auth-gate（README 配置表、
+  docs/deployment.md 部署清单、docs/dsh-auth-plan.md 路线图）。
+- This skill ships inside the package: `<package root>/.agents/skills/dsh-auth-gate-config/`,
+  installed to `$DSH_HOME/skills/dsh-auth-gate-config/`, kept in sync with the main
+  workspace copy `.dsh/skills/dsh-auth-gate-config/` (edit one, sync the other). /
+  本技能随包分发：`<包根>/.agents/skills/dsh-auth-gate-config/`；安装目标
+  `$DSH_HOME/skills/dsh-auth-gate-config/`，与主工作区 `.dsh/skills/dsh-auth-gate-config/`
+  同源（改一处同步另一处）。
