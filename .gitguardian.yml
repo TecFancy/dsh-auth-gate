@@ -2,7 +2,7 @@
 #
 # 这些"秘密"是测试 fixture，不是真实凭证：
 # - `s3cret-pw` / `TEST_PASSWORD`：password 集成/单元测试的测试口令（src/integration.password*.test.ts、
-#   src/password-endpoints.login*.test.ts），仅存在于测试代码与临时测试目录；
+#   src/integration.totp.test.ts、src/password-endpoints*.test.ts），仅存在于测试代码与临时测试目录；
 # - `password=pw`：端点单测的 urlencoded 请求体构造。
 # 真实口令只在运行时经 CLI（dsh-auth user add --password-stdin）写入 $DSH_HOME/auth/users.yaml，
 # 永不进入源码（docs/impl-m3.md P23 日志纪律）。
@@ -11,5 +11,9 @@ secret:
   ignored_matches:
     - name: test-only password fixtures (s3cret-pw)
       match: "s3cret-pw"
+      files:
+        - "src/**/*.test.ts"
     - name: test-only password fixtures (login request bodies)
       match: "password=pw"
+      files:
+        - "src/**/*.test.ts"
