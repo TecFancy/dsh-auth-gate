@@ -1,7 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { HttpHandler } from "../../gate/index.js";
-import { passwordLoginPageHtml, LoginRateLimiter } from "../../shared/index.js";
+import {
+  passwordLoginPageHtml,
+  totpChallengePageHtml,
+  LoginRateLimiter,
+} from "../../shared/index.js";
 import { registerPasswordEndpoints, type PasswordEndpointsDeps } from "./password-endpoints.js";
 
 interface FakeRes {
@@ -70,6 +74,7 @@ function makeDeps(): PasswordEndpointsDeps {
     verifyTotp: () => undefined,
     replayCheck: () => true,
     now: () => 1_700_000_000_000,
+    challengeMacKey: Buffer.alloc(32, 7), // D10 测试密钥
     limiter: new LoginRateLimiter(),
     logger: { error: () => undefined, info: () => undefined, warn: () => undefined },
   };
@@ -150,6 +155,23 @@ describe("POST /auth/login body errors", () => {
     );
     expect(res.status).toBe(413);
     expect(res.headers["connection"]).toBe("close");
+  });
+});
+
+describe("totpChallengePageHtml", () => {
+  it("escapes error text and renders the error paragraph", () => {
+    const html = totpChallengePageHtml("/", `bad <script> & "quotes"`);
+    expect(html).toContain('<p class="error">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>');
+  });
+
+  it("omits the error paragraph when no error is given", () => {
+    expect(totpChallengePageHtml("/")).not.toContain('class="error"');
+  });
+
+  it("renders the code field with one-time-code autocomplete", () => {
+    const html = totpChallengePageHtml("/");
+    expect(html).toContain('name="code"');
+    expect(html).toContain('autocomplete="one-time-code"');
   });
 });
 

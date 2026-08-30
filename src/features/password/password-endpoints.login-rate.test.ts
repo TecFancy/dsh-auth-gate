@@ -112,6 +112,7 @@ function makeHarness(): Harness {
       verifyTotp: () => undefined,
       replayCheck: () => true,
       now: () => 1_700_000_000_000,
+      challengeMacKey: Buffer.alloc(32, 7), // D10 测试密钥
       limiter,
       logger: {
         error: (message) => logs.push({ level: "error", message }),

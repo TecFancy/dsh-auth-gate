@@ -84,6 +84,7 @@ export class SessionStore {
     return row;
   }
 
+  // TODO(auth-m5): revokeBySubject - disabled users only block new logins (T13/D8).
   /** 吊销 = 删除行（登出语义，写盘）；不存在返回 false。 */
   revokeByToken(token: string): Promise<boolean> {
     return this.table.delete(digestToken(token));

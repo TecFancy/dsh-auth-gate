@@ -48,6 +48,8 @@ const ROOT_FILES = new Set([
   "integration.password.rate.test.ts",
   "integration.session.test.ts",
   "integration.totp.test.ts",
+  "integration.totp-hardening.test.ts",
+  "integration-totp-helpers.ts",
   "guard-proxy-deny.test.ts",
 ]);
 const errors = [];

@@ -39,6 +39,22 @@ describe("TOTP: password stage issues challenge cookie", () => {
     expect(res.body).toBe("invalid credentials");
   });
 
+  it("required mode: correct password for a no-secret user does not reset prior failures", async () => {
+    const h = makeHarness();
+    for (let i = 0; i < 4; i++) {
+      const res = await post(h, "POST", "username=bob&password=wrong");
+      expect(res.status).toBe(401);
+    }
+    // 正确密码 + required + 无 secret → 401（第 5 次失败；不得先 success 洗桶）
+    h.setTotpMode("required");
+    const res = await post(h, "POST", "username=bob&password=pw");
+    expect(res.status).toBe(401);
+    // 再试 → 429（若被错误 success 清桶则不会 429）
+    const locked = await post(h, "POST", "username=bob&password=pw");
+    expect(locked.status).toBe(429);
+    expect(locked.headers["retry-after"]).toBe("30");
+  });
+
   it("disabled user with secret is blocked at the password stage", async () => {
     const h = makeHarness();
     const alice = h.users.get("alice")!;

@@ -54,6 +54,7 @@ function authCatchAll(_req: IncomingMessage, res: ServerResponse): void {
   res.end("not found");
 }
 
+// TODO(auth-m5): login CSRF token - re-evaluated in T13/D8, still not added.
 function handleLogin(
   deps: PasswordEndpointsDeps,
   req: IncomingMessage,
@@ -63,12 +64,15 @@ function handleLogin(
     const next = validateNext(queryOf(req).get("next") ?? "/");
     res.setHeader("cache-control", "no-store");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    // M4 T6：有合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页
+    // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
+    // off 模式忽略 TOTP（T4）：残留/伪造 cookie 一律渲染密码页。
     const challenge = parseChallengeValue(
       parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
       deps.now(),
+      deps.challengeMacKey,
     );
-    res.end(challenge === undefined ? passwordLoginPageHtml(next) : totpChallengePageHtml(next));
+    const showTotp = challenge !== undefined && deps.totpMode !== "off";
+    res.end(showTotp ? totpChallengePageHtml(next) : passwordLoginPageHtml(next));
     return;
   }
   if (req.method === "POST") {

@@ -14,10 +14,10 @@ describe("TotpReplayGuard", () => {
     expect(guard.checkAndRecord("alice", 101, "123456")).toBe(true);
   });
 
-  it("allows a different code at the same counter", () => {
+  it("rejects a different code at the same counter", () => {
     const guard = new TotpReplayGuard();
     expect(guard.checkAndRecord("alice", 100, "123456")).toBe(true);
-    expect(guard.checkAndRecord("alice", 100, "654321")).toBe(true);
+    expect(guard.checkAndRecord("alice", 100, "654321")).toBe(false);
   });
 
   it("isolates users", () => {

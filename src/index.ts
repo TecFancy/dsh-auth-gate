@@ -1,4 +1,5 @@
 import type { Context } from "@deepseek-ai/cordis";
+import { randomBytes } from "node:crypto";
 import z from "@deepseek-ai/schemastery";
 import { registerAuthEndpoints, safeEqual, TokenGate } from "./features/token/index.js";
 import { wrapServer, type Gate, type WrappableServer } from "./gate/index.js";
@@ -167,6 +168,7 @@ function mountAuthEndpoints(
   usersPath: string,
   limiter: LoginRateLimiter,
   replayGuard: TotpReplayGuard,
+  challengeMacKey: Uint8Array,
   log: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -189,6 +191,7 @@ function mountAuthEndpoints(
         replayCheck: (username, counter, code) =>
           replayGuard.checkAndRecord(username, counter, code),
         now: Date.now,
+        challengeMacKey,
         logoutOrder: config.logoutOrder,
         logger: log,
       })
@@ -222,6 +225,9 @@ export function apply(ctx: Context, config: AuthConfig): void {
   const usersPath = config.usersFile === "" ? defaultUsersFilePath() : config.usersFile;
   const limiter = new LoginRateLimiter();
   const replayGuard = new TotpReplayGuard();
+  // 挑战 cookie HMAC 密钥（D10）：进程级随机值，与 limiter / replayGuard 同寿命；
+  // 重启/插件重载后在途挑战 cookie 失效（用户需重新输入密码，≤5 分钟窗口）。
+  const challengeMacKey = randomBytes(32);
 
   const auth: AuthService = {
     sessions: undefined,
@@ -247,7 +253,17 @@ export function apply(ctx: Context, config: AuthConfig): void {
 
   ctx.effect(
     () =>
-      mountAuthEndpoints(server, config, auth, resolveToken, usersPath, limiter, replayGuard, log),
+      mountAuthEndpoints(
+        server,
+        config,
+        auth,
+        resolveToken,
+        usersPath,
+        limiter,
+        replayGuard,
+        challengeMacKey,
+        log,
+      ),
     "dsh-auth-gate: auth endpoints",
   );
 

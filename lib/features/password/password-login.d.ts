@@ -1,14 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
 import { type SessionStore } from "../../session/index.js";
-/** TOTP 挑战 cookie 名（M4 T5）。 */
-export declare const CHALLENGE_COOKIE = "dsh_auth_challenge";
-/** 挑战 cookie 有效期（秒，M4 T5 模块常量）。 */
-export declare const CHALLENGE_TTL_SECONDS = 300;
-/** 挑战 cookie 值格式 `<username>.<expiresEpochMs>`（username 字符集不含 `.`）。 */
-export declare function buildChallengeValue(username: string, expiresEpochMs: number): string;
-/** 解析挑战 cookie 值；格式非法/过期/时间戳异常 → undefined。 */
-export declare function parseChallengeValue(value: string | undefined, nowMs: number): string | undefined;
+export { buildChallengeValue, CHALLENGE_COOKIE, CHALLENGE_TTL_SECONDS, parseChallengeValue, } from "./challenge-cookie.js";
 export interface PasswordLoginDeps {
     sessions: () => SessionStore | undefined;
     cookieName: string;
@@ -28,6 +21,8 @@ export interface PasswordLoginDeps {
     replayCheck: (username: string, counter: number, code: string) => boolean;
     /** 注入的当前时间（ms epoch；测试注入固定时钟）。 */
     now: () => number;
+    /** 挑战 cookie HMAC 密钥（进程级，apply() 生成；D10）。 */
+    challengeMacKey: Uint8Array;
     logger: {
         error(message: unknown): void;
         info(message: unknown): void;

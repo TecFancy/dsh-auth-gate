@@ -7,6 +7,7 @@ import {
   type PasswordEndpointsDeps,
 } from "../src/features/password/password-endpoints.js";
 import {
+  buildChallengeValue,
   CHALLENGE_COOKIE,
   CHALLENGE_TTL_SECONDS,
 } from "../src/features/password/password-login.js";
@@ -119,6 +120,9 @@ export interface Harness {
 
 export const SECRET_ALICE = "JBSWY3DPEHPK3PXP"; // 常见 16 字符测试 secret（base32）
 
+/** 测试用挑战 cookie HMAC 密钥（D10）：固定值，保证同一 harness 内签发/解析一致。 */
+export const TEST_CHALLENGE_KEY = Buffer.alloc(32, 7);
+
 export function makeHarness(): Harness {
   const routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[] = [];
   const table = new MemTable();
@@ -163,6 +167,7 @@ export function makeHarness(): Harness {
       return replayImpl(username, counter, code);
     },
     now: () => nowMs,
+    challengeMacKey: TEST_CHALLENGE_KEY,
     logger: { error: () => undefined, info: () => undefined, warn: () => undefined },
   };
   deps.totpMode = totpMode; // 初始模式（setTotpMode 变更）
@@ -194,9 +199,13 @@ export function makeHarness(): Harness {
   };
 }
 
-/** alice 的挑战 cookie（时钟原点 + TTL 内）。 */
+/** alice 的签名挑战 cookie（时钟原点 + TTL 内）。 */
 export function aliceChallengeCookie(): string {
-  return `${CHALLENGE_COOKIE}=alice.${1_700_000_000_000 + (CHALLENGE_TTL_SECONDS * 1000) / 2}`;
+  return `${CHALLENGE_COOKIE}=${buildChallengeValue(
+    "alice",
+    1_700_000_000_000 + (CHALLENGE_TTL_SECONDS * 1000) / 2,
+    TEST_CHALLENGE_KEY,
+  )}`;
 }
 
 /** 一次请求直达响应的便捷封装（用例内省去 handler/res 样板）。 */
