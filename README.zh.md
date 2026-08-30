@@ -74,6 +74,11 @@ printf '%s\n' '选一个强密码' | \
 
 ![登录页](docs/demo/login-page.png)
 
+账号启用了两步验证（TOTP）时，登录还会继续第二步——输入验证器 App（1Password、
+Google Authenticator 等）里的 6 位验证码（先密码、后验证码）：
+
+![两步验证码页](docs/demo/totp-code.png)
+
 登录后进入你的实例：
 
 ![dsh 实例](docs/demo/dashboard.png)

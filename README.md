@@ -84,6 +84,11 @@ Visitors without a session are sent to the login page:
 
 ![Login page](docs/demo/login-page.png)
 
+When TOTP is enabled for your account, signing in continues with a second step — a
+6-digit code from your authenticator app (password first, then the code):
+
+![TOTP verification step](docs/demo/totp-code.png)
+
 After signing in, they land on your instance:
 
 ![dsh instance](docs/demo/dashboard.png)
