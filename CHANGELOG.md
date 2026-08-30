@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.11.0...v0.11.1) (2026-08-30)
+
+
+### Bug Fixes
+
+* sign TOTP challenge cookies and fail-close submit path ([#63](https://github.com/TecFancy/dsh-auth-gate/issues/63)) ([820e5e9](https://github.com/TecFancy/dsh-auth-gate/commit/820e5e90a8067162b03d4c9d0c72a50eb891d976))
+
 ## [0.11.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.10.0...v0.11.0) (2026-08-30)
 
 
