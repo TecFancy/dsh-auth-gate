@@ -119,9 +119,9 @@ Run on an isolated test instance. / 隔离测试实例上验证：
 
 ## Key file locations / 关键文件位置
 
-- Source repo: TecFancy/dsh-auth-gate (README config table, docs/deployment.md,
-  docs/dsh-auth-plan.md). / 源码仓库：TecFancy/dsh-auth-gate（README 配置表、
-  docs/deployment.md 部署清单、docs/dsh-auth-plan.md 路线图）。
+- Source repo: TecFancy/dsh-auth-gate (README config table, docs/deployed/deployment.md,
+  docs/specs/dsh-auth-plan.md). / 源码仓库：TecFancy/dsh-auth-gate（README 配置表、
+  docs/deployed/deployment.md 部署清单、docs/specs/dsh-auth-plan.md 路线图）。
 - This skill ships inside the package: `<package root>/.agents/skills/dsh-auth-gate-config/`,
   installed to `$DSH_HOME/skills/dsh-auth-gate-config/`, kept in sync with the main
   workspace copy `.dsh/skills/dsh-auth-gate-config/` (edit one, sync the other). /

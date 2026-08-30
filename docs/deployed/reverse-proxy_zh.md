@@ -4,7 +4,7 @@
 2026-08-15 生产环境的实测经验：可用的 Caddy 配置、设置页 `403` 背后的浏览器信任栅栏
 坑、以及推荐的「半外壳」拓扑。
 
-> 配套文档：`docs/deployment_zh.md`（中文运维清单与验收步骤）、`docs/dsh-auth-plan_zh.md` §9
+> 配套文档：`docs/deployed/deployment_zh.md`（中文运维清单与验收步骤）、`docs/specs/dsh-auth-plan_zh.md` §9
 > M5（规划中的独立外壳）。
 
 ## 1. 为什么必须走反代
@@ -37,11 +37,11 @@ dsh 0.1.0-rc.6 的 `/api` 有浏览器信任栅栏（防 DNS rebinding + CSRF）
 
 ## 3. 拓扑选项
 
-| 选项                       | 认证                         | Host/Origin 重写     | 设置页             | 说明                                         |
-| -------------------------- | ---------------------------- | -------------------- | ------------------ | -------------------------------------------- |
-| 普通反代（Caddy 原样透传） | dsh-auth-gate                | 否                   | privileged API 403 | 除设置页外都正常                             |
-| **半外壳（推荐）**         | dsh-auth-gate                | **是**（Caddy 两行） | **全功能**         | 登录页/限速/吊销全保留                       |
-| 独立外壳（M5，路线图）     | dsh-auth-gate 自身做代理进程 | 内置                 | 全功能             | dsh 零插件；见 `docs/dsh-auth-plan_zh.md` §9 |
+| 选项                       | 认证                         | Host/Origin 重写     | 设置页             | 说明                                               |
+| -------------------------- | ---------------------------- | -------------------- | ------------------ | -------------------------------------------------- |
+| 普通反代（Caddy 原样透传） | dsh-auth-gate                | 否                   | privileged API 403 | 除设置页外都正常                                   |
+| **半外壳（推荐）**         | dsh-auth-gate                | **是**（Caddy 两行） | **全功能**         | 登录页/限速/吊销全保留                             |
+| 独立外壳（M5，路线图）     | dsh-auth-gate 自身做代理进程 | 内置                 | 全功能             | dsh 零插件；见 `docs/specs/dsh-auth-plan_zh.md` §9 |
 
 重写架空栅栏由门卫补偿：会话 cookie 为 `SameSite=Lax`，跨站/DNS rebinding 请求拿不到
 cookie → 门卫 401。纵深防御从「栅栏 + 门卫」变为「门卫 + SameSite」。
@@ -101,7 +101,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
 #   /api/events.host WebSocket 升级 → 带 cookie 101，无 cookie 401
 ```
 
-完整验收清单：`docs/deployment_zh.md` §4（A–I）。
+完整验收清单：`docs/deployed/deployment_zh.md` §4（A–I）。
 
 ## 6. 故障诊断
 

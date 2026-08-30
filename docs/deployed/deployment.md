@@ -4,8 +4,8 @@ This document describes how to deploy dsh-auth-gate (password mode, M3) to a pub
 instance and complete **deployment acceptance**. Applies to: an instance already running dsh
 web (`dsh --profile web`) that needs an authentication gate.
 
-Design basis: `docs/dsh-auth-plan.md` §7/§8 (absence of an upstream PR channel, defense in
-depth); specifications: `docs/impl-m2.md` (token mode), `docs/impl-m3.md` (password mode).
+Design basis: `docs/specs/dsh-auth-plan.md` §7/§8 (absence of an upstream PR channel, defense in
+depth); specifications: `docs/implemented/impl-m2.md` (token mode), `docs/implemented/impl-m3.md` (password mode).
 **Choose one of the two modes**: the text below is written for password mode (recommended, M3);
 token mode only needs to skip the "create users" step and configure `tokenRef`.
 
@@ -25,7 +25,7 @@ token mode only needs to skip the "create users" step and configure `tokenRef`.
   to pnpm). Verified: npm's default global prefix is `/usr` (cannot install without root
   privileges); use
   `npm i -g pnpm --prefix ~/.npm-global` and `export PATH="$HOME/.npm-global/bin:$PATH"`
-  (`dsh` itself is also installed in this prefix, see `docs/handoff-m2.md` §3.2).
+  (`dsh` itself is also installed in this prefix, see `docs/handoff/handoff-m2.md` §3.2).
 
 ---
 
@@ -156,6 +156,27 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
 3. Check `boot.log` for any new error/warn.
 
+### 5.1 Upgrading dsh-auth-gate (0.11.0 → 0.11.1, TOTP hardening)
+
+Real-world bumps (verified on `web-test`, 2026-08-30):
+
+1. **Fresh releases are blocked by pnpm's `minimumReleaseAge`** — a plain
+   `pnpm up dsh-auth-gate` may silently do nothing. Pin the version explicitly and use the
+   pnpm major that matches the profile's `node_modules` (the profile declares
+   `packageManager: pnpm@11.22.0`; the system pnpm 9.x fails on store mismatch):
+   ```sh
+   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.11.1
+   # verify: grep '"version"' "$DSH_HOME/profiles/<profile>/node_modules/dsh-auth-gate/package.json"
+   ```
+2. **Restarting invalidates in-flight TOTP challenges** (HMAC-signed challenge cookie,
+   process-keyed, ADR D10): users on the code page must re-enter their password
+   (window ≤ 5 minutes). The legacy plaintext cookie format also stops working after
+   upgrade — treated as "no challenge", users simply see the password page.
+3. After upgrade, run at least: `dsh-auth user list` sanity, then the TOTP acceptance
+   round — password stage → challenge cookie (3-part signed value) → code page → correct
+   code → session; wrong code → 401 with the challenge-page error slot; `/auth/status`
+   with the session cookie → `authenticated: true`.
+
 ## 6. Troubleshooting
 
 | Symptom                                   | Cause                                                                | Handling                                                         |
@@ -174,7 +195,7 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 - [ ] Treat session logs as confidential material (protect backups/sharing equally).
 - [ ] Fold upgrade regression (§5) into the ops process; add auth-line health checks
       (`boot.log` + acceptance B/D/F) to monitoring.
-- [ ] Password hashes are scrypt (`docs/impl-m3.md` P1); the file has zero plaintext.
+- [ ] Password hashes are scrypt (`docs/implemented/impl-m3.md` P1); the file has zero plaintext.
 - [ ] A disabled user only blocks new logins (issued sessions remain valid within TTL, a known
       M3 limitation).
 - [ ] Rate limiting is in-memory and cleared on restart; in a reverse-proxy deployment, rate
@@ -184,7 +205,7 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 
 > §1–§7 of this document are the "plugin form" (the guard lives inside the dsh process). After
 > production validation on 2026-08-15, the public instance switches to the **semi-shell** variant;
-> the long-term direction is `docs/dsh-auth-plan.md` §9 M5 (independent reverse-proxy shell).
+> the long-term direction is `docs/specs/dsh-auth-plan.md` §9 M5 (independent reverse-proxy shell).
 
 ### 8.1 Why a Shell Is Needed: The Browser-Trust Fence and Authentication Are Orthogonal
 

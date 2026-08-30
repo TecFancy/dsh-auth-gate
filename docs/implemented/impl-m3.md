@@ -3,12 +3,12 @@
 > Reader: the coding agent implementing this (expected deepseek v4 flash, **new session**). This document is a
 > **decision-complete spec**: all decision points are already closed; the executor only translates, it does not
 > design.
-> Baseline: `docs/impl-m2.md` (M2 delivered: guard + TokenGate + /auth endpoints + persistent sessions — M3 stacks
+> Baseline: `docs/implemented/impl-m2.md` (M2 delivered: guard + TokenGate + /auth endpoints + persistent sessions — M3 stacks
 > on top of it).
-> Design basis: `docs/dsh-auth-plan.md` §5/§6 phase 2/§8; engineering gates: `docs/development.md`.
+> Design basis: `docs/specs/dsh-auth-plan.md` §5/§6 phase 2/§8; engineering gates: `docs/specs/development.md`.
 > **This file is the sole authority for M3 details**; where it conflicts with plan/M1/M2, this file wins.
 >
-> Environment and verification workflow: see `docs/handoff-m2.md` (mandatory reading for a new session: server
+> Environment and verification workflow: see `docs/handoff/handoff-m2.md` (mandatory reading for a new session: server
 > access, sandbox network limits, M1/M2 pitfalls list — the §3/§4/§5 environment facts remain valid for M3).
 > **Do not explore the harness internals yourself** — if you need a fact not present in this file, stop and report.
 >
@@ -517,8 +517,8 @@ Behavior contract:
   permissions (0600, managed by the CLI), CLI usage, token → password migration notes, known limitations
   (rate limiting is in-memory and resets on restart; disabled users do not revoke already-issued sessions; residual
   risk without a CSRF token; Bearer session token semantics; XFF is not trusted).
-- `docs/development.md`'s `## Structure` tree updated per the §4 new files.
-- `AGENTS.md` adds two-pointer lines: the M3 spec `docs/impl-m3.md` + the handoff `docs/handoff-m3.md` (the latter
+- `docs/specs/development.md`'s `## Structure` tree updated per the §4 new files.
+- `AGENTS.md` adds two-pointer lines: the M3 spec `docs/implemented/impl-m3.md` + the handoff `docs/handoff/handoff-m3.md` (the latter
   written by the execution session when wrapping up; see DoD 6).
 
 ---
@@ -693,11 +693,11 @@ to preset `admin` (password `<test-password>`) and `disableduser` (`disabled: tr
 10. `src/cli.ts` + `src/cli.test.ts`.
 11. `src/index.ts` assembly + `src/index.test.ts` adaptation.
 12. `src/integration.password.test.ts`.
-13. Documentation: `docs/development.md` Structure tree, `README.md` (password mode/CLI/users file contract),
+13. Documentation: `docs/specs/development.md` Structure tree, `README.md` (password mode/CLI/users file contract),
     `AGENTS.md` (M3 pointers).
 14. `npm run build` + `lib/` in the same batch as `src/`; `git diff --exit-code -- lib` passes.
 15. Server end-to-end smoke test (DoD 4).
-16. Wrap up by writing `docs/handoff-m3.md` (DoD 6).
+16. Wrap up by writing `docs/handoff/handoff-m3.md` (DoD 6).
 
 ---
 
@@ -739,7 +739,7 @@ to preset `admin` (password `<test-password>`) and `disableduser` (`disabled: tr
         → first 5 are 401, the 6th is 429; `curl -s -i -d "username=admin&password=<test-password>" http://127.0.0.1:3081/auth/login | head -5` → 429 + `retry-after` header.
    5. wrap up: kill or keep the instance (report status); `boot.log` has no `password flow requires M3`-style error.
 5. Report: changed files, P1–P26 landing points, coverage numbers, deviations from this document (should be zero).
-6. **Write `docs/handoff-m3.md`** (for the M4 handoff): environment-fact increments (e.g. measured scrypt time,
+6. **Write `docs/handoff/handoff-m3.md`** (for the M4 handoff): environment-fact increments (e.g. measured scrypt time,
    the CLI's actual path on the server), M3 smoke-test real results, an M3 pitfalls list, M4 (TOTP) starting-point
    hints. Commit/push only when instructed by the user.
 

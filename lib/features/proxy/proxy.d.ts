@@ -4,7 +4,7 @@
  * 形态：用户机器上只监听回环的无状态反向代理；认证由服务端 auth-gate 完成
  * （登录页/会话 cookie 经本代理原样透传），本代理只负责"把 page origin 变成
  * 回环"与可控的头部适配。不做任何 Host/Origin 改写；生产链路由 Caddy 统一
- * 改写（见 docs/local-proxy_zh.md）。
+ * 改写（见 docs/deployed/local-proxy_zh.md）。
  */
 import { type Server } from "node:http";
 export interface ProxyOptions {

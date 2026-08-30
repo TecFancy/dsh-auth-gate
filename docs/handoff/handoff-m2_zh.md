@@ -1,8 +1,8 @@
 # dsh-auth M2 交接文档（session handoff）
 
-> 读者：在**新 session** 中执行 `docs/impl-m2_zh.md` 的编码代理。本文件承载本 session 独有的
+> 读者：在**新 session** 中执行 `docs/implemented/impl-m2_zh.md` 的编码代理。本文件承载本 session 独有的
 > 环境事实与过程知识——仓库里没有、重新探索成本高或会踩坑的内容。
-> **阅读顺序：`AGENTS.md` → `docs/impl-m2_zh.md` → 本文档**。
+> **阅读顺序：`AGENTS.md` → `docs/implemented/impl-m2_zh.md` → 本文档**。
 
 ---
 

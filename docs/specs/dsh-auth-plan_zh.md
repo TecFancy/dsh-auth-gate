@@ -243,11 +243,11 @@ export function apply(ctx, config) {
 | M5   | 独立反代外壳模式（proxy shell）：自身监听公网 + 反代裸 dsh + Host/Origin 重写       | 规划中（2026-08-15 记录，待排期）      |
 
 > M3 注：口令哈希按用户拍板选用 `node:crypto` **scrypt**（N=2¹⁶/r=8/p=1，零新增原生依赖；
-> 规格 `docs/impl-m3_zh.md` P1/P2），替代本节初稿中的 argon2id/bcryptjs 候选。
+> 规格 `docs/implemented/impl-m3_zh.md` P1/P2），替代本节初稿中的 argon2id/bcryptjs 候选。
 
 ### M5（规划）：独立反代外壳模式（standalone proxy shell）
 
-> 2026-08-15 由生产部署实证驱动立项；排期前先读 `docs/deployment_zh.md` §8（半外壳生产拓扑与
+> 2026-08-15 由生产部署实证驱动立项；排期前先读 `docs/deployed/deployment_zh.md` §8（半外壳生产拓扑与
 > 栅栏事实表）。
 
 **背景（实证结论）**：dsh 0.1.0-rc.6 的浏览器信任栅栏把 `settings.*` / `credentials.*` /

@@ -9,7 +9,7 @@
 > slice:check 白名单扩充（integration-totp-helpers / integration.totp-hardening）。
 
 > 读者：按本文落地的开发者。本文把已核实的 TOTP 评审发现改写成可执行步骤。
-> 权威现状以仓库当前 `development` 分支源码为准；`docs/impl-m4.md` 是 **M4 冻结规格**，改它必须附 ADR 或规格修订注记，禁止静默改写历史决策。
+> 权威现状以仓库当前 `development` 分支源码为准；`docs/implemented/impl-m4.md` 是 **M4 冻结规格**，改它必须附 ADR 或规格修订注记，禁止静默改写历史决策。
 > 架构约束（贯穿全文，不再逐条重复）：
 >
 > - **deps 注入**：password slice **不 import** totp slice（D5 / D9）。新能力从 `src/index.ts` `apply` / `mountAuthEndpoints` 注入 `PasswordLoginDeps`。
@@ -35,7 +35,7 @@
 | 装配               | `src/index.ts`（只加 deps 字段，不改 token 模式）                                                                                                                                                                  |
 | TOTP 算法 / 防重放 | `src/features/totp/replay-guard.ts`；可选 `src/features/totp/totp.ts`（dummy-HMAC）                                                                                                                                |
 | 测试               | `password-endpoints.totp-stage1.test.ts` / `totp-stage2.test.ts`、`replay-guard.test.ts`、`totp.test.ts`、`integration.totp.test.ts`、`test/password-totp-harness.ts`；必要时 `password-endpoints.methods.test.ts` |
-| 文档               | `docs/impl-m4.md` + `impl-m4_zh.md`（修订注记）、ADR、`docs/decisions.md`、`README.md` / `README.zh.md`、`.agents/skills/dsh-auth-gate-config/SKILL.md`                                                            |
+| 文档               | `docs/implemented/impl-m4.md` + `impl-m4_zh.md`（修订注记）、ADR、`docs/decisions.md`、`README.md` / `README.zh.md`、`.agents/skills/dsh-auth-gate-config/SKILL.md`                                                |
 
 **不会改**
 
@@ -331,11 +331,11 @@ GET 不读 query `error=`（避免开放重定向式的任意文案；slot 文�
 
 ## 4. P2 文档与规格回写
 
-`docs/impl-m4.md` 是冻结规格（文首第 3–11 行）。改正文用 **「修订注记」** 段（文首或对应行旁），不要假装 M4 当时就长这样。中文镜像 `docs/impl-m4_zh.md` 同步改。ADR 按 `docs/decisions/README.md`：已落地记录用现在时；**推翻**某条时写新记录并链接旧条，不改 archived 哈希。
+`docs/implemented/impl-m4.md` 是冻结规格（文首第 3–11 行）。改正文用 **「修订注记」** 段（文首或对应行旁），不要假装 M4 当时就长这样。中文镜像 `docs/implemented/impl-m4_zh.md` 同步改。ADR 按 `docs/decisions/README.md`：已落地记录用现在时；**推翻**某条时写新记录并链接旧条，不改 archived 哈希。
 
 ### 4.1 T10 装配签名（规格 ≠ 实现）
 
-- **规格**（`docs/impl-m4.md` 第 54 行）：`verifyTotp => Promise<boolean>`，`replayGuard: TotpReplayGuard`。
+- **规格**（`docs/implemented/impl-m4.md` 第 54 行）：`verifyTotp => Promise<boolean>`，`replayGuard: TotpReplayGuard`。
 - **实现**（`password-login.ts` 第 48–51 行）：`verifyTotp => number | undefined`（匹配 counter），`replayCheck: (username, counter, code) => boolean`。装配在 `src/index.ts` 第 188–190 行。D9（`docs/decisions/implemented/2026-08-30-totp-slice-and-injection.zh.md` 第 7–8、29 行）已按实现描述。
 - **改法**：T10 修订注记改为与实现一致，并写一句「返回 counter 才能把 T7 的匹配窗口交给 replayCheck；password 不持有 `TotpReplayGuard` 实例，符合 D9」。不要把实现改回 `Promise<boolean>`（会丢 counter，反而要在 password 里重算窗口）。
 
@@ -343,7 +343,7 @@ GET 不读 query `error=`（避免开放重定向式的任意文案；slot 文�
 
 ### 4.2 §3.3 first-dot vs 实现 last-dot；T7 prune 口径
 
-- **规格** `docs/impl-m4.md` 第 86 行：「split on first `.`」。第 85 行又写用户名字符集含 `.`、「与 `.` 分隔符无冲突」——自相矛盾。P5 `USERNAME_RE`（`users-file.ts` 第 8 行）**允许**中间 `.`。
+- **规格** `docs/implemented/impl-m4.md` 第 86 行：「split on first `.`」。第 85 行又写用户名字符集含 `.`、「与 `.` 分隔符无冲突」——自相矛盾。P5 `USERNAME_RE`（`users-file.ts` 第 8 行）**允许**中间 `.`。
 - **实现** `parseChallengeValue` 第 21 行 `lastIndexOf(".")`，对 `alice.bob.<exp>` 才是对的。
 - **改法**：**改规格就实现**，不要改成 first-dot（会把 `alice.bob` 切成用户名 `alice`）。修订注记：「按最后一个 `.` 切开 expires；方案 A 再按倒数第二个 `.` 切开 mac。用户名可含 `.`（P5）。」
 - T7 表格（第 51 行）写 drop `counter-2` 以前；§3.2 第 78 行写 `counter' < counter - 1`。实现第 27 行按 §3.2。修订 T7 表格与 §3.2 / 代码对齐（保留 window-1，即丢掉早于 `counter-1` 的）。
@@ -476,7 +476,7 @@ slice:check：新文件必须落在 `features/password/`（或 totp 纯函数）
 
 ## 7. 回滚与发布影响
 
-- 当前 `package.json` version 为 **0.11.0**。PR-fix 的 squash commit 类型是 `fix:` → 按 `docs/development.md` Releases：0.x 下 `fix:` → **0.11.1**（release-please 开 release PR，禁止手改 version/CHANGELOG/manifest）。
+- 当前 `package.json` version 为 **0.11.0**。PR-fix 的 squash commit 类型是 `fix:` → 按 `docs/specs/development.md` Releases：0.x 下 `fix:` → **0.11.1**（release-please 开 release PR，禁止手改 version/CHANGELOG/manifest）。
 - PR-docs 的 `docs:` / `chore:` / `test:` **不发版**。
 - **回滚**：revert 那条 `fix:` squash。行为回退包括：禁用用户可再走完第二段、off 残留 cookie 再生效、401 变回纯文本、（A）挑战 cookie 再变明文。部署侧若已强制用户重新登录（A 的重启失效），revert 后旧明文 cookie 仍可能在 TTL 内——A 的 parse 对旧格式当无效，revert 后旧格式又有效，属于短暂窗口，可接受。
 - **升级已有部署**：
@@ -505,4 +505,4 @@ slice:check：新文件必须落在 `features/password/`（或 totp 纯函数）
 | 装配 `verifyTotp` / `replayCheck` / `totpMode`             | `index.ts` 187–190                                                                  |
 | `USERNAME_RE`                                              | `users-file.ts` 8                                                                   |
 | D6 否决签名                                                | `docs/decisions/implemented/2026-08-30-totp-two-stage-challenge-cookie.zh.md` 22–24 |
-| T5 未签名 / T10 签名漂移 / §3.3 first-dot / T13 TODO       | `docs/impl-m4.md` 49、54、57、85–86                                                 |
+| T5 未签名 / T10 签名漂移 / §3.3 first-dot / T13 TODO       | `docs/implemented/impl-m4.md` 49、54、57、85–86                                     |

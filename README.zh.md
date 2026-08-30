@@ -178,9 +178,9 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 
 ## 部署
 
-- [反代部署指南](docs/reverse-proxy_zh.md) —— Caddy/nginx 配置、浏览器信任栅栏的坑
+- [反代部署指南](docs/deployed/reverse-proxy_zh.md) —— Caddy/nginx 配置、浏览器信任栅栏的坑
   （反代后设置页 `403`，以及为什么只加认证修不了它）、推荐的半外壳拓扑。
-- [docs/deployment_zh.md](docs/deployment_zh.md) —— 运维清单、验收步骤（A–I）与故障诊断。
+- [docs/deployed/deployment_zh.md](docs/deployed/deployment_zh.md) —— 运维清单、验收步骤（A–I）与故障诊断。
 
 ## 认证本地代理（可选，dsh-auth-proxy)
 
@@ -194,7 +194,7 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 > 半外壳解决服务端 `/api` 栅栏后，dsh **客户端**还要求"页面 origin 必须回环"：域名页面下
 > 设置页报 "settings are unavailable in this browser"（与认证无关）。`dsh-auth-proxy`
 > 在用户本机提供回环页面入口，配合 auth-gate 实现"远程编辑配置 + 全程认证"，
-> 不修改 dsh 源码。详细设计见 [docs/local-proxy_zh.md](docs/local-proxy_zh.md)。
+> 不修改 dsh 源码。详细设计见 [docs/deployed/local-proxy_zh.md](docs/deployed/local-proxy_zh.md)。
 
 - 零依赖 Node bin（`dsh-auth-proxy`）：严格绑定 `127.0.0.1`、无状态透传页面/API、
   `events.mux`/`events.host` WebSocket 隧道、`Set-Cookie` 去 `Secure` 适配（Safari 兜底）。

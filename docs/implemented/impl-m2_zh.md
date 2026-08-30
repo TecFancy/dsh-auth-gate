@@ -2,11 +2,11 @@
 
 > 读者：执行实现的编码代理（预期 deepseek v4 flash，**新 session**）。本文档是**决策完备的规格**：
 > 所有判断点已预先关闭，执行者只做翻译，不做设计。
-> 基线：`docs/impl-m1_zh.md`（M1 已交付：守卫包装、自检、会话存储、auth 服务骨架——M2 在其上叠加）。
-> 设计依据：`docs/dsh-auth-plan_zh.md` §5/§6 阶段 1/§8；工程门禁：`docs/development.md`。
+> 基线：`docs/implemented/impl-m1_zh.md`（M1 已交付：守卫包装、自检、会话存储、auth 服务骨架——M2 在其上叠加）。
+> 设计依据：`docs/specs/dsh-auth-plan_zh.md` §5/§6 阶段 1/§8；工程门禁：`docs/specs/development.md`。
 > **本文件是 M2 的唯一权威细则**；与 plan/M1 冲突时以本文件为准。
 >
-> 环境与验证工作流见 `docs/handoff-m2_zh.md`（新 session 必读：服务器访问、沙箱网络限制、
+> 环境与验证工作流见 `docs/handoff/handoff-m2_zh.md`（新 session 必读：服务器访问、沙箱网络限制、
 > M1 踩坑清单）。**禁止自行探索 harness 内部**——需要本文件之外的事实，停下报告。
 
 ---
@@ -411,7 +411,7 @@ credentials provider**（M18：`ctx.provide("credentials", { resolve: async (ref
 6. `src/auth-endpoints.ts` + 测试。
 7. `src/index.ts` 装配 + `src/index.test.ts` 适配（mode=password 抛错、credentials 缺失 fail-closed、gate 为 TokenGate 实例）。
 8. `src/integration.auth.test.ts`。
-9. `docs/development.md` Structure 树更新为：
+9. `docs/specs/development.md` Structure 树更新为：
    ```
    src/
    ├── index.ts           # plugin entry + auth 服务接线 + credentials 解析器（M2 改装配）
@@ -427,7 +427,7 @@ credentials provider**（M18：`ctx.provide("credentials", { resolve: async (ref
    ├── *.test.ts          # 单元测试（显式 vitest import）
    └── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试
    ```
-   `docs/handoff-m2_zh.md` 状态快照（§2）与 §5.4 冒烟序列同步更新。
+   `docs/handoff/handoff-m2_zh.md` 状态快照（§2）与 §5.4 冒烟序列同步更新。
 
 ---
 

@@ -30,4 +30,4 @@ operation (no caching), and every resolution failure logs an error and returns
 undefined - the gate then denies exactly as if no credential existed.
 
 Backfill note: registered as part of the decision-record process landing
-(2026-08-30); the original frozen decision lives in docs/impl-m2.md.
+(2026-08-30); the original frozen decision lives in docs/implemented/impl-m2.md.

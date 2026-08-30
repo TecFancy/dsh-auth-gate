@@ -2,7 +2,7 @@
 
 > Reader: the coding agent that executes the implementation (expected deepseek v4 flash). This document is a **decision-complete spec**:
 > every judgment point has already been closed in advance; the executor only translates, does not design.
-> Design rationale is in `docs/dsh-auth-plan.md`; engineering gates are in `docs/development.md`; this file is the sole
+> Design rationale is in `docs/specs/dsh-auth-plan.md`; engineering gates are in `docs/specs/development.md`; this file is the sole
 > authoritative fine-grained ruleset of the two for the M1 scope — where they conflict, this file wins.
 >
 > All mount-point facts have been verified against the real source and type declarations of `@deepseek-ai/*@0.1.0-rc.6` / `@deepseek-ai/cordis@4.0.1`.
@@ -459,7 +459,7 @@ import * as storageDomain from "@deepseek-ai/dsh-storage-domain";
 5. `src/self-check.ts` → `src/self-check.test.ts`.
 6. `src/index.ts` (rewrite, replacing the existing skeleton) → `src/index.test.ts` (rewrite).
 7. The two integration test files (write last: they depend on the stability of the previous five steps).
-8. Update the `## Structure` tree in `docs/development.md` to:
+8. Update the `## Structure` tree in `docs/specs/development.md` to:
    ```
    src/
    ├── index.ts          # plugin entry: name / inject / Config / apply + auth service wiring

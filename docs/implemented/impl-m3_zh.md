@@ -2,11 +2,11 @@
 
 > 读者：执行实现的编码代理（预期 deepseek v4 flash，**新 session**）。本文档是**决策完备的规格**：
 > 所有判断点已预先关闭，执行者只做翻译，不做设计。
-> 基线：`docs/impl-m2_zh.md`（M2 已交付：守卫 + TokenGate + /auth 端点 + 持久化会话——M3 在其上叠加）。
-> 设计依据：`docs/dsh-auth-plan_zh.md` §5/§6 阶段 2/§8；工程门禁：`docs/development.md`。
+> 基线：`docs/implemented/impl-m2_zh.md`（M2 已交付：守卫 + TokenGate + /auth 端点 + 持久化会话——M3 在其上叠加）。
+> 设计依据：`docs/specs/dsh-auth-plan_zh.md` §5/§6 阶段 2/§8；工程门禁：`docs/specs/development.md`。
 > **本文件是 M3 的唯一权威细则**；与 plan/M1/M2 冲突时以本文件为准。
 >
-> 环境与验证工作流见 `docs/handoff-m2_zh.md`（新 session 必读：服务器访问、沙箱网络限制、M1/M2
+> 环境与验证工作流见 `docs/handoff/handoff-m2_zh.md`（新 session 必读：服务器访问、沙箱网络限制、M1/M2
 > 踩坑清单——§3/§4/§5 的环境事实对 M3 依然有效）。**禁止自行探索 harness 内部**——需要本文件
 > 之外的事实，停下报告。
 >
@@ -491,8 +491,8 @@ export async function main(argv: string[], io: CliIo): Promise<number>;
 - `README.md` 新增一节（消费者契约）：`mode: "password"` 配置、users 文件格式与权限（0600、
   归 CLI 管）、CLI 用法、token → password 迁移说明、已知局限（限速内存态重启清零；禁用用户
   不吊销已发会话；无 CSRF token 的残余风险；Bearer 会话 token 语义；XFF 不信任）。
-- `docs/development.md` 的 `## Structure` 树按 §4 新文件更新。
-- `AGENTS.md` 增两行指针：M3 规格 `docs/impl-m3_zh.md` + 交接 `docs/handoff-m3_zh.md`（后者由执行
+- `docs/specs/development.md` 的 `## Structure` 树按 §4 新文件更新。
+- `AGENTS.md` 增两行指针：M3 规格 `docs/implemented/impl-m3_zh.md` + 交接 `docs/handoff/handoff-m3_zh.md`（后者由执行
   session 收尾时写，见 DoD 6）。
 
 ---
@@ -658,11 +658,11 @@ WebServer + 真实 users 文件（`mkdtemp` root；`beforeAll` 用 `hashPassword
 10. `src/cli.ts` + `src/cli.test.ts`。
 11. `src/index.ts` 装配 + `src/index.test.ts` 适配。
 12. `src/integration.password.test.ts`。
-13. 文档：`docs/development.md` Structure 树、`README.md`（密码模式/CLI/users 文件契约）、
+13. 文档：`docs/specs/development.md` Structure 树、`README.md`（密码模式/CLI/users 文件契约）、
     `AGENTS.md`（M3 指针）。
 14. `npm run build` + `lib/` 与 `src/` 同批；`git diff --exit-code -- lib` 通过。
 15. 服务器端到端冒烟（DoD 4）。
-16. 收尾写 `docs/handoff-m3_zh.md`（DoD 6）。
+16. 收尾写 `docs/handoff/handoff-m3_zh.md`（DoD 6）。
 
 ---
 
@@ -702,7 +702,7 @@ WebServer + 真实 users 文件（`mkdtemp` root；`beforeAll` 用 `hashPassword
         → 前 5 次 401、第 6 次 429；`curl -s -i -d "username=admin&password=<test-password>" http://127.0.0.1:3081/auth/login | head -5` → 429 + `retry-after` 头。
    5. 收尾：杀掉实例或留用（报告状态）；`boot.log` 无 `password flow requires M3` 类报错。
 5. 报告：改动文件、P1–P26 落点、覆盖率数字、与本文档的偏差（应为零）。
-6. **写 `docs/handoff-m3_zh.md`**（为 M4 交接）：环境事实增量（如 scrypt 实测耗时、CLI 在服务器上的
+6. **写 `docs/handoff/handoff-m3_zh.md`**（为 M4 交接）：环境事实增量（如 scrypt 实测耗时、CLI 在服务器上的
    实际路径）、M3 冒烟真实结果、M3 踩坑清单、M4（TOTP）起点提示。已获用户指令才 commit/push。
 
 ---

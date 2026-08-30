@@ -21,20 +21,24 @@
 >   `challengeMacKey: Uint8Array`.
 > - **T13**: `TODO(auth-m5):` markers are present in `src/` at the three revisit points.
 > - **§3.3**: value is split on the **last** `.` (usernames may contain dots, P5).
+> - **§3.3 / file map**: `CHALLENGE_COOKIE` / build / parse / issue live in
+>   `src/features/password/challenge-cookie.ts` (0.11.1 split; re-exported through
+>   `password-login.ts`). Historical mentions of `password-endpoints.ts` as the cookie home
+>   (§3.3, T11, file map) refer to the pre-0.11.1 layout.
 > - Files: `src/features/password/challenge-cookie.ts` (new), `src/integration-totp-helpers.ts` /
 >   `src/integration.totp-hardening.test.ts` (integration hardening suite).
 
 > Reader: the coding agent implementing this (expected deepseek v4 flash, **new session**). This document is a
 > **decision-complete spec**: all decision points are already closed; the executor only translates, it does not
 > design.
-> Baseline: `docs/impl-m3.md` (M3 delivered: users.yaml + scrypt + rate limiting + `dsh-auth user` CLI — M4 stacks
+> Baseline: `docs/implemented/impl-m3.md` (M3 delivered: users.yaml + scrypt + rate limiting + `dsh-auth user` CLI — M4 stacks
 > on top of it). M1's D1–D16, M2's M1–M22 and M3's P1–P26 stay unchanged unless explicitly amended below.
-> Design basis: `docs/dsh-auth-plan.md` §6 phase 3 / §8; engineering gates and slice layout: `docs/development.md`
-> and `docs/src-refactor-plan.md` (layered `src/`: gate/session core + features/{token,password,proxy} + shared leaf;
+> Design basis: `docs/specs/dsh-auth-plan.md` §6 phase 3 / §8; engineering gates and slice layout: `docs/specs/development.md`
+> and `docs/specs/src-refactor-plan.md` (layered `src/`: gate/session core + features/{token,password,proxy} + shared leaf;
 > cross-slice imports only through barrels; features never import each other).
 > **This file is the sole authority for M4 details**; where it conflicts with plan/M1/M2/M3, this file wins.
 >
-> Environment and verification workflow: see `docs/handoff-m3.md` (mandatory reading for a new session: server
+> Environment and verification workflow: see `docs/handoff/handoff-m3.md` (mandatory reading for a new session: server
 > smoke workflow §4, M1–M3 pitfalls §3, M4 starting hints §5). **Do not explore the harness internals yourself** —
 > if you need a fact not present in this file, stop and report.
 
@@ -81,7 +85,7 @@ surface.
 | T13 | M3 leftovers (eval) | Final dispositions, all **not implemented**, each with a one-line why (recorded in ADR T15-b): **(a) `revokeBySubject`** (P15/P17 TODO(auth-m4)) — not done: users file re-read per login (P7); gate-path file IO for every request is a performance/caching tradeoff the single-gate model doesn't merit; README keeps the documented limitation (disabled users only block new logins). **(b) Login CSRF token** (P21 re-evaluate) — still not added: TOTP does not change the analysis (a forged TOTP submission needs the victim's current code; challenge cookie CSRF-set is harmless — the code is the gate); `SameSite=Lax` + third-party Set-Cookie restrictions stand. **(c) Rate-limit persistence** — not done: in-memory reset-on-restart already documented; TOTP replay guard is in-memory for the same reason and documented together. New code keeps `TODO(auth-m5):` markers where these are revisited. |
 | T14 | CLI                 | `dsh-auth user totp enable <name>` — user must exist and not be disabled-flag-blocked (any status counts as existing); generates a new secret **only if none present** (existing secret → stderr `user <name> already has a TOTP secret (disable first)` + exit 1); writes users.yaml atomically via `writeUsersFile` (preserves other fields, 0600, P19); prints to stdout: the base32 secret and the `otpauth://` URI + a note "add to authenticator, then verify by logging in". `dsh-auth user totp disable <name>` — removes the secret (idempotent: no secret → success, `user <name> has no TOTP secret` on stdout? **No** — silent success, mirroring `disable` idempotence; stderr only on error). Invalid name/file errors like existing commands (exit 1).                                                                                                                                                    |
 | T15 | ADR records         | Written at implementation time, all to `docs/decisions/implemented/` (bilingual `(en                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | zh).md`, four-section template, `verify-decision-records`must pass), then`docs/decisions.md`index extended (D6+): **(a)**`YYYY-MM-DD-totp-two-stage-challenge-cookie`— stateless challenge cookie vs. pending-session store vs. single-page resubmission; **(b)**`YYYY-MM-DD-totp-disposition-of-m3-leftovers`— T13 (a/b/c) evaluation conclusions; **(c)**`YYYY-MM-DD-totp-slice-and-injection`— new`features/totp/`slice + root injection over same-layer import; **(d)**`YYYY-MM-DD-totp-config-off-by-default` — three-state config + default off (backward compat). If a decision set is tight, (a)+(d) may merge into one ADR (decision = "adaptively-enabled two-stage via stateless challenge cookie, default off") — executor's call, but each surviving decision must be traceable. |
-| T16 | DoD                 | (1) `npm run verify` fully green (all 10 gates; 230 + new tests). (2) `lib/` rebuilt in the same commit. (3) **otplib cross-validation** (§3.1): ≥ 200 randomized cases + RFC vectors, bit-for-bit match, transcript in handoff-m4. (4) Real-server smoke on `web-test` (handoff-m3 §4 workflow): password → challenge page → wrong code 401 → correct code → session cookie; challenge cookie cleared; replay (same code twice) → 401; required-mode user without secret → 401; `mode:"token"` regression untouched. (5) README/README.zh updated: config table + CLI + limitations (in-memory replay/limiter reset on restart; challenge cookie TTL; `off` default). (6) ADRs landed + decisions.md updated. (7) `docs/handoff-m4.md` written (env facts, real smoke results, cross-validation transcript, pitfalls, M5 starting hints; zh mirror optional).                                                           |
+| T16 | DoD                 | (1) `npm run verify` fully green (all 10 gates; 230 + new tests). (2) `lib/` rebuilt in the same commit. (3) **otplib cross-validation** (§3.1): ≥ 200 randomized cases + RFC vectors, bit-for-bit match, transcript in handoff-m4. (4) Real-server smoke on `web-test` (handoff-m3 §4 workflow): password → challenge page → wrong code 401 → correct code → session cookie; challenge cookie cleared; replay (same code twice) → 401; required-mode user without secret → 401; `mode:"token"` regression untouched. (5) README/README.zh updated: config table + CLI + limitations (in-memory replay/limiter reset on restart; challenge cookie TTL; `off` default). (6) ADRs landed + decisions.md updated. (7) `docs/handoff/handoff-m4.md` written (env facts, real smoke results, cross-validation transcript, pitfalls, M5 starting hints; zh mirror optional).                                                   |
 
 ---
 
@@ -94,7 +98,7 @@ surface.
 - Window ±1: for `t in {t0-1, t0, t0+1}` with `t0 = floor(nowMs / 30_000)`; if any counter's code matches, verification maps to success (then replay check, §3.2).
 - Constant-time compare: both sides converted to equal-length buffers (`Buffer.from(code, "ascii")`) + `timingSafeEqual`. Do **not** fall back to `===` anywhere.
 - `generateTotpSecret()`: `randomBytes(20)` → base32 (RFC 4648 alphabet `A-Z2-7`, no padding, uppercase). Base32 encode/decode is a private helper in `totp.ts` (node's `Buffer` base32 support is version-dependent — self-written avoids the engines question; ~40 lines, unit-tested via round-trips).
-- **Cross-validation against otplib (user-approved 2026-08-30)**: before the milestone lands, a one-off throwaway script (in a temp dir, never in the repo — development.md rule 4) installs `otplib@13.5.0` (`npm install --registry=https://registry.npmjs.org/ --no-save --prefix /tmp/...`) and compares our implementation against `@otplib/totp` (authenticator 30 s step, 6 digits) over **≥ 200 randomized cases**: random 20-byte secrets (base32-encoded), random counters in `±1`-window and outside-window positions, plus the RFC 6238 Appendix-B vectors. Every case must match bit-for-bit (window hit and miss). This is evidence, not a runtime dependency: the script's transcript is recorded in `docs/handoff-m4.md`; the package is not added to package.json.
+- **Cross-validation against otplib (user-approved 2026-08-30)**: before the milestone lands, a one-off throwaway script (in a temp dir, never in the repo — development.md rule 4) installs `otplib@13.5.0` (`npm install --registry=https://registry.npmjs.org/ --no-save --prefix /tmp/...`) and compares our implementation against `@otplib/totp` (authenticator 30 s step, 6 digits) over **≥ 200 randomized cases**: random 20-byte secrets (base32-encoded), random counters in `±1`-window and outside-window positions, plus the RFC 6238 Appendix-B vectors. Every case must match bit-for-bit (window hit and miss). This is evidence, not a runtime dependency: the script's transcript is recorded in `docs/handoff/handoff-m4.md`; the package is not added to package.json.
 
 ### 3.2 Replay guard semantics
 
@@ -185,11 +189,11 @@ src/features/password/password-endpoints.ts challenge cookie const/parse/issue/c
 src/index.ts                      config totp field + replayGuard instance + verifyTotp wiring (T10)
 src/cli.ts                        one `totp` branch delegating to features/totp/cli.ts (≤250)
 scripts/verify-slice-boundaries.mjs  FEATURE_SLICES += "totp"
-docs/impl-m4.md  (this file) + docs/impl-m4_zh.md (mirror, same batch)
+docs/implemented/impl-m4.md  (this file) + docs/implemented/impl-m4_zh.md (mirror, same batch)
 docs/decisions/implemented/2026-08-30-*.{en,zh}.md   ADRs per T15 (verify-decision-records must pass)
 docs/decisions.md                  index grows (D6+)
 README.md / README.zh.md           config table (+totp), CLI section (+user totp …), limitations paragraph
-docs/handoff-m4.md                 handoff for M5 (en; zh mirror optional)
+docs/handoff/handoff-m4.md                 handoff for M5 (en; zh mirror optional)
 ```
 
 Tests for the endpoint flow live under `src/features/password/` (`password-login.totp.test.ts` and/or
@@ -233,6 +237,6 @@ Coverage: keep ≥ 80 % red line (new files are small and densely exercised).
 7. `features/totp/cli.ts` + cli.ts branch + tests.
 8. `npm run build` (lib/ in same commit), full `npm run verify`.
 9. **otplib cross-validation script** (temp dir, transcript for handoff-m4).
-10. ADRs (T15) + decisions.md + README zh/en + docs/impl-m4_zh.md; final verify.
+10. ADRs (T15) + decisions.md + README zh/en + docs/implemented/impl-m4_zh.md; final verify.
 11. Server smoke (handoff-m3 §4 workflow adapted: add TOTP user via new CLI, exercise §3.4 flow), then
-    `docs/handoff-m4.md`.
+    `docs/handoff/handoff-m4.md`.

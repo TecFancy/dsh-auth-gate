@@ -59,7 +59,7 @@ dsh @ 127.0.0.1:3080
 ```
 bin/dsh-auth-proxy.js         # 可执行入口（shebang node）
 src/proxy/                    # 后续若做 TS 化，从纯 JS 迁入
-docs/local-proxy.md           # 本文（en + zh 双语拆分时可再分）
+docs/deployed/local-proxy.md           # 本文（en + zh 双语拆分时可再分）
 ```
 
 交付两种使用方式：

@@ -218,11 +218,11 @@ Not doing it. Reason: the threat model is "protect the single entry of the whole
 | M4    | Phase 3: TOTP two-stage login + config items                                                                                         | OTP hardening                                      |
 | M5    | Standalone reverse-proxy shell mode (proxy shell): listens on public net itself + reverse-proxies a bare dsh + Host/Origin rewriting | planned (recorded 2026-08-15, awaiting scheduling) |
 
-> M3 note: per the user's decision, password hashing uses `node:crypto` **scrypt** (N=2¹⁶/r=8/p=1, zero added native dependency; spec `docs/impl-m3.md` P1/P2), replacing the argon2id/bcryptjs candidates in the earlier draft of this section.
+> M3 note: per the user's decision, password hashing uses `node:crypto` **scrypt** (N=2¹⁶/r=8/p=1, zero added native dependency; spec `docs/implemented/impl-m3.md` P1/P2), replacing the argon2id/bcryptjs candidates in the earlier draft of this section.
 
 ### M5 (planned): standalone reverse-proxy shell mode (standalone proxy shell)
 
-> 2026-08-15 project initiation driven by production-deployment evidence; read `docs/deployment.md` §8 (semi-shell production topology and fence fact table) before scheduling.
+> 2026-08-15 project initiation driven by production-deployment evidence; read `docs/deployed/deployment.md` §8 (semi-shell production topology and fence fact table) before scheduling.
 
 **Background (empirical findings)**: dsh 0.1.0-rc.6's browser trust fence pins privileged methods such as `settings.*` / `credentials.*` / `llm.discoverModels` to loopback only (`dsh-client-connection` `PRIVILEGED_METHODS`, which `--trusted-host` can't open up). Behind a public reverse proxy these endpoints are always 403. Measured matrix:
 

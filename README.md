@@ -240,13 +240,13 @@ reads — the global copy is just a launcher.
 
 ## Deployment
 
-- [Reverse-proxy deployment guide](docs/reverse-proxy.md) — Caddy/nginx
+- [Reverse-proxy deployment guide](docs/deployed/reverse-proxy.md) — Caddy/nginx
   setups, the browser-trust fence gotcha (Settings-page `403`s behind a proxy,
   and why auth alone doesn't fix them), and the recommended semi-shell
   topology.
-- [`docs/deployment.md`](docs/deployment.md) — ops checklist, acceptance steps
+- [`docs/deployed/deployment.md`](docs/deployed/deployment.md) — ops checklist, acceptance steps
   (A–I) and troubleshooting. Chinese version:
-  [`docs/deployment_zh.md`](docs/deployment_zh.md).
+  [`docs/deployed/deployment_zh.md`](docs/deployed/deployment_zh.md).
 
 ## Authenticated local proxy (optional, dsh-auth-proxy)
 
@@ -262,8 +262,8 @@ reads — the global copy is just a launcher.
 > After the semi-shell fixed the server-side `/api` fence, dsh's **client** still requires
 > "page origin must be loopback"; the local proxy provides a loopback page entry on the user's
 > machine, composing with auth-gate for "remote config editing with authentication throughout",
-> without touching dsh sources. Full design: [docs/local-proxy.md](docs/local-proxy.md)
-> (Chinese: [docs/local-proxy_zh.md](docs/local-proxy_zh.md)).
+> without touching dsh sources. Full design: [docs/deployed/local-proxy.md](docs/deployed/local-proxy.md)
+> (Chinese: [docs/deployed/local-proxy_zh.md](docs/deployed/local-proxy_zh.md)).
 
 - Zero-dependency Node bin (`dsh-auth-proxy`): strictly bound to `127.0.0.1`, stateless
   pass-through for pages/API, `events.mux`/`events.host` WebSocket tunneling, and a

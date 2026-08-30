@@ -31,4 +31,4 @@ exercise ("old-parameter hashes still verify under new constants"). Basic
 timing-safety (constant-time compare) is applied on the verification side.
 
 Backfill note: registered as part of the decision-record process landing
-(2026-08-30); the original frozen decision lives in docs/impl-m3.md.
+(2026-08-30); the original frozen decision lives in docs/implemented/impl-m3.md.

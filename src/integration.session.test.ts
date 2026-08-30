@@ -67,7 +67,7 @@ describe("integration: real storage stack persistence", () => {
         issued = await auth1!.sessions!.create("token", 60_000);
         expect(auth1!.sessions!.getByToken(issued.token)?.subject).toBe("token");
 
-        // On-disk format (docs/impl-m1.md §2.2): unit header + tables map.
+        // On-disk format (docs/implemented/impl-m1.md §2.2): unit header + tables map.
         const doc = JSON.parse(readFileSync(join(root, "dsh_auth_sessions.json"), "utf8")) as {
           unit: { name: string; version: number };
           tables: Record<string, Record<string, unknown>>;

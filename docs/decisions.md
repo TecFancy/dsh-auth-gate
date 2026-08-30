@@ -6,7 +6,7 @@
 [`docs/decisions/README.md`](decisions/README.md)。
 
 > 注：M1–M3 的冻结决策表（D1–D16 / M1–M22 / P1–P26）是阶段执行契约，仍以
-> `docs/impl-mN.md` 为准；本索引从 2026-08-30 起收录「为什么层」记录，已实施的
+> `docs/implemented/impl-mN.md` 为准；本索引从 2026-08-30 起收录「为什么层」记录，已实施的
 > 重大决策按精选策略回填登记。
 
 ## D1. 认证门失败即关闭（fail-closed）

@@ -3,8 +3,8 @@
 本文档描述如何把 dsh-auth-gate（password 模式，M3）部署到一个公网 dsh web 实例，并完成
 **部署验收**。适用于：实例已跑通 dsh web（`dsh --profile web`），需要加认证门。
 
-设计依据：`docs/dsh-auth-plan_zh.md` §7/§8（无上游 PR 通道的限制、纵深防御）；
-规格：`docs/impl-m2_zh.md`（token 模式）、`docs/impl-m3_zh.md`（password 模式）。
+设计依据：`docs/specs/dsh-auth-plan_zh.md` §7/§8（无上游 PR 通道的限制、纵深防御）；
+规格：`docs/implemented/impl-m2_zh.md`（token 模式）、`docs/implemented/impl-m3_zh.md`（password 模式）。
 **两个模式二选一**：下面按 password 模式（推荐，M3）编写；token 模式只需跳过
 "建用户"一步并配置 `tokenRef`。
 
@@ -20,7 +20,7 @@
 - **服务器有 Node ≥ 22.19**（与部署一致）与 pnpm（`dsh plugin` 转发 pnpm）。实测：npm 默认
   global prefix 是 `/usr`（无 root 权限装不了），用
   `npm i -g pnpm --prefix ~/.npm-global` 并 `export PATH="$HOME/.npm-global/bin:$PATH"`
-  （`dsh` 本身也装在这个 prefix，见 `docs/handoff-m2_zh.md` §3.2）。
+  （`dsh` 本身也装在这个 prefix，见 `docs/handoff/handoff-m2_zh.md` §3.2）。
 
 ---
 
@@ -140,6 +140,24 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 2. 跑验收清单 B/D/F 三组（守卫 + 会话 + WS）；
 3. 检查 `boot.log` 无新增 error/warn。
 
+### 5.1 升级 dsh-auth-gate（0.11.0 → 0.11.1，TOTP 加固）
+
+实测踩坑（2026-08-30，web-test 验证）：
+
+1. **新发布版本会被 pnpm 的 `minimumReleaseAge` 拦截**——普通 `pnpm up dsh-auth-gate`
+   可能静默不升。显式钉版本，并用与 profile 的 `node_modules` 匹配的 pnpm 主版本
+   （profile 声明 `packageManager: pnpm@11.22.0`；系统 pnpm 9.x 会因 store 不匹配失败）：
+   ```sh
+   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.11.1
+   # 验证：grep '"version"' "$DSH_HOME/profiles/<profile>/node_modules/dsh-auth-gate/package.json"
+   ```
+2. **重启使在途 TOTP 挑战失效**（挑战 cookie 带进程级 HMAC 签名，ADR D10）：验证码页上的
+   用户需重新输入密码（窗口 ≤ 5 分钟）。旧明文 cookie 格式升级后也不再有效（视为无挑战，
+   用户看到密码页）。
+3. 升级后至少跑一轮 TOTP 验收：密码阶段 → 挑战 cookie（三段式签名值）→ 验证码页 →
+   正确码 → 会话；错码 → 401 + 挑战页错误槽位；带会话 cookie 访问 `/auth/status` →
+   `authenticated: true`。
+
 ## 6. 故障诊断
 
 | 症状                               | 原因                                              | 处理                                              |
@@ -156,14 +174,14 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] `$DSH_HOME/.credentials.yaml` 与 `auth/users.yaml` 均 `chmod 600`（dsh-auth CLI 自动 600）。
 - [ ] 会话日志视同含密材料（备份/共享同等防护）。
 - [ ] 升级回归（§5）纳入运维流程；auth 行健康检查（`boot.log` + 验收 B/D/F）纳入监控。
-- [ ] 口令哈希为 scrypt（`docs/impl-m3_zh.md` P1）；文件零明文。
+- [ ] 口令哈希为 scrypt（`docs/implemented/impl-m3_zh.md` P1）；文件零明文。
 - [ ] 禁用用户只拦新登录（已发会话 TTL 内有效，M3 已知局限）。
 - [ ] 限速内存态重启清零；反代部署时限速按出口 IP 聚合（不信任 X-Forwarded-For）。
 
 ## 8. 公网部署变体（2026-08-15 起，dsh.hi-ruofei.com 生效）：半外壳
 
 > 本文档 §1-§7 为"插件形态"（门卫进 dsh 进程）。2026-08-15 生产实证后，公网实例改用
-> **半外壳**变体；长期方向见 `docs/dsh-auth-plan_zh.md` §9 M5（独立反代外壳）。
+> **半外壳**变体；长期方向见 `docs/specs/dsh-auth-plan_zh.md` §9 M5（独立反代外壳）。
 
 ### 8.1 为什么需要外壳：浏览器信任栅栏与认证正交
 

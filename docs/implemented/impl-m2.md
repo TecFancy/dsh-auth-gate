@@ -2,11 +2,11 @@
 
 > Readers: coding agents implementing this (expected deepseek v4 flash, **new session**). This document is a **decision-complete spec**:
 > every decision point is pre-closed; the implementer only translates, no design.
-> Baseline: `docs/impl-m1.md` (M1 delivered: guard wrapper, self-check, session store, auth service skeleton — M2 layers on top of it).
-> Design rationale: `docs/dsh-auth-plan.md` §5/§6 phase 1/§8; engineering gates: `docs/development.md`.
+> Baseline: `docs/implemented/impl-m1.md` (M1 delivered: guard wrapper, self-check, session store, auth service skeleton — M2 layers on top of it).
+> Design rationale: `docs/specs/dsh-auth-plan.md` §5/§6 phase 1/§8; engineering gates: `docs/specs/development.md`.
 > **This file is the sole authoritative spec for M2**; where it conflicts with plan/M1, this file wins.
 >
-> Environment and verification workflow: see `docs/handoff-m2.md` (a new session must read: server access, sandbox network limits,
+> Environment and verification workflow: see `docs/handoff/handoff-m2.md` (a new session must read: server access, sandbox network limits,
 > M1 pitfall checklist). **Do not explore harness internals yourself** — if you need facts outside this file, stop and report.
 
 ---
@@ -411,7 +411,7 @@ credentials provider** (M18: `ctx.provide("credentials", { resolve: async (ref) 
 6. `src/auth-endpoints.ts` + tests.
 7. `src/index.ts` assembly + `src/index.test.ts` adaptation (mode=password throws, credentials missing fail-closed, gate is a TokenGate instance).
 8. `src/integration.auth.test.ts`.
-9. `docs/development.md` Structure tree updated to:
+9. `docs/specs/development.md` Structure tree updated to:
    ```
    src/
    ├── index.ts           # plugin entry + auth service wiring + credentials resolver (M2 changed assembly)
@@ -427,7 +427,7 @@ credentials provider** (M18: `ctx.provide("credentials", { resolve: async (ref) 
    ├── *.test.ts          # unit tests (explicit vitest imports)
    └── integration.*.test.ts  # real cordis/webserver/storage stack integration tests
    ```
-   `docs/handoff-m2.md` status snapshot (§2) and §5.4 smoke sequence updated in sync.
+   `docs/handoff/handoff-m2.md` status snapshot (§2) and §5.4 smoke sequence updated in sync.
 
 ---
 

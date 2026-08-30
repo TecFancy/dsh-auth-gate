@@ -32,4 +32,4 @@ turns "silently unguarded" into "boot fails with a clear error" - the
 fail-loud companion to the fail-closed gate.
 
 Backfill note: registered as part of the decision-record process landing
-(2026-08-30); the original frozen decision lives in docs/impl-m1.md.
+(2026-08-30); the original frozen decision lives in docs/implemented/impl-m1.md.

@@ -201,7 +201,7 @@ framework 的 ADR 制度是从 **dsh 官方仓库（一万次 commit 验证）**
 - **不全量回填 M1–M3**（60+ 条，成本远超收益；官方也不回填历史）
 - **但精选 3–5 条重大决策补记**作启动样例（fail-closed 原则、scrypt 选型、guard 包装 seam、logoutOrder 默认值……）——既立习惯，又避开官方点名的「无真实样例定规则」坑
 - **M4 TOTP 起新决策全部走 ADR**；修改已冻结决策时补记一条
-- 落地为**独立 docs 批次**（不塞重构 PR），M4 开工前生效；约定写入 `docs/development.md`，AGENTS.md 只挂索引
+- 落地为**独立 docs 批次**（不塞重构 PR），M4 开工前生效；约定写入 `docs/specs/development.md`，AGENTS.md 只挂索引
 
 ### 11.3 遗留细节（开工时定）
 

@@ -1,10 +1,10 @@
 # dsh-auth M3 handoff document (session handoff)
 
-> Readers: the coding agent executing `docs/impl-m4.md` in a **new session**. This file carries
+> Readers: the coding agent executing `docs/implemented/impl-m4.md` in a **new session**. This file carries
 > environment facts and procedural knowledge unique to this session — things not in the repo, that
 > are expensive to re-derive, or that will trip you up.
-> **Reading order: `AGENTS.md` → `docs/impl-m3.md` → this document**; the environment facts in
-> `docs/handoff-m2.md` §3/§4 (sandbox networking, server access, pkill tricks, lint pitfalls) are
+> **Reading order: `AGENTS.md` → `docs/implemented/impl-m3.md` → this document**; the environment facts in
+> `docs/handoff/handoff-m2.md` §3/§4 (sandbox networking, server access, pkill tricks, lint pitfalls) are
 > still valid and are not repeated here.
 
 ---
@@ -26,7 +26,7 @@ is unchanged with zero regressions, all green.
     `5f049c2` (handoff snapshot refresh + plan roadmap ✅) → `04037a9` (deployment deliverable).
 - **PR #2 is open** (`development` → `main`, titled "M2 shared token gate + M3 password login
   flow..."): pending merge. After merge, the `feat:` commits on `main` will trigger release-please to
-  automatically open a **release PR** (version bump + CHANGELOG, see `docs/development.md` Releases) —
+  automatically open a **release PR** (version bump + CHANGELOG, see `docs/specs/development.md` Releases) —
   that is an automated flow and needs no manual handling; do not hand-edit the `package.json` version
   before the release PR is merged.
 - Commit discipline during M3 implementation unchanged: `lib/` and `src/` in the same commit; `docs:`/`feat:`
@@ -123,7 +123,7 @@ On top of handoff-m2 §3.2:
 ## 6. Open questions / pending
 
 - The deployment-side deliverable is complete and tested: `deploy/cordis.patch.yml` (production overlay template) +
-  `docs/deployment.md` (deployment and acceptance checklist) — exercised end to end on the server following the
+  `docs/deployed/deployment.md` (deployment and acceptance checklist) — exercised end to end on the server following the
   documented flow (`npm pack` → `dsh plugin --profile web add` → package-name-referenced overlay → acceptance
   sequence A–H all green, including the `; Secure` cookie with `cookieSecure: true`).
 - No blockers. Possible follow-ups: M4 spec (TOTP), GUI logout button (client half).

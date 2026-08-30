@@ -50,15 +50,15 @@
 
 ## 3. 文件蓝图
 
-| 文件                                                   | 动作     | 说明                                                                                                                                                                                             |
-| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `src/client/context.ts`                                | 改       | 镜像新增 `AuthLocaleService`（register/bind）与 `AuthContext.effect`；`AuthSlotRegisterOptions` 增 `locale?: string`                                                                             |
-| `src/client/logout-action.tsx`                         | 改       | `SettingsLogoutAction`（`{ t? }`）：`useAuthenticated` 门控 + `<form>` + 居中危险 CTA（16px 图标 + `t("logout")` 文字，hover 提亮）                                                              |
-| `src/client/index.tsx`                                 | 改       | 注册词典（zh/en，zh=退出登录）→ `ctx.slots.inject("settings.general.item", ...)` 单处注册（`locale`/`order:30`/thunk label）；移除三处旧注册；`inject = ["slots","locale"]`                      |
-| `src/client/logout-action.test.tsx`                    | 改       | apply 断言：双语词典注册 + 单槽注册；组件断言：zh/en 文字、无认证隐藏、hover 提亮（见 D8）                                                                                                       |
-| `docs/impl-client-logout.md`                           | 改       | 本规格（即此文件）                                                                                                                                                                               |
-| `docs/deployment.md` / `_zh`、`README`、`README.zh.md` | 改       | 「右上角/侧边栏底部登出」描述 → 设置面板醒目退出登录按钮；删过时截图 `docs/demo/logout-hero-blank.png`、`logout-conversation-en.png`；设计预览 `docs/design/**` 仅作历史参考、不再在 README 链接 |
-| `lib/client.js`、`lib/client/index.d.ts`               | 构建产物 | 与 src 同批提交                                                                                                                                                                                  |
+| 文件                                                            | 动作     | 说明                                                                                                                                                                                             |
+| --------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/client/context.ts`                                         | 改       | 镜像新增 `AuthLocaleService`（register/bind）与 `AuthContext.effect`；`AuthSlotRegisterOptions` 增 `locale?: string`                                                                             |
+| `src/client/logout-action.tsx`                                  | 改       | `SettingsLogoutAction`（`{ t? }`）：`useAuthenticated` 门控 + `<form>` + 居中危险 CTA（16px 图标 + `t("logout")` 文字，hover 提亮）                                                              |
+| `src/client/index.tsx`                                          | 改       | 注册词典（zh/en，zh=退出登录）→ `ctx.slots.inject("settings.general.item", ...)` 单处注册（`locale`/`order:30`/thunk label）；移除三处旧注册；`inject = ["slots","locale"]`                      |
+| `src/client/logout-action.test.tsx`                             | 改       | apply 断言：双语词典注册 + 单槽注册；组件断言：zh/en 文字、无认证隐藏、hover 提亮（见 D8）                                                                                                       |
+| `docs/implemented/impl-client-logout.md`                        | 改       | 本规格（即此文件）                                                                                                                                                                               |
+| `docs/deployed/deployment.md` / `_zh`、`README`、`README.zh.md` | 改       | 「右上角/侧边栏底部登出」描述 → 设置面板醒目退出登录按钮；删过时截图 `docs/demo/logout-hero-blank.png`、`logout-conversation-en.png`；设计预览 `docs/design/**` 仅作历史参考、不再在 README 链接 |
+| `lib/client.js`、`lib/client/index.d.ts`                        | 构建产物 | 与 src 同批提交                                                                                                                                                                                  |
 
 ## 4. 验证步骤
 
@@ -70,7 +70,7 @@
    通用设置 → 页底出现居中的「退出登录 / Sign out」按钮 → 切换语言 → 按钮文字在
    「退出登录」/ "Sign out" 间切换 → 点击 → 302 回落登录页 → 未带 cookie 的 SPA 请求
    被门禁拦截。**会话头部右上角、新会话页右上角与侧边栏 footer 均不再有登出入口**。
-   按 `docs/development.md` "GUI demos"约定配演示（截图 + 说明证明了什么）。
+   按 `docs/specs/development.md` "GUI demos"约定配演示（截图 + 说明证明了什么）。
 4. 提交 development → PR → main（`feat:` → release-please）。
 
 ## 5. 明确不做的事

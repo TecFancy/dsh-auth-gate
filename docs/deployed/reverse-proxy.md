@@ -5,8 +5,8 @@ through a reverse proxy (TLS terminator). This guide collects what we learned
 from production (2026-08-15): the Caddy setup that works, the browser-trust
 fence gotcha behind the `403`s, and the recommended "semi-shell" topology.
 
-> Companion docs: `docs/deployment.md` (Chinese, ops checklist and acceptance
-> steps) and `docs/dsh-auth-plan.md` §9 M5 (the planned standalone shell).
+> Companion docs: `docs/deployed/deployment.md` (Chinese, ops checklist and acceptance
+> steps) and `docs/specs/dsh-auth-plan.md` §9 M5 (the planned standalone shell).
 
 ## 1. Why a reverse proxy is required
 
@@ -40,11 +40,11 @@ same layer that authenticates. Auth alone (gate or not) never fixes the 403s.
 
 ## 3. Topology options
 
-| Option                           | Auth                                   | Host/Origin rewrite     | Settings page          | Notes                                                      |
-| -------------------------------- | -------------------------------------- | ----------------------- | ---------------------- | ---------------------------------------------------------- |
-| Plain proxy (Caddy pass-through) | dsh-auth-gate                          | no                      | 403 on privileged APIs | works except Settings                                      |
-| **Semi-shell (recommended)**     | dsh-auth-gate                          | **yes** (2 Caddy lines) | **fully works**        | keep the login page, rate limit, revocation                |
-| Standalone shell (M5, roadmap)   | dsh-auth-gate as its own proxy process | built-in                | fully works            | dsh runs with zero plugins; see `docs/dsh-auth-plan.md` §9 |
+| Option                           | Auth                                   | Host/Origin rewrite     | Settings page          | Notes                                                            |
+| -------------------------------- | -------------------------------------- | ----------------------- | ---------------------- | ---------------------------------------------------------------- |
+| Plain proxy (Caddy pass-through) | dsh-auth-gate                          | no                      | 403 on privileged APIs | works except Settings                                            |
+| **Semi-shell (recommended)**     | dsh-auth-gate                          | **yes** (2 Caddy lines) | **fully works**        | keep the login page, rate limit, revocation                      |
+| Standalone shell (M5, roadmap)   | dsh-auth-gate as its own proxy process | built-in                | fully works            | dsh runs with zero plugins; see `docs/specs/dsh-auth-plan.md` §9 |
 
 The fence being neutralized by the rewrite is compensated by the gate: the
 session cookie is `SameSite=Lax`, so cross-site / DNS-rebinding requests never
@@ -106,7 +106,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
 #   WebSocket upgrade on /api/events.host → 101 with cookie, 401 without
 ```
 
-Full acceptance checklist: `docs/deployment.md` §4 (A–I).
+Full acceptance checklist: `docs/deployed/deployment.md` §4 (A–I).
 
 ## 6. Troubleshooting
 

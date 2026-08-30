@@ -1,8 +1,8 @@
 # dsh-auth M3 交接文档（session handoff）
 
-> 读者：在**新 session** 中执行 `docs/impl-m4.md` 的编码代理。本文件承载本 session 独有的
+> 读者：在**新 session** 中执行 `docs/implemented/impl-m4.md` 的编码代理。本文件承载本 session 独有的
 > 环境事实与过程知识——仓库里没有、重新探索成本高或会踩坑的内容。
-> **阅读顺序：`AGENTS.md` → `docs/impl-m3_zh.md` → 本文档**；`docs/handoff-m2_zh.md` §3/§4 的
+> **阅读顺序：`AGENTS.md` → `docs/implemented/impl-m3_zh.md` → 本文档**；`docs/handoff/handoff-m2_zh.md` §3/§4 的
 > 环境事实（沙箱网络、服务器访问、pkill 技巧、lint 陷阱）依然有效，不重复。
 
 ---
@@ -23,7 +23,7 @@ WS/429 限速/禁用用户/白名单）。`mode: "token"`（M2）行为零改动
     `5f049c2`（handoff 快照刷新 + plan 路线图 ✅）→ `04037a9`（部署交付物）。
 - **PR #2 已开**（`development` → `main`，标题 "M2 shared token gate + M3 password login
   flow..."）：待合并。合并后 `main` 上的 `feat:` 提交会触发 release-please 自动开 **release
-  PR**（版本 bump + CHANGELOG，见 `docs/development.md` Releases）——那是自动化流程，无需
+  PR**（版本 bump + CHANGELOG，见 `docs/specs/development.md` Releases）——那是自动化流程，无需
   手工处理；release PR 合并前不要手工改 `package.json` 版本。
 - M3 实施期间的提交纪律照旧：`lib/` 与 `src/` 同批；`docs:`/`feat:` 分型。
 
@@ -107,7 +107,7 @@ mountAuthEndpoints(...))` 里，mountAuthEndpoints 必须**立即执行注册并
 
 ## 6. 开放问题 / 待定
 
-- 部署侧交付物已完成并实测：`deploy/cordis.patch.yml`（生产 overlay 模板）+ `docs/deployment_zh.md`
+- 部署侧交付物已完成并实测：`deploy/cordis.patch.yml`（生产 overlay 模板）+ `docs/deployed/deployment_zh.md`
   （部署与验收清单）——已在服务器按文档流程走通（`npm pack` → `dsh plugin --profile web add`
   → 包名引用 overlay → 验收序列 A–H 全绿，含 `cookieSecure: true` 的 `; Secure` cookie）。
 - 无阻塞项。候选后续：M4 规格（TOTP）、GUI 登出按钮（client 半边）。

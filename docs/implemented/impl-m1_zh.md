@@ -2,7 +2,7 @@
 
 > 读者：执行实现的编码代理（预期 deepseek v4 flash）。本文档是**决策完备的规格**：
 > 所有判断点已预先关闭，执行者只做翻译，不做设计。
-> 设计依据见 `docs/dsh-auth-plan_zh.md`；工程门禁见 `docs/development.md`；本文件是两者在
+> 设计依据见 `docs/specs/dsh-auth-plan_zh.md`；工程门禁见 `docs/specs/development.md`；本文件是两者在
 > M1 范围内的唯一权威细则——冲突时以本文件为准。
 >
 > 所有挂载点事实均已在 `@deepseek-ai/*@0.1.0-rc.6` / `@deepseek-ai/cordis@4.0.1`
@@ -461,7 +461,7 @@ import * as storageDomain from "@deepseek-ai/dsh-storage-domain";
 5. `src/self-check.ts` → `src/self-check.test.ts`。
 6. `src/index.ts`（重写，替换现有骨架）→ `src/index.test.ts`（重写）。
 7. 集成测试两个文件（最后写：依赖前五步稳定）。
-8. `docs/development.md` 的 `## Structure` 树更新为：
+8. `docs/specs/development.md` 的 `## Structure` 树更新为：
    ```
    src/
    ├── index.ts          # plugin entry: name / inject / Config / apply + auth 服务接线

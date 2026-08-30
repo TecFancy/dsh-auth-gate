@@ -10,7 +10,7 @@
 ## 1. 背景与目标
 
 `src/login-page.ts` 是 M2/M3 冻结的自包含登录页(token 与 password 两版共用同一套
-内联样式,零第三方资源、无外部字体,`docs/impl-m2.md` §4.4 与 `docs/impl-m3.md`
+内联样式,零第三方资源、无外部字体,`docs/implemented/impl-m2.md` §4.4 与 `docs/implemented/impl-m3.md`
 P13/4.6 已把它的行为写死)。此前对该文件做过一轮人工评审,发现若干视觉与可访问性
 问题:按钮/页脚/输入框边框对比度不足、`autofocus` 属性缺失(违反冻结契约)、错误
 提示样式单薄、缺少 `:focus-visible` 状态、未响应 `prefers-reduced-motion`。
@@ -157,7 +157,7 @@ fields: [
 ],
 ```
 
-> 注意:这与"先聚焦第一个空字段"的常见直觉不一致,但 `docs/impl-m3.md` P13 原文
+> 注意:这与"先聚焦第一个空字段"的常见直觉不一致,但 `docs/implemented/impl-m3.md` P13 原文
 > 明确把 `autofocus` 写在 password 字段的 `<input>` 契约里,属于冻结决策,本次不
 > 重新评估,只补齐缺失的实现。
 
@@ -397,7 +397,7 @@ footer a:focus-visible {
 3. `npm run build`:`src/login-page.ts` 改动后必须重新生成 `lib/`,与 `src/` 改动
    一起提交(`AGENTS.md`"验证一个改动是否真的生效"第 2 条;CI 会跑
    `git diff --exit-code -- lib` 校验漂移)。
-4. 按 `docs/development.md`"GUI demos"约定:登录页是用户可见的 Web 行为,改动
+4. 按 `docs/specs/development.md`"GUI demos"约定:登录页是用户可见的 Web 行为,改动
    需要配一份从真实流程录制的演示(真实启动的 server、干净浏览器状态、非 mock
    传输),并在演示旁写清楚这份录制证明了什么(至少应覆盖:token 页与 password
    页首次加载时的焦点落点、错误提示态、Tab 键盘导航到按钮/页脚链接时的焦点环)。
@@ -445,7 +445,7 @@ footer a:focus-visible {
 3. `npm run verify` 全绿。
 4. `npm run build` 已执行,`lib/` 与 `src/` 改动在同一批提交里,`git diff --exit-code -- lib`
    通过。
-5. 已按 `docs/development.md`"GUI demos"约定录制真实流程演示,并说明演示验证了
+5. 已按 `docs/specs/development.md`"GUI demos"约定录制真实流程演示,并说明演示验证了
    哪些点(焦点落点、错误态、focus-visible 键盘导航)。
 6. 未触碰 §7"明确不做的事"列出的任何范围。
 7. 提交信息符合 `AGENTS.md` 的 commitlint 约定,`lib/` 与 `src/` 同批提交,未在

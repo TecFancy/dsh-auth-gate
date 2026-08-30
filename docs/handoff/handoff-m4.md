@@ -1,10 +1,33 @@
 # dsh-auth M4 handoff document (session handoff)
 
-> Readers: the coding agent executing `docs/impl-m5.md` (standalone reverse-proxy shell mode) in a **new session**.
+> ## Amendment (2026-08-30): 0.11.0 shipped, 0.11.1 hardening landed
+>
+> Post-M4 security review (Grok 4.6) → fix plan (`docs/implemented/totp-fix-plan.md`, decision A) →
+> implemented and released as **0.11.1** (PR #63 `fix:`, PR #64 `docs:`, release PR #65).
+> Everything below this block is the original M4 handoff; the following overrides
+> supersede it for any new session:
+>
+> - **The M4 PR series mentioned in §2 is complete**: `feat:` (TOTP, commit `9040228`) → main
+>   as squash #60 → **v0.11.0** (tag `669b793`); hardening fix `d0df533` → main as squash #63 →
+>   **v0.11.1** (tag `v0.11.1`). `development` is fully synced with `main`.
+> - **Contract changes (0.11.1)**: challenge cookie is HMAC-signed
+>   (`<user>.<exp>.<mac>`, ADR D10, `src/features/password/challenge-cookie.ts`); `off` gates
+>   the submit path and GET rendering; submit path checks `user.disabled`; replay guard keys
+>   on counter; `recordSuccess` moved after store availability; TOTP failures return 401 with
+>   the challenge-page HTML (error slot). Full list: `docs/implemented/impl-m4.md` amendment block.
+> - **Environment**: `web-test` profile is on 0.11.1; `totpverify` test user exists (secret in
+>   `dsh-auth user totp enable totpverify` output history). Main instance (port 3080, `dsh web`)
+>   is still on **0.11.0** — upgrading it is the next ops step (need restart; in-flight TOTP
+>   challenges die on restart, README documents this).
+> - Test inventory now ~300+ tests; new files `challenge-cookie.ts/.test.ts`,
+>   `integration-totp-helpers.ts`, `integration.totp-hardening.test.ts`;
+>   `scripts/verify-slice-boundaries.mjs` whitelist grew.
+
+> Readers: the coding agent executing `docs/specs/impl-m5.md` (standalone reverse-proxy shell mode) in a **new session**.
 > This file carries environment facts and procedural knowledge unique to this session — things not in the repo,
 > that are expensive to re-derive, or that will trip you up.
-> **Reading order: `AGENTS.md` → `docs/impl-m4.md` → this document**; the environment facts in
-> `docs/handoff-m2.md` §3/§4/§5 and `docs/handoff-m3.md` §3/§4 remain valid and are not repeated here.
+> **Reading order: `AGENTS.md` → `docs/implemented/impl-m4.md` → this document**; the environment facts in
+> `docs/handoff/handoff-m2.md` §3/§4/§5 and `docs/handoff/handoff-m3.md` §3/§4 remain valid and are not repeated here.
 
 ---
 
@@ -24,7 +47,7 @@ behavior (M3) are unchanged, all green.
   (impl-m4.md + impl-m4_zh.md + ADRs + decisions.md + README zh/en), then release via merge to main.
 - `test/password-totp-harness.ts` is a new **src-external** shared test harness (first of its kind in this repo;
   see §4 pitfall 12). `tsconfig.json` include now lists `test`.
-- The M4 spec is `docs/impl-m4.md` (decision table T1–T16) — authoritative for what/why; this file is about how.
+- The M4 spec is `docs/implemented/impl-m4.md` (decision table T1–T16) — authoritative for what/why; this file is about how.
 
 ## 3. Server smoke (M4 version, actually exercised end to end on web-test)
 
@@ -127,6 +150,6 @@ behavior (M3) are unchanged, all green.
 - The `web-test` profile's `package.json` now pins a `file:` tarball for dsh-auth-gate; **restore `^0.10.0`
   (or bump to the next release) after this PR lands if the profile should track published releases**.
 - `PR #53` (login redesign, fan PR) is still open, untouched.
-- No blockers. Possible follow-ups: M5 spec (standalone reverse-proxy shell mode — see `docs/dsh-auth-plan.md`
+- No blockers. Possible follow-ups: M5 spec (standalone reverse-proxy shell mode — see `docs/specs/dsh-auth-plan.md`
   §9 M5 notes), GUI login-page i18n, `revokeBySubject`/CSRF/persistence re-evaluation (frozen declined in
   M4, ADR D8).

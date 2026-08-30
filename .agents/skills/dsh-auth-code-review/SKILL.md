@@ -11,9 +11,9 @@ required behavior over style; one substantiated blocker beats a list of nits.
 
 ## Sources of truth
 
-- `AGENTS.md`, `docs/development.md` (gates and conventions), `docs/dsh-auth-plan.md` (threat
-  model and design), `docs/impl-m1.md` (M1 frozen decisions and verified contracts).
-- Only harness facts recorded in `docs/impl-m1.md` §2 are authoritative for the diff. Flag any
+- `AGENTS.md`, `docs/specs/development.md` (gates and conventions), `docs/specs/dsh-auth-plan.md` (threat
+  model and design), `docs/implemented/impl-m1.md` (M1 frozen decisions and verified contracts).
+- Only harness facts recorded in `docs/implemented/impl-m1.md` §2 are authoritative for the diff. Flag any
   change that depends on harness internals beyond that section — unexplored internals are the
   #1 hallucination source in this repo.
 

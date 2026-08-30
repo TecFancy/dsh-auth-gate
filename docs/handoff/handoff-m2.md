@@ -1,9 +1,9 @@
 # dsh-auth M2 handoff document (session handoff)
 
-> Reader: the coding agent executing `docs/impl-m2.md` in a **new session**. This document carries the
+> Reader: the coding agent executing `docs/implemented/impl-m2.md` in a **new session**. This document carries the
 > environment facts and process knowledge unique to this session — content that is not in the repo, would
 > be costly to re-derive, or would trip you up.
-> **Reading order: `AGENTS.md` → `docs/impl-m2.md` → this document**.
+> **Reading order: `AGENTS.md` → `docs/implemented/impl-m2.md` → this document**.
 
 ---
 

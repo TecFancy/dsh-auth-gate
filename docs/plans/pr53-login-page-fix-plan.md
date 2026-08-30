@@ -7,7 +7,7 @@
 > 的 Apple 风登录页 + `Accept-Language` 中英文本地化，干净合进当前
 > `development`（含 `logoutOrder` / 配置技能），门禁全绿，squash 署名留给贡献者。
 >
-> 对照：视觉基线见 `docs/login-page-polish-plan.md`（已落地的 WCAG AA /
+> 对照：视觉基线见 `docs/implemented/login-page-polish-plan.md`（已落地的 WCAG AA /
 > autofocus / reduced-motion）；本轮是**另一条贡献分支的移植 + 门禁修复**，
 > 不是那份规划的续篇。
 
@@ -131,7 +131,7 @@ passwordLoginPageHtml(next: string, error?: string, lang?: LoginLang): string;
 第三参缺省 = 英文（与现在默认页一致）。**不要**把 `langOf` 再写进两个
 endpoints（这是 PR 的重复，也是 TS2345 源头）。
 
-`docs/development.md` 的 `src/` 树状图在落地时补一行新文件名即可（`docs:`
+`docs/specs/development.md` 的 `src/` 树状图在落地时补一行新文件名即可（`docs:`
 提交，不触发发版）。本方案文档本身不预改 development.md。
 
 ### 4.2 `langOf`（修 type-check + lint）
@@ -193,7 +193,7 @@ res.end(loginPageHtml(next, undefined, langOf(req)));
 ### 4.5 必须改的配色（相对亮度实测）
 
 对比度按 WCAG 相对亮度公式 `(L1+0.05)/(L2+0.05)`。文字门槛 4.5:1；非文字 UI
-边界（1.4.11）3:1。与 `docs/login-page-polish-plan.md` §2 同一套算法。
+边界（1.4.11）3:1。与 `docs/implemented/login-page-polish-plan.md` §2 同一套算法。
 
 | 角色                                        | PR 色       | 实测      | 门槛                                           | 改成        | 改后 |
 | ------------------------------------------- | ----------- | --------- | ---------------------------------------------- | ----------- | ---- |
@@ -266,7 +266,7 @@ methods 文件更瘦，避免再顶 250）：
 
 ## 6. 文档与演示
 
-`docs/development.md`「GUI demos」：用户可见 Web 行为必须带真机演示——真实
+`docs/specs/development.md`「GUI demos」：用户可见 Web 行为必须带真机演示——真实
 server、干净浏览器、非 mock 传输，并在演示旁写清证明了什么。
 
 | 动作                                        | 说明                                                      |

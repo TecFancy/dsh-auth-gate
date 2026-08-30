@@ -137,7 +137,7 @@ byte-stable across Windows/Linux builders.
     narration ("used to", "no longer", "this PR"), no reviewer-addressed
     justifications. State the present behavior; deferred work becomes
     `TODO(<tag>):` or an issue reference. A resolvable committed-doc citation
-    (`docs/dsh-auth-plan.md` §4) is allowed.
+    (`docs/specs/dsh-auth-plan.md` §4) is allowed.
 - **TODO discipline**: inline TODO/FIXME carry a stable tag naming the smell
   (e.g. `TODO(auth-token-gate):`), say why it is safe to revisit, and name the
   action. No TODOs for speculative complaints.
@@ -155,7 +155,7 @@ byte-stable across Windows/Linux builders.
 - **四段式**：决定了什么（Decision）/ 背景（Context）/ 考虑过的替代方案（Alternatives Considered）/ 为什么这样选（Why）——「为什么层」是记录的核心价值。
 - **强制检查** `npm run decisions:check`：文件名、必需章节、双语配对、归档哈希冻结（`.manifest.json` 只追加）；已挂 verify 链与 CI。
 - **写与归档的判据**：有被认真考虑过的替代方案、或将来的人会重新踩一遍想清楚的坑 → 写；未来还需不需要靠它做决定 → 决定归档与否；归档 = 冻结，改动走新记录 + 链接。
-- 索引页 `docs/decisions.md`（一句话摘要 + 链接）；M1–M3 冻结表仍以 `docs/impl-mN.md` 为执行权威。
+- 索引页 `docs/decisions.md`（一句话摘要 + 链接）；M1–M3 冻结表仍以 `docs/implemented/impl-mN.md` 为执行权威。
 
 ## CI
 
@@ -231,7 +231,7 @@ now documented so nobody re-learns them:
 - `@deepseek-ai/cordis`, `@deepseek-ai/schemastery`, `zod` are runtime deps
   (all public on npmjs).
 - `@deepseek-ai/dsh-storage-domain` is pinned to `^0.1.0-rc.6` by
-  `docs/impl-m1.md` §3: verified present on the public registry and matching
+  `docs/implemented/impl-m1.md` §3: verified present on the public registry and matching
   the deployed dsh checkout's `0.1.0-rc.6`.
 - `lint-staged` stays on `^16.1.0`: 17.x requires Node ≥ 22.22.1, dev machines
   may run earlier 22.x.
