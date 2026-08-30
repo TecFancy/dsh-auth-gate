@@ -166,7 +166,7 @@ describe("loginPageHtml", () => {
 
   it("autofocuses the token input (M2 §4.4)", () => {
     expect(loginPageHtml("/")).toContain(
-      'autocomplete="current-password" placeholder="Paste your token" required autofocus>',
+      'autocomplete="current-password" placeholder="Paste your token" aria-label="Access token" required autofocus>',
     );
   });
 });

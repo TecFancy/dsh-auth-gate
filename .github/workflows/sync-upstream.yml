@@ -1,0 +1,100 @@
+name: sync-upstream
+
+# 自动追踪上游 TecFancy/dsh-auth-gate 的更新，把它合并进我们的
+# 默认分支 main（= 上游最新 + 登录页美化），保证美化不失效。
+#
+# 架构（2026-08-30 起）：
+# - fork 的 main（默认分支）= 上游 main + 登录页美化 + rebuilt lib + 本文件
+#   —— 插件市场/DSH 安装源指向 github:BuvkB/dsh-auth-gate（无分支）
+#     解析到的就是“上游最新 + 美化”
+# - fork 的 feat/login-page-localization = main 镜像，供上游 PR #53 参考
+# - 冲突（通常是上游改了登录页/相关源码）不会乱推：开 issue 由人/AI 处理
+on:
+  schedule:
+    - cron: "0 3 * * *" # 每天 03:00 UTC（北京时间 11:00）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  sync-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Add upstream remote
+        run: git remote add upstream https://github.com/TecFancy/dsh-auth-gate.git
+
+      - name: Fetch upstream
+        run: git fetch upstream main
+
+      - name: Check upstream updates
+        id: check
+        run: |
+          if git merge-base --is-ancestor upstream/main main; then
+            echo "No new upstream commits."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git log --oneline main..upstream/main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Rebase main (with beautify) onto upstream
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git rebase upstream/main || {
+            git rebase --abort
+            echo "::error::main (beautify) rebase conflict with upstream"
+            exit 1
+          }
+
+      - name: Rebuild lib artifacts
+        if: steps.check.outputs.changed == 'true'
+        run: npm ci && npm run build
+
+      - name: Commit rebuilt artifacts and push main
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          if git status --porcelain -- lib | grep -q .; then
+            git add lib
+            git commit -m "chore(lib): rebuild artifacts after upstream sync"
+          fi
+          git push origin main --force-with-lease
+
+      - name: Mirror main onto PR branch
+        if: steps.check.outputs.changed == 'true'
+        run: |
+          git checkout feat/login-page-localization
+          git reset --hard origin/main
+          git push origin feat/login-page-localization --force-with-lease
+
+      - name: Notify on conflict
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              '## ⚠️ 自动同步失败 — 需要人工处理',
+              '',
+              '上游 `TecFancy/dsh-auth-gate` 有更新，但与我们的登录页美化发生冲突，',
+              '**未推送任何改动**（main / feat 保持原状）。',
+              '',
+              '常见原因：上游修改了登录页相关文件（`src/**/login-page*`、`lib/` 等）。',
+              '处理方式：本机 clone 中 `git rebase origin/main` 手动解决冲突后',
+              'rebuild lib 再 force push（或联系 AI 助手完成）。',
+            ].join('\n');
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[auto-sync] upstream conflict on ${new Date().toISOString().slice(0, 10)}`,
+              body,
+            });
+            console.log(`Created issue #${issue.data.number}`);

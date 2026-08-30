@@ -77,7 +77,7 @@
     "lock:check": "node scripts/check-lockfile-registry.mjs",
     "gates": "node scripts/run-gates.mjs",
     "verify": "npm run format:check && npm run lint && npm run lint:no-emdash && npm run slice:check && npm run lock:check && npm run decisions:check && npm run type-check && npm run test:coverage && npm run build && npm run bundle:check",
-    "prepack": "npm run build",
+    "prepack": "node scripts/fresh-build.mjs",
     "prepare": "node -e \"try { require.resolve('husky') } catch { process.exit(0) } require('node:child_process').execSync('husky', { stdio: 'inherit' })\"",
     "lint:no-emdash": "node scripts/check-no-emdash.mjs",
     "slice:check": "node scripts/verify-slice-boundaries.mjs",

@@ -1,7 +1,7 @@
 /**
  * token 模式登录页：单字段（共享访问令牌），恒时校验由端点负责。
  */
-export declare function loginPageHtml(next: string, error?: string): string;
+export declare function loginPageHtml(next: string, error?: string, lang?: string): string;
 /** password 模式登录页（P13）：username + password 两字段，同款卡片样式。 */
-export declare function passwordLoginPageHtml(next: string, error?: string): string;
+export declare function passwordLoginPageHtml(next: string, error?: string, lang?: string): string;
 //# sourceMappingURL=login-page.d.ts.map

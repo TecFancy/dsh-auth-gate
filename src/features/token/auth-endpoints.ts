@@ -4,6 +4,7 @@ import {
   parseCookieHeader,
   parseFormBody,
   loginPageHtml,
+  langOf,
 } from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
@@ -77,7 +78,7 @@ function serveLoginPage(req: IncomingMessage, res: ServerResponse): void {
   const next = validateNext(queryOf(req).get("next") ?? "/");
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(loginPageHtml(next));
+  res.end(loginPageHtml(next, undefined, langOf(req)));
 }
 
 async function loginAttempt(

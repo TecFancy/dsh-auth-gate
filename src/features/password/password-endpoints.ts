@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { validateNext, parseCookieHeader, passwordLoginPageHtml } from "../../shared/index.js";
+import {
+  validateNext,
+  parseCookieHeader,
+  passwordLoginPageHtml,
+  langOf,
+} from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
 import { handlePasswordLogin, type PasswordLoginDeps } from "./password-login.js";
 import { buildSetCookie } from "../../session/index.js";
@@ -53,7 +58,7 @@ function handleLogin(
     const next = validateNext(queryOf(req).get("next") ?? "/");
     res.setHeader("cache-control", "no-store");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(passwordLoginPageHtml(next));
+    res.end(passwordLoginPageHtml(next, undefined, langOf(req)));
     return;
   }
   if (req.method === "POST") {
