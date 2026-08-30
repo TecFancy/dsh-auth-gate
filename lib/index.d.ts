@@ -20,6 +20,11 @@ export interface AuthConfig {
     /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
     usersFile: string;
     /**
+     * TOTP 两段式模式（M4 T4）：off 忽略 secret（纯密码）；optional 有 secret 的用户
+     * 走两段式；required 全员必须两段式（无 secret 的用户登录失败，统一 401）。
+     */
+    totp: "off" | "optional" | "required";
+    /**
      * 「退出登录」按钮在设置 → 通用设置 页的槽位 order（升序渲染，越大越靠底部）。
      * 默认 1000 已大于 dsh 自带条目（-25~20）与绝大多数第三方插件；如确有插件
      * 注册更大的 order，可在此显式调大。经 `/auth/status` 透传给 client 半边。

@@ -1,7 +1,17 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { validateNext, parseCookieHeader, passwordLoginPageHtml } from "../../shared/index.js";
+import {
+  validateNext,
+  parseCookieHeader,
+  passwordLoginPageHtml,
+  totpChallengePageHtml,
+} from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
-import { handlePasswordLogin, type PasswordLoginDeps } from "./password-login.js";
+import {
+  handlePasswordLogin,
+  CHALLENGE_COOKIE,
+  parseChallengeValue,
+  type PasswordLoginDeps,
+} from "./password-login.js";
 import { buildSetCookie } from "../../session/index.js";
 
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
@@ -53,7 +63,12 @@ function handleLogin(
     const next = validateNext(queryOf(req).get("next") ?? "/");
     res.setHeader("cache-control", "no-store");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(passwordLoginPageHtml(next));
+    // M4 T6：有合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页
+    const challenge = parseChallengeValue(
+      parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
+      deps.now(),
+    );
+    res.end(challenge === undefined ? passwordLoginPageHtml(next) : totpChallengePageHtml(next));
     return;
   }
   if (req.method === "POST") {

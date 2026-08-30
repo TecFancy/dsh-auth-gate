@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { hashPassword } from "./features/password/index.js";
+import { handleUserTotp } from "./features/totp/index.js";
 import { bundledSkillDir, installSkill, userSkillDir, SKILL_NAME } from "./shared/index.js";
 import {
   compareNames,
@@ -25,6 +26,7 @@ const USAGE = `Usage:
   dsh-auth user add <name> --password-stdin [--disabled] [--file <path>]
   dsh-auth user list [--file <path>]
   dsh-auth user disable <name> [--file <path>]
+  dsh-auth user totp <enable|disable> <name> [--file <path>]
   dsh-auth skill install [--force]`;
 
 const defaultIo: CliIo = {
@@ -69,6 +71,7 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
     );
   if (command === "list") return listUsers(file, io);
   if (command === "disable") return disableUser(file, tokens[2], io);
+  if (command === "totp") return handleUserTotp(file, tokens[2], tokens[3], io);
   io.err(USAGE);
   return 1;
 }

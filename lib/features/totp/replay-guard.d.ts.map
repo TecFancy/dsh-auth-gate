@@ -1,0 +1,1 @@
+{"version":3,"file":"replay-guard.d.ts","sourceRoot":"","sources":["../../../src/features/totp/replay-guard.ts"],"names":[],"mappings":"AAMA;;;;GAIG;AACH,qBAAa,eAAe;IAC1B,OAAO,CAAC,QAAQ,CAAC,OAAO,CAA0C;IAElE;;;OAGG;IACH,cAAc,CAAC,QAAQ,EAAE,MAAM,EAAE,OAAO,EAAE,MAAM,EAAE,IAAI,EAAE,MAAM,GAAG,OAAO;IAuBxE,uCAAuC;IACvC,OAAO,CAAC,UAAU;CAOnB"}

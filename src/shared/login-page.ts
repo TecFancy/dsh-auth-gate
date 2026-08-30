@@ -91,6 +91,8 @@ interface LoginCardOptions {
     type: "text" | "password";
     /** M2 §4.4 / M3 P13 冻结要求：token 字段与 password 表单的密码字段需要它。 */
     autofocus?: boolean;
+    /** 附加 HTML 属性字符串（原样拼入 input 标签；调用方保证转义）。 */
+    attrs?: string;
   }[];
   submitLabel: string;
   next: string;
@@ -105,7 +107,8 @@ function renderLoginCard(options: LoginCardOptions): string {
   const fieldsHtml = options.fields
     .map((field) => {
       const autofocusAttr = field.autofocus === true ? " autofocus" : "";
-      const input = `<input id="${field.id}" type="${field.type}" name="${field.name}" autocomplete="${field.autocomplete}" placeholder="${field.placeholder}" required${autofocusAttr}>`;
+      const extraAttr = field.attrs === undefined ? "" : ` ${field.attrs}`;
+      const input = `<input id="${field.id}" type="${field.type}" name="${field.name}" autocomplete="${field.autocomplete}" placeholder="${field.placeholder}" required${autofocusAttr}${extraAttr}>`;
       if (field.type === "password") {
         return `<label class="field"><span class="label">${field.label}</span><span class="pw-wrap">${input}<button type="button" class="eye" data-toggle="${field.id}" aria-label="Toggle password visibility" aria-pressed="false"><span class="eye-open">${EYE_OPEN_SVG}</span><span class="eye-closed" hidden>${EYE_CLOSED_SVG}</span></button></span></label>`;
       }
@@ -187,6 +190,29 @@ export function passwordLoginPageHtml(next: string, error?: string): string {
       },
     ],
     submitLabel: "Sign in",
+    next,
+    error,
+  });
+}
+
+/** TOTP 挑战页（M4 T6）：单验证码字段，两段式登录第二段。 */
+export function totpChallengePageHtml(next: string, error?: string): string {
+  return renderLoginCard({
+    title: "Verify",
+    subtitle: "Enter the 6-digit code from your authenticator app",
+    fields: [
+      {
+        id: "code",
+        label: "Verification code",
+        name: "code",
+        autocomplete: "one-time-code",
+        placeholder: "000000",
+        type: "text",
+        autofocus: true,
+        attrs: 'inputmode="numeric" maxlength="6" pattern="[0-9]{6}"',
+      },
+    ],
+    submitLabel: "Verify",
     next,
     error,
   });

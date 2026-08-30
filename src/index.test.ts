@@ -18,6 +18,7 @@ function cfg(): AuthConfig {
     tokenRef: "DSH_AUTH_TOKEN",
     cookieSecure: true,
     usersFile: "",
+    totp: "off",
     logoutOrder: 1000,
   };
 }
@@ -87,9 +88,7 @@ function makeCtx(
   } as unknown as Context;
   return { ctx, effects, logs, provided };
 }
-async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
+const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 function bearerReq(token: string): IncomingMessage {
   return { headers: { authorization: `Bearer ${token}` } } as IncomingMessage;
 }

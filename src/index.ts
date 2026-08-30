@@ -7,6 +7,7 @@ import {
   registerPasswordEndpoints,
   verifyPassword,
 } from "./features/password/index.js";
+import { TotpReplayGuard, verifyTotpCode } from "./features/totp/index.js";
 import { LoginRateLimiter, defaultUsersFilePath, loadUsersFile } from "./shared/index.js";
 import { assertGuarded } from "./gate/index.js";
 import { sessionDomainSpec, SessionStore } from "./session/index.js";
@@ -31,6 +32,11 @@ export interface AuthConfig {
   /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
   usersFile: string;
   /**
+   * TOTP 两段式模式（M4 T4）：off 忽略 secret（纯密码）；optional 有 secret 的用户
+   * 走两段式；required 全员必须两段式（无 secret 的用户登录失败，统一 401）。
+   */
+  totp: "off" | "optional" | "required";
+  /**
    * 「退出登录」按钮在设置 → 通用设置 页的槽位 order（升序渲染，越大越靠底部）。
    * 默认 1000 已大于 dsh 自带条目（-25~20）与绝大多数第三方插件；如确有插件
    * 注册更大的 order，可在此显式调大。经 `/auth/status` 透传给 client 半边。
@@ -49,6 +55,7 @@ export const Config: z<AuthConfig> = z.object({
     .default("DSH_AUTH_TOKEN"),
   cookieSecure: z.boolean().default(true),
   usersFile: z.string().default(""),
+  totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
 });
 
@@ -159,6 +166,7 @@ function mountAuthEndpoints(
   resolveToken: (() => Promise<string | undefined>) | undefined,
   usersPath: string,
   limiter: LoginRateLimiter,
+  replayGuard: TotpReplayGuard,
   log: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -176,6 +184,11 @@ function mountAuthEndpoints(
         loadUsers: () => loadUsersFile(usersPath),
         verify: verifyPassword,
         limiter,
+        totpMode: config.totp,
+        verifyTotp: (secretB32, code, nowMs) => verifyTotpCode(secretB32, code, nowMs),
+        replayCheck: (username, counter, code) =>
+          replayGuard.checkAndRecord(username, counter, code),
+        now: Date.now,
         logoutOrder: config.logoutOrder,
         logger: log,
       })
@@ -208,6 +221,7 @@ export function apply(ctx: Context, config: AuthConfig): void {
   const resolveToken = config.mode === "token" ? makeTokenResolver(ctx, config, log) : undefined;
   const usersPath = config.usersFile === "" ? defaultUsersFilePath() : config.usersFile;
   const limiter = new LoginRateLimiter();
+  const replayGuard = new TotpReplayGuard();
 
   const auth: AuthService = {
     sessions: undefined,
@@ -232,7 +246,8 @@ export function apply(ctx: Context, config: AuthConfig): void {
   ctx.effect(() => unwrap, "dsh-auth-gate: guard unwrap");
 
   ctx.effect(
-    () => mountAuthEndpoints(server, config, auth, resolveToken, usersPath, limiter, log),
+    () =>
+      mountAuthEndpoints(server, config, auth, resolveToken, usersPath, limiter, replayGuard, log),
     "dsh-auth-gate: auth endpoints",
   );
 

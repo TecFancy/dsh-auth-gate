@@ -19,7 +19,7 @@ function makeRes(): FakeRes {
   };
   const res = {
     setHeader: (name: string, value: string): void => {
-      state.headers[name.toLowerCase()] = value;
+      state.headers[name.toLowerCase()] = String(value);
     },
     writeHead: (status: number, extra?: Record<string, string | number>): void => {
       state.status = status;
@@ -66,6 +66,10 @@ function makeDeps(): PasswordEndpointsDeps {
         missing: false,
       }),
     verify: () => Promise.resolve(true),
+    totpMode: "off",
+    verifyTotp: () => undefined,
+    replayCheck: () => true,
+    now: () => 1_700_000_000_000,
     limiter: new LoginRateLimiter(),
     logger: { error: () => undefined, info: () => undefined, warn: () => undefined },
   };

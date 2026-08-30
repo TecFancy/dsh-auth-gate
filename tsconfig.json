@@ -23,6 +23,6 @@
     "noFallthroughCasesInSwitch": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src", "*.config.ts", "*.config.js", "*.config.mjs", "scripts"],
+  "include": ["src", "test", "*.config.ts", "*.config.js", "*.config.mjs", "scripts"],
   "exclude": ["src/client"]
 }

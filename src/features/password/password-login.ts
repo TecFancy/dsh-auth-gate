@@ -1,8 +1,36 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { validateNext, parseFormBody } from "../../shared/index.js";
+import { validateNext, parseFormBody, parseCookieHeader } from "../../shared/index.js";
 import { DUMMY_HASH } from "./password.js";
 import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
+
+/** TOTP 挑战 cookie 名（M4 T5）。 */
+export const CHALLENGE_COOKIE = "dsh_auth_challenge";
+
+/** 挑战 cookie 有效期（秒，M4 T5 模块常量）。 */
+export const CHALLENGE_TTL_SECONDS = 300;
+
+/** 挑战 cookie 值格式 `<username>.<expiresEpochMs>`（username 字符集不含 `.`）。 */
+export function buildChallengeValue(username: string, expiresEpochMs: number): string {
+  return `${username}.${expiresEpochMs}`;
+}
+
+/** 解析挑战 cookie 值；格式非法/过期/时间戳异常 → undefined。 */
+export function parseChallengeValue(value: string | undefined, nowMs: number): string | undefined {
+  if (value === undefined) return undefined;
+  const dot = value.lastIndexOf(".");
+  if (dot <= 0 || dot === value.length - 1) return undefined;
+  const username = value.slice(0, dot);
+  const expires = Number(value.slice(dot + 1));
+  if (
+    !Number.isInteger(expires) ||
+    expires <= nowMs ||
+    expires - nowMs > CHALLENGE_TTL_SECONDS * 1000
+  ) {
+    return undefined;
+  }
+  return username;
+}
 
 export interface PasswordLoginDeps {
   sessions: () => SessionStore | undefined;
@@ -15,6 +43,14 @@ export interface PasswordLoginDeps {
   /** 与 verifyPassword 同形 `(password, storedHash)`：index.ts 直接注入 verifyPassword。 */
   verify: (password: string, storedHash: string) => Promise<boolean>;
   limiter: LoginRateLimiter;
+  /** TOTP 模式（M4 T4）：off 忽略 secret；optional 有 secret 才两段式；required 全员两段式。 */
+  totpMode: "off" | "optional" | "required";
+  /** 注入的 TOTP 校验（index.ts 从 features/totp 装配；命中返回匹配 counter）。 */
+  verifyTotp: (secretB32: string, code: string, nowMs: number) => number | undefined;
+  /** 注入的防重放守卫（index.ts 装配单例）。 */
+  replayCheck: (username: string, counter: number, code: string) => boolean;
+  /** 注入的当前时间（ms epoch；测试注入固定时钟）。 */
+  now: () => number;
   logger: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -26,8 +62,11 @@ export interface PasswordLoginDeps {
 let warnedMissing = false;
 
 /**
- * POST /auth/login（password 模式，P14）。完成全部响应写出（415/413/401/429/503/302）。
- * 流程顺序冻结：body → 限速 → 用户文件 → 恒时验证 → 会话。不吞不带 `status` 的流异常。
+ * POST /auth/login（password 模式，P14 + M4 T6）。完成全部响应写出（415/413/401/429/503/302）。
+ * 流程顺序冻结：body → 挑战 cookie 分流 → 限速 → 用户文件 → 恒时验证 → 会话/挑战。
+ * 挑战提交路径（有合法挑战 cookie + body 含 code）：验证 TOTP → 发会话；
+ * 否则走密码路径：验证通过后按 totpMode 决定直接发会话或发挑战 cookie。
+ * 不吞不带 `status` 的流异常。
  */
 export async function handlePasswordLogin(
   deps: PasswordLoginDeps,
@@ -41,10 +80,81 @@ export async function handlePasswordLogin(
     respondFormError(res, error);
     return;
   }
-  const username = params.get("username") ?? "";
-  const password = params.get("password") ?? "";
   const next = validateNext(params.get("next") ?? "/");
   const ip = req.socket.remoteAddress ?? "";
+  const challenge = parseChallengeValue(
+    parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
+    deps.now(),
+  );
+  const code = params.get("code") ?? "";
+
+  if (challenge !== undefined && code !== "") {
+    await handleTotpSubmit(deps, res, challenge, code, next, ip);
+    return;
+  }
+  await handlePasswordSubmit(deps, res, params, next, ip);
+}
+
+/** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 发会话。 */
+async function handleTotpSubmit(
+  deps: PasswordLoginDeps,
+  res: ServerResponse,
+  username: string,
+  code: string,
+  next: string,
+  ip: string,
+): Promise<void> {
+  if (!rateLimitOk(deps, res, ip, username)) return;
+  const loaded = await loadUsersOr503(deps, res);
+  if (loaded === undefined) return;
+
+  const user = loaded.snapshot.users.get(username);
+  if (user?.totpSecret === undefined) {
+    deps.limiter.recordFailure(ip, username);
+    res.setHeader("cache-control", "no-store");
+    res.writeHead(401, { "content-type": "text/plain" });
+    res.end("invalid credentials");
+    deps.logger.info("login rejected");
+    return;
+  }
+
+  const matched = deps.verifyTotp(user.totpSecret, code, deps.now());
+  const replay = matched !== undefined && deps.replayCheck(username, matched, code);
+  if (matched === undefined || !replay) {
+    deps.limiter.recordFailure(ip, username);
+    res.setHeader("cache-control", "no-store");
+    res.writeHead(401, { "content-type": "text/plain" });
+    res.end("invalid credentials");
+    deps.logger.info("login rejected");
+    return;
+  }
+
+  deps.limiter.recordSuccess(ip, username);
+  const store = deps.sessions();
+  if (store === undefined) {
+    res.setHeader("cache-control", "no-store");
+    res.writeHead(503, { "content-type": "text/plain" });
+    res.end("session store unavailable");
+    deps.logger.error("login failed: session store unavailable");
+    return;
+  }
+  // 清挑战 cookie + 发正式会话（M4 T6：一次性，防重放再收窄）；set-cookie 用数组
+  // （Node 重复 setHeader 会覆盖，必须同一次写两个 cookie）
+  await issueSession(deps, res, store, username, next, [
+    buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure),
+  ]);
+}
+
+/** 密码提交：限速 → 用户文件 → 恒时验证 → 按 totpMode 发会话或发挑战 cookie。 */
+async function handlePasswordSubmit(
+  deps: PasswordLoginDeps,
+  res: ServerResponse,
+  params: URLSearchParams,
+  next: string,
+  ip: string,
+): Promise<void> {
+  const username = params.get("username") ?? "";
+  const password = params.get("password") ?? "";
   const accountKey = username === "" ? undefined : username;
 
   if (!rateLimitOk(deps, res, ip, accountKey)) return;
@@ -54,6 +164,34 @@ export async function handlePasswordLogin(
   if (await rejectedInvalid(deps, res, loaded, username, password, ip, accountKey)) return;
   deps.limiter.recordSuccess(ip, accountKey); // P10：验证通过即清零失败桶（spec §4.7 步骤 7）
 
+  const user = loaded.snapshot.users.get(username);
+  const needsTotp = user?.totpSecret !== undefined && deps.totpMode !== "off";
+  if (deps.totpMode === "required" && user?.totpSecret === undefined) {
+    // required 模式：无 secret 的用户（含未知用户）统一 401（防枚举，与密码错误同响应）
+    deps.limiter.recordFailure(ip, accountKey);
+    res.setHeader("cache-control", "no-store");
+    res.writeHead(401, { "content-type": "text/plain" });
+    res.end("invalid credentials");
+    deps.logger.info("login rejected");
+    return;
+  }
+  if (needsTotp) {
+    // 两段式第一段通过：发挑战 cookie，302 回挑战页（GET 渲染 TOTP 输入）
+    const expires = deps.now() + CHALLENGE_TTL_SECONDS * 1000;
+    res.setHeader("cache-control", "no-store");
+    res.setHeader(
+      "set-cookie",
+      buildSetCookie(
+        CHALLENGE_COOKIE,
+        buildChallengeValue(username, expires),
+        CHALLENGE_TTL_SECONDS,
+        deps.cookieSecure,
+      ),
+    );
+    res.writeHead(302, { location: `/auth/login?next=${encodeURIComponent(next)}` });
+    res.end();
+    return;
+  }
   const store = deps.sessions();
   if (store === undefined) {
     res.setHeader("cache-control", "no-store");
@@ -132,13 +270,15 @@ async function issueSession(
   store: SessionStore,
   username: string,
   next: string,
+  extraSetCookie?: string[],
 ): Promise<void> {
   const { token: sessionToken } = await store.create(username, deps.sessionTtl * 1000);
   res.setHeader("cache-control", "no-store");
-  res.setHeader(
-    "set-cookie",
+  const cookies = [
+    ...(extraSetCookie ?? []),
     buildSetCookie(deps.cookieName, sessionToken, deps.sessionTtl, deps.cookieSecure),
-  );
+  ];
+  res.setHeader("set-cookie", cookies);
   res.writeHead(302, { location: next });
   res.end();
   deps.logger.info("session issued");
