@@ -1,6 +1,6 @@
 ---
 name: dsh-auth-gate-config
-description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder), how to configure them, the dsh-auth CLI, login trouble, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`.
+description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder), how to configure them, the dsh-auth CLI (incl. user totp enable/disable), login trouble, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder）、dsh-auth CLI（含 user totp enable/disable）、登录故障、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
@@ -17,9 +17,9 @@ CLI 用法、常见故障时使用。
 ## Triggers / 触发词
 
 auth-gate / login door / logout button / cookieSecure / usersFile / logoutOrder /
-mode / dsh-auth commands / login failures / rate-limit 429 / config 403
+mode / totp / two-factor / authenticator code / dsh-auth commands / login failures / rate-limit 429 / config 403
 auth-gate / 登录门 / 退出登录按钮 / cookieSecure / usersFile / logoutOrder / mode /
-dsh-auth 命令 / 登录不上 / 限速锁定 429 / 配置面 403
+totp / 两步验证 / 验证码 / dsh-auth 命令 / 登录不上 / 限速锁定 429 / 配置面 403
 
 ## What it is / 一句话定位
 
@@ -38,6 +38,7 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
 - id: dsh-auth-gate
   config:
     mode: "password" # "password"（推荐）or "token" / "password"（推荐）或 "token"
+    totp: "optional" # "off"(default) | "optional" | "required" - two-factor for password mode / 密码模式两步验证："off"（默认，忽略密钥）| "optional"（有密钥的用户两段式）| "required"（全员必须）
     cookieSecure: true # HTTPS requires true; plain-http testing false (browser rejects cookie) / HTTPS 必须 true；纯 http 测试 false（否则浏览器不收 cookie）
     usersFile: "" # password-mode user file; default $DSH_HOME/auth/users.yaml / 密码模式用户文件；默认 $DSH_HOME/auth/users.yaml
     sessionTtl: 604800 # session TTL in seconds / 会话秒数
@@ -61,6 +62,8 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user add admin --password-stdin
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user list
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user disable <name>
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp enable <name> # prints base32 secret + otpauth:// URI / 生成 TOTP 密钥（打印 base32 与 otpauth:// URI）
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp disable <name>
 # Install this quick-reference skill into $DSH_HOME/skills/ for the dsh agent:
 # 技能安装（本包内置的配置速查，装进 $DSH_HOME/skills/ 供 dsh agent 加载）：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]

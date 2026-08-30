@@ -48,3 +48,37 @@
 轻量 ADR 制度（被官方实践否决）。**为什么**：层匹配依赖图，机器约束防回潮。
 → [zh](decisions/implemented/2026-08-30-layered-src-with-barrels.zh.md) ·
 [en](decisions/implemented/2026-08-30-layered-src-with-barrels.en.md)（2026-08-30 实施）
+
+## D6. TOTP 两段式登录采用无状态挑战 cookie
+
+密码通过后发短 TTL 挑战 cookie（无服务端状态），验证码通过才发正式会话并同帧清零。
+**替代方案**：内存 pending 会话；挑战页重提交密码；签名挑战令牌。**为什么**：
+中间态压成浏览器状态，服务端零存储、重启无感，安全边界仍在验证码本身。
+→ [zh](decisions/implemented/2026-08-30-totp-two-stage-challenge-cookie.zh.md) ·
+[en](decisions/implemented/2026-08-30-totp-two-stage-challenge-cookie.en.md)
+
+## D7. TOTP 三态配置，默认 off
+
+`totp: "off" | "optional" | "required"`，默认 `"off"`（升级零惊扰）。
+**替代方案**：布尔开关；默认 optional；仅按用户手工开挖。**为什么**：三态覆盖
+升级兼容、渐进启用、强制基线三种场景。
+→ [zh](decisions/implemented/2026-08-30-totp-config-off-by-default.zh.md) ·
+[en](decisions/implemented/2026-08-30-totp-config-off-by-default.en.md)
+
+## D8. M3 遗留评估项维持不实施
+
+revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估后全部**维持不做**
+（各留 TODO(auth-m5)）。**替代方案**：gate 路径现读用户文件；新增 CSRF token；
+状态落盘。**为什么**：收益在单门模型下边际递减，现状与局限均已文档化，
+「评估后明确不做」即是 M3 契约要求的收尾。
+→ [zh](decisions/implemented/2026-08-30-totp-disposition-of-m3-leftovers.zh.md) ·
+[en](decisions/implemented/2026-08-30-totp-disposition-of-m3-leftovers.en.md)
+
+## D9. TOTP 独立 slice，能力经根装配注入 password
+
+`features/totp/` 与 token/password/proxy 并列；password 不 import totp，由 index.ts
+把 verifyTotp/replayCheck/clock 注入 deps。**替代方案**：TOTP 放 shared；
+直接同层互引；全写进 password。**为什么**：保持依赖图清晰 + slice:check 守护，
+注入复用 M3 既有模式。
+→ [zh](decisions/implemented/2026-08-30-totp-slice-and-injection.zh.md) ·
+[en](decisions/implemented/2026-08-30-totp-slice-and-injection.en.md)

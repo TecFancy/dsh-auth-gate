@@ -59,6 +59,11 @@ src/
 │   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
 │   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
 │   │   └── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点
+│   ├── totp/
+│   │   ├── index.ts
+│   │   ├── totp.ts            # RFC 6238：自写 base32 + HOTP/TOTP + 恒时验证（M4 新增）
+│   │   ├── replay-guard.ts    # 防重放：内存记录已验 (counter, code)（M4 新增）
+│   │   └── cli.ts             # dsh-auth user totp enable/disable（M4 新增）
 │   └── proxy/
 │       ├── index.ts
 │       ├── proxy.ts           # 本地反向代理（HTTP/WS 透传，dsh-auth-proxy）
@@ -68,7 +73,7 @@ src/
 │   ├── auth-common.ts  # 端点共享纯函数（validateNext，M3 提取）
 │   ├── cookie.ts       # Cookie 头解析
 │   ├── form-body.ts    # urlencoded body 读取
-│   ├── login-page.ts   # 自包含登录页（token + password 两版）
+│   ├── login-page.ts   # 自包含登录页（token + password + TOTP 挑战三版）
 │   ├── rate-limit.ts   # 双桶登录限速器（M3 新增）
 │   ├── skill-install.ts # dsh-auth skill install（M3 新增）
 │   └── users-file.ts   # users.yaml 加载/校验/原子写 + 默认路径解析（M3 新增）
@@ -76,6 +81,7 @@ src/
 ├── *.test.ts          # 单元测试（与源码同居；integration 测试留在根）
 └── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试
 
+test/               # src 外共享测试 harness（vitest 不自动收集、不编译进 lib、不进 coverage）
 lib/                # build output — COMMITTED (see below), never hand-edited
 ```
 

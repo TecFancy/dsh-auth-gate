@@ -29,6 +29,8 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
   - **令牌**：整个实例共用一个秘密令牌。
 - **浏览器和脚本都能用。** 浏览器走登录页；脚本和 curl 直接带
   `Authorization: Bearer <token>` 就能跳过登录页。
+- **可选两步验证（TOTP）。** 密码模式下，账号绑定了 TOTP 密钥的用户登录时需要
+  密码**加**验证器 App 的 6 位动态码（RFC 6238；配置 off/optional/required 三态）。
 - **默认就安全。** 密码只存哈希、登录有限速（反复输错会临时锁定该地址）、会话 cookie
   带安全属性，而且配置缺失或损坏时**拒绝访问而不是悄悄开门**。
 - **一个管理用户的小命令行工具**：
@@ -37,6 +39,8 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
   dsh-auth user add admin --password-stdin   # 添加用户
   dsh-auth user list                          # 查看用户
   dsh-auth user disable admin                 # 禁止某用户今后登录
+  dsh-auth user totp enable admin             # 生成 TOTP 密钥（打印 otpauth:// URI）
+  dsh-auth user totp disable admin            # 移除 TOTP 密钥
   ```
 
   全局安装时 `dsh-auth` 直接在你的 PATH 上；`dsh plugin add` 安装后二进制在
@@ -91,18 +95,24 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
 - id: dsh-auth-gate
   config:
     mode: "password" # "password"（推荐）或 "token"
+    totp: "optional" # "off"（默认）、"optional" 或 "required"
     cookieSecure: true # 使用 https 时保持 true
 ```
 
-| 选项           | 默认值             | 作用                                                                                                      |
-| -------------- | ------------------ | --------------------------------------------------------------------------------------------------------- |
-| `mode`         | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                   |
-| `sessionTtl`   | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                    |
-| `cookieName`   | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                          |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                    |
-| `cookieSecure` | `true`             | 只在纯 http 测试环境设为 `false`                                                                          |
-| `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                              |
-| `logoutOrder`  | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值 |
+| 选项           | 默认值             | 作用                                                                                                              |
+| -------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `mode`         | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                           |
+| `totp`         | `"off"`            | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录需密码+动态码；`"required"`：所有用户都必须（无码则无法登录） |
+| `sessionTtl`   | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                            |
+| `cookieName`   | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                                  |
+| `tokenRef`     | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                            |
+| `cookieSecure` | `true`             | 只在纯 http 测试环境设为 `false`                                                                                  |
+| `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                                      |
+| `logoutOrder`  | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值         |
+
+给用户开启 TOTP：运行 `dsh-auth user totp enable <name>`，把打印出的密钥（或
+`otpauth://` URI 二维码）录入验证器 App（Google Authenticator、1Password 等）。
+动态码每 30 秒变化一次；前后一个窗口内的码也接受（容忍时钟漂移）。
 
 ## 内置配置技能
 
@@ -208,7 +218,10 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 ## 注意事项与局限
 
 - 禁用用户只阻止**新**登录；已经登录的会话要等它自然过期。
-- 登录限速在服务器重启后清零。
+- 登录限速在服务器重启后清零；TOTP 防重放记录同样重启清零（同一 30 秒窗口内用过的
+  码在重启后重新可用——需要「重启 + 同窗口窃码」同时发生才能利用）。
+- TOTP 挑战态（「密码已过、等验证码」）最长 5 分钟，重启后若浏览器 cookie 仍新鲜，
+  验证码页依然可用，提交时按用户当前配置的密钥验证。
 - 反代部署时，限速按反代出口地址统计。
 - 设置面板里有「退出登录」按钮：在 设置 → 通用设置 页最下方，文案随语言在
   「退出登录」/ "Sign out" 间切换；`/auth/logout?next=/` 始终可作为兜底。

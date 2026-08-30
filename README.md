@@ -35,6 +35,9 @@ codebase. Solid engineering worth building on.
   - **Token**: one shared secret token for the whole instance.
 - **Works for browsers and scripts.** Browsers use the login page; scripts and
   curl can pass `Authorization: Bearer <token>` and skip the page entirely.
+- **Optional two-factor authentication (TOTP).** In password mode, a user with
+  a TOTP secret added to their account signs in with password **plus** a 6-digit
+  code from an authenticator app (RFC 6238, configurable off/optional/required).
 - **Safe by default.** Passwords are stored hashed, logins are rate-limited
   (repeated wrong attempts temporarily lock the address), session cookies are
   secure, and any missing or broken configuration **blocks access instead of
@@ -45,6 +48,8 @@ codebase. Solid engineering worth building on.
   dsh-auth user add admin --password-stdin   # add a user
   dsh-auth user list                          # list users
   dsh-auth user disable admin                 # block a user's future logins
+  dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
+  dsh-auth user totp disable admin            # remove the TOTP secret
   ```
 
   `dsh-auth` is directly on your PATH when the package is installed globally.
@@ -103,18 +108,25 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
 - id: dsh-auth-gate
   config:
     mode: "password" # "password" (recommended) or "token"
+    totp: "optional" # "off" (default), "optional", or "required"
     cookieSecure: true # keep true when you use https
 ```
 
 | Option         | Default            | What it does                                                                                                                                |
 | -------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mode`         | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                       |
+| `totp`         | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must (no code = no login)  |
 | `sessionTtl`   | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                              |
 | `cookieName`   | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                          |
 | `tokenRef`     | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                         |
 | `cookieSecure` | `true`             | Set to `false` only if you are testing over plain http                                                                                      |
 | `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                          |
 | `logoutOrder`  | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order |
+
+To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
+printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
+Authenticator, 1Password, etc.). The code changes every 30 seconds; a code from
+the previous or next window is also accepted (drift tolerance).
 
 ## Bundled configuration skill
 
@@ -280,7 +292,14 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 
 - Disabling a user only stops **new** logins; already-signed-in sessions stay
   valid until they expire.
-- Login rate limiting resets when the server restarts.
+- Login rate limiting resets when the server restarts; so does the TOTP
+  replay guard (a used code in the same 30s window becomes acceptable again
+  after a restart — restart and code-stealing in the same window are both
+  needed to exploit this).
+- A TOTP challenge (the "password ok, code pending" state) lasts at most 5
+  minutes and survives restarts only as the browser cookie's own TTL; after a
+  restart the code page still works if the cookie is fresh, and the code is
+  validated against the user's configured secret at submit time.
 - Behind a reverse proxy, rate limiting counts by the proxy's address.
 - Sign out from the GUI: a prominent "Sign out / 退出登录" button sits in the
   Settings panel (Settings → General, bottom) — client half, requires the
