@@ -13,6 +13,13 @@
 给 [DeepSeek Harness](https://github.com/deepseek-ai/dsh)（dsh）网页版加一道登录门。部署到
 公网 dsh 实例前面之后，不登录就没人能碰到你的 agent、聊天会话和 LLM 凭证。
 
+## 基于 dsh-plugin-framework 构建
+
+本插件建立在 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework)
+（dsh 生态的参考插件框架）的工程约定之上：`src/` 分层（features/shared，跨 slice 只能走
+barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校验）和决策记录纪律
+全部对齐该框架——这些约定在 dsh 官方代码库中久经考验。好的工程实践，值得站在上面。
+
 ## 它能做什么
 
 - **所有访问都要先登录。** 每个页面、每个 API 调用、每条 WebSocket 连接都会检查；

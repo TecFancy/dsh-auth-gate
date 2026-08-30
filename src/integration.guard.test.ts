@@ -2,8 +2,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { request } from "node:http";
 import { describe, expect, it } from "vitest";
-import type { Gate } from "./gate.js";
-import type { WrappableServer } from "./guard.js";
+import type { Gate, WrappableServer } from "./gate/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "./index.js";
 
 type RealServer = WrappableServer & { readonly port: number };
@@ -73,7 +72,7 @@ describe("integration: real webserver + guard", () => {
 
     try {
       const base = `http://127.0.0.1:${port}`;
-      // M2：插件挂 TokenGate（无凭证恒 deny）——先显式换 allow 门验证守卫放行零扰动。
+      // M2：插件挂 TokenGate（无凭证恒 deny）；先显式换 allow 门验证守卫放行零扰动。
       ctx.get("auth")!.gate = { decide: () => "allow" };
       expect(await (await fetch(`${base}/probe`)).text()).toBe("probe");
       expect(await (await fetch(`${base}/pfx/x`)).text()).toBe("pfx");

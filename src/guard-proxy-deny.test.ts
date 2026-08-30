@@ -1,8 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { describe, expect, it } from "vitest";
-import type { Gate } from "./gate.js";
-import { guardHttp, guardUpgrade } from "./guard.js";
+import type { Gate } from "./gate/index.js";
+import { guardHttp, guardUpgrade } from "./gate/index.js";
 
 interface ResState {
   status: number | undefined;

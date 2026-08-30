@@ -1,16 +1,15 @@
 import type { Context } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
-import { registerAuthEndpoints } from "./auth-endpoints.js";
-import type { Gate } from "./gate.js";
-import { wrapServer, type WrappableServer } from "./guard.js";
-import { PasswordGate } from "./password-gate.js";
-import { registerPasswordEndpoints } from "./password-endpoints.js";
-import { verifyPassword } from "./password.js";
-import { LoginRateLimiter } from "./rate-limit.js";
-import { assertGuarded } from "./self-check.js";
-import { sessionDomainSpec, SessionStore } from "./session-store.js";
-import { safeEqual, TokenGate } from "./token-gate.js";
-import { defaultUsersFilePath, loadUsersFile } from "./users-file.js";
+import { registerAuthEndpoints, safeEqual, TokenGate } from "./features/token/index.js";
+import { wrapServer, type Gate, type WrappableServer } from "./gate/index.js";
+import {
+  PasswordGate,
+  registerPasswordEndpoints,
+  verifyPassword,
+} from "./features/password/index.js";
+import { LoginRateLimiter, defaultUsersFilePath, loadUsersFile } from "./shared/index.js";
+import { assertGuarded } from "./gate/index.js";
+import { sessionDomainSpec, SessionStore } from "./session/index.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export const name = "dsh-auth-gate";
@@ -73,7 +72,7 @@ declare module "@deepseek-ai/cordis" {
 }
 
 /**
- * 构造凭证解析器（每次调用惰性取服务——实测 harness 并行挂载行，credentials 行可能在
+ * 构造凭证解析器（每次调用惰性取服务。实测 harness 并行挂载行，credentials 行可能在
  * 本行 apply 之后才就绪；每次 resolve 现取既是 M2 的 per-operation 语义，也天然规避
  * 竞态）。服务缺失 → 首次解析时 log.error（fail-closed）；解析失败 → log.error 并返回
  * undefined（登录/门都按"无凭证"处理）。
@@ -150,7 +149,7 @@ function mountSessionDomain(
 
 /**
  * 端点注册（按 mode 二选一，包装后的 register；P26）。**立即执行注册**并返回合并
- * disposer（作为 ctx.effect 的 callback 返回值；不得再包一层函数——那会被 cordis
+ * disposer（作为 ctx.effect 的 callback 返回值；不得再包一层函数，否则会被 cordis
  * 当作 disposer 存起来，注册永不发生，实测 404）。
  */
 function mountAuthEndpoints(

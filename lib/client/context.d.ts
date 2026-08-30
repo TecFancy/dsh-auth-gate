@@ -1,6 +1,6 @@
 /**
  * 本地结构镜像（模式参考 dsh-better-sidebar 的 src/context-types.ts）：client
- * 半边只通过 cordis 服务协作，不 import 任何 @deepseek-ai/* 运行时值——类型在
+ * 半边只通过 cordis 服务协作，不 import 任何 @deepseek-ai/* 运行时值；类型在
  * 构建期擦除，bundle 只依赖平台模块表（react）。与上游运行时的漂移收敛在本文件。
  */
 /** `ctx.slots.register` 的注册选项（本插件用到的子集）。 */
@@ -25,7 +25,7 @@ export interface AuthSlotsService {
 }
 /**
  * 本地镜像的 locale 词典服务（运行时 LocaleRuntime 服务面）。未命名的词典
- * 按 (ns, locale) 分开注册——本插件不向 `LocaleNamespaceMap` 做编译期声明，
+ * 按 (ns, locale) 分开注册；本插件不向 `LocaleNamespaceMap` 做编译期声明，
  * 这里走非类型化 `register(ns, locale, dict)` 路径。
  */
 export interface AuthLocaleService {

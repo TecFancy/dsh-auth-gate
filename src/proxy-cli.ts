@@ -6,7 +6,11 @@
  *   dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
  */
 import { pathToFileURL } from "node:url";
-import { createProxyServer, validateProxyOptions, type ProxyOptions } from "./proxy.js";
+import {
+  createProxyServer,
+  validateProxyOptions,
+  type ProxyOptions,
+} from "./features/proxy/index.js";
 
 export interface CliIo {
   out(line: string): void;

@@ -2,8 +2,8 @@
 import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
-import { hashPassword } from "./password.js";
-import { bundledSkillDir, installSkill, userSkillDir, SKILL_NAME } from "./skill-install.js";
+import { hashPassword } from "./features/password/index.js";
+import { bundledSkillDir, installSkill, userSkillDir, SKILL_NAME } from "./shared/index.js";
 import {
   compareNames,
   defaultUsersFilePath,
@@ -12,7 +12,7 @@ import {
   UsersFileError,
   writeUsersFile,
   type UsersSnapshot,
-} from "./users-file.js";
+} from "./shared/index.js";
 
 export interface CliIo {
   out(line: string): void;
@@ -32,7 +32,7 @@ const defaultIo: CliIo = {
   err: (line) => process.stderr.write(`${line}\n`),
   readLine: async () => {
     // asyncIterator 顺序保证：once 监听器在"数据先于 createInterface 到达并 EOF"时
-    // close 可能先于 line（实测管道输入偶发返回空串——M3 服务器冒烟踩坑）。
+    // close 可能先于 line（实测管道输入偶发返回空串（M3 服务器冒烟踩坑））。
     const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
     for await (const line of lines) return line;
     return "";

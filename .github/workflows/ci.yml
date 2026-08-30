@@ -27,6 +27,9 @@ jobs:
       - run: npm run lock:check
       - run: npm run format:check
       - run: npm run lint
+      - run: npm run lint:no-emdash
+      - run: npm run slice:check
+      - run: npm run decisions:check
 
   quality:
     name: quality (${{ matrix.os }})
@@ -60,6 +63,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: npm run bundle:check
       - name: Verify committed lib/ matches a fresh build
         run: git diff --exit-code -- lib
       # dsh installs this package into a profile with `npm install` (devDeps

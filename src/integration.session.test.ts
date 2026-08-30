@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { apply, Config, inject, name, type AuthConfig } from "./index.js";
-import { digestToken, type IssuedSession } from "./session-store.js";
+import { digestToken, type IssuedSession } from "./session/index.js";
 
 async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
   const start = Date.now();
