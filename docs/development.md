@@ -33,31 +33,54 @@ Run tests by name: `npm run test -- -t "guard"`
 
 ## Structure
 
+分层布局（2026-08-30 重构，见 [`docs/decisions.md`](./decisions.md) D5）：
+
 ```
 src/
 ├── index.ts           # plugin entry + auth 服务接线（M3：mode 二选一装配 password 流）
-├── guard.ts           # webServer 路由/升级/fallback 包装与拒绝管线 + AUTH_PATH_PREFIX
-├── gate.ts            # Gate 词表 + noopGate
-├── token-gate.ts      # TokenGate：白名单/cookie/Bearer 共享 token + safeEqual（token 模式）
-├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token（password 模式，M3 新增）
-├── cookie.ts          # Cookie 头解析
-├── form-body.ts       # urlencoded body 读取
-├── login-page.ts      # 自包含登录页（token + password 两版）
-├── auth-common.ts     # 端点共享纯函数（validateNext，M3 提取）
-├── auth-endpoints.ts  # token 模式 /auth 兜底 + 三个 exact 端点
-├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话，M3 新增）
-├── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点（M3 新增）
-├── session-store.ts   # storage-domain 会话持久化
-├── users-file.ts      # users.yaml 加载/校验/原子写 + 默认路径解析（M3 新增）
-├── rate-limit.ts      # 双桶登录限速器（M3 新增）
-├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
 ├── cli.ts             # dsh-auth 用户管理 CLI（bin 入口，M3 新增）
-├── self-check.ts      # 包装覆盖自检（fail loud）
-├── *.test.ts          # 单元测试（显式 vitest import）
+├── proxy-cli.ts       # dsh-auth-proxy（bin 入口）
+├── gate/              # 守卫核心机制层（跨模式）
+│   ├── index.ts       #   barrel：跨 slice 唯一入口
+│   ├── gate.ts        #   Gate 词表 + noopGate
+│   ├── guard.ts       #   webServer 路由/升级/fallback 包装与拒绝管线 + AUTH_PATH_PREFIX
+│   └── self-check.ts  #   包装覆盖自检（fail loud）
+├── session/           # 会话层（核心机制层，token/password 共同消费）
+│   ├── index.ts
+│   └── session-store.ts  # storage-domain 会话持久化
+├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
+│   ├── token/
+│   │   ├── index.ts
+│   │   ├── token-gate.ts      # TokenGate：白名单/cookie/Bearer 共享 token + safeEqual
+│   │   └── auth-endpoints.ts  # token 模式 /auth 兜底 + 三个 exact 端点
+│   ├── password/
+│   │   ├── index.ts
+│   │   ├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
+│   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
+│   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
+│   │   └── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点
+│   └── proxy/
+│       ├── index.ts
+│       ├── proxy.ts           # 本地反向代理（HTTP/WS 透传，dsh-auth-proxy）
+│       └── proxy-headers.ts   # 请求/响应头过滤 + Set-Cookie 重写
+├── shared/            # 叶子通用层
+│   ├── index.ts
+│   ├── auth-common.ts  # 端点共享纯函数（validateNext，M3 提取）
+│   ├── cookie.ts       # Cookie 头解析
+│   ├── form-body.ts    # urlencoded body 读取
+│   ├── login-page.ts   # 自包含登录页（token + password 两版）
+│   ├── rate-limit.ts   # 双桶登录限速器（M3 新增）
+│   ├── skill-install.ts # dsh-auth skill install（M3 新增）
+│   └── users-file.ts   # users.yaml 加载/校验/原子写 + 默认路径解析（M3 新增）
+├── client/            # client 半边（与 host 互不 import）
+├── *.test.ts          # 单元测试（与源码同居；integration 测试留在根）
 └── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试
 
 lib/                # build output — COMMITTED (see below), never hand-edited
 ```
+
+分层纪律由 `npm run slice:check` 强制（跨 slice import 只落 barrel、features 同层互禁、
+client/host 隔离、无法解析即失败）；增删切片请同步本结构图与门禁脚本。
 
 ## Committed build artifact
 
@@ -117,11 +140,23 @@ byte-stable across Windows/Linux builders.
   flow — real server booted from that branch, clean browser state, no fixture
   or mock transport. State what the recording proves next to the embed.
 
+## Decision records
+
+重大决策记 ADR（对齐 dsh-plugin-framework 制度，见 [`docs/decisions/README.md`](./decisions/README.md)）：
+
+- **三态目录** `docs/decisions/{proposed,implemented,archived}/`，状态由路径表达，移动文件即改状态。
+- **双语成对** `YYYY-MM-DD-slug.{zh|en}.md`，`implemented/`/`archived/` 必须齐全；`proposed/` 允许单语。
+- **四段式**：决定了什么（Decision）/ 背景（Context）/ 考虑过的替代方案（Alternatives Considered）/ 为什么这样选（Why）——「为什么层」是记录的核心价值。
+- **强制检查** `npm run decisions:check`：文件名、必需章节、双语配对、归档哈希冻结（`.manifest.json` 只追加）；已挂 verify 链与 CI。
+- **写与归档的判据**：有被认真考虑过的替代方案、或将来的人会重新踩一遍想清楚的坑 → 写；未来还需不需要靠它做决定 → 决定归档与否；归档 = 冻结，改动走新记录 + 链接。
+- 索引页 `docs/decisions.md`（一句话摘要 + 链接）；M1–M3 冻结表仍以 `docs/impl-mN.md` 为执行权威。
+
 ## CI
 
 `.github/workflows/ci.yml` runs on every push to `main` and every PR, on
 **both ubuntu-latest and windows-latest** (fail-fast disabled): `npm ci`,
-format check, lint, type-check, coverage tests, build, then two parity gates:
+format check, lint, no-emdash, slice boundaries, decision records, type-check,
+coverage tests, build, bundle check, then two parity gates:
 
 1. **Committed artifact parity**: `git diff --exit-code -- lib` after the fresh
    build — the committed `lib/` must equal a clean build.

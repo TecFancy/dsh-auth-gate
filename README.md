@@ -15,6 +15,16 @@ A login door for your [DeepSeek Harness](https://github.com/deepseek-ai/dsh)
 reach your agents, your chat sessions, or your LLM credentials without signing
 in first.
 
+## Built on dsh-plugin-framework
+
+This plugin is developed on the engineering conventions of
+[dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework), the
+reference plugin framework for the dsh ecosystem. The `src/` layout
+(features/shared layers with barrel-only cross-slice imports), the engineering
+gates (`npm run verify`, bundle/slice/no-emdash checks) and the decision-record
+discipline all align with it - conventions that have held up across the dsh
+codebase. Solid engineering worth building on.
+
 ## What it does
 
 - **Everything needs a login.** Every page, API call, and WebSocket connection
