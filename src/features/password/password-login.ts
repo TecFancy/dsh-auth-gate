@@ -8,6 +8,7 @@ import {
 import { DUMMY_HASH } from "./password.js";
 import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
+import { issueSession } from "./session-issue.js";
 import {
   buildChallengeValue,
   CHALLENGE_COOKIE,
@@ -45,6 +46,13 @@ export interface PasswordLoginDeps {
   now: () => number;
   /** 挑战 cookie HMAC 密钥（进程级，apply() 生成；D10）。 */
   challengeMacKey: Uint8Array;
+  /**
+   * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
+   * 登录成功后 302 到 `launchTokenBridge(host)`（connection.authenticatedUrl，带 launch
+   * token），让浏览器自动 mint dsh cookie；返回 undefined / 抛错 / 未配置 → 原 302(next)。
+   * 桥失败绝不阻塞登录成功。
+   */
+  launchTokenBridge?: (host: string) => Promise<string | undefined>;
   logger: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -75,6 +83,7 @@ export async function handlePasswordLogin(
     return;
   }
   const next = validateNext(params.get("next") ?? "/");
+  const host = req.headers.host ?? "";
   const ip = req.socket.remoteAddress ?? "";
   const challenge = parseChallengeValue(
     parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
@@ -86,10 +95,10 @@ export async function handlePasswordLogin(
   // 挑战分流（M4 T6）：off 模式完全忽略 TOTP（残留/伪造挑战 cookie 不进入第二段，
   // 带 code 的 POST 落回密码路径（与「off = 忽略 secret」单出口，T4）。
   if (challenge !== undefined && code !== "" && deps.totpMode !== "off") {
-    await handleTotpSubmit(deps, res, challenge, code, next, ip);
+    await handleTotpSubmit(deps, res, challenge, code, next, ip, host);
     return;
   }
-  await handlePasswordSubmit(deps, res, params, next, ip);
+  await handlePasswordSubmit(deps, res, params, next, ip, host);
 }
 
 /** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
@@ -100,6 +109,7 @@ async function handleTotpSubmit(
   code: string,
   next: string,
   ip: string,
+  host: string,
 ): Promise<void> {
   if (!rateLimitOk(deps, res, ip, username)) return;
   const loaded = await loadUsersOr503(deps, res);
@@ -135,9 +145,15 @@ async function handleTotpSubmit(
   deps.limiter.recordSuccess(ip, username);
   // 清挑战 cookie + 发正式会话（M4 T6：一次性，防重放再收窄）；set-cookie 用数组
   // （Node 重复 setHeader 会覆盖，必须同一次写两个 cookie）
-  await issueSession(deps, res, store, username, next, [
-    buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure),
-  ]);
+  await issueSession(
+    deps,
+    res,
+    store,
+    username,
+    next,
+    [buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure)],
+    host,
+  );
 }
 
 /** 密码提交：限速 → 用户文件 → 恒时验证 → 按 totpMode 发会话或发挑战 cookie。 */
@@ -147,6 +163,7 @@ async function handlePasswordSubmit(
   params: URLSearchParams,
   next: string,
   ip: string,
+  host: string,
 ): Promise<void> {
   const username = params.get("username") ?? "";
   const password = params.get("password") ?? "";
@@ -199,7 +216,7 @@ async function handlePasswordSubmit(
     return;
   }
   deps.limiter.recordSuccess(ip, accountKey); // P10：验证通过即清零失败桶（spec §4.7 步骤 7）
-  await issueSession(deps, res, store, username, next);
+  await issueSession(deps, res, store, username, next, undefined, host);
 }
 
 /** TOTP 拒绝路径（P1.3）：401 + 挑战页 HTML（error slot 固定文案，浏览器表单可见；
@@ -269,27 +286,6 @@ function rateLimitOk(
   res.end("too many attempts");
   deps.logger.info("rate limit exceeded");
   return false;
-}
-
-/** 发会话（P14）：subject=username，每次登录新会话；成功 → 302 + set-cookie。 */
-async function issueSession(
-  deps: PasswordLoginDeps,
-  res: ServerResponse,
-  store: SessionStore,
-  username: string,
-  next: string,
-  extraSetCookie?: string[],
-): Promise<void> {
-  const { token: sessionToken } = await store.create(username, deps.sessionTtl * 1000);
-  res.setHeader("cache-control", "no-store");
-  const cookies = [
-    ...(extraSetCookie ?? []),
-    buildSetCookie(deps.cookieName, sessionToken, deps.sessionTtl, deps.cookieSecure),
-  ];
-  res.setHeader("set-cookie", cookies);
-  res.writeHead(302, { location: next });
-  res.end();
-  deps.logger.info("session issued");
 }
 
 /** 415/413 响应（M19 复刻：413 先写 `connection: close`，不调 req.destroy）；无 status 的异常向上抛。 */
