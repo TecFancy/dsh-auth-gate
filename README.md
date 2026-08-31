@@ -93,6 +93,11 @@ After signing in, they land on your instance:
 
 ![dsh instance](docs/demo/dashboard.png)
 
+On dsh 0.1.2-alpha+ (which guards pages with a launch token), signing in
+auto-bridges the token gate: the login redirect goes through a short relative
+`/?token=…` hop that mints the dsh cookie, then lands on `/` (details in
+`docs/implemented/impl-launch-token-bridge.md`).
+
 A prominent **Sign out / 退出登录** button sits inside the **Settings panel**
 (the Settings → General page, below the last preference row). It's a centered,
 danger-styled filled button (16px door icon + localized label, theme tokens

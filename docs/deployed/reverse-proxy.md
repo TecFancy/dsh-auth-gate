@@ -75,6 +75,24 @@ dsh.hi-ruofei.com {
 Reload: `sudo systemctl reload caddy`. WebSocket upgrades pass through the
 same rules (verified: `101` with cookie, `401` without).
 
+### 4.2.1 Note: launch-token gate (dsh ≥ 0.1.2-alpha) + dsh-auth-gate bridge
+
+Since 0.1.2-alpha, dsh web keeps a page-level launch-token gate: a fresh browser
+needs `/?token=<launchToken>` once to mint a 30-day, Host-bound session cookie.
+dsh-auth-gate bridges this after a successful login by redirecting to a
+**relative** `/?token=…` (details in `docs/implemented/impl-launch-token-bridge.md`).
+
+- **The relative redirect works in both topologies** (plain pass-through and the
+  semi-shell above): the browser stays on your origin, and the minted cookie is
+  bound to whatever Host the (possibly rewritten) request carries.
+- **Never use an absolute `http://127.0.0.1:3080/…` redirect here** — under the
+  semi-shell rewrite it would point the user's browser at their own machine. The
+  bridge deliberately drops host/scheme from `authenticatedUrl` and keeps only
+  the token.
+- The launch token appears in the 302 `Location`, hence in access logs; prefer
+  redacting `token=` in proxy logs (Caddy `log_skip` / filters) as operational
+  hygiene.
+
 ### 4.3 nginx equivalent
 
 ```nginx

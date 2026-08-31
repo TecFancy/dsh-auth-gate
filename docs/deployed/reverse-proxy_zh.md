@@ -70,6 +70,19 @@ dsh.hi-ruofei.com {
 重载：`sudo systemctl reload caddy`。WebSocket 升级走同一套规则（实测：带 cookie 101、
 无 cookie 401）。
 
+### 4.2.1 附注：launch-token 门（dsh ≥ 0.1.2-alpha）与 dsh-auth-gate 自动桥
+
+0.1.2-alpha 起 dsh web 有页面级 launch-token 门：新浏览器需先访问 `/?token=<launchToken>`
+才会 mint 30 天有效、绑定 Host authority 的 cookie。dsh-auth-gate 在登录成功后**相对**
+跳转 `/?token=…` 自动过门（详见 `docs/implemented/impl-launch-token-bridge.md`）。
+
+- **相对跳转在两种拓扑下都成立**（普通透传 / 半外壳）：浏览器停留在你的域名，
+  mint 的 cookie 按实际（可能被重写后的）请求 Host 绑定，后续校验一致。
+- **绝不要在这里配绝对 `http://127.0.0.1:3080/…` 跳转**——半外壳重写会把用户浏览器
+  送去本机或失败；桥的实现刻意丢弃 `authenticatedUrl` 返回的 host/scheme，只保留 token。
+- launch token 会出现在 302 Location 进而进 access log；建议在反代日志侧对 `token=`
+  做 redact（Caddy `log_skip` / 过滤器）作为运营卫生。
+
 ### 4.3 nginx 等价写法
 
 ```nginx
