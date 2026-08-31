@@ -11,6 +11,7 @@ dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
 | [`plans/`](plans/)                                          | 进行中规划：pr53-login-page-fix-plan（#53 移植）                                                                                                              | #53 落地时                |
 | [`decisions.md`](decisions.md) + [`decisions/`](decisions/) | 重大决策编号索引 D1–D10（双语记录，proposed / implemented / archived）                                                                                        | 理解「为什么」时          |
 | [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例）                                                                                                                | README 引用               |
+| [`reviews/`](reviews/)                                      | 外部评审记录（grok-4.6 launch-token bridge review 等）                                                                                                        | 变更合入前对照            |
 
 ## 阅读路径
 
