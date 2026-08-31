@@ -7,17 +7,18 @@ through one command.
 
 ## Commands
 
-| Task           | Command                                                                                                 |
-| -------------- | ------------------------------------------------------------------------------------------------------- |
-| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                  |
-| Lint           | `npm run lint` (flat ESLint, type-checked)                                                              |
-| Format         | `npm run format` / `npm run format:check`                                                               |
-| Tests          | `npm run test` (Vitest, `vitest run`)                                                                   |
-| Watch tests    | `npm run test:watch`                                                                                    |
-| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                   |
-| Build          | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps)                           |
-| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                   |
-| Full gate      | `npm run verify` (format:check + lint + type-check + test:coverage; full set - CI, not every local run) |
+| Task           | Command                                                                                                             |
+| -------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                              |
+| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                          |
+| Format         | `npm run format` / `npm run format:check`                                                                           |
+| Tests          | `npm run test` (Vitest, `vitest run`)                                                                               |
+| Watch tests    | `npm run test:watch`                                                                                                |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                               |
+| Build          | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps)                                       |
+| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                               |
+| Full gate      | `npm run verify` (format:check + lint + type-check + test:coverage; full set - CI, not every local run)             |
+| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line; part of `verify` — see `docs/README.md` "文档规范") |
 
 Run a single test file: `npm run test -- src/guard.test.ts`
 Run tests by name: `npm run test -- -t "guard"`

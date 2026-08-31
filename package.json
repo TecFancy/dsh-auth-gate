@@ -76,13 +76,14 @@
     "test:coverage": "vitest run --coverage",
     "lock:check": "node scripts/check-lockfile-registry.mjs",
     "gates": "node scripts/run-gates.mjs",
-    "verify": "npm run format:check && npm run lint && npm run lint:no-emdash && npm run slice:check && npm run lock:check && npm run decisions:check && npm run type-check && npm run test:coverage && npm run build && npm run bundle:check",
+    "verify": "npm run format:check && npm run lint && npm run lint:no-emdash && npm run slice:check && npm run lock:check && npm run decisions:check && npm run docs:check && npm run type-check && npm run test:coverage && npm run build && npm run bundle:check",
     "prepack": "npm run build",
     "prepare": "node -e \"try { require.resolve('husky') } catch { process.exit(0) } require('node:child_process').execSync('husky', { stdio: 'inherit' })\"",
     "lint:no-emdash": "node scripts/check-no-emdash.mjs",
     "slice:check": "node scripts/verify-slice-boundaries.mjs",
     "bundle:check": "node scripts/verify-bundle.mjs",
-    "decisions:check": "node scripts/verify-decision-records.mjs"
+    "decisions:check": "node scripts/verify-decision-records.mjs",
+    "docs:check": "node scripts/verify-doc-pairs.mjs"
   },
   "dependencies": {
     "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.6",
