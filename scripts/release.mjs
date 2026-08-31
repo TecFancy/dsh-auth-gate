@@ -1,23 +1,32 @@
 #!/usr/bin/env node
 /**
- * Release orchestration for dsh-auth-gate (development → main → npm).
+ * Release orchestration for dsh release-please repos
+ * (development → main → npm, or main-direct repos like dsh-collab).
+ *
+ * Works from ANY dsh repo root (reads package.json for the npm name);
+ * the authoritative copy lives in the workspace at
+ * .dsh/scripts/release.mjs (mirrored into dsh-auth-gate/scripts/).
  *
  * Subcommands (run from the repo root):
  *   check             - environment & readiness (gh auth, remote, branch,
  *                       clean tree, unpushed commits)
- *   pr                - push development + open PR against main
+ *   pr                - push the current branch + open PR against main
  *                       (--title required)
  *   merge-pr <n|url>  - wait for CI on the PR to pass, then squash-merge
  *                       (never --delete-branch)
  *   release-pr        - find the open release-please PR (chore(main): release)
  *                       and squash-merge it
  *   wait-publish      - poll the npm registry until the expected version is
- *                       published (--version <v> required)
- *   sync-back         - merge origin/main back into development & push
- *   ship --title <t>  - run the whole chain end to end (check → pr →
- *                       merge-pr → release-pr → wait-publish → sync-back)
+ *                       published (--version <v> required; --package to
+ *                       override the name read from package.json)
+ *   sync-back         - merge origin/main back into the base branch & push
+ *   ship --title <t>  - run the whole chain end to end
  *
- * Rules baked in (see docs/specs/development.md "Releases" / AGENTS.md):
+ * Flags:
+ *   --branch <name>   - base branch (default development; use main for
+ *                       repos without a development branch)
+ *
+ * Rules baked in (see the target repo's development.md "Releases"):
  *   - PRs merge into main with squash (one conventional commit per PR)
  *   - never pass --delete-branch when merging promotion PRs
  *   - the PR title's conventional type drives the release-please bump
@@ -25,7 +34,15 @@
  *   - release PRs usually carry no required checks; merge once they appear
  */
 import { execSync, spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import process from "node:process";
+
+const flag = (name) => {
+  const at = process.argv.indexOf(name);
+  return at === -1 ? undefined : process.argv[at + 1];
+};
+
+const BASE = flag("--branch") ?? "development";
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -48,10 +65,13 @@ function sh(cmd) {
   }
 }
 
-const flag = (name) => {
-  const at = process.argv.indexOf(name);
-  return at === -1 ? undefined : process.argv[at + 1];
-};
+function pkgName() {
+  try {
+    return JSON.parse(readFileSync("package.json", "utf8")).name;
+  } catch {
+    return undefined;
+  }
+}
 
 const bumpHint = (title) =>
   /^feat(\(|:)/.test(title)
@@ -64,8 +84,9 @@ const bumpHint = (title) =>
 
 function check() {
   const branch = sh("git branch --show-current");
-  if (branch !== "development") {
-    console.error(`✗ must be on 'development' (on '${branch}')`);
+  const npmName = pkgName() ?? "(no package.json)";
+  if (branch !== BASE) {
+    console.error(`✗ must be on '${BASE}' (on '${branch}') — use --branch to override`);
     process.exit(1);
   }
   const dirty = sh("git status --porcelain");
@@ -74,9 +95,11 @@ function check() {
     process.exit(1);
   }
   gh(["auth", "status"]);
-  const ahead = Number(sh("git rev-list --count origin/development..development") || 0);
-  console.log(`✓ on development, tree clean, ${ahead} unpushed commit(s)`);
-  console.log(`✓ gh authenticated, origin = ${sh("git remote get-url origin")}`);
+  const ahead = Number(sh(`git rev-list --count origin/${BASE}..${BASE}`) || 0);
+  console.log(`✓ on ${BASE}, tree clean, ${ahead} unpushed commit(s)`);
+  console.log(
+    `✓ npm package: ${npmName}, gh authenticated, origin = ${sh("git remote get-url origin")}`,
+  );
   if (ahead === 0) console.log("  (nothing to release — did you commit?)");
 }
 
@@ -86,18 +109,19 @@ function openPr(title) {
     process.exit(1);
   }
   console.log(`  bump: ${bumpHint(title)}`);
-  sh("git push origin development");
+  sh(`git push origin HEAD`);
+  const head = sh("git branch --show-current");
   const url = gh([
     "pr",
     "create",
     "--base",
     "main",
     "--head",
-    "development",
+    head,
     "--title",
     title,
     "--body",
-    "Automated release via scripts/release.mjs. CI runs the full matrix on this PR.",
+    "Automated release via .dsh/scripts/release.mjs. CI runs the full matrix on this PR.",
   ]);
   console.log(`✓ PR opened: ${url}`);
   return url.split("/").pop();
@@ -142,17 +166,24 @@ async function releasePr() {
 }
 
 async function waitPublish(version) {
+  const pkg = flag("--package") ?? pkgName();
   if (!version) {
     console.error("✗ --version required (e.g. 0.12.0)");
     process.exit(1);
   }
-  console.log(`  waiting for dsh-auth-gate@${version} on npm…`);
+  if (!pkg) {
+    console.error(
+      "✗ cannot read package.json name here — run from the repo root or pass --package",
+    );
+    process.exit(1);
+  }
+  console.log(`  waiting for ${pkg}@${version} on npm…`);
   const deadline = Date.now() + 5 * 60_000;
   while (Date.now() < deadline) {
     try {
-      const out = execSync(`npm view dsh-auth-gate@${version} version`, { encoding: "utf8" });
+      const out = execSync(`npm view ${pkg}@${version} version`, { encoding: "utf8" });
       if (out.trim() !== "") {
-        console.log(`✓ published: dsh-auth-gate@${version}`);
+        console.log(`✓ published: ${pkg}@${version}`);
         return;
       }
     } catch {
@@ -165,9 +196,13 @@ async function waitPublish(version) {
 }
 
 function syncBack() {
+  if (BASE === "main") {
+    console.log("  (main-based repo — nothing to sync back)");
+    return;
+  }
   sh("git fetch origin main");
   sh("git merge origin/main --no-edit");
-  sh("git push origin development");
+  sh("git push origin HEAD");
   console.log("✓ origin/main merged back into development and pushed");
 }
 
@@ -193,9 +228,9 @@ async function main() {
       syncBack();
       break;
     case "ship": {
-      const ns = flag("--title");
+      const title = flag("--title");
       check();
-      const pr = openPr(ns);
+      const pr = openPr(title);
       await mergePr(pr);
       const version = await releasePr();
       await waitPublish(version);
@@ -205,7 +240,8 @@ async function main() {
     }
     default:
       console.log(
-        "usage: node scripts/release.mjs <check|pr|merge-pr|release-pr|wait-publish|sync-back|ship> [--title <t>] [--version <v>]",
+        "usage: node release.mjs <check|pr|merge-pr|release-pr|wait-publish|sync-back|ship>\n" +
+          "  flags: --title <t> --version <v> --package <npm-name> --branch <base>",
       );
       process.exit(2);
   }
