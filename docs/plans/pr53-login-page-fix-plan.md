@@ -196,8 +196,8 @@ In `renderLoginCard`, use `??` for `htmlLang` / `securedBy`; `sloganHtml` keeps 
 Contrast uses the WCAG relative-luminance formula `(L1+0.05)/(L2+0.05)`. Text threshold 4.5:1; non-text UI
 boundaries (1.4.11) 3:1. Same algorithm as §2 of `docs/implemented/login-page-polish-plan.md`.
 
-| Role                                                           | PR color    | Measured     | Threshold                                                 | Change to     | After |
-| -------------------------------------------------------------- | ----------- | ------------ | --------------------------------------------------------- | ------------- | ----- |
+| Role                                                           | PR color    | Measured     | Change to                                                 | After         |
+| -------------------------------------------------------------- | ----------- | ------------ | --------------------------------------------------------- | ------------- |
 | Subtitle `#86868b` on `#fff` / `#f5f5f7`                       | 3.62 / 3.33 | < 4.5        | `#6e6e73`                                                 | 5.07 / 4.66   |
 | Footer / placeholder `#a1a1a6`                                 | 2.36–2.57   | far below AA | `#6e6e73`                                                 | same as above |
 | Input border (transparent border + `#f5f5f7` bg vs white card) | 1.09        | < 3.0        | `1px solid #8a919a` (consistent with current development) | ~3.2          |
