@@ -27,6 +27,7 @@ const SCENE_OF = {
   "aliases:check": "hygiene",
   "lock:check": "hygiene",
   "decisions:check": "hygiene",
+  "docs:check": "hygiene",
   "type-check": "types",
   typecheck: "types",
   "test:coverage": "tests",
