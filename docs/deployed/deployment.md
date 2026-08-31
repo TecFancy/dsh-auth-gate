@@ -154,7 +154,16 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 
 1. Start up (§3) — a fail-loud self-check means failure;
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
-3. Check `boot.log` for any new error/warn.
+3. Check `boot.log` for any new error/warn;
+4. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
+   launch-token gate (a fresh browser needs `/?token=` once). dsh-auth-gate
+   bridges it after a successful login via a relative `/?token=…` redirect (see
+   `docs/implemented/impl-launch-token-bridge.md`). After the upgrade, run
+   acceptance item A with a **fresh browser** (no dsh cookie): signing in should
+   land directly on the instance — no 401 token-gate wall. In `boot.log`,
+   `launch-token bridge inactive` is expected only when dsh has no
+   `authenticatedUrl` (older dsh); `launch-token bridge unavailable` warrants
+   connection-service troubleshooting.
 
 ### 5.1 Upgrading dsh-auth-gate (0.11.0 → 0.11.1, TOTP hardening)
 
