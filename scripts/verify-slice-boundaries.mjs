@@ -5,8 +5,9 @@
  * aliases and css-module handling are dropped).
  *
  * Layers:
- *   root      src/index.ts, src/cli.ts, src/proxy-cli.ts + their tests +
- *             src/integration.*.test.ts and src/guard-proxy-deny.test.ts
+ *   root      src/index.ts, src/launch-token-bridge.ts, src/cli.ts, src/proxy-cli.ts
+ *             + their tests + src/integration.*.test.ts and
+ *             src/guard-proxy-deny.test.ts
  *   gate      src/gate/**        (one slice)
  *   shared    src/shared/**      (one slice, leaf - no upward deps)
  *   session   src/session/**      (core mechanism layer like gate/)
@@ -35,6 +36,7 @@ const CODE_EXT = /\.(ts|tsx)$/;
 const FEATURE_SLICES = new Set(["token", "password", "proxy", "totp"]);
 const ROOT_FILES = new Set([
   "index.ts",
+  "launch-token-bridge.ts",
   "index.test.ts",
   "index.password.test.ts",
   "cli.ts",

@@ -27,6 +27,7 @@ async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<voi
 async function mountPasswordStack(options?: {
   usersFile?: string;
   seedUsers?: boolean;
+  provideConnection?: boolean;
 }): Promise<{ ctx: Context; port: number; fibers: Fiber[]; root: string; usersFile: string }> {
   const root = mkdtempSync(join(tmpdir(), "dsh-auth-pw-"));
   const usersFile = options?.usersFile ?? join(root, "users.yaml");
@@ -41,6 +42,12 @@ async function mountPasswordStack(options?: {
     });
   }
   const ctx = new Context();
+  if (options?.provideConnection === true) {
+    // 假 connection：模拟 dsh 0.1.2-alpha client-connection 的 authenticatedUrl
+    ctx.provide("connection", {
+      authenticatedUrl: () => "http://127.0.0.1:3080/?token=launchTok123",
+    });
+  }
   const fibers: Fiber[] = [];
   fibers.push(await ctx.plugin(Storage));
   fibers.push(
@@ -215,6 +222,22 @@ describe("integration: password login rejection paths", () => {
       });
       const fixed = await postLogin(base, loginBody("admin", TEST_PASSWORD));
       expect(fixed.status).toBe(302);
+    } finally {
+      await unmountStack(fibers, root);
+    }
+  });
+});
+
+describe("integration: launch-token bridge over real HTTP", () => {
+  it("stripes the host/scheme off authenticatedUrl: relative /?token= after login", async () => {
+    const { port, fibers, root } = await mountPasswordStack({ provideConnection: true });
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      const good = await postLogin(base, loginBody("admin", TEST_PASSWORD));
+      expect(good.status).toBe(302);
+      // 只保留 token，host/scheme 全部丢弃（grok-4.6 review F1/F2）
+      expect(good.location).toBe("/?token=launchTok123");
+      expect(good.cookie).toContain("dsh_auth=");
     } finally {
       await unmountStack(fibers, root);
     }

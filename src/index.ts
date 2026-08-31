@@ -11,6 +11,7 @@ import {
 import { TotpReplayGuard, verifyTotpCode } from "./features/totp/index.js";
 import { LoginRateLimiter, defaultUsersFilePath, loadUsersFile } from "./shared/index.js";
 import { assertGuarded } from "./gate/index.js";
+import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { sessionDomainSpec, SessionStore } from "./session/index.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
@@ -113,35 +114,6 @@ function makeTokenResolver(
 }
 
 /**
- * dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）：登录成功后
- * 302 到 connection.authenticatedUrl(host)（带 launch token），浏览器自动 mint dsh cookie，
- * 免去手动复制 `?token=`。connection 服务缺失 / 无 authenticatedUrl（旧版 dsh）→ 返回
- * undefined（保持原 302(next) 行为）。桥失败绝不影响登录成功。
- */
-function makeLaunchTokenBridge(
-  ctx: Context,
-  log: { error(message: unknown): void },
-): ((host: string) => Promise<string | undefined>) | undefined {
-  let warnedMissing = false;
-  return (host: string): Promise<string | undefined> => {
-    try {
-      const connection = ctx.get("connection") as unknown as
-        { authenticatedUrl?(baseUrl: string): string } | undefined;
-      if (connection === undefined || typeof connection.authenticatedUrl !== "function") {
-        return Promise.resolve(undefined);
-      }
-      return Promise.resolve(connection.authenticatedUrl(`http://${host}`));
-    } catch {
-      if (!warnedMissing) {
-        warnedMissing = true;
-        log.error("connection service is unavailable: launch-token bridge disabled");
-      }
-      return Promise.resolve(undefined);
-    }
-  };
-}
-
-/**
  * 会话层软接（M1 逻辑不变）：storageDomain 缺失 → error 日志后守卫照常挂载；
  * 存在 → effect 内 open domain，就绪后把 SessionStore 挂到 auth.sessions。
  */
@@ -194,7 +166,7 @@ function mountAuthEndpoints(
   config: AuthConfig,
   auth: AuthService,
   resolveToken: (() => Promise<string | undefined>) | undefined,
-  launchTokenBridge: ((host: string) => Promise<string | undefined>) | undefined,
+  launchTokenBridge: () => Promise<string | undefined>,
   usersPath: string,
   limiter: LoginRateLimiter,
   replayGuard: TotpReplayGuard,
@@ -222,7 +194,7 @@ function mountAuthEndpoints(
           replayGuard.checkAndRecord(username, counter, code),
         now: Date.now,
         challengeMacKey,
-        ...(launchTokenBridge === undefined ? {} : { launchTokenBridge }),
+        launchTokenBridge,
         logoutOrder: config.logoutOrder,
         logger: log,
       })

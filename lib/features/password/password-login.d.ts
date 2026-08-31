@@ -25,11 +25,11 @@ export interface PasswordLoginDeps {
     challengeMacKey: Uint8Array;
     /**
      * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
-     * 登录成功后 302 到 `launchTokenBridge(host)`（connection.authenticatedUrl，带 launch
-     * token），让浏览器自动 mint dsh cookie；返回 undefined / 抛错 / 未配置 → 原 302(next)。
+     * 登录成功后 302 到 `launchTokenBridge()` 的相对 `/?token=`（浏览器自动 mint dsh
+     * cookie，沿用当前 origin）；返回 undefined / 抛错 / 未配置 → 原 302(next)。
      * 桥失败绝不阻塞登录成功。
      */
-    launchTokenBridge?: (host: string) => Promise<string | undefined>;
+    launchTokenBridge?: () => Promise<string | undefined>;
     logger: {
         error(message: unknown): void;
         info(message: unknown): void;

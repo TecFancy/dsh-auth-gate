@@ -81,13 +81,13 @@ interface Harness {
   deps: PasswordEndpointsDeps;
   routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[];
   logs: { level: string; message: unknown }[];
-  setBridge(bridge: ((host: string) => Promise<string | undefined>) | undefined): void;
+  setBridge(bridge: (() => Promise<string | undefined>) | undefined): void;
 }
 
 function makeHarness(): Harness {
   const routes: Harness["routes"] = [];
   const logs: Harness["logs"] = [];
-  let bridge: ((host: string) => Promise<string | undefined>) | undefined;
+  let bridge: (() => Promise<string | undefined>) | undefined;
   const limiter = new LoginRateLimiter({ now: () => 1_000_000 });
   const table = new MemTable();
   return {
@@ -122,8 +122,7 @@ function makeHarness(): Harness {
       replayCheck: () => true,
       now: () => 1_700_000_000_000,
       challengeMacKey: Buffer.alloc(32, 7),
-      launchTokenBridge: (host) =>
-        bridge === undefined ? Promise.resolve(undefined) : bridge(host),
+      launchTokenBridge: () => (bridge === undefined ? Promise.resolve(undefined) : bridge()),
       limiter,
       logger: {
         error: (message) => logs.push({ level: "error", message }),
@@ -157,7 +156,7 @@ function loginReq(body: string, host = "", cookie = ""): IncomingMessage {
 }
 
 describe("POST /auth/login: launch-token bridge with TOTP two-step", () => {
-  it("bridges on TOTP challenge submit", async () => {
+  it("bridges on TOTP challenge submit (relative token URL) and clears the challenge cookie", async () => {
     const harness = makeHarness();
     harness.deps.totpMode = "optional";
     harness.deps.verifyTotp = () => 42;
@@ -170,7 +169,7 @@ describe("POST /auth/login: launch-token bridge with TOTP two-step", () => {
         },
         missing: false,
       });
-    harness.setBridge(() => Promise.resolve("http://dsh.test/?token=launch"));
+    harness.setBridge(() => Promise.resolve("/?token=launch"));
     registerPasswordEndpoints(harness.deps);
     const res = makeRes();
     const challenge = buildChallengeValue(
@@ -187,17 +186,17 @@ describe("POST /auth/login: launch-token bridge with TOTP two-step", () => {
       res.res,
     );
     expect(res.status).toBe(302);
-    expect(res.headers["location"]).toBe("http://dsh.test/?token=launch");
+    expect(res.headers["location"]).toBe("/?token=launch");
+    // 成功仍发会话 cookie，且一次性挑战 cookie 被清（M4 T6）
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+    expect(res.headers["set-cookie"]).toContain(`${CHALLENGE_COOKIE}=;`);
   });
 });
 
 describe("POST /auth/login: launch-token bridge (dsh 0.1.2-alpha token gate)", () => {
-  it("redirects to the bridged authenticated URL when bridge returns one", async () => {
+  it("redirects to the relative bridged URL and still issues the session cookie", async () => {
     const harness = makeHarness();
-    harness.setBridge((host) => {
-      expect(host).toBe("dsh.test");
-      return Promise.resolve("http://dsh.test/?token=launch");
-    });
+    harness.setBridge(() => Promise.resolve("/?token=launch"));
     registerPasswordEndpoints(harness.deps);
     const res = makeRes();
     await handlerOf(harness)(
@@ -205,7 +204,8 @@ describe("POST /auth/login: launch-token bridge (dsh 0.1.2-alpha token gate)", (
       res.res,
     );
     expect(res.status).toBe(302);
-    expect(res.headers["location"]).toBe("http://dsh.test/?token=launch");
+    expect(res.headers["location"]).toBe("/?token=launch");
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
     expect(harness.logs).toContainEqual({ level: "info", message: "session issued" });
   });
 
@@ -237,20 +237,5 @@ describe("POST /auth/login: launch-token bridge (dsh 0.1.2-alpha token gate)", (
       level: "warn",
       message: "launch-token bridge failed; falling back to plain redirect",
     });
-  });
-
-  it("skips the bridge when the request has no Host header", async () => {
-    const harness = makeHarness();
-    const calls: string[] = [];
-    harness.setBridge((host) => {
-      calls.push(host);
-      return Promise.resolve("http://dsh.test/?token=launch");
-    });
-    registerPasswordEndpoints(harness.deps);
-    const res = makeRes();
-    await handlerOf(harness)(loginReq("username=alice&password=pw&next=%2Fok"), res.res);
-    expect(res.status).toBe(302);
-    expect(res.headers["location"]).toBe("/ok");
-    expect(calls).toEqual([]);
   });
 });
