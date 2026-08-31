@@ -85,7 +85,7 @@ Google Authenticator 等）里的 6 位验证码（先密码、后验证码）�
 
 在 dsh 0.1.2-alpha 及更高版本（页面有 launch token 门）上，登录会自动桥接这道门：
 登录跳转会先经过一次相对 `/?token=…` 的短跳、mint 好 dsh cookie，再落到 `/`
-（详见 `docs/implemented/impl-launch-token-bridge.md`）。
+（详见 `docs/implemented/impl-launch-token-bridge_zh.md`）。
 
 设置面板里有一个醒目的**「退出登录 / Sign out」**按钮——在 **设置 → 通用设置**
 页的最下方（最后一条设置项之后）。它是居中排布的填充式危险按钮（16px 门形图标 +

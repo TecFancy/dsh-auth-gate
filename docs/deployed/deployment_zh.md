@@ -141,7 +141,7 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 3. 检查 `boot.log` 无新增 error/warn；
 4. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
    `/?token=`）——auth-gate 登录成功会自动桥接（相对跳转 `/?token=…`，见
-   `docs/implemented/impl-launch-token-bridge.md`）。升级后用**全新浏览器**（无 dsh
+   `docs/implemented/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
    cookie）跑一遍验收 A：登录成功即直达实例，不应撞 401 token 门；`boot.log` 里
    `launch-token bridge inactive` 只应在「dsh 无 `authenticatedUrl`」时出现（旧版
    dsh 属预期），`launch-token bridge unavailable` 出现则需排查 connection 服务。

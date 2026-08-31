@@ -74,7 +74,7 @@ dsh.hi-ruofei.com {
 
 0.1.2-alpha 起 dsh web 有页面级 launch-token 门：新浏览器需先访问 `/?token=<launchToken>`
 才会 mint 30 天有效、绑定 Host authority 的 cookie。dsh-auth-gate 在登录成功后**相对**
-跳转 `/?token=…` 自动过门（详见 `docs/implemented/impl-launch-token-bridge.md`）。
+跳转 `/?token=…` 自动过门（详见 `docs/implemented/impl-launch-token-bridge_zh.md`）。
 
 - **相对跳转在两种拓扑下都成立**（普通透传 / 半外壳）：浏览器停留在你的域名，
   mint 的 cookie 按实际（可能被重写后的）请求 Host 绑定，后续校验一致。
