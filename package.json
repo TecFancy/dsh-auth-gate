@@ -83,7 +83,12 @@
     "slice:check": "node scripts/verify-slice-boundaries.mjs",
     "bundle:check": "node scripts/verify-bundle.mjs",
     "decisions:check": "node scripts/verify-decision-records.mjs",
-    "docs:check": "node scripts/verify-doc-pairs.mjs"
+    "docs:check": "node scripts/verify-doc-pairs.mjs",
+    "release:check": "node scripts/release.mjs check",
+    "release:pr": "node scripts/release.mjs pr",
+    "release:merge-pr": "node scripts/release.mjs merge-pr",
+    "release:ship": "node scripts/release.mjs ship",
+    "release:sync-back": "node scripts/release.mjs sync-back"
   },
   "dependencies": {
     "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.6",
