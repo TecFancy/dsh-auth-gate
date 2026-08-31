@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.11.1...v0.12.0) (2026-08-31)
+
+
+### Features
+
+* auto-bridge dsh launch-token gate after login (grok-4.6 reviewed) ([b21a50f](https://github.com/TecFancy/dsh-auth-gate/commit/b21a50f5900203ed42e27644ae0043961015cec2))
+
 ## [0.11.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.11.0...v0.11.1) (2026-08-30)
 
 
