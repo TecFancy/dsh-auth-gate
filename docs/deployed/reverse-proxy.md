@@ -128,18 +128,20 @@ Full acceptance checklist: `docs/deployed/deployment.md` §4 (A–I).
 
 ## 6. Troubleshooting
 
-| Symptom                                         | Cause                                                     | Fix                                        |
-| ----------------------------------------------- | --------------------------------------------------------- | ------------------------------------------ |
-| Settings page: `transport failure ... HTTP 403` | fence loopback pin; proxy passes public Host              | semi-shell rewrite (§4.2)                  |
-| All `/api` 401 right after a login              | stale session (service restarted; sessions are in-memory) | log in again                               |
-| Login `429`                                     | rate limiter locked (per proxy exit IP)                   | wait for `retry-after`, or restart dsh-web |
-| Browser won't keep the session                  | `cookieSecure: true` without HTTPS                        | terminate TLS at the proxy                 |
-| WS `401` without cookie                         | gate rejects upgrade                                      | expected fail-closed; log in first         |
+| Symptom                                         | Cause                                                                                                                      | Fix                                        |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Settings page: `transport failure ... HTTP 403` | fence loopback pin; proxy passes public Host                                                                               | semi-shell rewrite (§4.2)                  |
+| All `/api` 401 right after a login              | session cookie expired or not forwarded (a restart does not invalidate sessions: they persist under `$DSH_HOME/storages/`) | log in again; check cookie pass-through    |
+| Login `429`                                     | rate limiter locked (per proxy exit IP)                                                                                    | wait for `retry-after`, or restart dsh-web |
+| Browser won't keep the session                  | `cookieSecure: true` without HTTPS                                                                                         | terminate TLS at the proxy                 |
+| WS `401` without cookie                         | gate rejects upgrade                                                                                                       | expected fail-closed; log in first         |
 
 ## 7. Security notes
 
 - Never run a bare dsh instance publicly without a gate or shell: the agent
   has workspace write access and `$DSH_HOME/.credentials.yaml` holds your LLM
   API keys (anyone can burn your quota).
-- dsh-web restarts wipe in-memory sessions — all browsers must log in again.
+- Sessions survive a dsh-web restart (persisted per instance under `$DSH_HOME/storages/`; revoke
+  explicitly with `POST /auth/logout`). Only process-level state resets: rate limiting, the TOTP
+  replay guard, and in-flight TOTP challenges.
 - Rate limiting aggregates per proxy exit IP (do not trust `X-Forwarded-For`).

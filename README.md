@@ -47,7 +47,7 @@ codebase. Solid engineering worth building on.
   ```sh
   dsh-auth user add admin --password-stdin   # add a user
   dsh-auth user list                          # list users
-  dsh-auth user disable admin                 # block a user's future logins
+  dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
   dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
   dsh-auth user totp disable admin            # remove the TOTP secret
   ```
@@ -122,16 +122,17 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
     cookieSecure: true # keep true when you use https
 ```
 
-| Option         | Default            | What it does                                                                                                                                                                                                                                        |
-| -------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`         | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                               |
-| `totp`         | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration) |
-| `sessionTtl`   | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                      |
-| `cookieName`   | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                  |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                 |
-| `cookieSecure` | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                              |
-| `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                  |
-| `logoutOrder`  | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                         |
+| Option          | Default            | What it does                                                                                                                                                                                                                                        |
+| --------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`          | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                               |
+| `totp`          | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration) |
+| `sessionTtl`    | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                      |
+| `cookieName`    | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                  |
+| `tokenRef`      | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                 |
+| `cookieSecure`  | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                              |
+| `usersFile`     | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                  |
+| `revokeSweepMs` | `5000`             | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                   |
+| `logoutOrder`   | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                         |
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google

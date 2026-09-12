@@ -138,8 +138,13 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 
 1. 启动（§3）——自检 fail loud 即失败；
 2. 跑验收清单 B/D/F 三组（守卫 + 会话 + WS）；
-3. 检查 `boot.log` 无新增 error/warn；
-4. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
+3. **重跑未认证入口覆盖探测**（只读、不带凭证）：`node scripts/check-live-entries.mjs`
+   （默认打 `http://127.0.0.1:3080`）。脚本会从已加载 profile 里发现全部已注册入口
+   （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**未带会话却答 2xx** 就以非零码退出。
+   最近一次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
+   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 探测被拒（401，HTML 面 302 → `/auth/login`）。
+4. 检查 `boot.log` 无新增 error/warn；
+5. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
    `/?token=`）——auth-gate 登录成功会自动桥接（相对跳转 `/?token=…`，见
    `docs/implemented/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
    cookie）跑一遍验收 A：登录成功即直达实例，不应撞 401 token 门；`boot.log` 里
@@ -181,7 +186,8 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] 会话日志视同含密材料（备份/共享同等防护）。
 - [ ] 升级回归（§5）纳入运维流程；auth 行健康检查（`boot.log` + 验收 B/D/F）纳入监控。
 - [ ] 口令哈希为 scrypt（`docs/implemented/impl-m3_zh.md` P1）；文件零明文。
-- [ ] 禁用用户只拦新登录（已发会话 TTL 内有效，M3 已知局限）。
+- [ ] `dsh-auth user disable <name>` 既拦新登录，也**吊销该用户已发的会话**（插件按 `revokeSweepMs`
+      周期扫描 users.yaml，默认 5000 毫秒；设 0 = 退回 M3「只拦新登录」的旧行为）。
 - [ ] 限速内存态重启清零；反代部署时限速按出口 IP 聚合（不信任 X-Forwarded-For）。
 
 ## 8. 公网部署变体（2026-08-15 起，dsh.hi-ruofei.com 生效）：半外壳
@@ -228,7 +234,11 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 - 升级回归（§5）照跑；另加设置页冒烟：登录后点「设置」，确认无 `transport failure`、
   无 403 console 报错。
 - `--trusted-host dsh.hi-ruofei.com` 在重写后已冗余（Host 恒 loopback），保留无害。
-- 会话仍为内存态：dsh-web 重启后所有浏览器需重新登录（旧 cookie 一律 401，属 fail-closed 正常）。
+- 会话能扛住 dsh-web 重启：按实例落盘在 `$DSH_HOME/storages/dsh_auth_sessions.json`
+  （mode 0600；键为会话 token 的 sha256，盘上无明文 token），在到期（`sessionTtl`，默认 7 天）
+  前一直有效，除非被吊销（`POST /auth/logout` 会删掉落盘行）。重启真正清掉的是进程级状态：
+  在途 TOTP 挑战（§5.1）、登录限速器（§6）与 TOTP 防重放记录。所以已登录的浏览器不用重新
+  登录，停在验证码页的用户需重新输入密码。
 - 裸奔测试教训：**不要**在无外壳无门卫状态下公网运行——agent 有工作区写权限且
   `$DSH_HOME/.credentials.yaml` 含模型 API key，任何人可白嫖调用。
 
@@ -253,7 +263,7 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 - 认证复用 auth-gate：登录页与 302/Set-Cookie 原样透传（cookie 归 `127.0.0.1:8443` 名下）；
   `--strip-secure-cookie`（默认开）在本地明文 http 下移除 `Secure` 属性（回环一跳，
   Chrome/Firefox 本可保留，Safari 兜底；`HttpOnly`/`SameSite=Lax`/`Path=/` 保留）。
-- 代理不保存任何会话/凭证（无状态，进程重启即失效）。
+- 代理不保存任何会话/凭证（无状态；重启只断它自己的连接，不影响 dsh-web 落盘的会话）。
 - WS 升级（`/api/events.mux`、`/api/events.host`）同样经代理隧道转发。
 
 ### 9.2 使用

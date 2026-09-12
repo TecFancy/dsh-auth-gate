@@ -118,17 +118,18 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
 
 ## 6. 故障诊断
 
-| 症状                                    | 原因                                    | 处理                             |
-| --------------------------------------- | --------------------------------------- | -------------------------------- |
-| 设置页 `transport failure ... HTTP 403` | 栅栏 loopback 钉死；反代透传了公网 Host | 半外壳重写（§4.2）               |
-| 登录后 `/api` 全 401                    | 会话失效（服务重启；会话为内存态）      | 重新登录                         |
-| 登录 `429`                              | 限速锁定（按反代出口 IP 聚合）          | 等 `retry-after`，或重启 dsh-web |
-| 浏览器存不住会话                        | `cookieSecure: true` 但没有 https       | 反代终结 TLS                     |
-| 无 cookie 的 WS `401`                   | 门卫拒升级                              | 预期 fail-closed；先登录         |
+| 症状                                    | 原因                                                                         | 处理                             |
+| --------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------- |
+| 设置页 `transport failure ... HTTP 403` | 栅栏 loopback 钉死；反代透传了公网 Host                                      | 半外壳重写（§4.2）               |
+| 登录后 `/api` 全 401                    | 会话 cookie 过期或没透传（重启不会让会话失效：落盘在 `$DSH_HOME/storages/`） | 重新登录；检查 cookie 透传       |
+| 登录 `429`                              | 限速锁定（按反代出口 IP 聚合）                                               | 等 `retry-after`，或重启 dsh-web |
+| 浏览器存不住会话                        | `cookieSecure: true` 但没有 https                                            | 反代终结 TLS                     |
+| 无 cookie 的 WS `401`                   | 门卫拒升级                                                                   | 预期 fail-closed；先登录         |
 
 ## 7. 安全注意
 
 - 公网**不要**裸奔运行 dsh：agent 有工作区写权限，`$DSH_HOME/.credentials.yaml` 里有你的
   模型 API key（任何人都能白嫖你的额度）。
-- dsh-web 重启会清空内存会话——所有浏览器需重新登录。
+- 会话能扛住 dsh-web 重启（按实例落盘在 `$DSH_HOME/storages/`；吊销用 `POST /auth/logout`）。
+  重启只清进程级状态：限速、TOTP 防重放记录、在途 TOTP 挑战。
 - 限速按反代出口 IP 聚合（不要信任 `X-Forwarded-For`）。

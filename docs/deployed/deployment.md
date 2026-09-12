@@ -154,8 +154,14 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 
 1. Start up (§3) — a fail-loud self-check means failure;
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
-3. Check `boot.log` for any new error/warn;
-4. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
+3. **Re-run the unauthenticated entry-coverage probe** (read-only, no credentials):
+   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every
+   registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits
+   non-zero if any entry answers 2xx without a session. Latest verified run:
+   [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md) — dsh `0.1.5-rc.2`,
+   56 entries from 8 packages, 61/61 probes rejected (401, or 302 to `/auth/login` for HTML).
+4. Check `boot.log` for any new error/warn;
+5. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
    launch-token gate (a fresh browser needs `/?token=` once). dsh-auth-gate
    bridges it after a successful login via a relative `/?token=…` redirect (see
    `docs/implemented/impl-launch-token-bridge.md`). After the upgrade, run
@@ -205,8 +211,9 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 - [ ] Fold upgrade regression (§5) into the ops process; add auth-line health checks
       (`boot.log` + acceptance B/D/F) to monitoring.
 - [ ] Password hashes are scrypt (`docs/implemented/impl-m3.md` P1); the file has zero plaintext.
-- [ ] A disabled user only blocks new logins (issued sessions remain valid within TTL, a known
-      M3 limitation).
+- [ ] `dsh-auth user disable <name>` blocks new logins **and** revokes that user's issued sessions
+      (the plugin sweeps `users.yaml` every `revokeSweepMs`, default 5000 ms; set `0` to keep the
+      old M3 behavior of blocking new logins only).
 - [ ] Rate limiting is in-memory and cleared on restart; in a reverse-proxy deployment, rate
       limiting aggregates by egress IP (do not trust X-Forwarded-For).
 
@@ -260,8 +267,13 @@ public dsh.hi-ruofei.com (Caddy, TLS)
   login, click "Settings" and confirm there is no `transport failure` and no 403 console errors.
 - `--trusted-host dsh.hi-ruofei.com` is already redundant after the rewrite (Host always
   loopback), but keeping it is harmless.
-- Sessions are still in-memory: after a dsh-web restart every browser must log in again (all old
-  cookies return 401, which is normal fail-closed behavior).
+- Sessions survive a dsh-web restart: they are persisted per instance in
+  `$DSH_HOME/storages/dsh_auth_sessions.json` (mode 0600; keyed by the sha256 of the session token,
+  no plaintext token on disk) and stay valid until they expire (`sessionTtl`, default 7 days) or
+  are revoked (`POST /auth/logout` deletes the row on disk). What a restart does clear is
+  process-level state: in-flight TOTP challenges (§5.1), the login rate limiter (§6), and the TOTP
+  replay guard. A signed-in browser therefore stays signed in; a user sitting on the code page must
+  re-enter the password.
 - Bare-running lesson: **do not** run bare in public without the shell and without the guard —
   agents have workspace write access and `$DSH_HOME/.credentials.yaml` contains model API keys,
   so anyone could freely invoke them.
@@ -290,7 +302,8 @@ User browser (http://127.0.0.1:8443  -- page origin loopback; client-side gate p
   (the cookie is owned by `127.0.0.1:8443`); `--strip-secure-cookie` (default on) removes the
   `Secure` attribute over plain-text loopback HTTP (one hop only; Chrome/Firefox would keep it
   anyway; Safari fallback). `HttpOnly`/`SameSite=Lax`/`Path=/` are preserved.
-- The proxy stores no sessions or credentials (stateless; restart simply invalidates it).
+- The proxy stores no sessions or credentials (stateless; restarting it drops only its own
+  connections and leaves dsh-web's persisted sessions untouched).
 - WebSocket upgrades (`/api/events.mux`, `/api/events.host`) are tunneled through the proxy too.
 
 ### 9.2 Usage
