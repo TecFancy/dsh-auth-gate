@@ -64,9 +64,13 @@ describe("integration: TOTP two-stage flow over real HTTP", () => {
     const { port, fibers, root, totpSecret } = await mountTotpStack();
     try {
       const base = `http://127.0.0.1:${port}`;
+      // 只取一次码，并把它交给登录：验证命中的 counter 由 code 唯一决定，
+      // 同一个 code 两次提交必然落到同一 counter。若前后各取一次码，两次
+      // 取码跨 30s 窗口时登录消费的是新 counter，重放旧 code 会命中未消费的
+      // 旧 counter（窗口容差 ±1 仍认它），防重放被绕过而返回 302。
       const code = currentCode(totpSecret);
       // 同一 code 用两次：先成功一次
-      const session = await twoStageLogin(base, "admin", TEST_PASSWORD, totpSecret);
+      const session = await twoStageLogin(base, "admin", TEST_PASSWORD, totpSecret, code);
       expect(session.length).toBeGreaterThan(0);
 
       // 重新走密码阶段拿新挑战 cookie，同一窗口秒级内重放同一 code → 防重放拒绝
@@ -125,12 +129,17 @@ function expectCleared(cookies: string[], name: string): void {
   expect(cleared).toBeDefined();
 }
 
-/** 两步登录：密码 → 拿走挑战 cookie；code → 会话 cookie。返回会话 cookie。 */
+/**
+ * 两步登录：密码 → 拿走挑战 cookie；code → 会话 cookie。返回会话 cookie。
+ * code 省略时现取当前窗口的码；重放类用例必须传入已取好的同一个 code，
+ * 否则两次取码可能跨窗口，重放就落不到被消费的那个 counter 上。
+ */
 async function twoStageLogin(
   base: string,
   username: string,
   password: string,
   secret: string,
+  code?: string,
 ): Promise<string> {
   const stage1 = await postLogin(base, `username=${username}&password=${password}&next=%2F__probe`);
   expect(stage1.status).toBe(302);
@@ -138,7 +147,7 @@ async function twoStageLogin(
   expect(challengeCookie).toBeDefined();
   const stage2 = await postLogin(
     base,
-    `code=${currentCode(secret)}&next=%2F__probe`,
+    `code=${code ?? currentCode(secret)}&next=%2F__probe`,
     challengeCookie,
   );
   expect(stage2.status).toBe(302);
