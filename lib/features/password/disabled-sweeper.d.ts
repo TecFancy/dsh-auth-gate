@@ -28,6 +28,7 @@ export declare class DisabledSessionSweeper {
     private readonly intervalMs;
     private readonly log;
     private warnedUnreadable;
+    private warnedSweepFailure;
     constructor(options: DisabledSweeperOptions);
     /** 扫一遍：吊销所有禁用用户的会话，返回吊销条数。读文件失败 → 记一次警告并跳过。 */
     sweep(): Promise<number>;

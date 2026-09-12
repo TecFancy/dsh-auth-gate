@@ -111,6 +111,28 @@ describe("DisabledSessionSweeper.sweep", () => {
     expect(warn).toHaveBeenCalledTimes(1);
     expect(store.getByToken(issued.token)?.subject).toBe("alice");
   });
+
+  it("does not reject when the session domain is already closed (disposal race)", async () => {
+    const warn = vi.fn();
+    let calls = 0;
+    // 插件卸载时 domain 已 close，而定时器可能还有一个 tick 在途（Windows CI 实测）。
+    const closedStore = {
+      revokeBySubject: (): Promise<number> => {
+        calls += 1;
+        return Promise.reject(new Error("domain 'dsh_auth_sessions' is closed"));
+      },
+    } as unknown as SessionStore;
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => closedStore,
+      loadUsers: () => Promise.resolve(snapshot([["alice", true]])),
+      log: { info: (): void => undefined, warn },
+    });
+
+    expect(await sweeper.sweep()).toBe(0);
+    expect(await sweeper.sweep()).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(calls).toBe(2);
+  });
 });
 
 describe("DisabledSessionSweeper.start", () => {

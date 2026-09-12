@@ -28,6 +28,7 @@ export class DisabledSessionSweeper {
   private readonly intervalMs: number;
   private readonly log: DisabledSweeperOptions["log"];
   private warnedUnreadable = false;
+  private warnedSweepFailure = false;
 
   constructor(options: DisabledSweeperOptions) {
     this.sessions = options.sessions;
@@ -56,9 +57,23 @@ export class DisabledSessionSweeper {
     }
     if (loaded.missing) return 0;
     let revoked = 0;
-    for (const [name, record] of loaded.snapshot.users) {
-      if (!record.disabled) continue;
-      revoked += await store.revokeBySubject(name);
+    try {
+      for (const [name, record] of loaded.snapshot.users) {
+        if (!record.disabled) continue;
+        revoked += await store.revokeBySubject(name);
+      }
+    } catch (error) {
+      // 插件卸载/宿主停机时 domain 已关，而定时器可能还有一个 tick 在途：
+      // 这里必须吞掉，否则会变成未处理的 promise rejection（Windows CI 实测触发）。
+      if (!this.warnedSweepFailure) {
+        this.warnedSweepFailure = true;
+        this.log.warn(
+          `disabled-session sweep failed (session store unavailable): ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+      return revoked;
     }
     if (revoked > 0) {
       this.log.info(`revoked ${revoked} session(s) of disabled user(s)`);
@@ -70,7 +85,8 @@ export class DisabledSessionSweeper {
   start(): () => void {
     if (this.intervalMs <= 0) return () => undefined;
     const timer = setInterval(() => {
-      void this.sweep();
+      // sweep() 自带兜底，这里再兜一层：定时器回调绝不产生未处理拒绝。
+      void this.sweep().catch(() => undefined);
     }, this.intervalMs);
     timer.unref();
     return () => clearInterval(timer);
