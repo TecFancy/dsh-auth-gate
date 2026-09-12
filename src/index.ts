@@ -4,6 +4,7 @@ import z from "@deepseek-ai/schemastery";
 import { registerAuthEndpoints, safeEqual, TokenGate } from "./features/token/index.js";
 import { wrapServer, type Gate, type WrappableServer } from "./gate/index.js";
 import {
+  DisabledSessionSweeper,
   PasswordGate,
   registerPasswordEndpoints,
   verifyPassword,
@@ -34,6 +35,12 @@ export interface AuthConfig {
   /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
   usersFile: string;
   /**
+   * 禁用用户会话的扫描间隔（毫秒，password 模式）：`dsh-auth user disable` 之后，
+   * 该用户**已发出**的会话最多在这么久内被吊销（默认 5000）；`<= 0` 关闭周期扫描，
+   * 退回 M3 行为（禁用只拦新登录）。
+   */
+  revokeSweepMs: number;
+  /**
    * TOTP 两段式模式（M4 T4）：off 忽略 secret（纯密码）；optional 有 secret 的用户
    * 走两段式；required 全员必须两段式（无 secret 的用户登录失败，统一 401）。
    */
@@ -57,6 +64,7 @@ export const Config: z<AuthConfig> = z.object({
     .default("DSH_AUTH_TOKEN"),
   cookieSecure: z.boolean().default(true),
   usersFile: z.string().default(""),
+  revokeSweepMs: z.natural().default(5000),
   totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
 });
@@ -250,6 +258,18 @@ export function apply(ctx: Context, config: AuthConfig): void {
   const sessionDisposer = mountSessionDomain(ctx, auth, log);
   if (sessionDisposer !== undefined) {
     ctx.effect(sessionDisposer, "dsh-auth-gate: session domain");
+  }
+
+  // 禁用用户 → 已发会话即时失效（D8）：插件侧周期扫描 users.yaml，把变更落到会话表；
+  // 门保持 P12 的同步零 IO 语义，CLI 也不需要访问会话存储。
+  if (config.mode === "password" && config.revokeSweepMs > 0) {
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => auth.sessions,
+      loadUsers: () => loadUsersFile(usersPath),
+      intervalMs: config.revokeSweepMs,
+      log,
+    });
+    ctx.effect(() => sweeper.start(), "dsh-auth-gate: disabled session sweeper");
   }
 
   const unwrap = wrapServer(server, () => auth.gate, log);

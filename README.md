@@ -47,7 +47,7 @@ codebase. Solid engineering worth building on.
   ```sh
   dsh-auth user add admin --password-stdin   # add a user
   dsh-auth user list                          # list users
-  dsh-auth user disable admin                 # block a user's future logins
+  dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
   dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
   dsh-auth user totp disable admin            # remove the TOTP secret
   ```
@@ -122,16 +122,17 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
     cookieSecure: true # keep true when you use https
 ```
 
-| Option         | Default            | What it does                                                                                                                                                                                                                                        |
-| -------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`         | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                               |
-| `totp`         | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration) |
-| `sessionTtl`   | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                      |
-| `cookieName`   | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                  |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                 |
-| `cookieSecure` | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                              |
-| `usersFile`    | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                  |
-| `logoutOrder`  | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                         |
+| Option          | Default            | What it does                                                                                                                                                                                                                                        |
+| --------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`          | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                               |
+| `totp`          | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration) |
+| `sessionTtl`    | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                      |
+| `cookieName`    | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                  |
+| `tokenRef`      | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                 |
+| `cookieSecure`  | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                              |
+| `usersFile`     | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                  |
+| `revokeSweepMs` | `5000`             | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                   |
+| `logoutOrder`   | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                         |
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
@@ -160,47 +161,6 @@ does not sit in every agent turn, and you open it explicitly from the skill
 panel whenever you need the config reference (the UI marks it `user-only`).
 If you prefer the agent to answer configuration questions automatically,
 remove that frontmatter field after installation.
-
-## Troubleshooting
-
-### `dsh-auth: command not found`
-
-`dsh plugin --profile web add dsh-auth-gate` installs the package into the
-profile's `node_modules` (`$DSH_HOME/profiles/web/node_modules/dsh-auth-gate`,
-default `~/.dsh/...`), but nothing is added to your shell's `PATH`, so the CLI
-binary is not callable by name. This only affects the CLI — the plugin itself
-runs fine. Pick one:
-
-1. **Call it through the profile (recommended).** `dsh plugin` already requires
-   pnpm, so the CLI resolves from the same place the plugin lives:
-
-   ```sh
-   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user add admin --password-stdin
-   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user list
-   ```
-
-   Optionally, once per shell session:
-
-   ```sh
-   alias dsh-auth='pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth'
-   ```
-
-2. **Direct node invocation** (no pnpm needed at runtime):
-
-   ```sh
-   node "$DSH_HOME/profiles/web/node_modules/dsh-auth-gate/lib/cli.js" user add admin --password-stdin
-   ```
-
-3. **Install the package globally**, then `dsh-auth` is on your PATH:
-
-   ```sh
-   npm install -g dsh-auth-gate
-   dsh-auth user add admin --password-stdin
-   ```
-
-Whichever way you call it, the CLI manages the same shared user list
-(`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
-reads — the global copy is just a launcher.
 
 ## Troubleshooting
 

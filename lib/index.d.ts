@@ -20,6 +20,12 @@ export interface AuthConfig {
     /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
     usersFile: string;
     /**
+     * 禁用用户会话的扫描间隔（毫秒，password 模式）：`dsh-auth user disable` 之后，
+     * 该用户**已发出**的会话最多在这么久内被吊销（默认 5000）；`<= 0` 关闭周期扫描，
+     * 退回 M3 行为（禁用只拦新登录）。
+     */
+    revokeSweepMs: number;
+    /**
      * TOTP 两段式模式（M4 T4）：off 忽略 secret（纯密码）；optional 有 secret 的用户
      * 走两段式；required 全员必须两段式（无 secret 的用户登录失败，统一 401）。
      */

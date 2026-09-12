@@ -100,6 +100,20 @@ describe("SessionStore", () => {
     expect(store.getByToken(stale1.token)).toBeUndefined();
     expect(store.getByToken(stale2.token)).toBeUndefined();
   });
+
+  it("revokes every session of one subject and leaves other subjects alone", async () => {
+    const table = new MemTable();
+    const store = new SessionStore(table);
+    const first = await store.create("alice", 60_000);
+    const second = await store.create("alice", 60_000);
+    const other = await store.create("bob", 60_000);
+
+    expect(await store.revokeBySubject("alice")).toBe(2);
+    expect(store.getByToken(first.token)).toBeUndefined();
+    expect(store.getByToken(second.token)).toBeUndefined();
+    expect(store.getByToken(other.token)?.subject).toBe("bob");
+    expect(await store.revokeBySubject("alice")).toBe(0);
+  });
 });
 
 describe("buildSetCookie", () => {

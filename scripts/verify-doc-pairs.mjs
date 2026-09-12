@@ -15,10 +15,14 @@
  * 3. Size red line — single docs over 50 KiB must be sliced (skeleton +
  *    references/). Frozen specs over the line are exempted by exact path and
  *    are expected to be split at their next revision, not extended further.
+ * 4. Duplicate headings — one file must not repeat the same H2/H3/H4 heading
+ *    (a copy-paste accident). The repo-root READMEs are in scope as well: the
+ *    historical accident was a byte-identical `## Troubleshooting` block in
+ *    README.md, which `docs/`-only pairing checks could never see.
  *
  * Run via `npm run docs:check` (part of `npm run verify`).
  */
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, dirname, relative, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -138,9 +142,48 @@ for (const full of files) {
   }
 }
 
+/**
+ * 4. 重复标题: 同一文件里同一个 H2/H3/H4 标题出现两次 = 复制粘贴事故。
+ *    范围含仓库根 README（历史事故就发生在根 README，docs/ 下的检查看不见）。
+ *    围栏代码块里的 `#` 行不算标题。
+ */
+const HEADING = /^(#{2,4})\s+(.+?)\s*$/;
+const FENCE = /^\s*```/;
+const SCAN_DUPLICATE_HEADINGS = [
+  ...files,
+  ...["README.md", "README.zh.md"].map((name) => join(ROOT, name)),
+];
+for (const full of SCAN_DUPLICATE_HEADINGS) {
+  if (!existsSync(full)) continue;
+  const rel = relative(ROOT, full).split("\\").join("/");
+  const seen = new Map();
+  const lines = readFileSync(full, "utf8").split("\n");
+  let fenced = false;
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i].trimEnd();
+    if (FENCE.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    const match = HEADING.exec(line);
+    if (match === null) continue;
+    const key = `${match[1]} ${match[2].toLowerCase()}`;
+    if (!seen.has(key)) {
+      seen.set(key, i + 1);
+      continue;
+    }
+    errors.push(
+      `${rel}: 第 ${i + 1} 行标题 "${line}" 与第 ${seen.get(key)} 行重复（同一文件禁止重复 H2-H4 标题）`,
+    );
+  }
+}
+
 if (errors.length > 0) {
   console.error("docs:check FAILED:");
   for (const e of errors) console.error(`  - ${e}`);
   process.exit(1);
 }
-console.log(`OK: docs bilingual pairing + size red line verified (${files.length} files)`);
+console.log(
+  `OK: docs bilingual pairing + size red line + duplicate-heading scan verified (${files.length} docs + root READMEs)`,
+);

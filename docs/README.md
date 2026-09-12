@@ -31,6 +31,11 @@ dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
    `reviews/_template(_zh).md`（评审记录）、`handoff/_template(_zh).md`（交接）、
    `decisions/_template.(en|zh).md`（ADR）。
 4. **大小红线**：单文件 ≤ 50 KiB；超限必须切片（骨架 + `references/`）。冻结中的
-   frozen spec（impl-m3、totp-fix-plan）在豁免清单里，下次大 revision 时再分，
+   frozen spec（`implemented/impl-m3.md`、`implemented/impl-m3_zh.md`、
+   `implemented/totp-fix-plan.en.md`）按确切路径豁免，下次大 revision 时再分，
    不许继续膨胀。
-5. 新文档无法满足 1/2/4 时先改这里的规则再提交，不让 `docs:check` 静默变红。
+5. **禁止重复标题**：同一文件内同一个 H2/H3/H4 标题不得出现两次（复制粘贴事故）。
+   扫描范围是 `docs/` 下全部 `.md`（含单语豁免文件与 `demo/`、`design/`）加上仓库根
+   `README.md` / `README.zh.md`；围栏代码块（以三个反引号开头的行）内的 `#` 行不算
+   标题，H1 不在扫描范围，标题比较忽略大小写。
+6. 新文档无法满足 1-5 时先改这里的规则再提交，不让 `docs:check` 静默变红。

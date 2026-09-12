@@ -18,6 +18,7 @@ function cfg(): AuthConfig {
     tokenRef: "DSH_AUTH_TOKEN",
     cookieSecure: true,
     usersFile: "",
+    revokeSweepMs: 5000,
     totp: "off",
     logoutOrder: 1000,
   };

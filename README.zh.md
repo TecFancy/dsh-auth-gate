@@ -38,7 +38,7 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
   ```sh
   dsh-auth user add admin --password-stdin   # 添加用户
   dsh-auth user list                          # 查看用户
-  dsh-auth user disable admin                 # 禁止某用户今后登录
+  dsh-auth user disable admin                 # 禁止某用户今后登录，并吊销其已发会话
   dsh-auth user totp enable admin             # 生成 TOTP 密钥（打印 otpauth:// URI）
   dsh-auth user totp disable admin            # 移除 TOTP 密钥
   ```
@@ -108,16 +108,17 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
     cookieSecure: true # 使用 https 时保持 true
 ```
 
-| 选项           | 默认值             | 作用                                                                                                                                                                 |
-| -------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`         | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                                                                              |
-| `totp`         | `"off"`            | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录需密码+动态码；`"required"`：所有用户都必须有密钥（无密钥/未知用户在密码阶段即统一 401，与错密同响应体，防枚举） |
-| `sessionTtl`   | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                                                                               |
-| `cookieName`   | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                                                                                     |
-| `tokenRef`     | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                                                                               |
-| `cookieSecure` | `true`             | 只在纯 http 测试环境设为 `false`                                                                                                                                     |
-| `usersFile`    | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                                                                                         |
-| `logoutOrder`  | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值                                                            |
+| 选项            | 默认值             | 作用                                                                                                                                                                 |
+| --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`          | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                                                                              |
+| `totp`          | `"off"`            | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录需密码+动态码；`"required"`：所有用户都必须有密钥（无密钥/未知用户在密码阶段即统一 401，与错密同响应体，防枚举） |
+| `sessionTtl`    | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                                                                               |
+| `cookieName`    | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                                                                                     |
+| `tokenRef`      | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                                                                               |
+| `cookieSecure`  | `true`             | 只在纯 http 测试环境设为 `false`                                                                                                                                     |
+| `usersFile`     | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                                                                                         |
+| `revokeSweepMs` | `5000`             | 密码模式：被 `dsh-auth user disable` 禁用的用户，其**已发**会话多久内（毫秒）被吊销。`0` = 不扫描（禁用只拦新登录）                                                  |
+| `logoutOrder`   | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值                                                            |
 
 给用户开启 TOTP：运行 `dsh-auth user totp enable <name>`，把打印出的密钥（或
 `otpauth://` URI 二维码）录入验证器 App（Google Authenticator、1Password 等）。
@@ -226,7 +227,7 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 
 ## 注意事项与局限
 
-- 禁用用户只阻止**新**登录；已经登录的会话要等它自然过期。
+- 禁用用户会立即阻止**新**登录；**已发**会话由插件周期扫描吊销（`revokeSweepMs`，默认 5 秒内生效）。
 - 登录限速在服务器重启后清零；TOTP 防重放记录同样重启清零（同一 30 秒窗口内用过的
   码在重启后重新可用——需要「重启 + 同窗口窃码」同时发生才能利用）。
 - TOTP 挑战态（「密码已过、等验证码」）最长 5 分钟。挑战 cookie 带 **HMAC 签名**

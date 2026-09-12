@@ -43,6 +43,12 @@ export declare class SessionStore {
     getByToken(token: string): Session | undefined;
     /** 吊销 = 删除行（登出语义，写盘）；不存在返回 false。 */
     revokeByToken(token: string): Promise<boolean>;
+    /**
+     * 吊销某个 subject（用户名）的**全部**会话行，返回吊销条数（写盘）。
+     * 用途：`dsh-auth user disable` 之后，已发 cookie / Bearer token 立即失效；
+     * 行内没有主体索引，故按 row.subject 全表扫描（会话量级为单机用户数，成本可忽略）。
+     */
+    revokeBySubject(subject: string): Promise<number>;
     /** 全表扫描删除过期行，返回删除数。 */
     pruneExpired(now?: number): Promise<number>;
 }
