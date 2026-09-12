@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.12.0...v0.13.0) (2026-09-12)
+
+
+### Features
+
+* revoke issued sessions when a user is disabled ([#70](https://github.com/TecFancy/dsh-auth-gate/issues/70)) ([b8d5501](https://github.com/TecFancy/dsh-auth-gate/commit/b8d550182b6f6d72860416a29cc8b4eae9f31f59))
+
 ## [0.12.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.11.1...v0.12.0) (2026-08-31)
 
 
