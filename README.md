@@ -202,47 +202,6 @@ Whichever way you call it, the CLI manages the same shared user list
 (`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
 reads — the global copy is just a launcher.
 
-## Troubleshooting
-
-### `dsh-auth: command not found`
-
-`dsh plugin --profile web add dsh-auth-gate` installs the package into the
-profile's `node_modules` (`$DSH_HOME/profiles/web/node_modules/dsh-auth-gate`,
-default `~/.dsh/...`), but nothing is added to your shell's `PATH`, so the CLI
-binary is not callable by name. This only affects the CLI — the plugin itself
-runs fine. Pick one:
-
-1. **Call it through the profile (recommended).** `dsh plugin` already requires
-   pnpm, so the CLI resolves from the same place the plugin lives:
-
-   ```sh
-   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user add admin --password-stdin
-   pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth user list
-   ```
-
-   Optionally, once per shell session:
-
-   ```sh
-   alias dsh-auth='pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/web" exec dsh-auth'
-   ```
-
-2. **Direct node invocation** (no pnpm needed at runtime):
-
-   ```sh
-   node "$DSH_HOME/profiles/web/node_modules/dsh-auth-gate/lib/cli.js" user add admin --password-stdin
-   ```
-
-3. **Install the package globally**, then `dsh-auth` is on your PATH:
-
-   ```sh
-   npm install -g dsh-auth-gate
-   dsh-auth user add admin --password-stdin
-   ```
-
-Whichever way you call it, the CLI manages the same shared user list
-(`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
-reads — the global copy is just a launcher.
-
 ## Deployment
 
 - [Reverse-proxy deployment guide](docs/deployed/reverse-proxy.md) — Caddy/nginx
