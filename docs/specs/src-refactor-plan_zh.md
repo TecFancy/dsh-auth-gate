@@ -1,6 +1,7 @@
 # dsh-auth-gate src 目录重构方案（参考 framework 分层约定）
 
 > 状态：**已实施（2026-08-30）**——verify 自检全绿、与 framework 交叉验证通过，待 review 后提交/开 PR
+> 注（2026-09-13）：§1 的体检数字是**重构前快照**（52 文件 / 8202 行、client 3 文件；现 `src/` 为 86 文件 / 11070 行、client 4 文件）。这些数字只作那次变更的记录，不是当前基线。
 > 分支：`development`
 > 性质：**纯结构性重构**——只移动文件 + 机械更新 import，零行为变更
 > 参考：`dsh-plugin-framework` / `dsh-collab` 的 `features/ + shared/ + client/` 分层约定

@@ -30,6 +30,9 @@ tables).
     lifecycle, disposal, real-entry-path tests, prose contracts.
   - `dsh-auth-pre-push` — smallest relevant evidence before a push;
     force-with-lease discipline.
+  - `dsh-auth-gate-config` — configuration quick reference shipped with the
+    package (options, `dsh-auth` CLI, login trouble); user-invoked
+    (`disable-model-invocation: true`), not an agent workflow.
 - **Engineering conventions**: `docs/specs/development.md` (commands, hooks, gates,
   release flow). Authoritative for the rules summarized below — update it
   there, not here.

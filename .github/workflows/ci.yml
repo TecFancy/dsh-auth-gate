@@ -30,6 +30,7 @@ jobs:
       - run: npm run lint:no-emdash
       - run: npm run slice:check
       - run: npm run decisions:check
+      - run: npm run docs:check
 
   quality:
     name: quality (${{ matrix.os }})
