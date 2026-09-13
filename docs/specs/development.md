@@ -50,6 +50,9 @@ src/
 ├── session/           # 会话层（核心机制层，token/password 共同消费）
 │   ├── index.ts
 │   └── session-store.ts  # storage-domain 会话持久化
+├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
+│   ├── index.ts       #   barrel：跨 slice 唯一入口
+│   └── endpoints.ts   #   404 兜底 / logout / status / methodNotAllowed / queryOf（token+password 共用）
 ├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
 │   ├── token/
 │   │   ├── index.ts

@@ -92,3 +92,13 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 不可接受；进程级 HMAC 与内存限速/防重放同一寿命模型。
 → [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
+
+## D11. 认证 HTTP 端点公共件独立成 http 层
+
+token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进新核心机制层
+`src/http/`（与 gate、session 并列，经 barrel 引用），`shared` 保持叶子层不变。
+**替代方案**：下沉 `shared`（破坏叶子约束，或得把 cookie 构造当参数注入）；
+塞进 `session`（methodNotAllowed 与会话无关）；保持重复（改一处得记得另一处）。
+**为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
+→ [zh](decisions/implemented/2026-09-13-http-endpoint-layer.zh.md) ·
+[en](decisions/implemented/2026-09-13-http-endpoint-layer.en.md)
