@@ -1,1 +1,1 @@
-{"version":3,"file":"index.js","sourceRoot":"","sources":["../../../src/features/proxy/index.ts"],"names":[],"mappings":"AAAA;;GAEG;AACH,cAAc,oBAAoB,CAAC;AACnC,cAAc,YAAY,CAAC"}
+{"version":3,"file":"index.js","sourceRoot":"","sources":["../../../src/features/proxy/index.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,OAAO,EACL,oBAAoB,EACpB,QAAQ,EACR,oBAAoB,EACpB,qBAAqB,EACrB,4BAA4B,EAC5B,kBAAkB,EAClB,kBAAkB,EAClB,WAAW,EACX,gBAAgB,GACjB,MAAM,oBAAoB,CAAC;AAC5B,OAAO,EAAE,iBAAiB,EAAE,oBAAoB,EAAE,MAAM,YAAY,CAAC"}

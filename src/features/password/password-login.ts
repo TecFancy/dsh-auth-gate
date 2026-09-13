@@ -16,15 +16,6 @@ import {
   parseChallengeValue,
 } from "./challenge-cookie.js";
 
-// 挑战 cookie 常量/构建/解析迁至 ./challenge-cookie.js（D10：HMAC 签名），此处 re-export
-// 保持公共 API 位置（password/index.ts → 下游 import 不断）。
-export {
-  buildChallengeValue,
-  CHALLENGE_COOKIE,
-  CHALLENGE_TTL_SECONDS,
-  parseChallengeValue,
-} from "./challenge-cookie.js";
-
 export interface PasswordLoginDeps {
   sessions: () => SessionStore | undefined;
   cookieName: string;

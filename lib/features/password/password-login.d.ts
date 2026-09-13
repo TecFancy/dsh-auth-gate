@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
 import { type SessionStore } from "../../session/index.js";
-export { buildChallengeValue, CHALLENGE_COOKIE, CHALLENGE_TTL_SECONDS, parseChallengeValue, } from "./challenge-cookie.js";
 export interface PasswordLoginDeps {
     sessions: () => SessionStore | undefined;
     cookieName: string;

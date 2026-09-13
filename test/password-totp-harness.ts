@@ -10,7 +10,7 @@ import {
   buildChallengeValue,
   CHALLENGE_COOKIE,
   CHALLENGE_TTL_SECONDS,
-} from "../src/features/password/password-login.js";
+} from "../src/features/password/challenge-cookie.js";
 import { SessionStore, type Session } from "../src/session/index.js";
 
 export class MemTable implements KvTable<string, Session> {

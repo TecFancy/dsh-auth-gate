@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHALLENGE_COOKIE } from "./password-login.js";
-import { buildChallengeValue } from "./challenge-cookie.js";
+import { buildChallengeValue, CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import {
   aliceChallengeCookie,
   makeHarness,

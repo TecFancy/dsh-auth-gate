@@ -6,12 +6,8 @@ import {
   totpChallengePageHtml,
 } from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
-import {
-  handlePasswordLogin,
-  CHALLENGE_COOKIE,
-  parseChallengeValue,
-  type PasswordLoginDeps,
-} from "./password-login.js";
+import { handlePasswordLogin, type PasswordLoginDeps } from "./password-login.js";
+import { CHALLENGE_COOKIE, parseChallengeValue } from "./challenge-cookie.js";
 import { buildSetCookie } from "../../session/index.js";
 
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
