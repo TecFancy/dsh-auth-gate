@@ -218,6 +218,10 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 ## 环境要求
 
 - 服务器上需要 Node ≥ 22.19 和 pnpm。
+- dsh `0.1.x`（声明为 `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2`，最近一次验证对应
+  `0.1.5-rc.2`）。插件用的是宿主自己那份 `@deepseek-ai/dsh-storage-domain` 与
+  `@deepseek-ai/cordis`（两者都是 peer 依赖，不随插件打包），所以只要 profile 由 dsh
+  基础包启动，依赖就齐了。
 - dsh 的 `web` profile 正常运行（`dsh --profile web`）。
 - 如果 `cookieSecure` 是 `true`，站点必须走 https（浏览器在纯 http 下会拒绝安全 cookie）。
 

@@ -102,3 +102,17 @@ token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进�
 **为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
 → [zh](decisions/implemented/2026-09-13-http-endpoint-layer.zh.md) ·
 [en](decisions/implemented/2026-09-13-http-endpoint-layer.en.md)
+
+## D12. 宿主要求声明 + storage-domain 转 peer
+
+顶层 `engines.dsh` 声明宿主走廊 `^0.1.0-rc.6 || ^0.1.5-rc.2`；
+`@deepseek-ai/dsh-storage-domain` 从 `dependencies` 移到 `peerDependencies`
+（同范围，devDependencies 留一份给本仓构建/测试），运行时不带副本。
+**替代方案**：只加 engines 而依赖字段不动（嵌套旧线副本留在进程里）；范围只写
+`^0.1.5-rc.2`（对 0.1.2-alpha/0.1.5-rc.1 假报低于下限）或只写 `^0.1.0-rc.6`
+（严格语义下匹配不到当前宿主，市场打假警告）；放 `dsh.engines.dsh`（顶层才是
+官方位置，同时存在时市场只认顶层）。
+**为什么**：`||` 让两条走廊在严格 semver 下都成立，dev 走廊与生产宿主都覆盖；
+交给宿主后 pnpm 不再装第二份 domain 契约，插件随宿主升级。
+→ [zh](decisions/implemented/2026-09-14-host-requirement-declaration.zh.md) ·
+[en](decisions/implemented/2026-09-14-host-requirement-declaration.en.md)

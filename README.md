@@ -250,6 +250,11 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 ## Requirements
 
 - Node ≥ 22.19 and pnpm on the server.
+- dsh `0.1.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2`, last
+  verified against `0.1.5-rc.2`). The plugin runs on the host's own
+  `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis` copies — both are
+  peer dependencies, never bundled — so a profile booted from the dsh base
+  bundle already provides them.
 - The dsh `web` profile running (`dsh --profile web`).
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).
