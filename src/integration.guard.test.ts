@@ -38,12 +38,12 @@ function registerRoutes(server: RealServer): void {
   });
 }
 
-function requestUpgradeStatus(port: number): Promise<number> {
+function requestUpgradeStatus(port: number, path = "/api/events.host"): Promise<number> {
   return new Promise((resolve, reject) => {
     const req = request({
       port,
       host: "127.0.0.1",
-      path: "/api/events.host",
+      path,
       headers: {
         Connection: "Upgrade",
         Upgrade: "websocket",
@@ -115,6 +115,40 @@ describe("integration: real webserver + guard", () => {
         },
       });
       expect((await fetch(`${base}/late`)).status).toBe(401);
+    } finally {
+      await authFiber.dispose();
+      await wsFiber.dispose();
+    }
+  });
+
+  it("serves only the public read-only static whitelist without credentials", async () => {
+    const ctx = new Context();
+    const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
+    const server = ctx.get("webServer") as unknown as RealServer;
+    registerRoutes(server);
+    const authFiber = await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig);
+    const port = server.port;
+    const base = `http://127.0.0.1:${port}`;
+
+    try {
+      // 默认 TokenGate（无凭证）：浏览器抓 manifest 时不带 cookie，必须仍可拿 200。
+      const manifest = await fetch(`${base}/manifest.webmanifest`);
+      expect(manifest.status).toBe(200);
+      expect(await manifest.text()).toBe("spa");
+      // 只有白名单那一条：相邻静态路径照旧 401。
+      expect((await fetch(`${base}/assets/index.js`)).status).toBe(401);
+      expect((await fetch(`${base}/manifest.webmanifest.bak`)).status).toBe(401);
+
+      // upgrade 语义不在白名单内（注册出来给守卫拒，仍是 401）。
+      server.registerUpgrade({
+        path: "/manifest.webmanifest",
+        handler: (_req, socket) => {
+          socket.write(
+            "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
+          );
+        },
+      });
+      expect(await requestUpgradeStatus(port, "/manifest.webmanifest")).toBe(401);
     } finally {
       await authFiber.dispose();
       await wsFiber.dispose();

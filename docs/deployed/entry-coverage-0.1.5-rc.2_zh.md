@@ -138,29 +138,32 @@
 | fallback-probe | /favicon.ico                                 | fallback seat owner @deepseek-ai/dsh-host-frontend-static [补充表] | 401                        | PASS (浏览器默认请求的真实路径，易被静态服务绕过)                 |
 | fallback-probe | / (Accept: text/html)                        | 浏览器导航分支（同 fallback 席位）                                 | 302 → /auth/login?next=%2F | PASS (浏览器导航应 302 → /auth/login?next=%2F)                    |
 
-## 表 2 - 门自己的公开端点（4 行）
+## 表 2 - 门自己的公开端点（5 行）
 
 `/auth` 面是**设计上公开**的（门把 `/auth` 与 `/auth/*` 放进白名单，否则没人能登录）。
-脚本仍然探测它：白名单坏掉会把所有人锁在门外，白名单漏了则是另一类事故——四条都必须
-有应答，且都不许是 401。
+脚本仍然探测它：白名单坏掉会把所有人锁在门外，白名单漏了则是另一类事故——五条都必须
+有应答，且都不许是 401。末行 `/manifest.webmanifest` 虽不属于 `/auth`，但同理必须未认证
+可达（浏览器抓 manifest 不带凭证；见 D13），所以放进本表。
 
-| 入口类型 | 路径         | 来源包                                                                                             | 未认证响应 | 判定                                                                              |
-| -------- | ------------ | -------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------- |
-| public   | /auth        | dsh-auth-gate lib/features/password/password-endpoints.js:14 / token/auth-endpoints.js:15 [补充表] | 404        | PASS (预期 404（/auth/* 兜底，不落 SPA）；prefix 兜底：未注册的 /auth/* 一律 404) |
-| public   | /auth/login  | dsh-auth-gate lib/features/password/password-endpoints.js:15（token 模式同名） [补充表]            | 200        | PASS (预期 200（登录页）；必须可达，否则无法登录)                                 |
-| public   | /auth/logout | dsh-auth-gate lib/features/password/password-endpoints.js:17（token 模式同名） [补充表]            | 405        | PASS (预期 405（仅 POST）；GET 未认证不得 2xx)                                    |
-| public   | /auth/status | dsh-auth-gate lib/features/password/password-endpoints.js:22（token 模式同名） [补充表]            | 200        | PASS (预期 200（未认证态 JSON）；只返回认证态，不含凭证)                          |
+| 入口类型 | 路径                  | 来源包                                                                                                 | 未认证响应 | 判定                                                                                              |
+| -------- | --------------------- | ------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------- |
+| public   | /auth                 | dsh-auth-gate lib/features/password/password-endpoints.js:14 / token/auth-endpoints.js:15 [补充表]     | 404        | PASS (预期 404（/auth/* 兜底，不落 SPA）；prefix 兜底：未注册的 /auth/* 一律 404)                 |
+| public   | /auth/login           | dsh-auth-gate lib/features/password/password-endpoints.js:15（token 模式同名） [补充表]                | 200        | PASS (预期 200（登录页）；必须可达，否则无法登录)                                                 |
+| public   | /auth/logout          | dsh-auth-gate lib/features/password/password-endpoints.js:17（token 模式同名） [补充表]                | 405        | PASS (预期 405（仅 POST）；GET 未认证不得 2xx)                                                    |
+| public   | /auth/status          | dsh-auth-gate lib/features/password/password-endpoints.js:22（token 模式同名） [补充表]                | 200        | PASS (预期 200（未认证态 JSON）；只返回认证态，不含凭证)                                          |
+| public   | /manifest.webmanifest | dsh-host-frontend-static@0.1.5-rc.2（fallback 席位）+ dsh-auth-gate 白名单（D13，2026-09-18） [补充表] | 200        | PASS (预期 200（浏览器抓 manifest 按规范不带凭证，未认证也必须可达）；精确白名单：相邻路径仍 401) |
 
 ## 补充表
 
-有 5 条探测不是静态发现的产物，每条都注明来源：
+有 6 条探测不是静态发现的产物，每条都注明来源：
 
-| 路径                                                   | 来源                                                                                                            | 为什么必须补充                                                                                                 |
-| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `/`                                                    | fallback 席位持有者 `@deepseek-ai/dsh-host-frontend-static`                                                     | SPA 根路径由 fallback 席位响应，本身没有 `register` 调用；它也是文档里线上验收的基线（`curl /` -> 401）        |
-| `/index.html`                                          | 同一 fallback 持有者                                                                                            | fallback 静态服务直接命中，没有具名路由                                                                        |
-| `/favicon.ico`                                         | 同一 fallback 持有者                                                                                            | 浏览器最先请求的路径；静态服务是绕过守卫最经典的位置                                                           |
-| `/auth`、`/auth/login`、`/auth/logout`、`/auth/status` | `dsh-auth-gate` 的 `lib/features/password/password-endpoints.js`（`lib/features/token/auth-endpoints.js` 同名） | 门通过包装 `register: (route) => server.register(route)` 注册它们，receiver 不叫 `webServer`，静态发现刻意不认 |
+| 路径                                                   | 来源                                                                                                            | 为什么必须补充                                                                                                                                                                            |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/`                                                    | fallback 席位持有者 `@deepseek-ai/dsh-host-frontend-static`                                                     | SPA 根路径由 fallback 席位响应，本身没有 `register` 调用；它也是文档里线上验收的基线（`curl /` -> 401）                                                                                   |
+| `/index.html`                                          | 同一 fallback 持有者                                                                                            | fallback 静态服务直接命中，没有具名路由                                                                                                                                                   |
+| `/favicon.ico`                                         | 同一 fallback 持有者                                                                                            | 浏览器最先请求的路径；静态服务是绕过守卫最经典的位置                                                                                                                                      |
+| `/auth`、`/auth/login`、`/auth/logout`、`/auth/status` | `dsh-auth-gate` 的 `lib/features/password/password-endpoints.js`（`lib/features/token/auth-endpoints.js` 同名） | 门通过包装 `register: (route) => server.register(route)` 注册它们，receiver 不叫 `webServer`，静态发现刻意不认                                                                            |
+| `/manifest.webmanifest`                                | 同一 fallback 持有者；门的公开白名单见 D13（2026-09-18）                                                        | 浏览器抓 manifest 按规范不带凭证（Chromium 仅 `crossorigin="use-credentials"` 才带 cookie），只被守卫包住的静态路径**登录后也恒 401**，与 `/favicon.ico` 那类「带 cookie 的常规请求」不同 |
 
 ## 未覆盖
 

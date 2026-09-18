@@ -5,7 +5,7 @@
  */
 export { noopGate } from "./gate.js";
 export type { Gate, GateDecision, GuardKind } from "./gate.js";
-export { AUTH_PATH_PREFIX, denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isProxyDeniedRequest, LOGIN_PATH, PROXY_MARKER_HEADER, wrapServer, } from "./guard.js";
+export { AUTH_PATH_PREFIX, denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isProxyDeniedRequest, isPublicStaticPath, LOGIN_PATH, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, wrapServer, } from "./guard.js";
 export type { GuardLog, HttpHandler, UpgradeHandler, WrappableRoute, WrappableServer, WrappableUpgradeRoute, } from "./guard.js";
 export { assertGuarded } from "./self-check.js";
 //# sourceMappingURL=index.d.ts.map

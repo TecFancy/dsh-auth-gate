@@ -15,8 +15,10 @@ export {
   guardUpgrade,
   isGuarded,
   isProxyDeniedRequest,
+  isPublicStaticPath,
   LOGIN_PATH,
   PROXY_MARKER_HEADER,
+  PUBLIC_STATIC_PATHS,
   wrapServer,
 } from "./guard.js";
 export type {
