@@ -1,7 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { parseCookieHeader } from "../../shared/index.js";
 import type { Gate, GuardKind } from "../../gate/index.js";
-import { AUTH_PATH_PREFIX } from "../../gate/index.js";
+import { AUTH_PATH_PREFIX, isPublicStaticPath } from "../../gate/index.js";
 import type { SessionStore } from "../../session/index.js";
 
 export interface PasswordGateOptions {
@@ -11,8 +11,9 @@ export interface PasswordGateOptions {
 }
 
 /**
- * password 模式门（P12）：白名单 → 会话 cookie → Bearer 会话 token → deny。
- * 门内零 KDF、零文件 IO、同步返回；Bearer 通道按会话查表（可吊销可过期）。
+ * password 模式门（P12）：白名单（`/auth` 前缀 + 公开只读静态路径）→ 会话 cookie
+ * → Bearer 会话 token → deny。门内零 KDF、零文件 IO、同步返回；Bearer 通道按会话
+ * 查表（可吊销可过期）。
  */
 export class PasswordGate implements Gate {
   private readonly sessions: () => SessionStore | undefined;
@@ -23,10 +24,11 @@ export class PasswordGate implements Gate {
     this.cookieName = options.cookieName;
   }
 
-  decide(req: IncomingMessage, _kind: GuardKind, pathname: string): "allow" | "deny" {
+  decide(req: IncomingMessage, kind: GuardKind, pathname: string): "allow" | "deny" {
     if (pathname === AUTH_PATH_PREFIX || pathname.startsWith(AUTH_PATH_PREFIX + "/")) {
       return "allow";
     }
+    if (isPublicStaticPath(kind, pathname)) return "allow";
     const store = this.sessions();
     if (store === undefined) return "deny";
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);

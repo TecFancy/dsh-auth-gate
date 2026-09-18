@@ -29,7 +29,9 @@ codebase. Solid engineering worth building on.
 
 - **Everything needs a login.** Every page, API call, and WebSocket connection
   is checked. Visitors without a valid session are sent to a simple login page
-  (or rejected with `401` for API/script requests).
+  (or rejected with `401` for API/script requests). The one exception is
+  `GET /manifest.webmanifest`: browsers fetch the Web App Manifest without
+  credentials, so that exact path is public (name / icons / display mode only).
 - **Two ways to sign in** (pick one in the configuration):
   - **Password** (recommended): each admin gets a username and password.
   - **Token**: one shared secret token for the whole instance.

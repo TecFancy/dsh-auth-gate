@@ -92,3 +92,17 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 不可接受；进程级 HMAC 与内存限速/防重放同一寿命模型。
 → [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
+
+## D13. PWA manifest 列入免守卫公开静态路径
+
+浏览器抓 manifest 按规范不带凭证（Chromium 仅 `crossorigin="use-credentials"` 才带上），
+cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
+`PUBLIC_STATIC_PATHS = ["/manifest.webmanifest"]` + `isPublicStaticPath(kind, pathname)`
+（upgrade 不算），两个门共用。
+**替代方案**：Caddy 直答/托管（内容双份、路径随 dsh 版本腐化、只修一台）；
+改 dist 的 `<link>` 加 `crossorigin`（改官方产物，升级即覆盖）；放行整个 `/assets`
+前缀（公开面过大）；加 `publicPaths` 配置项（违背 M4/P12 冻结决策）。
+**为什么**：manifest 只含应用名/图标/显示模式，与 `/auth` 同属「不认证也必须可达」；
+精确匹配 + 排除 upgrade 让新增攻击面只有一个只读 GET，白名单只有一处。
+→ [zh](decisions/implemented/2026-09-18-public-static-manifest.zh.md) ·
+[en](decisions/implemented/2026-09-18-public-static-manifest.en.md)

@@ -7,6 +7,19 @@ export declare const GUARDED: unique symbol;
 export declare const LOGIN_PATH = "/auth/login";
 /** auth 公共路径前缀（两种 gate 的白名单：登录/登出/状态端点免守卫）。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
+/**
+ * 免守卫的公开只读静态路径（精确匹配）。浏览器抓取 Web App Manifest 时按规范
+ * 不带凭证（Chromium `manifest_fetcher.cc`：只有 link 带 `crossorigin="use-credentials"`
+ * 才是 `kInclude`，否则 `kOmit`），cookie/Bearer 门永远认不出这次请求，登录用户
+ * 也会恒 401。manifest 只含应用名/图标/显示模式等公开元数据，不含工作区信息，
+ * 故列入白名单（语义与 `/auth` 同一类：不认证也必须可达）。
+ */
+export declare const PUBLIC_STATIC_PATHS: readonly string[];
+/**
+ * 是否命中公开只读静态路径。`kind === "upgrade"` 一律不算：这些路径只有 HTTP
+ * GET 语义，放行握手只会白扩攻击面（升级请求仍走完整认证）。
+ */
+export declare function isPublicStaticPath(kind: GuardKind, pathname: string): boolean;
 /** 认证本地代理（`dsh-auth-proxy --mark-proxy`）附加的请求标记头。 */
 export declare const PROXY_MARKER_HEADER = "x-dsh-proxy";
 /** 是否命中"代理标记 + 禁行方法"：`/api/<method>` 路径上带 `X-Dsh-Proxy: 1`。 */

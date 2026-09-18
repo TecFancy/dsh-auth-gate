@@ -13,12 +13,12 @@ export interface TokenGateOptions {
     sessions: () => SessionStore | undefined;
     cookieName: string;
 }
-/** 共享 token 门（M2）：白名单 → 会话 cookie → Bearer，恒时校验，fail-closed。 */
+/** 共享 token 门（M2）：白名单（`/auth` 前缀 + 公开只读静态路径）→ 会话 cookie → Bearer，恒时校验，fail-closed。 */
 export declare class TokenGate implements Gate {
     private readonly resolveToken;
     private readonly sessions;
     private readonly cookieName;
     constructor(options: TokenGateOptions);
-    decide(req: IncomingMessage, _kind: GuardKind, pathname: string): Promise<"allow" | "deny">;
+    decide(req: IncomingMessage, kind: GuardKind, pathname: string): Promise<"allow" | "deny">;
 }
 //# sourceMappingURL=token-gate.d.ts.map
