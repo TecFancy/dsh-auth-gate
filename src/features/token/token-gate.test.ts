@@ -39,6 +39,18 @@ describe("TokenGate", () => {
     expect(await gate.decide(fakeReq({}), "prefix", "/auth/whatever")).toBe("allow");
   });
 
+  it("allows the public read-only static whitelist on HTTP but never on upgrade", async () => {
+    const gate = makeGate();
+    expect(await gate.decide(fakeReq({}), "fallback", "/manifest.webmanifest")).toBe("allow");
+    expect(await gate.decide(fakeReq({}), "exact", "/manifest.webmanifest")).toBe("allow");
+    // upgrade 只有认证一条路（白名单不含握手）。
+    expect(await gate.decide(fakeReq({}), "upgrade", "/manifest.webmanifest")).toBe("deny");
+    // 精确匹配：不加前缀、不容尾斜杠、不放行相邻路径。
+    expect(await gate.decide(fakeReq({}), "fallback", "/manifest.webmanifest/")).toBe("deny");
+    expect(await gate.decide(fakeReq({}), "fallback", "/manifest.webmanifest.bak")).toBe("deny");
+    expect(await gate.decide(fakeReq({}), "fallback", "/assets/index.js")).toBe("deny");
+  });
+
   it("allows a valid session cookie and falls through otherwise", async () => {
     const gate = makeGate({ sessions: () => fakeSessions(new Set(["good-session"])) });
     expect(await gate.decide(fakeReq({ cookie: "dsh_auth=good-session" }), "exact", "/probe")).toBe(

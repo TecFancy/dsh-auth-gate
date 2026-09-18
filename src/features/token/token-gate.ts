@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Gate, GuardKind } from "../../gate/index.js";
-import { AUTH_PATH_PREFIX } from "../../gate/index.js";
+import { AUTH_PATH_PREFIX, isPublicStaticPath } from "../../gate/index.js";
 import type { SessionStore } from "../../session/index.js";
 import { parseCookieHeader } from "../../shared/index.js";
 
@@ -23,7 +23,7 @@ export interface TokenGateOptions {
   cookieName: string;
 }
 
-/** 共享 token 门（M2）：白名单 → 会话 cookie → Bearer，恒时校验，fail-closed。 */
+/** 共享 token 门（M2）：白名单（`/auth` 前缀 + 公开只读静态路径）→ 会话 cookie → Bearer，恒时校验，fail-closed。 */
 export class TokenGate implements Gate {
   private readonly resolveToken: () => Promise<string | undefined>;
   private readonly sessions: () => SessionStore | undefined;
@@ -35,14 +35,11 @@ export class TokenGate implements Gate {
     this.cookieName = options.cookieName;
   }
 
-  async decide(
-    req: IncomingMessage,
-    _kind: GuardKind,
-    pathname: string,
-  ): Promise<"allow" | "deny"> {
+  async decide(req: IncomingMessage, kind: GuardKind, pathname: string): Promise<"allow" | "deny"> {
     if (pathname === AUTH_PATH_PREFIX || pathname.startsWith(AUTH_PATH_PREFIX + "/")) {
       return "allow";
     }
+    if (isPublicStaticPath(kind, pathname)) return "allow";
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
     if (cookie !== undefined && cookie !== "") {
       const store = this.sessions();
