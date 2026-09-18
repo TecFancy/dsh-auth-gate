@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.13.0...v0.13.1) (2026-09-18)
+
+
+### Bug Fixes
+
+* allow unauthenticated GET /manifest.webmanifest ([0ef9960](https://github.com/TecFancy/dsh-auth-gate/commit/0ef9960a9a15b934a62e314ad97de9a5ff75fc6f))
+
 ## [0.13.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.12.0...v0.13.0) (2026-09-12)
 
 
