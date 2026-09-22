@@ -9,7 +9,8 @@
  * 三变体共享样式：单栏「门禁检查点」卡（2026-09-22 grok-4.6 设计定稿）。
  * 身份块（kicker + 域名标记 + host）是反钓鱼核心：用户应在 3 秒内认出这是自己实例的
  * 门禁，而不是上游聊天产品的登录页。因此：不用上游品牌蓝、不放产品 logo、不用胶囊控件；
- * 域名是视觉主角（等宽 + 收字距），顶/底用一层发丝分隔线分区，卡片靠一层柔和阴影悬浮。
+ * 域名是视觉主角（加粗大号 + 收字距 + bidi 隔离），顶/底用一层发丝分隔线分区，
+ * 卡片靠一层柔和阴影悬浮。
  * 约束：零第三方资源、无外部字体、无 JS 也能提交、CSS 预算 6KB 内、深浅色 + 减少动效。
  */
 
@@ -21,7 +22,7 @@ body{margin:0;min-height:100vh;min-height:100dvh;display:flex;align-items:center
 .card{width:100%;max-width:22.5rem;padding:1.75rem 1.75rem 1.65rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
 .head{padding-bottom:1.15rem;border-bottom:1px solid var(--line)}
 .kicker{margin:0;font-size:11px;font-weight:600;line-height:16px;letter-spacing:.12em;text-transform:uppercase;color:var(--focus)}
-.host{margin:6px 0 0;font-size:22px;font-weight:700;line-height:28px;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr}
+.host{margin:6px 0 0;font-size:22px;font-weight:700;line-height:28px;letter-spacing:-.025em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:ltr;unicode-bidi:isolate}
 .mark{display:inline-block;width:7px;height:7px;margin-right:9px;border-radius:1.5px;background:var(--mark);vertical-align:2px}
 .who{margin:6px 0 0;font-size:13px;line-height:18px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 form{margin-top:1.15rem}

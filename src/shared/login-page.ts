@@ -214,7 +214,8 @@ export function totpChallengePageHtml(
         autofocus: true,
         invalid: true,
         className: "code",
-        attrs: 'inputmode="numeric" maxlength="6" autocapitalize="off" spellcheck="false"',
+        attrs:
+          'inputmode="numeric" maxlength="6" pattern="[0-9]{6}" autocapitalize="off" spellcheck="false"',
       },
     ],
     submitLabel: "Verify",
