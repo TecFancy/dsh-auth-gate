@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.1...v0.14.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* render the login card for failed logins instead of a bare text page ([#83](https://github.com/TecFancy/dsh-auth-gate/issues/83)) ([58b9318](https://github.com/TecFancy/dsh-auth-gate/commit/58b9318835c84d986f782953459387d0d56afea2))
+
 ## [0.14.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.0...v0.14.1) (2026-09-22)
 
 
