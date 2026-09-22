@@ -69,7 +69,8 @@ dsh plugin --profile web add dsh-auth-gate   # forwards to pnpm, resolved from p
    `$DSH_HOME/cordis.patch.yml` — since 0.4.1 the template is a pure config
    override (no `insert`; the mount itself is registered by `dsh plugin add` via
    the `dsh.bundle` manifest). Adjust as needed (`cookieSecure` must match the
-   TLS environment; only set `usersFile` for a non-default path).
+   TLS environment; only set `usersFile` for a non-default path; set `publicHost`
+   to your public domain whenever the reverse proxy rewrites `Host`, see D14).
 3. Confirm no other line occupies the `dsh-auth-gate` id (the patch stack overrides by id).
 
 ## 3. Startup and Health Check

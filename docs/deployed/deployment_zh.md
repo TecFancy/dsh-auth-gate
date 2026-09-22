@@ -59,7 +59,7 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
 2. **配置覆盖**：把仓库 `deploy/cordis.patch.yml` 复制为 `$DSH_HOME/cordis.patch.yml`
    ——0.4.1 起该模板是纯配置覆盖（无 `insert`；挂载本身由 `dsh plugin add` 通过
    `dsh.bundle` manifest 注册）。按需调整（`cookieSecure` 必须与 TLS 环境一致；
-   非默认路径才设 `usersFile`）。
+   非默认路径才设 `usersFile`；反代改写了 `Host` 时必须设 `publicHost` 为公网域名，见 D14）。
 3. 确认无其他行占用 `dsh-auth-gate` id（patch 栈按 id 覆盖）。
 
 ## 3. 启动与健康检查

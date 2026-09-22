@@ -70,6 +70,10 @@ dsh.hi-ruofei.com {
 重载：`sudo systemctl reload caddy`。WebSocket 升级走同一套规则（实测：带 cookie 101、
 无 cookie 401）。
 
+> **身份块（D14）**：这套重写让 dsh 收到的 `Host` 是 `127.0.0.1:3080`，登录页身份块会
+> 渲染回环地址、与地址栏不一致。请在插件配置里把 `publicHost` 设为你的公网域名；
+> 留空则回退请求头 `Host`（§4.1 的普通反代拓扑下这才是对的）。
+
 ### 4.2.1 附注：launch-token 门（dsh ≥ 0.1.2-alpha）与 dsh-auth-gate 自动桥
 
 0.1.2-alpha 起 dsh web 有页面级 launch-token 门：新浏览器需先访问 `/?token=<launchToken>`

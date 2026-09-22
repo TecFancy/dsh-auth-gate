@@ -130,3 +130,27 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 精确匹配 + 排除 upgrade 让新增攻击面只有一个只读 GET，白名单只有一处。
 → [zh](decisions/implemented/2026-09-18-public-static-manifest.zh.md) ·
 [en](decisions/implemented/2026-09-18-public-static-manifest.en.md)
+
+## D14. 身份块 host 走 publicHost 配置（空值回退请求头 Host）
+
+反钓鱼身份块原读 `req.headers.host`，半外壳反代把 Host 改写成 `127.0.0.1:3080`，
+远程用户看到回环地址。新增 `publicHost` 配置 + `resolvePublicHost()`（配置优先、
+空值回退 Host 头），三个变体的渲染点统一走它，只影响展示、不参与鉴权。
+**替代方案**：读 `X-Forwarded-Host`（可伪造，违背 P10 不读 XFF）；改反代透传 Host
+（牵动 loopback 栅栏与 launch-token 桥，属于动生产）；只写文档（反钓鱼等于失效）。
+**为什么**：运营侧配置是唯一既不可被请求伪造、又不动生产拓扑的来源；空值回退让
+现有部署行为零变化。
+→ [zh](decisions/implemented/2026-09-22-public-host-identity.zh.md) ·
+[en](decisions/implemented/2026-09-22-public-host-identity.en.md)
+
+## D15. 登录页视觉语言：冷中性检查点卡
+
+保留反钓鱼身份块，视觉从「暖纸色工具站」改为冷中性 + 柔和层次 + 发丝分隔线，域名升为
+视觉主角（22px + 中性标记）；grok-4.6 三路候选（编辑式排印 / 柔和层次 / 检查点控制台）
+在隔离实例真实渲染对比后，取 B 打底 + A 的分隔线 + C 的域名强调。
+**替代方案**：保持 09-17 观感（主人反馈「有点复古」）；回上游品牌蓝 + 盾牌 logo
+（削弱反钓鱼语义）；通用 SaaS 现代风（无差别、AI 味重）；只取三候选中的单一路线。
+**为什么**：层次与过渡解决观感，分隔线建立信息分区，域名强调把身份块立回视觉锚点，
+正好服务这个页面的安全职责；取舍过程留档可查。
+→ [zh](decisions/implemented/2026-09-22-login-page-identity-redesign.zh.md) ·
+[en](decisions/implemented/2026-09-22-login-page-identity-redesign.en.md)

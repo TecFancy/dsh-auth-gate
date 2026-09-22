@@ -75,6 +75,11 @@ dsh.hi-ruofei.com {
 Reload: `sudo systemctl reload caddy`. WebSocket upgrades pass through the
 same rules (verified: `101` with cookie, `401` without).
 
+> **Identity block (D14)**: with this rewrite dsh receives `Host: 127.0.0.1:3080`, so the
+> login page identity block would render a loopback address that does not match the
+> address bar. Set `publicHost` to your public domain in the plugin config; empty falls back
+> to the request `Host` header (correct for the plain-proxy topology in 4.1).
+
 ### 4.2.1 Note: launch-token gate (dsh ≥ 0.1.2-alpha) + dsh-auth-gate bridge
 
 Since 0.1.2-alpha, dsh web keeps a page-level launch-token gate: a fresh browser
