@@ -6,6 +6,7 @@ import {
   compareNames,
   defaultUsersFilePath,
   loadUsersFile,
+  renameWithRetry,
   UsersFileError,
   writeUsersFile,
   type UsersSnapshot,
@@ -150,5 +151,42 @@ users:
     await writeUsersFile(file, { users: new Map() });
     const stat = await fs.stat(file);
     expect(stat.mode & 0o777).toBe(0o600);
+  });
+});
+
+describe("renameWithRetry", () => {
+  /** 构造带 errno code 的错误（与 node 的 rename 失败形状一致）。 */
+  function failure(code: string): Error {
+    return Object.assign(new Error(code), { code });
+  }
+
+  it("retries while the target handle is transiently busy", async () => {
+    let calls = 0;
+    const flaky = (): Promise<void> => {
+      calls += 1;
+      return calls < 3 ? Promise.reject(failure("EPERM")) : Promise.resolve();
+    };
+    await expect(renameWithRetry("a", "b", flaky)).resolves.toBeUndefined();
+    expect(calls).toBe(3);
+  });
+
+  it("gives up after the attempt budget and rethrows the last error", async () => {
+    let calls = 0;
+    const alwaysBusy = (): Promise<void> => {
+      calls += 1;
+      return Promise.reject(failure("EBUSY"));
+    };
+    await expect(renameWithRetry("a", "b", alwaysBusy)).rejects.toThrow("EBUSY");
+    expect(calls).toBe(5);
+  });
+
+  it("rethrows a non-transient failure without retrying", async () => {
+    let calls = 0;
+    const missing = (): Promise<void> => {
+      calls += 1;
+      return Promise.reject(failure("ENOENT"));
+    };
+    await expect(renameWithRetry("a", "b", missing)).rejects.toThrow("ENOENT");
+    expect(calls).toBe(1);
   });
 });

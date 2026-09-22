@@ -27,4 +27,11 @@ export declare function loadUsersFile(filePath: string): Promise<UsersLoadResult
 export declare function compareNames(a: string, b: string): number;
 /** CLI 用（P19）：全量序列化 + 同目录 `.tmp` + 原子替换 + 0600；目录自动创建。 */
 export declare function writeUsersFile(filePath: string, snapshot: UsersSnapshot): Promise<void>;
+type RenameFn = (from: string, to: string) => Promise<void>;
+/**
+ * 原子替换的同目录 `rename`：短暂占用退避重试，其余错误立即上抛。
+ * 重试耗尽后抛最后一次错误，调用方看到的失败语义不变。
+ */
+export declare function renameWithRetry(from: string, to: string, rename?: RenameFn): Promise<void>;
+export {};
 //# sourceMappingURL=users-file.d.ts.map
