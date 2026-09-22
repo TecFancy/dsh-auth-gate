@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.14.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.13.1...v0.14.0) (2026-09-22)
+
+
+### Features
+
+* redesigned login gate with anti-phishing identity block and publicHost ([#75](https://github.com/TecFancy/dsh-auth-gate/issues/75)) ([22b5a30](https://github.com/TecFancy/dsh-auth-gate/commit/22b5a30530711022a28a9066e65d01c31f49c7d9))
+
+
+### Bug Fixes
+
+* require --target for dsh-auth-proxy (no default upstream) ([#77](https://github.com/TecFancy/dsh-auth-gate/issues/77)) ([3a8228c](https://github.com/TecFancy/dsh-auth-gate/commit/3a8228c380253dd9944d9b96649e720201c95b84))
+* retry users-file writes on a transient Windows lock ([#78](https://github.com/TecFancy/dsh-auth-gate/issues/78)) ([6c518ca](https://github.com/TecFancy/dsh-auth-gate/commit/6c518ca8e09820502899b48d9fa356fce724a42a))
+
 ## [0.13.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.13.0...v0.13.1) (2026-09-18)
 
 
