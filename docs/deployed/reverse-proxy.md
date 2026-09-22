@@ -137,7 +137,7 @@ Full acceptance checklist: `docs/deployed/deployment.md` §4 (A–I).
 | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | Settings page: `transport failure ... HTTP 403` | fence loopback pin; proxy passes public Host                                                                               | semi-shell rewrite (§4.2)                  |
 | All `/api` 401 right after a login              | session cookie expired or not forwarded (a restart does not invalidate sessions: they persist under `$DSH_HOME/storages/`) | log in again; check cookie pass-through    |
-| Login `429`                                     | rate limiter locked (per proxy exit IP)                                                                                    | wait for `retry-after`, or restart dsh-web |
+| Login `429`                                     | rate limiter locked (keys on the client address, see §7)                                                                   | wait for `retry-after`, or restart dsh-web |
 | Browser won't keep the session                  | `cookieSecure: true` without HTTPS                                                                                         | terminate TLS at the proxy                 |
 | WS `401` without cookie                         | gate rejects upgrade                                                                                                       | expected fail-closed; log in first         |
 
@@ -149,4 +149,11 @@ Full acceptance checklist: `docs/deployed/deployment.md` §4 (A–I).
 - Sessions survive a dsh-web restart (persisted per instance under `$DSH_HOME/storages/`; revoke
   explicitly with `POST /auth/logout`). Only process-level state resets: rate limiting, the TOTP
   replay guard, and in-flight TOTP challenges.
-- Rate limiting aggregates per proxy exit IP (do not trust `X-Forwarded-For`).
+- Rate limiting keys on the actual client address. Behind a same-host proxy (the topology in §2,
+  where every request arrives from `127.0.0.1`) every client shares one bucket unless
+  `clientIpHeader` is configured, and five mistyped passwords anywhere lock out the whole instance
+  for the lock window (issue #74). Set `clientIpHeader: "x-forwarded-for"` (or `cf-connecting-ip`
+  when Cloudflare is the edge): the header is read only when the peer is inside
+  `trustedProxyCidrs` (loopback by default), and the rightmost address that is not itself a
+  trusted hop wins. The proxy must **overwrite** that header, never pass a client-supplied value
+  through.

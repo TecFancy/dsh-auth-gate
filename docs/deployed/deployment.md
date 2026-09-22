@@ -215,8 +215,11 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 - [ ] `dsh-auth user disable <name>` blocks new logins **and** revokes that user's issued sessions
       (the plugin sweeps `users.yaml` every `revokeSweepMs`, default 5000 ms; set `0` to keep the
       old M3 behavior of blocking new logins only).
-- [ ] Rate limiting is in-memory and cleared on restart; in a reverse-proxy deployment, rate
-      limiting aggregates by egress IP (do not trust X-Forwarded-For).
+- [ ] Rate limiting is in-memory and cleared on restart. Behind a reverse proxy on the same host,
+      configure `clientIpHeader` (`x-forwarded-for`; `cf-connecting-ip` when Cloudflare is the
+      edge); without it every client shares one bucket and five mistyped passwords lock out the
+      whole instance (issue #74). Only peers inside `trustedProxyCidrs` (loopback by default) may
+      supply that header, and the proxy must overwrite it rather than pass a client value through.
 
 ## 8. Public Deployment Variant (effective 2026-08-15 on dsh.example.com): Semi-Shell
 
