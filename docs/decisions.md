@@ -177,3 +177,16 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 报错，而不是远端 TLS 错误，与仓库 fail-closed 纪律一致。
 → [zh](decisions/implemented/2026-09-22-required-proxy-target.zh.md) ·
 [en](decisions/implemented/2026-09-22-required-proxy-target.en.md)
+
+## D18. 随包技能保持单文件 SKILL.md（不启用 references/）
+
+配置速查技能正文全部留在 `SKILL.md`，不用 `references/` 子目录；两条测试锁进 CI（技能目录无
+`references/`、`Config` schema 里每个配置项都出现在技能正文里）。2026-09-02 的拆分（故障表 +
+验证技巧进 references/，主文件 13.9KB→6.5KB）作为超集残留弃用，不再复活。
+**替代方案**：按原方案拆分（省显式打开那一次的 ~2.2k tokens，换来 stub 计数腐烂、二次读取与
+三份副本的同步面）；按语言拆两份（面板不能选语言，正文必须双语）；单文件压缩正文（删掉的正是
+最常查的故障矩阵）；只写约定不加测试。
+**为什么**：技能是用户显式打开的低频速查，「打开即得答案」才是它的价值；单文件把同步面从三份
+降到一份，并有测试拦住 schema 与技能正文的漂移。
+→ [zh](decisions/implemented/2026-09-22-single-file-bundled-skill.zh.md) ·
+[en](decisions/implemented/2026-09-22-single-file-bundled-skill.en.md)
