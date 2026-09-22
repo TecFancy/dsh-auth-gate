@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.0...v0.14.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* key login rate-limit buckets on the real client address behind a trusted proxy ([#79](https://github.com/TecFancy/dsh-auth-gate/issues/79)) ([6ec88b2](https://github.com/TecFancy/dsh-auth-gate/commit/6ec88b228e683b2a4533990a9b805b5454ee34d5))
+
 ## [0.14.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.13.1...v0.14.0) (2026-09-22)
 
 
