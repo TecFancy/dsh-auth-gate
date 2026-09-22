@@ -63,12 +63,18 @@ export function makeRes(): FakeRes {
     headers: {} as Record<string, string>,
     body: "",
   };
+  let headersSent = false;
   const res = {
+    // 对齐 node:http：writeHead 之后再 setHeader 会抛 ERR_HTTP_HEADERS_SENT
+    // （2026-09-22 线上同型故障：GET ?stage=password 清 cookie 时连接被重置）。
     setHeader: (name: string, value: string): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: setHeader after writeHead");
       state.headers[name.toLowerCase()] = String(value);
     },
     writeHead: (status: number, extra?: Record<string, string | number>): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: writeHead called twice");
       state.status = status;
+      headersSent = true;
       for (const [name, value] of Object.entries(extra ?? {})) {
         state.headers[name.toLowerCase()] = String(value);
       }
@@ -85,12 +91,15 @@ export function makeReq(options: {
   url?: string;
   cookie?: string;
   body?: Buffer;
+  /** 模拟反代改写后的 Host 头；缺省 = 不带 Host。 */
+  host?: string;
 }): IncomingMessage {
   return {
     method: options.method ?? "GET",
     url: options.url ?? "/",
     headers: {
       cookie: options.cookie,
+      host: options.host,
       "content-type": "application/x-www-form-urlencoded",
     },
     socket: { remoteAddress: "127.0.0.1" },

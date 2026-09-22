@@ -21,12 +21,19 @@ function makeRes(): FakeRes {
     headers: {} as Record<string, string>,
     body: "",
   };
+  let headersSent = false;
   const res = {
+    // 对齐 node:http：writeHead 之后再 setHeader / writeHead 会抛 ERR_HTTP_HEADERS_SENT。
+    // 2026-09-22 实测过真实故障（GET ?stage=password 在 writeHead 后补 set-cookie →
+    // 连接被重置、无响应），这条语义就是用来挡住同型回归的。
     setHeader: (name: string, value: string): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: setHeader after writeHead");
       state.headers[name.toLowerCase()] = String(value);
     },
     writeHead: (status: number, extra?: Record<string, string | number>): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: writeHead called twice");
       state.status = status;
+      headersSent = true;
       for (const [name, value] of Object.entries(extra ?? {})) {
         state.headers[name.toLowerCase()] = String(value);
       }
