@@ -43,7 +43,12 @@ codebase. Solid engineering worth building on.
 - **Safe by default.** Passwords are stored hashed, logins are rate-limited
   (repeated wrong attempts temporarily lock the address), session cookies are
   secure, and any missing or broken configuration **blocks access instead of
-  silently opening the door**.
+  silently opening the door**. A wrong username or password re-renders the
+  login card with an inline `Invalid username or password.`: the username is
+  kept, the password must be retyped. A lockout (HTTP 429 + `retry-after`)
+  shows the same card with the retry seconds and a message scoped to "this
+  network"; the number of remaining attempts is deliberately never shown, and
+  with JavaScript a page refresh no longer spends another failure.
 - **A small command-line tool** for managing users:
 
   ```sh

@@ -25,4 +25,12 @@ export declare const EYE_SCRIPT = "\n<script>\n(function () {\n  var buttons = d
  * 只去非数字并截 6 位，满 6 位 lock 住按钮再交表单，避免双击重复提交。
  */
 export declare const TOTP_SCRIPT = "\n<script>\n(function () {\n  var code = document.getElementById(\"code\");\n  var form = code && code.form;\n  if (!code || !form) return;\n  var submit = form.querySelector('[type=\"submit\"]');\n  code.addEventListener(\"input\", function () {\n    code.value = code.value.replace(/[^0-9]/g, \"\").slice(0, 6);\n    if (code.value.length === 6) {\n      if (submit) submit.disabled = true;\n      form.requestSubmit();\n    }\n  });\n})();\n</script>\n";
+/**
+ * 密码表单提交态（D20，渐进增强）：scrypt 约 200ms 期间给按钮 pending 反馈并挡住第二次提交；
+ * 失败页加载后再把这条 POST 历史换成 GET 版本，使 F5/刷新不再重放 POST（否则会白吃一次限速失败
+ * 额度）。注意必须在「失败页已渲染」时改历史：在 submit 事件里改是无效的，因为 POST 导航会在
+ * 处理器返回之后才提交、把替换掉的历史项又盖回 POST。无 JS 时按钮永不禁用、表单照常提交；
+ * `pageshow` + 10s 超时保证按钮不会被永久锁住。
+ */
+export declare const SUBMIT_SCRIPT = "\n<script>\n(function () {\n  var form = document.querySelector(\"form\");\n  if (!form) return;\n  var submit = form.querySelector('[type=\"submit\"]');\n  var idle = submit ? submit.textContent : \"\";\n  var busy = false;\n  var timer = 0;\n  function reset() {\n    busy = false;\n    if (timer) window.clearTimeout(timer);\n    timer = 0;\n    if (submit) {\n      submit.disabled = false;\n      submit.textContent = idle;\n    }\n    form.removeAttribute(\"aria-busy\");\n  }\n  var next = form.querySelector('input[name=\"next\"]');\n  var target = \"/auth/login\" + (next && next.value ? \"?next=\" + encodeURIComponent(next.value) : \"\");\n  var failed = document.getElementById(\"err\");\n  if (failed) {\n    try {\n      history.replaceState(null, \"\", target);\n    } catch (error) {\n      failed = null;\n    }\n  }\n  form.addEventListener(\"submit\", function (event) {\n    if (busy) {\n      event.preventDefault();\n      return;\n    }\n    busy = true;\n    if (submit) {\n      submit.disabled = true;\n      submit.textContent = \"Signing in...\";\n    }\n    form.setAttribute(\"aria-busy\", \"true\");\n    timer = window.setTimeout(reset, 10000);\n  });\n  window.addEventListener(\"pageshow\", reset);\n})();\n</script>\n";
 //# sourceMappingURL=login-page-assets.d.ts.map

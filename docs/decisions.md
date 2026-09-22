@@ -206,3 +206,25 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 始终落在同一个桶。
 → [zh](decisions/implemented/2026-09-22-trusted-proxy-client-ip.zh.md) ·
 [en](decisions/implemented/2026-09-22-trusted-proxy-client-ip.en.md)
+
+## D20. 登录失败渲染登录卡片（HTML），不再返回裸文本页
+
+错凭据（未知用户 / 错口令 / 禁用三态同一）**保持 401**，但 content-type 改为 `text/html`，body 换成
+既有登录卡片 + error slot（唯一常量 `Invalid username or password.`）：用户名 HTML 转义后
+`value=` 回填（无条件，含未知/禁用，避免枚举侧通道）、密码永不回填、密码框保持 `autofocus`、
+两个字段 `aria-invalid`/`aria-describedby="err"`、`<title>` 加 `Error: ` 前缀。锁定**保持 429 +
+`retry-after`**，body 换成同一张卡片，文案按「这个网络」陈述并带上静态秒数，提交按钮**不** disabled
+（无 JS 仍可重试），不披露剩余次数、不做活倒计时；TOTP 第二段 429 渲染挑战卡。用户名查库前先 trim
+（密码不 trim）；失败页带提交守卫脚本（`aria-busy` + `Signing in...`），并在**失败页渲染后**用
+`history.replaceState` 把历史项换成 GET，使 F5 不再重放 POST（在 submit 事件里改无效——POST 导航在
+处理器返回后才提交；无 JS 仍会重放，如实记录）。
+**替代方案**：PRG 303（砸冻结 401、脚本误判成功导航、撞 Chromium 密码管理器指南）；200 重渲染
+（Keycloak 形态，破坏 401 契约）；fetch 内联注入（双路径 / CSP / 行为分叉）；独立错误页（新 CSS 撞
+6KB 预算、丢反钓鱼身份块）；一次性 form ticket（无 JS 下唯一能关 F5 计次，但与 #81 锁语义耦合，
+暂缓）；活倒计时 + disabled（无 JS 永久搁浅，WCAG 2.2.1；NAT 下不诚实）；按 `Accept` 内容协商
+（`*/*` 分不开两端）；为合规补 `WWW-Authenticate: Basic`（浏览器原生对话框会盖住卡片，刻意偏离
+RFC 9110 §15.5.2 并记录在此）。
+**为什么**：这是删掉「空白页死胡同」的最小改动，状态码、常量、不反射规则、日志纪律、无 JS 提交路径、
+6KB CSS 预算、切片边界与依赖集合全部不变，且与 0.11.1 起已发布并有测试覆盖的 TOTP 修复同构。
+→ [zh](decisions/implemented/2026-09-22-login-failure-html-card.zh.md) ·
+[en](decisions/implemented/2026-09-22-login-failure-html-card.en.md)
