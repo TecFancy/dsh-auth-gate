@@ -18,6 +18,8 @@ const cfg = (): AuthConfig => ({
   cookieSecure: true,
   usersFile: "",
   publicHost: "",
+  clientIpHeader: "",
+  trustedProxyCidrs: ["127.0.0.0/8", "::1/128"],
   revokeSweepMs: 5000,
   totp: "off",
   logoutOrder: 1000,
@@ -92,6 +94,9 @@ const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 
 function bearerReq(token: string): IncomingMessage {
   return { headers: { authorization: `Bearer ${token}` } } as IncomingMessage;
 }
+function loggedError(logs: FakeLog[], needle: string): boolean {
+  return logs.some((entry) => entry.level === "error" && String(entry.message).includes(needle));
+}
 describe("dsh-auth-gate plugin shape", () => {
   it("uses the stable plugin name and inject list", () => {
     expect(name).toBe("dsh-auth-gate");
@@ -121,11 +126,7 @@ describe("apply: mode 与装配", () => {
     const auth = provided["auth"] as AuthService;
     expect(auth.gate).toBeInstanceOf(TokenGate);
     expect(auth.sessions).toBeUndefined();
-    expect(
-      logs.some(
-        (e) => e.level === "error" && String(e.message).includes("storage-domain is unavailable"),
-      ),
-    ).toBe(true);
+    expect(loggedError(logs, "storage-domain is unavailable")).toBe(true);
   });
   it("denies via bearer and logs when credential resolution fails", async () => {
     const server = makeFakeServer();
@@ -135,11 +136,7 @@ describe("apply: mode 与装配", () => {
     apply(ctx, cfg());
     const auth = provided["auth"] as AuthService;
     await expect(auth.gate.decide(bearerReq("x"), "exact", "/probe")).resolves.toBe("deny");
-    expect(
-      logs.some(
-        (e) => e.level === "error" && String(e.message).includes("token resolution failed"),
-      ),
-    ).toBe(true);
+    expect(loggedError(logs, "token resolution failed")).toBe(true);
   });
   it("allows a correct bearer token through the mounted gate", async () => {
     const server = makeFakeServer();
