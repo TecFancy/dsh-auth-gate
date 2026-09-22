@@ -10,7 +10,7 @@ import { type Server } from "node:http";
 export interface ProxyOptions {
     /** 浏览器连接入口，形如 `127.0.0.1:8443`；必须回环。 */
     listen: string;
-    /** 上游 origin，如 `https://dsh.hi-ruofei.com` 或验证用 `http://127.0.0.1:3080`。 */
+    /** 上游 origin，如 `https://dsh.example.com` 或验证用 `http://127.0.0.1:3080`。 */
     target: string;
     /** 本地明文 http 时去掉转发 Set-Cookie 的 `Secure`。 */
     stripSecureCookie: boolean;

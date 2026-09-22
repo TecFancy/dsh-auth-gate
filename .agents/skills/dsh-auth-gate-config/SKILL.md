@@ -1,6 +1,6 @@
 ---
 name: dsh-auth-gate-config
-description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder), how to configure them, the dsh-auth CLI (incl. user totp enable/disable), login trouble, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/logoutOrder）、dsh-auth CLI（含 user totp enable/disable）、登录故障、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
+description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/logoutOrder), how to configure them, the dsh-auth CLI (incl. user totp enable/disable), login trouble, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/logoutOrder）、dsh-auth CLI（含 user totp enable/disable）、登录故障、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
@@ -41,6 +41,7 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     totp: "optional" # "off"(default) | "optional" | "required" - two-factor for password mode / 密码模式两步验证："off"（默认，忽略密钥）| "optional"（有密钥的用户两段式）| "required"（全员必须）
     cookieSecure: true # HTTPS requires true; plain-http testing false (browser rejects cookie) / HTTPS 必须 true；纯 http 测试 false（否则浏览器不收 cookie）
     usersFile: "" # password-mode user file; default $DSH_HOME/auth/users.yaml / 密码模式用户文件；默认 $DSH_HOME/auth/users.yaml
+    publicHost: "" # host shown in the login identity block; empty = request Host header. Set it when the proxy rewrites Host (Caddy header_up Host 127.0.0.1:3080), else the card shows a loopback address / 登录页身份块显示的域名；空 = 用请求头 Host。反代改写 Host 时必须配置，否则卡片显示回环地址
     sessionTtl: 604800 # session TTL in seconds / 会话秒数
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
@@ -88,6 +89,7 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 | Config changes have no effect                                 | Restart dsh after editing `$DSH_HOME/cordis.patch.yml`; `dsh --profile <p> --dump-config` shows the composed result. / 改了 `$DSH_HOME/cordis.patch.yml` 后重启 dsh；`dsh --profile <p> --dump-config` 查组合结果                                                                                                                                                                                                                                     |
 | Code page spins / after submit back to password page          | TOTP challenge expires after 5 min; since 0.11.1 the cookie is HMAC-signed with a process key - restart/reload also invalidates it, re-enter the password. / 验证码挑战最长 5 分钟；0.11.1 起 cookie 带进程级 HMAC 签名——重启/重载插件同样使挑战失效，需重新输密码                                                                                                                                                                                    |
 | Same code rejected on second submit                           | Replay guard (in-memory, keyed by time window, resets on restart) - independent of rate limiting. / 同一时间窗口的验证码第二次提交被防重放拒绝（内存态，重启清零），与限速相互独立                                                                                                                                                                                                                                                                    |
+| Sign-in card shows `127.0.0.1:3080` instead of your domain    | The reverse proxy rewrites `Host` (Caddy `header_up Host 127.0.0.1:3080`); the identity block reads the request Host. Set `publicHost: <your domain>` (D14). / 反代改写了 `Host`，身份块读的是请求头 → 设 `publicHost: <你的域名>`（D14）                                                                                                                                                                                                             |
 
 ## Verification tips / 验证技巧
 

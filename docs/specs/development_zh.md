@@ -6,20 +6,20 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 命令
 
-| Task                       | Command                                                                                                                                         |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                          |
-| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                      |
-| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                       |
-| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                           |
-| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                            |
-| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                           |
-| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                        |
-| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                               |
-| Full gate（全量门禁）      | `npm run verify` (format:check + lint + type-check + test:coverage；完整组合 —— CI 跑全套，并非每次本地运行)                                    |
-| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链 —— 规则见 `docs/README.md`「文档规范」) |
+| Task                       | Command                                                                                                                                                                                                        |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                         |
+| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                     |
+| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                      |
+| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                          |
+| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                           |
+| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                          |
+| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                       |
+| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                              |
+| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
+| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                   |
 
-跑单个测试文件：`npm run test -- src/guard.test.ts`
+跑单个测试文件：`npm run test -- src/gate/guard.test.ts`
 按名称跑测试：`npm run test -- -t "guard"`
 
 ## Git 钩子
@@ -39,6 +39,7 @@ src/
 ├── index.ts           # plugin entry + auth 服务接线（M3：mode 二选一装配 password 流）
 ├── cli.ts             # dsh-auth 用户管理 CLI（bin 入口，M3 新增）
 ├── proxy-cli.ts       # dsh-auth-proxy（bin 入口）
+├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
 ├── gate/              # 守卫核心机制层（跨模式）
 │   ├── index.ts       #   barrel：跨 slice 唯一入口
 │   ├── gate.ts        #   Gate 词表 + noopGate
@@ -47,6 +48,9 @@ src/
 ├── session/           # 会话层（核心机制层，token/password 共同消费）
 │   ├── index.ts
 │   └── session-store.ts  # storage-domain 会话持久化
+├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
+│   ├── index.ts       #   barrel：跨 slice 唯一入口
+│   └── endpoints.ts   #   404 兜底 / logout / status / methodNotAllowed / queryOf（token+password 共用）
 ├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
 │   ├── token/
 │   │   ├── index.ts
@@ -57,6 +61,9 @@ src/
 │   │   ├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
 │   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
 │   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
+│   │   ├── challenge-cookie.ts # TOTP 挑战 cookie 签发/校验（HMAC 签名，D10）
+│   │   ├── session-issue.ts   # 会话签发 + launch-token 桥（password 侧）
+│   │   ├── disabled-sweeper.ts # 定期撤销已禁用用户的会话（`revokeSweepMs`）
 │   │   └── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点
 │   ├── totp/
 │   │   ├── index.ts
@@ -113,6 +120,9 @@ client/host 隔离、无法解析即失败）；增删切片请同步本结构�
 - **`.sort()`/`.toSorted()` 必须显式传比较器** —— 默认字典序在纯 ASCII 之外不可靠。
 - **行尾一律 LF**（`.editorconfig` + `.gitattributes`），Prettier 默认值：
   宽度 100、双引号、尾逗号。
+- **示例域名**：真实部署域名不写进仓库。文档、部署样例、测试、代码默认值与截图统一用
+  RFC 2606 保留域名 `example.com`（`dsh.example.com`；隔离实例 `dsh-test.example.com`）
+  —— 发布产物会随 `lib/`、`docs/demo/`、`.agents/skills/` 一起出去（D16）。
 - **提交风格**：`type(scope): subject`，scope 是模块名（`guard`、`session-store`、`ci`）。
   Conventional commits 驱动发布（见下文）。
 - **行文（Prose）**：写到足以保住契约为止，然后删掉其余部分。

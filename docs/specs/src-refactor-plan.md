@@ -1,6 +1,7 @@
 # dsh-auth-gate src directory refactor plan (following the framework layering convention)
 
 > Status: **implemented (2026-08-30)** — `verify` self-check fully green, cross-validation with the framework passed; pending review, then commit / open PR
+> Note (2026-09-13): the inventory in §1 is the **pre-refactor snapshot** (52 files / 8202 lines, 3 client files; `src/` is now 86 files / 11070 lines with 4 client files). Read those numbers as the record of that change, not as a current baseline.
 > Branch: `development`
 > Nature: **pure structural refactor** — file moves only + mechanical import updates, zero behavior change
 > Reference: the `features/ + shared/ + client/` layering convention of `dsh-plugin-framework` / `dsh-collab`

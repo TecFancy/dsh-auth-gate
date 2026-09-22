@@ -4,7 +4,7 @@
 > contract remains "302 → next"; this document is its compatibility-layer override on dsh ≥ 0.1.2-alpha).
 > **Applies to**: dsh ≥ 0.1.2-alpha (`dsh-client-connection`'s `authenticatedUrl` exists);
 > earlier versions have zero behavioral change (the bridge auto-falls back).
-> **Source**: live test on 2026-08-31 (isolated instance dsh-test.hi-ruofei.com) + `19c8431` +
+> **Source**: live test on 2026-08-31 (isolated instance dsh-test.example.com) + `19c8431` +
 > `grok-4.6 review` (`docs/reviews/grok46-launch-token-bridge-review.md`, F1–F6 all landed).
 
 ## 1. Background

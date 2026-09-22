@@ -15,6 +15,11 @@ export interface AuthEndpointsDeps {
     /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
     logoutOrder: number;
     validateToken: (token: string) => Promise<boolean>;
+    /**
+     * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+     * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+     */
+    publicHost?: string | undefined;
     logger: {
         error(message: unknown): void;
         info(message: unknown): void;

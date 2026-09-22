@@ -1,11 +1,18 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
-  validateNext,
-  parseCookieHeader,
-  parseFormBody,
   loginPageHtml,
+  parseFormBody,
+  resolvePublicHost,
+  validateNext,
 } from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
+import {
+  authCatchAll,
+  handleLogout,
+  handleStatus,
+  methodNotAllowed,
+  queryOf,
+} from "../../http/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 
 export interface AuthEndpointsDeps {
@@ -19,6 +26,11 @@ export interface AuthEndpointsDeps {
   /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
   logoutOrder: number;
   validateToken: (token: string) => Promise<boolean>; // 恒时校验（index.ts 注入 safeEqual 闭包）
+  /**
+   * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+   * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+   */
+  publicHost?: string | undefined;
   logger: { error(message: unknown): void; info(message: unknown): void };
 }
 
@@ -50,20 +62,13 @@ export function registerAuthEndpoints(deps: AuthEndpointsDeps): () => void {
   };
 }
 
-/** 兜底：未注册的 `/auth/*` 一律 404，不落到 SPA fallback（M20）。 */
-function authCatchAll(_req: IncomingMessage, res: ServerResponse): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(404, { "content-type": "text/plain" });
-  res.end("not found");
-}
-
 function handleLogin(
   deps: AuthEndpointsDeps,
   req: IncomingMessage,
   res: ServerResponse,
 ): void | Promise<void> {
   if (req.method === "GET") {
-    serveLoginPage(req, res);
+    serveLoginPage(deps, req, res);
     return;
   }
   if (req.method === "POST") {
@@ -73,11 +78,13 @@ function handleLogin(
 }
 
 /** GET：恒渲染登录页（不查会话、不重定向，M20）。 */
-function serveLoginPage(req: IncomingMessage, res: ServerResponse): void {
+function serveLoginPage(deps: AuthEndpointsDeps, req: IncomingMessage, res: ServerResponse): void {
   const next = validateNext(queryOf(req).get("next") ?? "/");
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(loginPageHtml(next));
+  res.end(
+    loginPageHtml(next, undefined, { host: resolvePublicHost(deps.publicHost, req.headers.host) }),
+  );
 }
 
 async function loginAttempt(
@@ -123,63 +130,4 @@ async function loginAttempt(
   res.writeHead(302, { location: next });
   res.end();
   deps.logger.info("session issued");
-}
-
-function handleLogout(
-  deps: AuthEndpointsDeps,
-  req: IncomingMessage,
-  res: ServerResponse,
-): void | Promise<void> {
-  if (req.method !== "POST") {
-    methodNotAllowed(res, "POST");
-    return;
-  }
-  return logout(deps, req, res);
-}
-
-/** POST /auth/logout：next 仅从 query 取（M22），不解析 body、不要求 content-type。 */
-async function logout(
-  deps: AuthEndpointsDeps,
-  req: IncomingMessage,
-  res: ServerResponse,
-): Promise<void> {
-  const next = validateNext(queryOf(req).get("next") ?? "/");
-  const store = deps.sessions();
-  const token = parseCookieHeader(req.headers.cookie, deps.cookieName);
-  if (store !== undefined && token !== undefined && token !== "") {
-    await store.revokeByToken(token); // 无会话/无 cookie 静默成功
-  }
-  res.setHeader("cache-control", "no-store");
-  res.setHeader("set-cookie", buildSetCookie(deps.cookieName, "", 0, deps.cookieSecure));
-  res.writeHead(302, { location: next });
-  res.end();
-  deps.logger.info("logout");
-}
-
-/** GET /auth/status：只认 cookie（M5，Bearer 不参与）。 */
-function handleStatus(deps: AuthEndpointsDeps, req: IncomingMessage, res: ServerResponse): void {
-  if (req.method !== "GET") {
-    methodNotAllowed(res, "GET");
-    return;
-  }
-  const store = deps.sessions();
-  const token = parseCookieHeader(req.headers.cookie, deps.cookieName);
-  const authenticated =
-    store !== undefined &&
-    token !== undefined &&
-    token !== "" &&
-    store.getByToken(token) !== undefined;
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ authenticated, logoutOrder: deps.logoutOrder }));
-}
-
-function queryOf(req: IncomingMessage): URLSearchParams {
-  return new URL(req.url ?? "/", "http://x").searchParams;
-}
-
-function methodNotAllowed(res: ServerResponse, allow: string): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(405, { allow, "content-type": "text/plain" });
-  res.end("method not allowed");
 }

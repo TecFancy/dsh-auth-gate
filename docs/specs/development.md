@@ -7,20 +7,20 @@ through one command.
 
 ## Commands
 
-| Task           | Command                                                                                                                                                               |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                |
-| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                            |
-| Format         | `npm run format` / `npm run format:check`                                                                                                                             |
-| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                 |
-| Watch tests    | `npm run test:watch`                                                                                                                                                  |
-| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                 |
-| Build          | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps)                                                                                         |
-| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                 |
-| Full gate      | `npm run verify` (format:check + lint + type-check + test:coverage; full set - CI, not every local run)                                                               |
-| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` — see `docs/README.md` "文档规范") |
+| Task           | Command                                                                                                                                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                    |
+| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                |
+| Format         | `npm run format` / `npm run format:check`                                                                                                                                                                 |
+| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                     |
+| Watch tests    | `npm run test:watch`                                                                                                                                                                                      |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                     |
+| Build          | `npm run build` (tsc emit to `lib/`, LF newlines, declarations + source maps)                                                                                                                             |
+| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                     |
+| Full gate      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + type-check + test:coverage + build + bundle:check; full set - CI, not every local run) |
+| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` and of CI `hygiene` — see `docs/README.md` "文档规范")                 |
 
-Run a single test file: `npm run test -- src/guard.test.ts`
+Run a single test file: `npm run test -- src/gate/guard.test.ts`
 Run tests by name: `npm run test -- -t "guard"`
 
 ## Git hooks
@@ -41,6 +41,7 @@ src/
 ├── index.ts           # plugin entry + auth 服务接线（M3：mode 二选一装配 password 流）
 ├── cli.ts             # dsh-auth 用户管理 CLI（bin 入口，M3 新增）
 ├── proxy-cli.ts       # dsh-auth-proxy（bin 入口）
+├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
 ├── gate/              # 守卫核心机制层（跨模式）
 │   ├── index.ts       #   barrel：跨 slice 唯一入口
 │   ├── gate.ts        #   Gate 词表 + noopGate
@@ -49,6 +50,9 @@ src/
 ├── session/           # 会话层（核心机制层，token/password 共同消费）
 │   ├── index.ts
 │   └── session-store.ts  # storage-domain 会话持久化
+├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
+│   ├── index.ts       #   barrel：跨 slice 唯一入口
+│   └── endpoints.ts   #   404 兜底 / logout / status / methodNotAllowed / queryOf（token+password 共用）
 ├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
 │   ├── token/
 │   │   ├── index.ts
@@ -59,6 +63,9 @@ src/
 │   │   ├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
 │   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
 │   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
+│   │   ├── challenge-cookie.ts # TOTP 挑战 cookie 签发/校验（HMAC 签名，D10）
+│   │   ├── session-issue.ts   # 会话签发 + launch-token 桥（password 侧）
+│   │   ├── disabled-sweeper.ts # 定期撤销已禁用用户的会话（`revokeSweepMs`）
 │   │   └── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点
 │   ├── totp/
 │   │   ├── index.ts
@@ -120,6 +127,10 @@ byte-stable across Windows/Linux builders.
   lexicographic order is unreliable outside plain ASCII.
 - **Line endings LF everywhere** (`.editorconfig` + `.gitattributes`), Prettier
   defaults: 100 width, double quotes, trailing commas.
+- **Example domains**: the real deployment domain never enters the repo. Docs, deploy
+  samples, tests, code defaults and screenshots use the RFC 2606 reserved `example.com`
+  (`dsh.example.com`; isolated instances `dsh-test.example.com`) - the published tarball
+  ships `lib/`, `docs/demo/` and `.agents/skills/` (D16).
 - **Commit style**: `type(scope): subject`, scope is a module name
   (`guard`, `session-store`, `ci`). Conventional commits drive releases
   (see below).

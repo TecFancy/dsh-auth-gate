@@ -11,6 +11,9 @@
  *   gate      src/gate/**        (one slice)
  *   shared    src/shared/**      (one slice, leaf - no upward deps)
  *   session   src/session/**      (core mechanism layer like gate/)
+ *   http      src/http/**        (core mechanism layer: auth endpoint pieces shared by
+ *             the token and password feature slices; may import gate/session/shared,
+ *             never features/)
  *   features  src/features/<f>/**  (token | password | proxy | totp)
  *   client    src/client/**      (separate half: no host<->client imports)
  *
@@ -76,7 +79,7 @@ function sliceOf(rel) {
   const parts = rel.split("/");
   if (parts.length === 1) return ROOT_FILES.has(rel) ? "root" : null;
   if (parts[0] === "client") return "client";
-  if (parts[0] === "gate" || parts[0] === "session") return parts[0];
+  if (parts[0] === "gate" || parts[0] === "session" || parts[0] === "http") return parts[0];
   if (parts[0] === "shared") return "shared";
   if (parts[0] === "features" && FEATURE_SLICES.has(parts[1])) return `feature:${parts[1]}`;
   return null;
@@ -89,6 +92,8 @@ function barrelOf(slice) {
       return "gate/index.ts";
     case "session":
       return "session/index.ts";
+    case "http":
+      return "http/index.ts";
     case "shared":
       return "shared/index.ts";
     default:

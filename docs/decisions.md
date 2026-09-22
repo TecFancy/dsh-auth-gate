@@ -93,6 +93,30 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 → [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
 
+## D11. 认证 HTTP 端点公共件独立成 http 层
+
+token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进新核心机制层
+`src/http/`（与 gate、session 并列，经 barrel 引用），`shared` 保持叶子层不变。
+**替代方案**：下沉 `shared`（破坏叶子约束，或得把 cookie 构造当参数注入）；
+塞进 `session`（methodNotAllowed 与会话无关）；保持重复（改一处得记得另一处）。
+**为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
+→ [zh](decisions/implemented/2026-09-13-http-endpoint-layer.zh.md) ·
+[en](decisions/implemented/2026-09-13-http-endpoint-layer.en.md)
+
+## D12. 宿主要求声明 + storage-domain 转 peer
+
+顶层 `engines.dsh` 声明宿主走廊 `^0.1.0-rc.6 || ^0.1.5-rc.2`；
+`@deepseek-ai/dsh-storage-domain` 从 `dependencies` 移到 `peerDependencies`
+（同范围，devDependencies 留一份给本仓构建/测试），运行时不带副本。
+**替代方案**：只加 engines 而依赖字段不动（嵌套旧线副本留在进程里）；范围只写
+`^0.1.5-rc.2`（对 0.1.2-alpha/0.1.5-rc.1 假报低于下限）或只写 `^0.1.0-rc.6`
+（严格语义下匹配不到当前宿主，市场打假警告）；放 `dsh.engines.dsh`（顶层才是
+官方位置，同时存在时市场只认顶层）。
+**为什么**：`||` 让两条走廊在严格 semver 下都成立，dev 走廊与生产宿主都覆盖；
+交给宿主后 pnpm 不再装第二份 domain 契约，插件随宿主升级。
+→ [zh](decisions/implemented/2026-09-14-host-requirement-declaration.zh.md) ·
+[en](decisions/implemented/2026-09-14-host-requirement-declaration.en.md)
+
 ## D13. PWA manifest 列入免守卫公开静态路径
 
 浏览器抓 manifest 按规范不带凭证（Chromium 仅 `crossorigin="use-credentials"` 才带上），
@@ -106,3 +130,39 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 精确匹配 + 排除 upgrade 让新增攻击面只有一个只读 GET，白名单只有一处。
 → [zh](decisions/implemented/2026-09-18-public-static-manifest.zh.md) ·
 [en](decisions/implemented/2026-09-18-public-static-manifest.en.md)
+
+## D14. 身份块 host 走 publicHost 配置（空值回退请求头 Host）
+
+反钓鱼身份块原读 `req.headers.host`，半外壳反代把 Host 改写成 `127.0.0.1:3080`，
+远程用户看到回环地址。新增 `publicHost` 配置 + `resolvePublicHost()`（配置优先、
+空值回退 Host 头），三个变体的渲染点统一走它，只影响展示、不参与鉴权。
+**替代方案**：读 `X-Forwarded-Host`（可伪造，违背 P10 不读 XFF）；改反代透传 Host
+（牵动 loopback 栅栏与 launch-token 桥，属于动生产）；只写文档（反钓鱼等于失效）。
+**为什么**：运营侧配置是唯一既不可被请求伪造、又不动生产拓扑的来源；空值回退让
+现有部署行为零变化。
+→ [zh](decisions/implemented/2026-09-22-public-host-identity.zh.md) ·
+[en](decisions/implemented/2026-09-22-public-host-identity.en.md)
+
+## D15. 登录页视觉语言：冷中性检查点卡
+
+保留反钓鱼身份块，视觉从「暖纸色工具站」改为冷中性 + 柔和层次 + 发丝分隔线，域名升为
+视觉主角（22px + 中性标记）；grok-4.6 三路候选（编辑式排印 / 柔和层次 / 检查点控制台）
+在隔离实例真实渲染对比后，取 B 打底 + A 的分隔线 + C 的域名强调。
+**替代方案**：保持 09-17 观感（主人反馈「有点复古」）；回上游品牌蓝 + 盾牌 logo
+（削弱反钓鱼语义）；通用 SaaS 现代风（无差别、AI 味重）；只取三候选中的单一路线。
+**为什么**：层次与过渡解决观感，分隔线建立信息分区，域名强调把身份块立回视觉锚点，
+正好服务这个页面的安全职责；取舍过程留档可查。
+→ [zh](decisions/implemented/2026-09-22-login-page-identity-redesign.zh.md) ·
+[en](decisions/implemented/2026-09-22-login-page-identity-redesign.en.md)
+
+## D16. 示例域名一律用 example.com（真实部署域名不随包发布）
+
+真实部署域名从文档、部署样例、测试与代码默认值中移除，统一写 `dsh.example.com`
+（隔离实例 `dsh-test.example.com`），`dsh-auth-proxy --target` 默认值随之改为保留域名；
+规则写进开发约定。
+**替代方案**：只改文档、保留默认值（仍随 `lib/` 发到 npm）；`--target` 改必填（CLI 行为
+变更，另议）；加门禁脚本扫描（脚本自身得写下被禁字符串，等于放进仓库）；重写 git 历史。
+**为什么**：RFC 2606 保留域名永不指向真实服务，规则一眼可验；顺带修掉「公开包默认把
+流量导向作者生产环境」这个真实缺陷。
+→ [zh](decisions/implemented/2026-09-22-example-domain-in-examples.zh.md) ·
+[en](decisions/implemented/2026-09-22-example-domain-in-examples.en.md)

@@ -110,17 +110,18 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
     cookieSecure: true # 使用 https 时保持 true
 ```
 
-| 选项            | 默认值             | 作用                                                                                                                                                                 |
-| --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`          | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                                                                              |
-| `totp`          | `"off"`            | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录需密码+动态码；`"required"`：所有用户都必须有密钥（无密钥/未知用户在密码阶段即统一 401，与错密同响应体，防枚举） |
-| `sessionTtl`    | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                                                                               |
-| `cookieName`    | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                                                                                     |
-| `tokenRef`      | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                                                                               |
-| `cookieSecure`  | `true`             | 只在纯 http 测试环境设为 `false`                                                                                                                                     |
-| `usersFile`     | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                                                                                         |
-| `revokeSweepMs` | `5000`             | 密码模式：被 `dsh-auth user disable` 禁用的用户，其**已发**会话多久内（毫秒）被吊销。`0` = 不扫描（禁用只拦新登录）                                                  |
-| `logoutOrder`   | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值                                                            |
+| 选项            | 默认值             | 作用                                                                                                                                                                                         |
+| --------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`          | `"token"`          | `"password"` = 用户名密码登录；`"token"` = 一个共享秘密                                                                                                                                      |
+| `totp`          | `"off"`            | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录需密码+动态码；`"required"`：所有用户都必须有密钥（无密钥/未知用户在密码阶段即统一 401，与错密同响应体，防枚举）                         |
+| `sessionTtl`    | `604800`           | 一次登录持续多久（秒），到期需重新登录                                                                                                                                                       |
+| `cookieName`    | `dsh_auth`         | 会话 cookie 的名字（很少需要改）                                                                                                                                                             |
+| `tokenRef`      | `"DSH_AUTH_TOKEN"` | 仅令牌模式：共享秘密存在哪个环境变量里                                                                                                                                                       |
+| `cookieSecure`  | `true`             | 只在纯 http 测试环境设为 `false`                                                                                                                                                             |
+| `usersFile`     | `""`               | 密码模式：用户列表文件位置。默认 `$DSH_HOME/auth/users.yaml`                                                                                                                                 |
+| `publicHost`    | `""`               | 登录页身份块显示的域名（反钓鱼的「这是哪个实例」那行）。空 = 用请求头 `Host`；反代改写了 `Host` 时（如 Caddy `header_up Host 127.0.0.1:3080`）必须显式配置，否则卡片显示回环地址而非公网域名 |
+| `revokeSweepMs` | `5000`             | 密码模式：被 `dsh-auth user disable` 禁用的用户，其**已发**会话多久内（毫秒）被吊销。`0` = 不扫描（禁用只拦新登录）                                                                          |
+| `logoutOrder`   | `1000`             | 「退出登录」按钮在 设置 → 通用设置 页的槽位顺序（越大越靠底）。若有其他插件注册了更大的 order，可调大此值                                                                                    |
 
 给用户开启 TOTP：运行 `dsh-auth user totp enable <name>`，把打印出的密钥（或
 `otpauth://` URI 二维码）录入验证器 App（Google Authenticator、1Password 等）。
@@ -220,6 +221,10 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 ## 环境要求
 
 - 服务器上需要 Node ≥ 22.19 和 pnpm。
+- dsh `0.1.x`（声明为 `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2`，最近一次验证对应
+  `0.1.5-rc.2`）。插件用的是宿主自己那份 `@deepseek-ai/dsh-storage-domain` 与
+  `@deepseek-ai/cordis`（两者都是 peer 依赖，不随插件打包），所以只要 profile 由 dsh
+  基础包启动，依赖就齐了。
 - dsh 的 `web` profile 正常运行（`dsh --profile web`）。
 - 如果 `cookieSecure` 是 `true`，站点必须走 https（浏览器在纯 http 下会拒绝安全 cookie）。
 

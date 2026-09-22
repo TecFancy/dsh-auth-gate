@@ -226,12 +226,12 @@ Not doing it. Reason: the threat model is "protect the single entry of the whole
 
 **Background (empirical findings)**: dsh 0.1.0-rc.6's browser trust fence pins privileged methods such as `settings.*` / `credentials.*` / `llm.discoverModels` to loopback only (`dsh-client-connection` `PRIVILEGED_METHODS`, which `--trusted-host` can't open up). Behind a public reverse proxy these endpoints are always 403. Measured matrix:
 
-| Upstream Host                 | Origin           | privileged API |
-| ----------------------------- | ---------------- | -------------- |
-| `dsh.hi-ruofei.com` (current) | any              | 403            |
-| `127.0.0.1:3080` (rewritten)  | matches loopback | 200            |
-| `127.0.0.1:3080` (rewritten)  | stripped         | 200            |
-| `127.0.0.1:3080` (rewritten)  | doesn't match    | 403            |
+| Upstream Host                | Origin           | privileged API |
+| ---------------------------- | ---------------- | -------------- |
+| `dsh.example.com` (current)  | any              | 403            |
+| `127.0.0.1:3080` (rewritten) | matches loopback | 200            |
+| `127.0.0.1:3080` (rewritten) | stripped         | 200            |
+| `127.0.0.1:3080` (rewritten) | doesn't match    | 403            |
 
 Conclusion: **"making dsh believe it's on loopback" and authentication must both be borne by the same shell layer** — adding only an auth shell without rewriting Host/Origin is ineffective (the fence and auth are orthogonal).
 

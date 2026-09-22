@@ -124,17 +124,18 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
     cookieSecure: true # keep true when you use https
 ```
 
-| Option          | Default            | What it does                                                                                                                                                                                                                                        |
-| --------------- | ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`          | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                               |
-| `totp`          | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration) |
-| `sessionTtl`    | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                      |
-| `cookieName`    | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                  |
-| `tokenRef`      | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                 |
-| `cookieSecure`  | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                              |
-| `usersFile`     | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                  |
-| `revokeSweepMs` | `5000`             | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                   |
-| `logoutOrder`   | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                         |
+| Option          | Default            | What it does                                                                                                                                                                                                                                                                                                 |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `mode`          | `"token"`          | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                                                                                        |
+| `totp`          | `"off"`            | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration)                                                          |
+| `sessionTtl`    | `604800`           | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                                                                               |
+| `cookieName`    | `dsh_auth`         | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                                                                           |
+| `tokenRef`      | `"DSH_AUTH_TOKEN"` | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                                                                          |
+| `cookieSecure`  | `true`             | Set to `false` only if you are testing over plain http                                                                                                                                                                                                                                                       |
+| `usersFile`     | `""`               | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                           |
+| `publicHost`    | `""`               | Host rendered in the login page identity block (the anti-phishing "which instance is this" line). Empty = use the request `Host` header. Set it when a reverse proxy rewrites `Host` (e.g. Caddy `header_up Host 127.0.0.1:3080`), otherwise the card shows a loopback address instead of your public domain |
+| `revokeSweepMs` | `5000`             | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                                                                            |
+| `logoutOrder`   | `1000`             | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                                                                                  |
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
@@ -252,6 +253,11 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 ## Requirements
 
 - Node ≥ 22.19 and pnpm on the server.
+- dsh `0.1.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2`, last
+  verified against `0.1.5-rc.2`). The plugin runs on the host's own
+  `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis` copies — both are
+  peer dependencies, never bundled — so a profile booted from the dsh base
+  bundle already provides them.
 - The dsh `web` profile running (`dsh --profile web`).
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).

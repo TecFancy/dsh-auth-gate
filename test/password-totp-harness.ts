@@ -10,7 +10,7 @@ import {
   buildChallengeValue,
   CHALLENGE_COOKIE,
   CHALLENGE_TTL_SECONDS,
-} from "../src/features/password/password-login.js";
+} from "../src/features/password/challenge-cookie.js";
 import { SessionStore, type Session } from "../src/session/index.js";
 
 export class MemTable implements KvTable<string, Session> {
@@ -63,12 +63,18 @@ export function makeRes(): FakeRes {
     headers: {} as Record<string, string>,
     body: "",
   };
+  let headersSent = false;
   const res = {
+    // 对齐 node:http：writeHead 之后再 setHeader 会抛 ERR_HTTP_HEADERS_SENT
+    // （2026-09-22 线上同型故障：GET ?stage=password 清 cookie 时连接被重置）。
     setHeader: (name: string, value: string): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: setHeader after writeHead");
       state.headers[name.toLowerCase()] = String(value);
     },
     writeHead: (status: number, extra?: Record<string, string | number>): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: writeHead called twice");
       state.status = status;
+      headersSent = true;
       for (const [name, value] of Object.entries(extra ?? {})) {
         state.headers[name.toLowerCase()] = String(value);
       }
@@ -85,12 +91,15 @@ export function makeReq(options: {
   url?: string;
   cookie?: string;
   body?: Buffer;
+  /** 模拟反代改写后的 Host 头；缺省 = 不带 Host。 */
+  host?: string;
 }): IncomingMessage {
   return {
     method: options.method ?? "GET",
     url: options.url ?? "/",
     headers: {
       cookie: options.cookie,
+      host: options.host,
       "content-type": "application/x-www-form-urlencoded",
     },
     socket: { remoteAddress: "127.0.0.1" },
@@ -214,16 +223,23 @@ export async function post(
   method: "GET" | "POST",
   bodyOrCookie?: string,
   cookie?: string,
+  /** 模拟反代改写后的 Host 头（D14 用例用它证明配置优先）。 */
+  host?: string,
 ): Promise<FakeRes> {
   const res = makeRes();
+  const withHost = host === undefined ? {} : { host };
   if (method === "GET") {
-    const options = bodyOrCookie === undefined ? { method } : { method, cookie: bodyOrCookie };
+    const options = {
+      method,
+      ...(bodyOrCookie === undefined ? {} : { cookie: bodyOrCookie }),
+      ...withHost,
+    };
     await h.handlerOf("exact", "/auth/login")(makeReq(options), res.res);
     return res;
   }
   const base =
     bodyOrCookie === undefined ? { method } : { method, body: Buffer.from(bodyOrCookie) };
-  const options = cookie === undefined ? base : { ...base, cookie };
+  const options = { ...base, ...(cookie === undefined ? {} : { cookie }), ...withHost };
   await h.handlerOf("exact", "/auth/login")(makeReq(options), res.res);
   return res;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHALLENGE_TTL_SECONDS, CHALLENGE_COOKIE } from "./password-login.js";
+import { CHALLENGE_TTL_SECONDS, CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import { makeHarness, post } from "../../../test/password-totp-harness.js";
 
 describe("TOTP: password stage issues challenge cookie", () => {

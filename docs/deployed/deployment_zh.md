@@ -59,7 +59,7 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
 2. **配置覆盖**：把仓库 `deploy/cordis.patch.yml` 复制为 `$DSH_HOME/cordis.patch.yml`
    ——0.4.1 起该模板是纯配置覆盖（无 `insert`；挂载本身由 `dsh plugin add` 通过
    `dsh.bundle` manifest 注册）。按需调整（`cookieSecure` 必须与 TLS 环境一致；
-   非默认路径才设 `usersFile`）。
+   非默认路径才设 `usersFile`；反代改写了 `Host` 时必须设 `publicHost` 为公网域名，见 D14）。
 3. 确认无其他行占用 `dsh-auth-gate` id（patch 栈按 id 覆盖）。
 
 ## 3. 启动与健康检查
@@ -190,7 +190,7 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
       周期扫描 users.yaml，默认 5000 毫秒；设 0 = 退回 M3「只拦新登录」的旧行为）。
 - [ ] 限速内存态重启清零；反代部署时限速按出口 IP 聚合（不信任 X-Forwarded-For）。
 
-## 8. 公网部署变体（2026-08-15 起，dsh.hi-ruofei.com 生效）：半外壳
+## 8. 公网部署变体（2026-08-15 起，dsh.example.com 生效）：半外壳
 
 > 本文档 §1-§7 为"插件形态"（门卫进 dsh 进程）。2026-08-15 生产实证后，公网实例改用
 > **半外壳**变体；长期方向见 `docs/specs/dsh-auth-plan_zh.md` §9 M5（独立反代外壳）。
@@ -204,17 +204,17 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 
 实测 header 矩阵（登录后 cookie 访问 `/api/settings.describe`）：
 
-| 上游 Host                       | Origin        | 结果 |
-| ------------------------------- | ------------- | ---- |
-| `dsh.hi-ruofei.com`（原样透传） | 任意          | 403  |
-| `127.0.0.1:3080`（重写）        | 匹配 loopback | 200  |
-| `127.0.0.1:3080`（重写）        | 剥离          | 200  |
-| `127.0.0.1:3080`（重写）        | 不匹配        | 403  |
+| 上游 Host                     | Origin        | 结果 |
+| ----------------------------- | ------------- | ---- |
+| `dsh.example.com`（原样透传） | 任意          | 403  |
+| `127.0.0.1:3080`（重写）      | 匹配 loopback | 200  |
+| `127.0.0.1:3080`（重写）      | 剥离          | 200  |
+| `127.0.0.1:3080`（重写）      | 不匹配        | 403  |
 
 ### 8.2 半外壳拓扑（当前生产）
 
 ```
-公网 dsh.hi-ruofei.com (Caddy, TLS)
+公网 dsh.example.com (Caddy, TLS)
   └─ reverse_proxy 127.0.0.1:3080 {
          header_up Host 127.0.0.1:3080   # 重写 Host → dsh 视为 loopback
          header_up -Origin                # 剥离 Origin → 通过栅栏 Origin 匹配
@@ -233,7 +233,7 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 
 - 升级回归（§5）照跑；另加设置页冒烟：登录后点「设置」，确认无 `transport failure`、
   无 403 console 报错。
-- `--trusted-host dsh.hi-ruofei.com` 在重写后已冗余（Host 恒 loopback），保留无害。
+- `--trusted-host dsh.example.com` 在重写后已冗余（Host 恒 loopback），保留无害。
 - 会话能扛住 dsh-web 重启：按实例落盘在 `$DSH_HOME/storages/dsh_auth_sessions.json`
   （mode 0600；键为会话 token 的 sha256，盘上无明文 token），在到期（`sessionTtl`，默认 7 天）
   前一直有效，除非被吊销（`POST /auth/logout` 会删掉落盘行）。重启真正清掉的是进程级状态：
@@ -255,7 +255,7 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 ```
 用户浏览器 (http://127.0.0.1:8443  ← 页面 origin 回环，客户端放行)
    └─ dsh-auth-proxy（用户本机，严格绑定 127.0.0.1，无状态透传）
-        └─ https://dsh.hi-ruofei.com（SNI/Host = 域名）
+        └─ https://dsh.example.com（SNI/Host = 域名）
              └─ Caddy（§8.2 头改写：Host/Origin → 127.0.0.1:3080）
                   └─ dsh web + dsh-auth-gate（认证逻辑不变）
 ```
@@ -269,18 +269,18 @@ dsh 0.1.0-rc.6 的 `dsh-client-connection` 把 `settings.*`/`credentials.*`/`llm
 ### 9.2 使用
 
 ```sh
-node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com --mark-proxy
+node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.example.com --mark-proxy
 # 浏览器打开 http://127.0.0.1:8443 → auth-gate 登录 → 「设置 → 模型」即可编辑
 ```
 
-| 参数                      | 默认                        | 说明                                                                                         |
-| ------------------------- | --------------------------- | -------------------------------------------------------------------------------------------- |
-| `--listen`                | `127.0.0.1:8443`            | 必须回环（非回环拒绝启动，防局域网跳板）                                                     |
-| `--target`                | `https://dsh.hi-ruofei.com` | 上游；默认 https 并校验 TLS                                                                  |
-| `--strip-secure-cookie`   | 开（`--no-…` 关闭）         | 本地明文 http 下去掉 `Secure`                                                                |
-| `--mark-proxy`            | 关                          | 每请求加 `X-Dsh-Proxy: 1`（启用 §9.3 的 deny-list）                                          |
-| `--local-token-env <VAR>` | 无                          | 所有经代理请求须带 `Authorization: Bearer <环境变量值>`（fail-closed：变量未设置则拒绝启动） |
-| `--unsafe-plain-target`   | 关                          | 允许 `http://` 上游（仅本机验证场景）                                                        |
+| 参数                      | 默认                      | 说明                                                                                         |
+| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------- |
+| `--listen`                | `127.0.0.1:8443`          | 必须回环（非回环拒绝启动，防局域网跳板）                                                     |
+| `--target`                | `https://dsh.example.com` | 上游；默认 https 并校验 TLS                                                                  |
+| `--strip-secure-cookie`   | 开（`--no-…` 关闭）       | 本地明文 http 下去掉 `Secure`                                                                |
+| `--mark-proxy`            | 关                        | 每请求加 `X-Dsh-Proxy: 1`（启用 §9.3 的 deny-list）                                          |
+| `--local-token-env <VAR>` | 无                        | 所有经代理请求须带 `Authorization: Bearer <环境变量值>`（fail-closed：变量未设置则拒绝启动） |
+| `--unsafe-plain-target`   | 关                        | 允许 `http://` 上游（仅本机验证场景）                                                        |
 
 ### 9.3 安全边界：`X-Dsh-Proxy` deny-list（Phase 2.1）
 
@@ -311,4 +311,4 @@ sudo systemctl daemon-reload && sudo systemctl enable --now dsh-auth-proxy
 4. 带 cookie `POST /api/settings.describe`（RPC 信封 `{"type":"client-request","rpcId":"x","method":"…","payload":{}}`，`Content-Type: application/json`）→ `200 {"ok":true,…}`；
 5. 浏览器：登录后「设置 → 模型」无 "settings are unavailable"、提供方行可编辑；
 6. 开 `--mark-proxy`：标记请求 `settings.describe` 仍 200，`host.openPath` → 403；
-7. 回归：直连 `https://dsh.hi-ruofei.com` 的模型页仍显示原错误（预期，未走代理）。
+7. 回归：直连 `https://dsh.example.com` 的模型页仍显示原错误（预期，未走代理）。

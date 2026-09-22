@@ -28,12 +28,12 @@ removing the gate does not help (verified 2026-08-15).
 
 Measured header matrix (authenticated request to `/api/settings.describe`):
 
-| Upstream `Host` header             | `Origin`          | Result |
-| ---------------------------------- | ----------------- | ------ |
-| `dsh.hi-ruofei.com` (pass-through) | anything          | 403    |
-| `127.0.0.1:3080` (rewritten)       | matching loopback | 200    |
-| `127.0.0.1:3080` (rewritten)       | stripped          | 200    |
-| `127.0.0.1:3080` (rewritten)       | mismatched        | 403    |
+| Upstream `Host` header           | `Origin`          | Result |
+| -------------------------------- | ----------------- | ------ |
+| `dsh.example.com` (pass-through) | anything          | 403    |
+| `127.0.0.1:3080` (rewritten)     | matching loopback | 200    |
+| `127.0.0.1:3080` (rewritten)     | stripped          | 200    |
+| `127.0.0.1:3080` (rewritten)     | mismatched        | 403    |
 
 **Conclusion:** the layer that makes dsh believe it is on loopback must be the
 same layer that authenticates. Auth alone (gate or not) never fixes the 403s.
@@ -56,7 +56,7 @@ carry it and are rejected with `401`. Defense in depth shifts from
 ### 4.1 Caddy — plain proxy (Settings page will 403 on privileged APIs)
 
 ```
-dsh.hi-ruofei.com {
+dsh.example.com {
 	reverse_proxy 127.0.0.1:3080
 }
 ```
@@ -64,7 +64,7 @@ dsh.hi-ruofei.com {
 ### 4.2 Caddy — semi-shell (recommended: Host rewrite + Origin strip)
 
 ```
-dsh.hi-ruofei.com {
+dsh.example.com {
 	reverse_proxy 127.0.0.1:3080 {
 		header_up Host 127.0.0.1:3080   # dsh sees a loopback Host
 		header_up -Origin                # drop Origin so the fence's match passes
@@ -74,6 +74,11 @@ dsh.hi-ruofei.com {
 
 Reload: `sudo systemctl reload caddy`. WebSocket upgrades pass through the
 same rules (verified: `101` with cookie, `401` without).
+
+> **Identity block (D14)**: with this rewrite dsh receives `Host: 127.0.0.1:3080`, so the
+> login page identity block would render a loopback address that does not match the
+> address bar. Set `publicHost` to your public domain in the plugin config; empty falls back
+> to the request `Host` header (correct for the plain-proxy topology in 4.1).
 
 ### 4.2.1 Note: launch-token gate (dsh ≥ 0.1.2-alpha) + dsh-auth-gate bridge
 
@@ -98,7 +103,7 @@ dsh-auth-gate bridges this after a successful login by redirecting to a
 ```nginx
 server {
     listen 443 ssl;
-    server_name dsh.hi-ruofei.com;
+    server_name dsh.example.com;
     # ... ssl_certificate / ssl_certificate_key ...
 
     location / {
@@ -117,8 +122,8 @@ server {
 
 ```sh
 # unauthenticated: page navigation 302 to /auth/login, API 401
-curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: text/html" https://dsh.hi-ruofei.com/__dsh_api   # 302
-curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://dsh.hi-ruofei.com/__dsh_api  # 401
+curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: text/html" https://dsh.example.com/__dsh_api   # 302
+curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://dsh.example.com/__dsh_api  # 401
 # after login (cookie jar):
 #   settings.describe / credentials.describe → 200 (semi-shell)
 #   WebSocket upgrade on /api/events.host → 101 with cookie, 401 without

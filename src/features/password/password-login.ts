@@ -3,22 +3,14 @@ import {
   validateNext,
   parseFormBody,
   parseCookieHeader,
+  resolvePublicHost,
   totpChallengePageHtml,
 } from "../../shared/index.js";
 import { DUMMY_HASH } from "./password.js";
-import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
+import { LoginRateLimiter, loginPath, type UsersLoadResult } from "../../shared/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 import { issueSession } from "./session-issue.js";
 import {
-  buildChallengeValue,
-  CHALLENGE_COOKIE,
-  CHALLENGE_TTL_SECONDS,
-  parseChallengeValue,
-} from "./challenge-cookie.js";
-
-// 挑战 cookie 常量/构建/解析迁至 ./challenge-cookie.js（D10：HMAC 签名），此处 re-export
-// 保持公共 API 位置（password/index.ts → 下游 import 不断）。
-export {
   buildChallengeValue,
   CHALLENGE_COOKIE,
   CHALLENGE_TTL_SECONDS,
@@ -46,6 +38,11 @@ export interface PasswordLoginDeps {
   now: () => number;
   /** 挑战 cookie HMAC 密钥（进程级，apply() 生成；D10）。 */
   challengeMacKey: Uint8Array;
+  /**
+   * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+   * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+   */
+  publicHost?: string | undefined;
   /**
    * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
    * 登录成功后 302 到 `launchTokenBridge()` 的相对 `/?token=`（浏览器自动 mint dsh
@@ -94,7 +91,15 @@ export async function handlePasswordLogin(
   // 挑战分流（M4 T6）：off 模式完全忽略 TOTP（残留/伪造挑战 cookie 不进入第二段，
   // 带 code 的 POST 落回密码路径（与「off = 忽略 secret」单出口，T4）。
   if (challenge !== undefined && code !== "" && deps.totpMode !== "off") {
-    await handleTotpSubmit(deps, res, challenge, code, next, ip);
+    await handleTotpSubmit(
+      deps,
+      resolvePublicHost(deps.publicHost, req.headers.host),
+      res,
+      challenge,
+      code,
+      next,
+      ip,
+    );
     return;
   }
   await handlePasswordSubmit(deps, res, params, next, ip);
@@ -103,6 +108,7 @@ export async function handlePasswordLogin(
 /** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
 async function handleTotpSubmit(
   deps: PasswordLoginDeps,
+  host: string,
   res: ServerResponse,
   username: string,
   code: string,
@@ -116,7 +122,7 @@ async function handleTotpSubmit(
   const user = loaded.snapshot.users.get(username);
   if (user?.totpSecret === undefined) {
     deps.limiter.recordFailure(ip, username);
-    rejectTotp(deps, res, next);
+    rejectTotp(deps, host, res, next, username);
     return;
   }
 
@@ -126,7 +132,7 @@ async function handleTotpSubmit(
   const replay = matched !== undefined && deps.replayCheck(username, matched, code);
   if (matched === undefined || !replay || user.disabled) {
     deps.limiter.recordFailure(ip, username);
-    rejectTotp(deps, res, next);
+    rejectTotp(deps, host, res, next, username);
     return;
   }
 
@@ -194,7 +200,7 @@ async function handlePasswordSubmit(
         deps.cookieSecure,
       ),
     );
-    res.writeHead(302, { location: `/auth/login?next=${encodeURIComponent(next)}` });
+    res.writeHead(302, { location: loginPath(next) });
     res.end();
     return;
   }
@@ -212,11 +218,23 @@ async function handlePasswordSubmit(
 
 /** TOTP 拒绝路径（P1.3）：401 + 挑战页 HTML（error slot 固定文案，浏览器表单可见；
  * 不读 query error=，避免开放重定向式任意文案；挑战 cookie 保留，可重试）。 */
-function rejectTotp(deps: PasswordLoginDeps, res: ServerResponse, next: string): void {
+function rejectTotp(
+  deps: PasswordLoginDeps,
+  host: string,
+  res: ServerResponse,
+  next: string,
+  username: string,
+): void {
   deps.logger.info("login rejected");
   res.setHeader("cache-control", "no-store");
   res.writeHead(401, { "content-type": "text/html; charset=utf-8" });
-  res.end(totpChallengePageHtml(next, "invalid credentials"));
+  res.end(
+    totpChallengePageHtml(next, "invalid credentials", {
+      host,
+      who: username,
+      resetHref: loginPath(next, "password"),
+    }),
+  );
 }
 
 /** 读取用户文件；失败 → 503 + error 日志并返回 undefined（不计失败）。 */

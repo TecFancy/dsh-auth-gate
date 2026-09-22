@@ -10,7 +10,7 @@ Type=simple
 # --mark-proxy 启用 §9.3 的 X-Dsh-Proxy deny-list；本地令牌门示例：
 #   Environment=DSH_AUTH_PROXY_TOKEN=change-me
 #   ExecStart=... --local-token-env DSH_AUTH_PROXY_TOKEN
-ExecStart=/usr/bin/env node /opt/dsh-auth-gate/lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com --mark-proxy
+ExecStart=/usr/bin/env node /opt/dsh-auth-gate/lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.example.com --mark-proxy
 Restart=on-failure
 RestartSec=3
 

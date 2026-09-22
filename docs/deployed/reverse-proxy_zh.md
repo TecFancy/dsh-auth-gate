@@ -25,12 +25,12 @@ dsh 0.1.0-rc.6 的 `/api` 有浏览器信任栅栏（防 DNS rebinding + CSRF）
 
 实测 header 矩阵（登录后访问 `/api/settings.describe`）：
 
-| 上游 `Host` 头                  | `Origin`      | 结果 |
-| ------------------------------- | ------------- | ---- |
-| `dsh.hi-ruofei.com`（原样透传） | 任意          | 403  |
-| `127.0.0.1:3080`（重写）        | 匹配 loopback | 200  |
-| `127.0.0.1:3080`（重写）        | 剥离          | 200  |
-| `127.0.0.1:3080`（重写）        | 不匹配        | 403  |
+| 上游 `Host` 头                | `Origin`      | 结果 |
+| ----------------------------- | ------------- | ---- |
+| `dsh.example.com`（原样透传） | 任意          | 403  |
+| `127.0.0.1:3080`（重写）      | 匹配 loopback | 200  |
+| `127.0.0.1:3080`（重写）      | 剥离          | 200  |
+| `127.0.0.1:3080`（重写）      | 不匹配        | 403  |
 
 **结论**：让 dsh 以为自己在 loopback 的层，必须和做认证的层是同一层。只加认证（无论门卫
 在不在）永远修不了 403。
@@ -51,7 +51,7 @@ cookie → 门卫 401。纵深防御从「栅栏 + 门卫」变为「门卫 + Sa
 ### 4.1 Caddy —— 普通反代（设置页 privileged API 会 403）
 
 ```
-dsh.hi-ruofei.com {
+dsh.example.com {
 	reverse_proxy 127.0.0.1:3080
 }
 ```
@@ -59,7 +59,7 @@ dsh.hi-ruofei.com {
 ### 4.2 Caddy —— 半外壳（推荐：重写 Host + 剥离 Origin）
 
 ```
-dsh.hi-ruofei.com {
+dsh.example.com {
 	reverse_proxy 127.0.0.1:3080 {
 		header_up Host 127.0.0.1:3080   # dsh 看到 loopback Host
 		header_up -Origin                # 剥掉 Origin，栅栏匹配通过
@@ -69,6 +69,10 @@ dsh.hi-ruofei.com {
 
 重载：`sudo systemctl reload caddy`。WebSocket 升级走同一套规则（实测：带 cookie 101、
 无 cookie 401）。
+
+> **身份块（D14）**：这套重写让 dsh 收到的 `Host` 是 `127.0.0.1:3080`，登录页身份块会
+> 渲染回环地址、与地址栏不一致。请在插件配置里把 `publicHost` 设为你的公网域名；
+> 留空则回退请求头 `Host`（§4.1 的普通反代拓扑下这才是对的）。
 
 ### 4.2.1 附注：launch-token 门（dsh ≥ 0.1.2-alpha）与 dsh-auth-gate 自动桥
 
@@ -88,7 +92,7 @@ dsh.hi-ruofei.com {
 ```nginx
 server {
     listen 443 ssl;
-    server_name dsh.hi-ruofei.com;
+    server_name dsh.example.com;
     # ... ssl_certificate / ssl_certificate_key ...
 
     location / {
@@ -107,8 +111,8 @@ server {
 
 ```sh
 # 未认证：页面导航 302 到 /auth/login，API 401
-curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: text/html" https://dsh.hi-ruofei.com/__dsh_api   # 302
-curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://dsh.hi-ruofei.com/__dsh_api  # 401
+curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: text/html" https://dsh.example.com/__dsh_api   # 302
+curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://dsh.example.com/__dsh_api  # 401
 # 登录后（cookie jar）：
 #   settings.describe / credentials.describe → 200（半外壳）
 #   /api/events.host WebSocket 升级 → 带 cookie 101，无 cookie 401

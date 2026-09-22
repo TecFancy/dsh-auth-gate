@@ -3,7 +3,7 @@
  * dsh-auth-proxy CLI：认证本地代理入口。
  *
  * 用法示例：
- *   dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
+ *   dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
  */
 import { pathToFileURL } from "node:url";
 import {
@@ -23,7 +23,7 @@ const defaultIo: CliIo = {
 };
 
 const USAGE = `Usage:
-  dsh-auth-proxy [--listen 127.0.0.1:8443] [--target https://dsh.hi-ruofei.com]
+  dsh-auth-proxy [--listen 127.0.0.1:8443] [--target https://dsh.example.com]
                  [--strip-secure-cookie | --no-strip-secure-cookie]
                  [--mark-proxy] [--local-token-env <VAR>] [--unsafe-plain-target]`;
 
@@ -61,7 +61,7 @@ export function parseProxyArgs(
   return {
     options: {
       listen: valueOf(argv, "--listen", "127.0.0.1:8443"),
-      target: valueOf(argv, "--target", "https://dsh.hi-ruofei.com"),
+      target: valueOf(argv, "--target", "https://dsh.example.com"),
       stripSecureCookie: !flag(argv, "--no-strip-secure-cookie"),
       markProxy: flag(argv, "--mark-proxy"),
       localToken: flag(argv, "--local-token-env") ? (resolveLocalToken(argv, env) ?? "") : "",

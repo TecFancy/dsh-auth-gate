@@ -1,7 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { LoginRateLimiter, type UsersLoadResult } from "../../shared/index.js";
 import { type SessionStore } from "../../session/index.js";
-export { buildChallengeValue, CHALLENGE_COOKIE, CHALLENGE_TTL_SECONDS, parseChallengeValue, } from "./challenge-cookie.js";
 export interface PasswordLoginDeps {
     sessions: () => SessionStore | undefined;
     cookieName: string;
@@ -23,6 +22,11 @@ export interface PasswordLoginDeps {
     now: () => number;
     /** 挑战 cookie HMAC 密钥（进程级，apply() 生成；D10）。 */
     challengeMacKey: Uint8Array;
+    /**
+     * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+     * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+     */
+    publicHost?: string | undefined;
     /**
      * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
      * 登录成功后 302 到 `launchTokenBridge()` 的相对 `/?token=`（浏览器自动 mint dsh

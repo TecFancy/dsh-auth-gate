@@ -11,7 +11,7 @@ the credential semantics of every other entry are untouched.
 
 ## Context
 
-On the live deployment (`dsh.hi-ruofei.com`, dsh 0.1.5-rc.2 + Caddy + this gate) a logged-in
+On the live deployment (`dsh.example.com`, dsh 0.1.5-rc.2 + Caddy + this gate) a logged-in
 browser shows a permanent console error: `GET /manifest.webmanifest → 401`. Nothing is
 misconfigured:
 

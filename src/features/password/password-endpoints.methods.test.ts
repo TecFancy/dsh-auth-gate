@@ -21,12 +21,19 @@ function makeRes(): FakeRes {
     headers: {} as Record<string, string>,
     body: "",
   };
+  let headersSent = false;
   const res = {
+    // 对齐 node:http：writeHead 之后再 setHeader / writeHead 会抛 ERR_HTTP_HEADERS_SENT。
+    // 2026-09-22 实测过真实故障（GET ?stage=password 在 writeHead 后补 set-cookie →
+    // 连接被重置、无响应），这条语义就是用来挡住同型回归的。
     setHeader: (name: string, value: string): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: setHeader after writeHead");
       state.headers[name.toLowerCase()] = String(value);
     },
     writeHead: (status: number, extra?: Record<string, string | number>): void => {
+      if (headersSent) throw new Error("ERR_HTTP_HEADERS_SENT: writeHead called twice");
       state.status = status;
+      headersSent = true;
       for (const [name, value] of Object.entries(extra ?? {})) {
         state.headers[name.toLowerCase()] = String(value);
       }
@@ -43,11 +50,15 @@ function makeReq(options: {
   url: string;
   contentType?: string;
   body?: Buffer;
+  host?: string;
 }): IncomingMessage {
   return {
     method: options.method,
     url: options.url,
-    headers: { "content-type": options.contentType },
+    headers: {
+      "content-type": options.contentType,
+      ...(options.host === undefined ? {} : { host: options.host }),
+    },
     socket: { remoteAddress: "127.0.0.1" },
     *[Symbol.asyncIterator](): Generator<Buffer> {
       if (options.body !== undefined) yield options.body;
@@ -55,7 +66,7 @@ function makeReq(options: {
   } as unknown as IncomingMessage;
 }
 
-function makeDeps(): PasswordEndpointsDeps {
+function makeDeps(publicHost?: string): PasswordEndpointsDeps {
   return {
     register: () => () => undefined,
     sessions: () => undefined, // 本文件用例不走到会话分支（405/404/415/413/页面渲染提前短路）
@@ -64,6 +75,7 @@ function makeDeps(): PasswordEndpointsDeps {
     sessionTtl: 604800,
     logoutOrder: 1000,
     usersPath: "/tmp/users.yaml",
+    publicHost,
     loadUsers: () =>
       Promise.resolve({
         snapshot: { users: new Map([["alice", { passwordHash: "h", disabled: false }]]) },
@@ -80,8 +92,8 @@ function makeDeps(): PasswordEndpointsDeps {
   };
 }
 
-function registerAndGet(path: string): HttpHandler {
-  const deps = makeDeps();
+function registerAndGet(path: string, publicHost?: string): HttpHandler {
+  const deps = makeDeps(publicHost);
   const routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[] = [];
   deps.register = (route) => {
     routes.push(route);
@@ -161,7 +173,9 @@ describe("POST /auth/login body errors", () => {
 describe("totpChallengePageHtml", () => {
   it("escapes error text and renders the error paragraph", () => {
     const html = totpChallengePageHtml("/", `bad <script> & "quotes"`);
-    expect(html).toContain('<p class="error">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>');
+    expect(html).toContain(
+      '<p class="error" id="err" role="alert">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>',
+    );
   });
 
   it("omits the error paragraph when no error is given", () => {
@@ -178,7 +192,9 @@ describe("totpChallengePageHtml", () => {
 describe("passwordLoginPageHtml", () => {
   it("escapes error text and renders the error paragraph", () => {
     const html = passwordLoginPageHtml("/", `bad <script> & "quotes"`);
-    expect(html).toContain('<p class="error">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>');
+    expect(html).toContain(
+      '<p class="error" id="err" role="alert">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>',
+    );
   });
 
   it("omits the error paragraph when no error is given", () => {
@@ -205,5 +221,37 @@ describe("passwordLoginPageHtml", () => {
     expect(html).not.toContain(
       'autocomplete="username" placeholder="Enter your username" required autofocus>',
     );
+  });
+});
+
+describe("publicHost on the password login page (D14)", () => {
+  it("falls back to the request Host header when publicHost is unset", async () => {
+    const res = makeRes();
+    await registerAndGet("/auth/login")(
+      makeReq({ method: "GET", url: "/auth/login?next=/", host: "dsh.example.com" }),
+      res.res,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("dsh.example.com");
+  });
+
+  it("prefers the configured publicHost over a rewritten Host header", async () => {
+    const res = makeRes();
+    await registerAndGet("/auth/login", "dsh.example.com")(
+      makeReq({ method: "GET", url: "/auth/login?next=/", host: "127.0.0.1:3080" }),
+      res.res,
+    );
+    expect(res.body).toContain("dsh.example.com");
+    expect(res.body).not.toContain("127.0.0.1:3080");
+  });
+
+  it("uses the configured publicHost on the stage=password reset view too", async () => {
+    const res = makeRes();
+    await registerAndGet("/auth/login", "dsh.example.com")(
+      makeReq({ method: "GET", url: "/auth/login?next=/&stage=password", host: "127.0.0.1:3080" }),
+      res.res,
+    );
+    expect(res.body).toContain("dsh.example.com");
+    expect(res.body).not.toContain("127.0.0.1:3080");
   });
 });

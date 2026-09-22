@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { CHALLENGE_COOKIE } from "./password-login.js";
-import { buildChallengeValue } from "./challenge-cookie.js";
+import { buildChallengeValue, CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import {
   aliceChallengeCookie,
   makeHarness,
+  makeReq,
+  makeRes,
   post,
   SECRET_ALICE,
   TEST_CHALLENGE_KEY,
@@ -19,6 +20,32 @@ describe("TOTP: challenge submit path", () => {
     expect(res.body).toContain('inputmode="numeric"');
   });
 
+  it("shows the pending account and a real 'Use a different account' GET link", async () => {
+    const h = makeHarness();
+    const res = await post(h, "GET", aliceChallengeCookie());
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Signing in as alice");
+    expect(res.body).toContain('href="/auth/login?next=%2F&amp;stage=password"');
+  });
+
+  it("?stage=password clears the challenge cookie and falls back to the password page", async () => {
+    const h = makeHarness();
+    const res = makeRes();
+    await h.handlerOf("exact", "/auth/login")(
+      makeReq({
+        method: "GET",
+        url: "/auth/login?stage=password&next=%2Fmodels",
+        cookie: aliceChallengeCookie(),
+      }),
+      res.res,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers["set-cookie"]).toContain(`${CHALLENGE_COOKIE}=;`);
+    expect(res.headers["set-cookie"]).toContain("Max-Age=0");
+    expect(res.body).toContain('name="password"');
+    expect(res.body).not.toContain('name="code"');
+  });
+
   it("renders the password page without a challenge cookie (GET, M3 unchanged)", async () => {
     const h = makeHarness();
     const res = await post(h, "GET");
@@ -26,7 +53,9 @@ describe("TOTP: challenge submit path", () => {
     expect(res.body).toContain('name="username"');
     expect(res.body).not.toContain('name="code"');
   });
+});
 
+describe("TOTP: challenge submit path (session issuing & limits)", () => {
   it("correct code: clears challenge cookie and issues session", async () => {
     const h = makeHarness();
     h.setVerifyImpl((secret, code) =>
@@ -150,6 +179,23 @@ describe("TOTP: submit hardening (disabled / off)", () => {
     expect(res.body).toContain('name="code"');
     expect(res.body).toContain("invalid credentials");
     expect(h.replayCalls).toEqual([]);
+  });
+
+  it("D14: TOTP page and reject page render the configured publicHost, not the rewritten Host", async () => {
+    const h = makeHarness();
+    h.deps.publicHost = "dsh.example.com";
+    // 半外壳反代把 Host 改写成回环地址：卡片必须显示配置的域名。
+    const rewrittenHost = "127.0.0.1:3080";
+    const page = await post(h, "GET", aliceChallengeCookie(), undefined, rewrittenHost);
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('title="dsh.example.com"');
+    expect(page.body).not.toContain(rewrittenHost);
+
+    h.setVerifyImpl(() => undefined);
+    const rejected = await post(h, "POST", "code=000000", aliceChallengeCookie(), rewrittenHost);
+    expect(rejected.status).toBe(401);
+    expect(rejected.body).toContain('title="dsh.example.com"');
+    expect(rejected.body).not.toContain(rewrittenHost);
   });
 });
 
