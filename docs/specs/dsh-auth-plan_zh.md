@@ -254,12 +254,12 @@ export function apply(ctx, config) {
 `llm.discoverModels` 等 privileged 方法钉死为仅 loopback（`dsh-client-connection`
 `PRIVILEGED_METHODS`，`--trusted-host` 放不开）。公网反代下这些端点恒 403。实测矩阵：
 
-| 上游 Host                   | Origin        | privileged API |
-| --------------------------- | ------------- | -------------- |
-| `dsh.hi-ruofei.com`（现状） | 任意          | 403            |
-| `127.0.0.1:3080`（重写）    | 匹配 loopback | 200            |
-| `127.0.0.1:3080`（重写）    | 剥离          | 200            |
-| `127.0.0.1:3080`（重写）    | 不匹配        | 403            |
+| 上游 Host                 | Origin        | privileged API |
+| ------------------------- | ------------- | -------------- |
+| `dsh.example.com`（现状） | 任意          | 403            |
+| `127.0.0.1:3080`（重写）  | 匹配 loopback | 200            |
+| `127.0.0.1:3080`（重写）  | 剥离          | 200            |
+| `127.0.0.1:3080`（重写）  | 不匹配        | 403            |
 
 结论：**"让 dsh 以为自己在 loopback"与认证必须由同一层外壳承担**——只加认证壳而不重写
 Host/Origin 无效（栅栏与认证正交）。

@@ -6,7 +6,7 @@
 ## 0. 背景与结论
 
 部署形态：dsh（0.1.1-rc.2，`web` profile）跑在服务器 `127.0.0.1:3080`，Caddy 终结
-`https://dsh.hi-ruofei.com` 后反代到该端口，dsh-auth-gate（0.8.0，password 模式 + HTTPS）
+`https://dsh.example.com` 后反代到该端口，dsh-auth-gate（0.8.0，password 模式 + HTTPS）
 守卫全部入口。
 
 问题：远程浏览器在域名下打开"设置 → 模型"报
@@ -37,7 +37,7 @@
    │  HTTP/1.1 + WebSocket 升级（Cookie: dsh_auth=… 由浏览器持有）
    ▼
 dsh-auth proxy（用户本机，严格绑定 127.0.0.1，无状态透传）
-   │  HTTPS + SNI=dsh.hi-ruofei.com，原样转发 Cookie/Bearer
+   │  HTTPS + SNI=dsh.example.com，原样转发 Cookie/Bearer
    ▼
 Caddy（TLS 终结；header_up Host/Origin → 127.0.0.1:3080）
    ▼
@@ -65,9 +65,9 @@ docs/deployed/local-proxy.md           # 本文（en + zh 双语拆分时可再�
 交付两种使用方式：
 
 ```sh
-node bin/dsh-auth-proxy.js --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
+node bin/dsh-auth-proxy.js --listen 127.0.0.1:8443 --target https://dsh.example.com
 # 或（安装后）
-dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
+dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
 ```
 
 后者需在 CLI（`src/cli.ts`）注册 `proxy` 子命令——若当前基线版本构建链不可用，
@@ -75,14 +75,14 @@ dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
 
 ### 2.2 配置项
 
-| 参数                    | 默认                        | 说明                                                                                  |
-| ----------------------- | --------------------------- | ------------------------------------------------------------------------------------- |
-| `--listen`              | `127.0.0.1:8443`            | 必须回环；程序在非回环地址时**拒绝启动**                                              |
-| `--target`              | `https://dsh.hi-ruofei.com` | 上游；默认要求 https 并校验 TLS                                                       |
-| `--unsafe-plain-target` | 关                          | 允许 `--target http://…`（仅本地验证场景）                                            |
-| `--strip-secure-cookie` | 开                          | 本地明文 http 时去掉 `Set-Cookie` 的 `Secure`（Chrome/Firefox 一般可留，Safari 兜底） |
-| `--local-token-env`     | 空                          | 可选第二把锁：经代理的请求必须带 `Authorization: Bearer <env值>`                      |
-| `--mark-proxy`          | 关                          | 每请求加 `X-Dsh-Proxy: 1` 头（Phase 2.1 deny-list 标记）                              |
+| 参数                    | 默认                      | 说明                                                                                  |
+| ----------------------- | ------------------------- | ------------------------------------------------------------------------------------- |
+| `--listen`              | `127.0.0.1:8443`          | 必须回环；程序在非回环地址时**拒绝启动**                                              |
+| `--target`              | `https://dsh.example.com` | 上游；默认要求 https 并校验 TLS                                                       |
+| `--unsafe-plain-target` | 关                        | 允许 `--target http://…`（仅本地验证场景）                                            |
+| `--strip-secure-cookie` | 开                        | 本地明文 http 时去掉 `Set-Cookie` 的 `Secure`（Chrome/Firefox 一般可留，Safari 兜底） |
+| `--local-token-env`     | 空                        | 可选第二把锁：经代理的请求必须带 `Authorization: Bearer <env值>`                      |
+| `--mark-proxy`          | 关                        | 每请求加 `X-Dsh-Proxy: 1` 头（Phase 2.1 deny-list 标记）                              |
 
 ### 2.3 行为规格
 
@@ -132,9 +132,9 @@ dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
 | #   | 操作                                                                                                                                      | 预期                                                           |
 | --- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
 | M1  | `--target http://127.0.0.1:3080`：curl 经代理 `GET /` → 302 登录页；`POST /auth/login` 拿 cookie；带 cookie `POST /api/settings.describe` | 200                                                            |
-| M2  | `--target https://dsh.hi-ruofei.com`（生产形态，走 Caddy 头改写）：重复 M1                                                                | 200                                                            |
+| M2  | `--target https://dsh.example.com`（生产形态，走 Caddy 头改写）：重复 M1                                                                  | 200                                                            |
 | M3  | playwright（headless）打开 `http://127.0.0.1:8443` → 登录临时用户 → 设置→模型                                                             | 页面无 "settings are unavailable" 文案，出现提供方行；截图归档 |
-| M4  | 回归：直接开 `https://dsh.hi-ruofei.com` 的模型页                                                                                         | 仍报原错误（预期——未走代理），证明代理必要且充分               |
+| M4  | 回归：直接开 `https://dsh.example.com` 的模型页                                                                                           | 仍报原错误（预期——未走代理），证明代理必要且充分               |
 | M5  | 聊天页发送一条消息（验证 events.mux/events.host 隧道）                                                                                    | 消息正常往返                                                   |
 | M6  | 清理：停止代理、禁用临时用户、删除临时文件                                                                                                | —                                                              |
 
@@ -142,11 +142,11 @@ dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
 
 - M1：登录 302 + `Set-Cookie` **无 Secure**（strip 生效，`HttpOnly; SameSite=Lax; Path=/` 保留）；
   `settings.describe` → `200 {"ok":true,…}` ✅
-- M2：同上，经 `https://dsh.hi-ruofei.com`（Caddy 头改写）→ `200 ok:true` ✅
+- M2：同上，经 `https://dsh.example.com`（Caddy 头改写）→ `200 ok:true` ✅
 - M3：headless Chromium 经代理登录后，"设置→模型"完整渲染：`DeepSeek (deepseek-official)`、
   `opencode-go` 两行提供方均带"API 密钥已配置"徽标与编辑/删除按钮；页面无
   "unavailable/加载提供方"文案 ✅
-- M4：同一浏览器直连 `https://dsh.hi-ruofei.com`，模型页仍显示
+- M4：同一浏览器直连 `https://dsh.example.com`，模型页仍显示
   "settings are unavailable in this browser" ✅（回归符合预期）
 - M5：`GET /api/events.mux` 带会话 cookie 经代理握手 → `101 Switching Protocols` ✅
 - M6：4 个临时会话全部 `POST /auth/logout` 吊销、临时用户 `disable`、代理停止、临时文件清理 ✅

@@ -4,7 +4,7 @@
 > 契约仍为「302 → next」，本文档是其在 dsh ≥ 0.1.2-alpha 上的兼容层覆写）。
 > **适用**: dsh ≥ 0.1.2-alpha（存在 `dsh-client-connection` 的 `authenticatedUrl`）；
 > 更早版本零行为变化（桥自动回退）。
-> **来源**: 2026-08-31 实测（隔离实例 dsh-test.hi-ruofei.com）+ `19c8431` +
+> **来源**: 2026-08-31 实测（隔离实例 dsh-test.example.com）+ `19c8431` +
 > `grok-4.6 review`（`docs/reviews/grok46-launch-token-bridge-review.md`，F1–F6 全部落地）。
 
 ## 1. 背景

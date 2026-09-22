@@ -218,7 +218,7 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 - [ ] Rate limiting is in-memory and cleared on restart; in a reverse-proxy deployment, rate
       limiting aggregates by egress IP (do not trust X-Forwarded-For).
 
-## 8. Public Deployment Variant (effective 2026-08-15 on dsh.hi-ruofei.com): Semi-Shell
+## 8. Public Deployment Variant (effective 2026-08-15 on dsh.example.com): Semi-Shell
 
 > §1–§7 of this document are the "plugin form" (the guard lives inside the dsh process). After
 > production validation on 2026-08-15, the public instance switches to the **semi-shell** variant;
@@ -235,17 +235,17 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 
 Verified header matrix (cookie access to `/api/settings.describe` after login):
 
-| Upstream Host                                  | Origin           | Result |
-| ---------------------------------------------- | ---------------- | ------ |
-| `dsh.hi-ruofei.com` (passed through unchanged) | any              | 403    |
-| `127.0.0.1:3080` (rewritten)                   | matches loopback | 200    |
-| `127.0.0.1:3080` (rewritten)                   | stripped         | 200    |
-| `127.0.0.1:3080` (rewritten)                   | does not match   | 403    |
+| Upstream Host                                | Origin           | Result |
+| -------------------------------------------- | ---------------- | ------ |
+| `dsh.example.com` (passed through unchanged) | any              | 403    |
+| `127.0.0.1:3080` (rewritten)                 | matches loopback | 200    |
+| `127.0.0.1:3080` (rewritten)                 | stripped         | 200    |
+| `127.0.0.1:3080` (rewritten)                 | does not match   | 403    |
 
 ### 8.2 Semi-Shell Topology (current production)
 
 ```
-public dsh.hi-ruofei.com (Caddy, TLS)
+public dsh.example.com (Caddy, TLS)
   └─ reverse_proxy 127.0.0.1:3080 {
          header_up Host 127.0.0.1:3080   # rewrite Host → dsh treats it as loopback
          header_up -Origin                # strip Origin → passes the fence's Origin match
@@ -266,7 +266,7 @@ public dsh.hi-ruofei.com (Caddy, TLS)
 
 - Run the upgrade regression (§5) as usual; additionally smoke-test the settings page: after
   login, click "Settings" and confirm there is no `transport failure` and no 403 console errors.
-- `--trusted-host dsh.hi-ruofei.com` is already redundant after the rewrite (Host always
+- `--trusted-host dsh.example.com` is already redundant after the rewrite (Host always
   loopback), but keeping it is harmless.
 - Sessions survive a dsh-web restart: they are persisted per instance in
   `$DSH_HOME/storages/dsh_auth_sessions.json` (mode 0600; keyed by the sha256 of the session token,
@@ -294,7 +294,7 @@ public dsh.hi-ruofei.com (Caddy, TLS)
 ```
 User browser (http://127.0.0.1:8443  -- page origin loopback; client-side gate passes)
    └─ dsh-auth-proxy (user machine, strictly bound to 127.0.0.1, stateless pass-through)
-        └─ https://dsh.hi-ruofei.com (SNI/Host = domain)
+        └─ https://dsh.example.com (SNI/Host = domain)
              └─ Caddy (§8.2 header rewrite: Host/Origin -> 127.0.0.1:3080)
                   └─ dsh web + dsh-auth-gate (authentication unchanged)
 ```
@@ -310,18 +310,18 @@ User browser (http://127.0.0.1:8443  -- page origin loopback; client-side gate p
 ### 9.2 Usage
 
 ```sh
-node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com --mark-proxy
+node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.example.com --mark-proxy
 # Open http://127.0.0.1:8443 in the browser -> auth-gate login -> edit the settings pages
 ```
 
-| Flag                      | Default                     | Purpose                                                                                                             |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `--listen`                | `127.0.0.1:8443`            | Must be loopback (startup refuses anything else; no LAN trampoline)                                                 |
-| `--target`                | `https://dsh.hi-ruofei.com` | Upstream; requires https with TLS verification by default                                                           |
-| `--strip-secure-cookie`   | on (`--no-…` disables)      | Remove `Secure` over plain-text loopback HTTP                                                                       |
-| `--mark-proxy`            | off                         | Add `X-Dsh-Proxy: 1` to every request (enables the §9.3 deny-list)                                                  |
-| `--local-token-env <VAR>` | none                        | Every request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors if the variable is unset) |
-| `--unsafe-plain-target`   | off                         | Allow `http://` upstreams (local verification only)                                                                 |
+| Flag                      | Default                   | Purpose                                                                                                             |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--listen`                | `127.0.0.1:8443`          | Must be loopback (startup refuses anything else; no LAN trampoline)                                                 |
+| `--target`                | `https://dsh.example.com` | Upstream; requires https with TLS verification by default                                                           |
+| `--strip-secure-cookie`   | on (`--no-…` disables)    | Remove `Secure` over plain-text loopback HTTP                                                                       |
+| `--mark-proxy`            | off                       | Add `X-Dsh-Proxy: 1` to every request (enables the §9.3 deny-list)                                                  |
+| `--local-token-env <VAR>` | none                      | Every request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors if the variable is unset) |
+| `--unsafe-plain-target`   | off                       | Allow `http://` upstreams (local verification only)                                                                 |
 
 ### 9.3 Security Boundary: the `X-Dsh-Proxy` Deny-List (Phase 2.1)
 
@@ -358,5 +358,5 @@ sudo systemctl daemon-reload && sudo systemctl enable --now dsh-auth-proxy
 5. Browser: after login, "Settings -> Models" shows no "settings are unavailable" and the
    provider rows are editable;
 6. With `--mark-proxy`: a marked `settings.describe` still returns 200; `host.openPath` returns 403;
-7. Regression: the models page opened directly on `https://dsh.hi-ruofei.com` still shows the
+7. Regression: the models page opened directly on `https://dsh.example.com` still shows the
    original error (expected — no proxy).

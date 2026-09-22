@@ -6,7 +6,7 @@
 ## 0. Background and Findings
 
 Deployment shape: dsh (0.1.1-rc.2, `web` profile) runs on the server at `127.0.0.1:3080`,
-Caddy terminates `https://dsh.hi-ruofei.com` and reverse-proxies to that port, and
+Caddy terminates `https://dsh.example.com` and reverse-proxies to that port, and
 dsh-auth-gate (0.8.0, password mode + HTTPS) guards every entry point.
 
 Problem: a remote browser opened "Settings -> Models" on the domain and got
@@ -39,7 +39,7 @@ User browser (http://127.0.0.1:8443, page origin = loopback -> client-side gate 
    |  HTTP/1.1 + WebSocket upgrades (Cookie: dsh_auth=... held by the browser)
    v
 dsh-auth proxy (user machine, strictly bound to 127.0.0.1, stateless pass-through)
-   |  HTTPS + SNI=dsh.hi-ruofei.com, forwards Cookie/Bearer untouched
+   |  HTTPS + SNI=dsh.example.com, forwards Cookie/Bearer untouched
    v
 Caddy (TLS termination; header_up Host/Origin -> 127.0.0.1:3080)
    v
@@ -61,21 +61,21 @@ Zero-dependency Node script (Node >= 22 built-ins only), delivered as a `bin/`-r
 standalone CLI (`dsh-auth-proxy`); no build/runtime dependencies to add to the project.
 
 ```sh
-node bin/dsh-auth-proxy.js --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
+node bin/dsh-auth-proxy.js --listen 127.0.0.1:8443 --target https://dsh.example.com
 # or, installed:
-dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.hi-ruofei.com
+dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
 ```
 
 ### 2.2 Options
 
-| Flag                      | Default                     | Purpose                                                                                                                  |
-| ------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `--listen`                | `127.0.0.1:8443`            | Must be loopback; the program refuses to start on anything else                                                          |
-| `--target`                | `https://dsh.hi-ruofei.com` | Upstream; requires https with TLS verification by default                                                                |
-| `--strip-secure-cookie`   | on (disable via `--no-…`)   | Remove `Secure` from forwarded `Set-Cookie` over plain-text loopback (Chrome/Firefox generally keep it; Safari fallback) |
-| `--mark-proxy`            | off                         | Add `X-Dsh-Proxy: 1` to every request (hook for the §3 deny-list)                                                        |
-| `--local-token-env <VAR>` | none                        | Every proxied request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors when unset)            |
-| `--unsafe-plain-target`   | off                         | Allow `http://` upstreams (local verification only)                                                                      |
+| Flag                      | Default                   | Purpose                                                                                                                  |
+| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--listen`                | `127.0.0.1:8443`          | Must be loopback; the program refuses to start on anything else                                                          |
+| `--target`                | `https://dsh.example.com` | Upstream; requires https with TLS verification by default                                                                |
+| `--strip-secure-cookie`   | on (disable via `--no-…`) | Remove `Secure` from forwarded `Set-Cookie` over plain-text loopback (Chrome/Firefox generally keep it; Safari fallback) |
+| `--mark-proxy`            | off                       | Add `X-Dsh-Proxy: 1` to every request (hook for the §3 deny-list)                                                        |
+| `--local-token-env <VAR>` | none                      | Every proxied request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors when unset)            |
+| `--unsafe-plain-target`   | off                       | Allow `http://` upstreams (local verification only)                                                                      |
 
 ### 2.3 Behavior spec
 
@@ -128,7 +128,7 @@ Gotchas found during verification (matter for Phase 1):
 | #   | Operation                                                                                                                | Result                                                                                                           |
 | --- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | M1  | `--target http://127.0.0.1:3080`: GET / -> 302 login; login -> cookie; `settings.describe` with the cookie               | 200 `ok:true`; `Set-Cookie` without `Secure`                                                                     |
-| M2  | `--target https://dsh.hi-ruofei.com` (production form; Caddy rewrites headers): repeat M1                                | 200 `ok:true`                                                                                                    |
+| M2  | `--target https://dsh.example.com` (production form; Caddy rewrites headers): repeat M1                                  | 200 `ok:true`                                                                                                    |
 | M3  | Headless Chromium through the proxy: login -> Settings -> Models                                                         | Provider rows (DeepSeek/opencode-go) with key badges and edit/delete buttons; no "settings are unavailable" text |
 | M4  | Regression: the same browser opened directly on the domain                                                               | Still shows the original error (expected — no proxy), proving the proxy is necessary and sufficient              |
 | M5  | `GET /api/events.mux` with the session cookie through the proxy                                                          | `101 Switching Protocols`                                                                                        |

@@ -10,7 +10,7 @@
 
 ## 背景
 
-线上（`dsh.hi-ruofei.com`，dsh 0.1.5-rc.2 + Caddy + 门）登录后浏览器控制台常驻
+线上（`dsh.example.com`，dsh 0.1.5-rc.2 + Caddy + 门）登录后浏览器控制台常驻
 报错：`GET /manifest.webmanifest → 401`。这不是漏配：
 
 - 浏览器抓取 Web App Manifest 时**按规范不带凭证**。Chromium
