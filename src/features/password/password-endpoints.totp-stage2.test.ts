@@ -76,7 +76,22 @@ describe("TOTP: challenge submit path (session issuing & limits)", () => {
     const res = await post(h, "POST", "code=123456");
     // 无挑战 cookie + 无 username/password → 走密码路径 → 空 username → 401
     expect(res.status).toBe(401);
-    expect(res.body).toBe("invalid credentials");
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain('class="error"');
+    expect(res.body).toContain("Invalid username or password.");
+  });
+
+  it("locked TOTP stage: 429 challenge card, retry-after header and seconds in the copy (D20)", async () => {
+    const h = makeHarness();
+    for (let i = 0; i < 5; i++) h.deps.limiter.recordFailure("127.0.0.1", "alice");
+    const res = await post(h, "POST", "code=123456", aliceChallengeCookie());
+    expect(res.status).toBe(429);
+    expect(res.headers["retry-after"]).toBe("30");
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain('name="code"');
+    expect(res.body).toContain("Signing in as alice");
+    expect(res.body).toContain("Try again in 30 seconds.");
+    expect(res.body).toContain('<button type="submit">Verify</button>');
   });
 
   it("expired challenge cookie: treated as absent (password page)", async () => {

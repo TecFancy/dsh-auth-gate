@@ -10,6 +10,7 @@ import { DUMMY_HASH } from "./password.js";
 import { LoginRateLimiter, loginPath, type UsersLoadResult } from "../../shared/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 import { issueSession } from "./session-issue.js";
+import { sendInvalidCredentials, sendLockout, sendTotpLockout } from "./login-failure-pages.js";
 import {
   buildChallengeValue,
   CHALLENGE_COOKIE,
@@ -87,6 +88,7 @@ export async function handlePasswordLogin(
   }
   const next = validateNext(params.get("next") ?? "/");
   const ip = deps.clientIp?.(req) ?? req.socket.remoteAddress ?? "";
+  const host = resolvePublicHost(deps.publicHost, req.headers.host);
   const challenge = parseChallengeValue(
     parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
     deps.now(),
@@ -97,18 +99,10 @@ export async function handlePasswordLogin(
   // 挑战分流（M4 T6）：off 模式完全忽略 TOTP（残留/伪造挑战 cookie 不进入第二段，
   // 带 code 的 POST 落回密码路径（与「off = 忽略 secret」单出口，T4）。
   if (challenge !== undefined && code !== "" && deps.totpMode !== "off") {
-    await handleTotpSubmit(
-      deps,
-      resolvePublicHost(deps.publicHost, req.headers.host),
-      res,
-      challenge,
-      code,
-      next,
-      ip,
-    );
+    await handleTotpSubmit(deps, host, res, challenge, code, next, ip);
     return;
   }
-  await handlePasswordSubmit(deps, res, params, next, ip);
+  await handlePasswordSubmit(deps, res, params, next, ip, host);
 }
 
 /** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
@@ -121,10 +115,14 @@ async function handleTotpSubmit(
   next: string,
   ip: string,
 ): Promise<void> {
-  if (!rateLimitOk(deps, res, ip, username)) return;
+  const lockout = lockoutSeconds(deps, ip, username);
+  if (lockout !== undefined) {
+    sendTotpLockout(res, { host, next, username }, lockout);
+    deps.logger.info("rate limit exceeded");
+    return;
+  }
   const loaded = await loadUsersOr503(deps, res);
   if (loaded === undefined) return;
-
   const user = loaded.snapshot.users.get(username);
   if (user?.totpSecret === undefined) {
     deps.limiter.recordFailure(ip, username);
@@ -167,16 +165,28 @@ async function handlePasswordSubmit(
   params: URLSearchParams,
   next: string,
   ip: string,
+  host: string,
 ): Promise<void> {
-  const username = params.get("username") ?? "";
+  // 用户名 trim（手机键盘/剪贴板常带尾空格，`alice ` 永远对不上）；密码不 trim
+  // （首尾空格可以是密码的一部分）。trim 发生在查用户与 DUMMY_HASH 之前，计时均一不变。
+  const username = (params.get("username") ?? "").trim();
   const password = params.get("password") ?? "";
   const accountKey = username === "" ? undefined : username;
 
-  if (!rateLimitOk(deps, res, ip, accountKey)) return;
+  const lockout = lockoutSeconds(deps, ip, accountKey);
+  if (lockout !== undefined) {
+    sendLockout(res, { host, next, username }, lockout);
+    deps.logger.info("rate limit exceeded");
+    return;
+  }
 
   const loaded = await loadUsersOr503(deps, res);
   if (loaded === undefined) return; // 系统错误不计失败
-  if (await rejectedInvalid(deps, res, loaded, username, password, ip, accountKey)) return;
+  if (
+    await rejectedInvalid(deps, res, loaded, username, password, ip, accountKey, { host, next })
+  ) {
+    return;
+  }
 
   const user = loaded.snapshot.users.get(username);
   const needsTotp = user?.totpSecret !== undefined && deps.totpMode !== "off";
@@ -184,9 +194,7 @@ async function handlePasswordSubmit(
     // required 模式：无 secret 的用户（含未知用户）统一 401（防枚举，与密码错误同响应）。
     // 只计失败、不先 recordSuccess（正确密码不得重置该账号/IP 的历史失败，P1.1）。
     deps.limiter.recordFailure(ip, accountKey);
-    res.setHeader("cache-control", "no-store");
-    res.writeHead(401, { "content-type": "text/plain" });
-    res.end("invalid credentials");
+    sendInvalidCredentials(res, { host, next, username });
     deps.logger.info("login rejected");
     return;
   }
@@ -270,6 +278,7 @@ async function rejectedInvalid(
   password: string,
   ip: string,
   accountKey: string | undefined,
+  page: { host: string; next: string },
 ): Promise<boolean> {
   if (loaded.missing && !warnedMissing) {
     warnedMissing = true;
@@ -279,28 +288,20 @@ async function rejectedInvalid(
   const ok = await deps.verify(password, user?.passwordHash ?? DUMMY_HASH);
   if (ok && user !== undefined && !user.disabled) return false;
   deps.limiter.recordFailure(ip, accountKey);
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(401, { "content-type": "text/plain" });
-  res.end("invalid credentials");
+  // D20：401 保状态码，body 换成登录卡片（error slot），否则浏览器只看到空白纯文本页。
+  sendInvalidCredentials(res, { host: page.host, next: page.next, username });
   deps.logger.info("login rejected");
   return true;
 }
 
-/** 限速门（P10）：锁定 → 429 + retry-after，不验证、不增计数。返回是否放行。 */
-function rateLimitOk(
+/** 限速门（P10）：锁定 → 返回 retry-after 秒数（调用方渲染 429），放行 → undefined。 */
+function lockoutSeconds(
   deps: PasswordLoginDeps,
-  res: ServerResponse,
   ip: string,
   accountKey: string | undefined,
-): boolean {
+): number | undefined {
   const check = deps.limiter.check(ip, accountKey);
-  if (check.allowed) return true;
-  res.setHeader("cache-control", "no-store");
-  res.setHeader("retry-after", String(check.retryAfterSeconds));
-  res.writeHead(429, { "content-type": "text/plain" });
-  res.end("too many attempts");
-  deps.logger.info("rate limit exceeded");
-  return false;
+  return check.allowed ? undefined : check.retryAfterSeconds;
 }
 
 /** 415/413 响应（M19 复刻：413 先写 `connection: close`，不调 req.destroy）；无 status 的异常向上抛。 */

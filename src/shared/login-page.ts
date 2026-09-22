@@ -3,6 +3,7 @@ import {
   EYE_CLOSED_SVG,
   EYE_OPEN_SVG,
   EYE_SCRIPT,
+  SUBMIT_SCRIPT,
   TOTP_SCRIPT,
 } from "./login-page-assets.js";
 
@@ -28,6 +29,11 @@ export interface LoginPageOptions {
   who?: string | undefined;
   /** 「换一个账号」回退链接（仅 TOTP 段）；服务端需在该 GET 上清掉挑战 cookie。 */
   resetHref?: string | undefined;
+  /**
+   * 失败页回填的用户名（D20）：未知用户 / 错口令 / 禁用三态**同样回填**，
+   * 否则「只有真用户才回填」本身就是账号存在性预言机。密码字段永不回填。
+   */
+  username?: string | undefined;
 }
 
 interface FieldSpec {
@@ -41,6 +47,8 @@ interface FieldSpec {
   autofocus?: boolean;
   /** 表单级错误时标记该字段（密码/令牌/验证码），配 aria-describedby 指向错误槽。 */
   invalid?: boolean;
+  /** 回填值（走 escapeHtml；仅非空时渲染 value，密码字段一律不设）。 */
+  value?: string | undefined;
   /** 附加 HTML 属性字符串（原样拼入 input 标签；调用方保证转义）。 */
   attrs?: string;
   /** 额外 class（如 TOTP 的 code）。 */
@@ -91,7 +99,11 @@ function renderLoginCard(spec: LoginCardOptions): string {
           ? ' aria-invalid="true" aria-describedby="err"'
           : "";
       const extraAttr = field.attrs === undefined ? "" : ` ${field.attrs}`;
-      const input = `<input id="${field.id}"${classAttr} type="${field.type}" name="${field.name}" autocomplete="${field.autocomplete}" placeholder="${field.placeholder}" required${autofocusAttr}${invalidAttr}${extraAttr}>`;
+      const valueAttr =
+        field.value === undefined || field.value === ""
+          ? ""
+          : ` value="${escapeHtml(field.value)}"`;
+      const input = `<input id="${field.id}"${classAttr} type="${field.type}" name="${field.name}"${valueAttr} autocomplete="${field.autocomplete}" placeholder="${field.placeholder}" required${autofocusAttr}${invalidAttr}${extraAttr}>`;
       if (field.type === "password") {
         return `<div class="field"><label for="${field.id}">${field.label}</label><span class="pw">${input}<button type="button" class="eye" data-toggle="${field.id}" aria-label="Show password" aria-pressed="false"><span class="eye-open">${EYE_OPEN_SVG}</span><span class="eye-closed" hidden>${EYE_CLOSED_SVG}</span></button></span></div>`;
       }
@@ -102,12 +114,15 @@ function renderLoginCard(spec: LoginCardOptions): string {
     opts.resetHref === undefined
       ? ""
       : `<a class="back" href="${escapeHtml(opts.resetHref)}">Use a different account</a>`;
+  // 失败页标题前缀（可达性）：整页导航后已填充的 role="alert" 常不被读屏播报
+  // （APG/MDN/ARIA19 一致），GOV.UK 的做法是让 <title> 先说 "Error:"。
+  const docTitle = spec.error === undefined ? spec.title : `Error: ${spec.title}`;
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(spec.title)}</title>
+<title>${escapeHtml(docTitle)}</title>
 <style>${CARD_STYLE}</style>
 </head>
 <body>
@@ -161,6 +176,10 @@ export function passwordLoginPageHtml(
   error?: string,
   options?: LoginPageOptions,
 ): string {
+  const username = options?.username ?? "";
+  // 失败页焦点策略：用户名为空（空提交 / 手机上被 autofill 清掉）→ 焦点给用户名；
+  // 否则给密码框（用户只需重敲密码，且 aria-describedby 会把错误一起读出来）。
+  const focusUsername = error !== undefined && username.trim() === "";
   return renderLoginCard({
     title: "Sign in - dsh-auth-gate",
     kicker: "Sign in",
@@ -173,6 +192,9 @@ export function passwordLoginPageHtml(
         autocomplete: "username",
         placeholder: "Enter your username",
         type: "text",
+        autofocus: focusUsername,
+        invalid: true,
+        value: username,
         attrs: 'autocapitalize="off" spellcheck="false"',
       },
       {
@@ -182,7 +204,7 @@ export function passwordLoginPageHtml(
         autocomplete: "current-password",
         placeholder: "Enter your password",
         type: "password",
-        autofocus: true,
+        autofocus: !focusUsername,
         invalid: true,
       },
     ],
@@ -190,6 +212,7 @@ export function passwordLoginPageHtml(
     next,
     error,
     options,
+    script: EYE_SCRIPT + SUBMIT_SCRIPT,
   });
 }
 

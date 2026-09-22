@@ -219,7 +219,7 @@ describe("POST /auth/login: rejection", () => {
       "/auth/login",
     )(loginReq("username=alice&password=wrong"), res.res);
     expect(res.status).toBe(401);
-    expect(res.body).toBe("invalid credentials");
+    expect(res.body).toContain('class="error"'); // D20：HTML 卡片而非裸文本
     expect(harness.table.size).toBe(0);
     expect(harness.logs).toContainEqual({ level: "info", message: "login rejected" });
   });

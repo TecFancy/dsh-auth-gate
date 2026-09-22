@@ -5,6 +5,11 @@ export interface LoginPageOptions {
     who?: string | undefined;
     /** 「换一个账号」回退链接（仅 TOTP 段）；服务端需在该 GET 上清掉挑战 cookie。 */
     resetHref?: string | undefined;
+    /**
+     * 失败页回填的用户名（D20）：未知用户 / 错口令 / 禁用三态**同样回填**，
+     * 否则「只有真用户才回填」本身就是账号存在性预言机。密码字段永不回填。
+     */
+    username?: string | undefined;
 }
 /** token 模式登录页：单字段（共享访问令牌），恒时校验由端点负责。 */
 export declare function loginPageHtml(next: string, error?: string, options?: LoginPageOptions): string;

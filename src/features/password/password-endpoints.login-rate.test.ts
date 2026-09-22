@@ -154,7 +154,8 @@ describe("POST /auth/login: rate limiting", () => {
     )(loginReq("username=alice&password=pw"), res.res);
     expect(res.status).toBe(429);
     expect(res.headers["retry-after"]).toBe("30");
-    expect(res.body).toBe("too many attempts");
+    expect(res.body).toContain("Too many sign-in attempts from this network.");
+    expect(res.body).toContain("Try again in 30 seconds.");
     expect(harness.verifyCalls).toEqual([]);
     expect(harness.logs).toContainEqual({ level: "info", message: "rate limit exceeded" });
   });

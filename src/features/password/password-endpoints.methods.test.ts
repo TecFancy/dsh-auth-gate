@@ -222,6 +222,27 @@ describe("passwordLoginPageHtml", () => {
       'autocomplete="username" placeholder="Enter your username" required autofocus>',
     );
   });
+
+  it("echoes the escaped username and prefixes the title on failure pages (D20)", () => {
+    const html = passwordLoginPageHtml("/", "Invalid username or password.", {
+      username: 'a"><b>',
+    });
+    expect(html).toContain("<title>Error: Sign in - dsh-auth-gate</title>");
+    expect(html).toContain('value="a&quot;&gt;&lt;b&gt;"');
+    // 用户名非空 → 焦点留在密码框（用户只需重敲密码）
+    expect(html).toMatch(/placeholder="Enter your password" required autofocus aria-invalid/);
+  });
+
+  it("moves autofocus to the username when the failure page has none to keep (D20)", () => {
+    const html = passwordLoginPageHtml("/", "Invalid username or password.");
+    expect(html).toMatch(/placeholder="Enter your username" required autofocus aria-invalid/);
+    expect(html).not.toContain('placeholder="Enter your password" required autofocus');
+  });
+
+  it("ships the pending-state script with the password form only (D20)", () => {
+    expect(passwordLoginPageHtml("/")).toContain("history.replaceState");
+    expect(totpChallengePageHtml("/")).not.toContain("history.replaceState");
+  });
 });
 
 describe("publicHost on the password login page (D14)", () => {

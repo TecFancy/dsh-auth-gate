@@ -36,7 +36,11 @@ describe("TOTP: password stage issues challenge cookie", () => {
     h.setTotpMode("required");
     const res = await post(h, "POST", "username=bob&password=pw");
     expect(res.status).toBe(401);
-    expect(res.body).toBe("invalid credentials");
+    // D20：required + 无 secret 也走同一张失败卡（三态正文同一，防枚举）
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain('class="error"');
+    expect(res.body).toContain("Invalid username or password.");
+    expect(res.body).toContain('value="bob"');
   });
 
   it("required mode: correct password for a no-secret user does not reset prior failures", async () => {

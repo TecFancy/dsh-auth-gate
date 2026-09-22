@@ -112,7 +112,10 @@ describe("integration: TOTP mode variants", () => {
         redirect: "manual",
       });
       expect(raw.status).toBe(401);
-      expect(await raw.text()).toBe("invalid credentials");
+      expect(raw.headers.get("content-type")).toContain("text/html");
+      const rawBody = await raw.text();
+      expect(rawBody).toContain('class="error"');
+      expect(rawBody).toContain("Invalid username or password.");
     } finally {
       await unmountStack(fibers, root);
     }
