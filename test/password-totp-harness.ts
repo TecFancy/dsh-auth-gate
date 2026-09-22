@@ -223,16 +223,23 @@ export async function post(
   method: "GET" | "POST",
   bodyOrCookie?: string,
   cookie?: string,
+  /** 模拟反代改写后的 Host 头（D14 用例用它证明配置优先）。 */
+  host?: string,
 ): Promise<FakeRes> {
   const res = makeRes();
+  const withHost = host === undefined ? {} : { host };
   if (method === "GET") {
-    const options = bodyOrCookie === undefined ? { method } : { method, cookie: bodyOrCookie };
+    const options = {
+      method,
+      ...(bodyOrCookie === undefined ? {} : { cookie: bodyOrCookie }),
+      ...withHost,
+    };
     await h.handlerOf("exact", "/auth/login")(makeReq(options), res.res);
     return res;
   }
   const base =
     bodyOrCookie === undefined ? { method } : { method, body: Buffer.from(bodyOrCookie) };
-  const options = cookie === undefined ? base : { ...base, cookie };
+  const options = { ...base, ...(cookie === undefined ? {} : { cookie }), ...withHost };
   await h.handlerOf("exact", "/auth/login")(makeReq(options), res.res);
   return res;
 }

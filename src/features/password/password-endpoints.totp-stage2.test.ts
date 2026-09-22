@@ -184,15 +184,18 @@ describe("TOTP: submit hardening (disabled / off)", () => {
   it("D14: TOTP page and reject page render the configured publicHost, not the rewritten Host", async () => {
     const h = makeHarness();
     h.deps.publicHost = "dsh.example.com";
-    const page = await post(h, "GET", aliceChallengeCookie());
+    // 半外壳反代把 Host 改写成回环地址：卡片必须显示配置的域名。
+    const rewrittenHost = "127.0.0.1:3080";
+    const page = await post(h, "GET", aliceChallengeCookie(), undefined, rewrittenHost);
     expect(page.status).toBe(200);
     expect(page.body).toContain('title="dsh.example.com"');
-    expect(page.body).not.toContain("127.0.0.1");
+    expect(page.body).not.toContain(rewrittenHost);
 
     h.setVerifyImpl(() => undefined);
-    const rejected = await post(h, "POST", "code=000000", aliceChallengeCookie());
+    const rejected = await post(h, "POST", "code=000000", aliceChallengeCookie(), rewrittenHost);
     expect(rejected.status).toBe(401);
     expect(rejected.body).toContain('title="dsh.example.com"');
+    expect(rejected.body).not.toContain(rewrittenHost);
   });
 });
 
