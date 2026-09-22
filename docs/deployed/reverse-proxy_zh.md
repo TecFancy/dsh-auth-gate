@@ -140,4 +140,6 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
   `clientIpHeader` 就是所有客户端共用一个桶 —— 任何一处错 5 次密码，整台实例在锁定期内都登不上
   （issue #74）。显式配置 `clientIpHeader: "x-forwarded-for"`（Cloudflare 在边缘时用
   `cf-connecting-ip`）：只有 peer ∈ `trustedProxyCidrs`（默认回环）才会读该头，取从右往左
-  跳过受信跳后的第一个地址。反代必须**覆盖写入**该头，不能把客户端带来的同名头透传。
+  数第一个「合法且非受信」的地址。反代必须**覆盖写入**该头、不能把客户端带来的同名头透传，
+  而且必须写合法 IP：任何别的内容（字面量 `unknown`、主机名、空段）都会让整头作废，退回
+  按 socket 地址分桶。

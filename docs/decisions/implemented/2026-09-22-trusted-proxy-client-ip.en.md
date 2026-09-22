@@ -11,23 +11,33 @@ for rate limiting: from the TCP peer address to a trusted client address.
   addresses. The header is consulted **only when the immediate peer is inside this set**.
 - New `src/shared/client-ip.ts` (policy parsing, per-request resolution, warning de-duplication)
   and `src/shared/ip-address.ts` (literals and CIDR matching). The fixed algorithm is:
-  read the header, split on `,`, normalize each entry, then **walk right to left and take the
-  first address that is not itself a trusted hop**; missing, unparsable, over-long (>256 B), or
-  all-trusted values fall back to the peer with one warning per class.
+  read the header, split on `,`, normalize each entry, then **take the first address from the
+  right that is both a valid IP and not a trusted hop**. **Any segment that is not a valid IP
+  invalidates the whole header** (including an empty segment), so garbage on the right can never
+  make the code fall back to a client-supplied value on the left; missing, over-long (>1024 B), or
+  all-trusted values fall back to the peer with a warning (one per untrusted peer, capped at 10;
+  configuration problems warn once).
+- A peer is trusted when it is inside `trustedProxyCidrs`, **or** when the transport is not TCP and
+  has no peer address at all (a Unix socket, which can only come from this host and is therefore
+  trusted like loopback). Omitting `trustedProxyCidrs` means the loopback default; passing an
+  **explicit empty list means "trust nobody"** (the header is never read) rather than widening back
+  to loopback.
 - The password path and the TOTP second stage share one resolution point
-  (`handlePasswordLogin` computes `ip` once), so both paths always use the same key.
+  (`handlePasswordLogin` computes `ip` once), so both paths always use the same key; the
+  integration tests verify "the other device is not collateral damage" for both paths.
 
 This is an **explicit exception to P10** ("the IP comes from `req.socket.remoteAddress ?? ""`;
 do not read XFF"). The default is unchanged; the header is only believed when the operator
 configures it and the request actually arrives from a trusted peer. A bad configuration can only
 narrow trust, never widen it, and never fails open:
 
-| Configuration problem               | Behaviour                                                 |
-| ----------------------------------- | --------------------------------------------------------- |
-| header name is not an HTTP token    | read no header (historical behaviour) + error log         |
-| all CIDRs invalid or the list empty | trust loopback only + error log                           |
-| some CIDRs invalid                  | drop the invalid entries, keep the valid ones + error log |
-| `0.0.0.0/0`, `::/0` (prefix 0)      | rejected (they mean "trust everyone") + error log         |
+| Configuration problem             | Behaviour                                                  |
+| --------------------------------- | ---------------------------------------------------------- |
+| header name is not an HTTP token  | read no header (historical behaviour) + error log          |
+| non-empty list, all CIDRs invalid | trust loopback only + error log                            |
+| explicit empty list `[]`          | trust nobody (never read the header, no fallback widening) |
+| some CIDRs invalid                | drop the invalid entries, keep the valid ones + error log  |
+| `0.0.0.0/0`, `::/0` (prefix 0)    | rejected (they mean "trust everyone") + error log          |
 
 ## Context
 

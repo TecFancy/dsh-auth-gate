@@ -44,7 +44,7 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     publicHost: "" # host shown in the login identity block; empty = request Host header. Set it when the proxy rewrites Host (Caddy header_up Host 127.0.0.1:3080), else the card shows a loopback address / 登录页身份块显示的域名；空 = 用请求头 Host。反代改写 Host 时必须配置，否则卡片显示回环地址
     revokeSweepMs: 5000 # password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses already-issued sessions; 0 = never sweep (disabling only blocks new logins) / 密码模式：被禁用的用户多久（毫秒）失去已签发会话；0 = 不扫描（禁用只挡新登录）
     clientIpHeader: "" # real client IP for rate limiting: "x-forwarded-for", or "cf-connecting-ip" behind Cloudflare; "" = read no header. Required behind a same-host reverse proxy, otherwise every client shares one lockout bucket (D19) / 限速用的真实客户端 IP 头；空 = 不读任何头。同主机反代必须配置，否则所有客户端共用一个锁定桶
-    trustedProxyCidrs: ["127.0.0.0/8", "::1/128"] # peers allowed to supply clientIpHeader (default: loopback only); invalid entries narrow trust to loopback, "0.0.0.0/0" and "::/0" are rejected / 有资格提供该头的 peer（默认只信回环）；非法项降级为只信回环，0.0.0.0/0 与 ::/0 一律拒绝
+    trustedProxyCidrs: ["127.0.0.0/8", "::1/128"] # peers allowed to supply clientIpHeader (default: loopback; a peer with no address, e.g. a Unix socket, counts as local); invalid entries narrow trust to loopback, [] = trust nobody, "0.0.0.0/0" and "::/0" are rejected / 有资格提供该头的 peer（默认只信回环；无对端地址的 Unix socket 视同本机）；非法项降级为只信回环，[] = 谁都不信，0.0.0.0/0 与 ::/0 一律拒绝
     sessionTtl: 604800 # session TTL in seconds / 会话秒数
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）

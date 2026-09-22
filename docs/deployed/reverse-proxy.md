@@ -156,4 +156,5 @@ Full acceptance checklist: `docs/deployed/deployment.md` §4 (A–I).
   when Cloudflare is the edge): the header is read only when the peer is inside
   `trustedProxyCidrs` (loopback by default), and the rightmost address that is not itself a
   trusted hop wins. The proxy must **overwrite** that header, never pass a client-supplied value
-  through.
+  through, and it must write a valid IP: any other content (a literal `unknown`, a hostname, an
+  empty entry) makes the whole header unusable, and the socket address is used instead.

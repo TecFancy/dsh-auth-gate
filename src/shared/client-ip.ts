@@ -6,31 +6,36 @@
  * （issue #74）。解法是**有条件**地信任反代写入的客户端 IP 头：
  *
  * - `header` 为空（默认）→ 一个头都不读，key = 归一化后的 `socket.remoteAddress`；
- * - `header` 非空 → **仅当** peer ∈ `trusted` 才读该头；取「从右往左跳过受信跳后的第一个
- *   合法 IP」（最左可被客户端预置，禁止）；缺失/不可解析 → 回退 peer 并告警。
+ * - `header` 非空 → **仅当** peer ∈ `trusted` 才读该头；取「从右往左数第一个合法且非受信的
+ *   地址」（最左可被客户端预置，禁止）；缺失、超长、或任何一段不是合法 IP → 整头不可用，
+ *   回退 peer 并告警（**不左移**：右侧出现 `unknown` 之类垃圾时，绝不能改用客户端预置的值）。
  *
  * 前提：受信代理必须**覆盖写入**该头。把客户端带来的同名头原样透传，等于把伪造权交给客户端。
  */
 import type { IncomingMessage } from "node:http";
 import { cidrContains, normalizeIp, parseCidr, type CidrNetwork } from "./ip-address.js";
 
-/** 请求头值长度上限：单个 IP 足够、XFF 短链也够；超长一律回退，不给解析器喂垃圾。 */
-const HEADER_VALUE_LIMIT = 256;
+/** 头值长度上限：单 IP 足够，多跳 IPv6 链也够（仍远低于常见 header 上限）。超长整头作废。 */
+const HEADER_VALUE_LIMIT = 1024;
+/** 运行期告警上限：非受信 peer 最多记这么多条（防刷日志）；配置类告警只记一条。 */
+const WARNING_LIMIT = 10;
 /** 默认只信回环：同主机反代是唯一「不用额外配置就正确」的形态。 */
 export const DEFAULT_TRUSTED_PROXIES: readonly string[] = ["127.0.0.0/8", "::1/128"];
+/** HTTP `tchar`（RFC 7230）：合法请求头名的字符集。 */
+const HEADER_NAME_RE = /^[a-z0-9!#$%&'*+.^_`|~-]{1,64}$/;
 
 export interface ClientIpPolicy {
   /** 小写头名；`""` = 不读任何请求头（桶 key 恒为 socket 地址）。 */
   header: string;
-  /** 受信反代网络。 */
+  /** 受信反代网络；空数组 = 显式「谁都不信」（永不读头）。 */
   trusted: CidrNetwork[];
   /** 配置被降级的原因（非法头名 / 非法 CIDR）；`undefined` = 配置按写法生效。 */
   degraded: string | undefined;
 }
 
 export interface ClientIpWarning {
-  /** 去重键：每类问题只打一条日志（插件实例内一次）。 */
-  key: "untrusted-peer" | "header-unusable";
+  /** 去重键：配置类问题只打一条；非受信 peer 每个地址一条，总数上限 `WARNING_LIMIT`。 */
+  key: string;
   message: string;
 }
 
@@ -57,7 +62,7 @@ function loopback(): CidrNetwork[] {
 /**
  * 解析 D19 配置。**不抛错**：非法输入退化为**更窄**的信任（非法头名 → 不读头；非法 CIDR →
  * 只信回环），原因放进 `degraded` 交给调用方打日志：配置写错绝不能让守卫卸载或放宽。
- * 前缀长度 0（`0.0.0.0/0`、`::/0`）等于「信任所有人」，一律拒绝。
+ * 前缀长度 0（`0.0.0.0/0`、`::/0`）等于「信任所有人」，一律拒绝；显式空列表表示谁都不信。
  */
 export function parseClientIpPolicy(
   header: string | undefined,
@@ -65,12 +70,13 @@ export function parseClientIpPolicy(
 ): ClientIpPolicy {
   const name = (header ?? "").trim().toLowerCase();
   if (name === "") return { header: "", trusted: loopback(), degraded: undefined };
-  if (!/^[a-z0-9-]{1,64}$/.test(name)) {
+  if (!HEADER_NAME_RE.test(name)) {
     return { header: "", trusted: loopback(), degraded: `invalid clientIpHeader "${name}"` };
   }
-  const entries = cidrs ?? [];
+  if (cidrs === undefined) return { header: name, trusted: loopback(), degraded: undefined };
+  if (cidrs.length === 0) return { header: name, trusted: [], degraded: undefined };
   const parsed: CidrNetwork[] = [];
-  for (const entry of entries) {
+  for (const entry of cidrs) {
     const network = parseCidr(entry);
     if (network !== undefined && network.prefix > 0) parsed.push(network);
   }
@@ -81,7 +87,7 @@ export function parseClientIpPolicy(
       degraded: "trustedProxyCidrs unusable: trusting loopback only",
     };
   }
-  if (parsed.length !== entries.length) {
+  if (parsed.length !== cidrs.length) {
     return {
       header: name,
       trusted: parsed,
@@ -92,8 +98,8 @@ export function parseClientIpPolicy(
 }
 
 /**
- * 配置期构造一次的解析器：`degraded` 打 error，运行期回退按 `warning.key` 去重打 warn，
- * 返回桶 key。去重状态属于解析器实例（插件重载即重置）。
+ * 配置期构造一次的解析器：`degraded` 打 error，运行期回退按 `warning.key` 去重打 warn（上限
+ * `WARNING_LIMIT` 条，防伪造头刷日志），返回桶 key。去重状态属于解析器实例（插件重载即重置）。
  */
 export function makeClientIpResolver(
   policy: ClientIpPolicy,
@@ -104,7 +110,7 @@ export function makeClientIpResolver(
   return (req) => {
     const result = resolveClientIp(req, policy);
     const warning = result.warning;
-    if (warning !== undefined && !warned.has(warning.key)) {
+    if (warning !== undefined && warned.size < WARNING_LIMIT && !warned.has(warning.key)) {
       warned.add(warning.key);
       logger?.warn(warning.message);
     }
@@ -113,28 +119,33 @@ export function makeClientIpResolver(
 }
 
 /**
- * 纯函数：解析本请求的客户端标识。`policy` 缺省或 `header` 为空 = 不读任何请求头（历史行为）。
- * 不写日志（告警交给 `makeClientIpResolver`），便于直接断言。
+ * 纯函数：解析本请求的客户端标识。`policy` 缺省、`header` 为空、或受信集合为空 = 不读任何请求头
+ * （历史行为）。不写日志（告警交给 `makeClientIpResolver`），便于直接断言。
  */
 export function resolveClientIp(
   req: IncomingMessage,
   policy: ClientIpPolicy | undefined,
 ): ClientIpResult {
-  const peer = normalizeIp(req.socket.remoteAddress);
-  if (policy === undefined || policy.header === "") return { ip: peer, warning: undefined };
-  if (peer === "" || !policy.trusted.some((network) => cidrContains(network, peer))) {
+  const raw = req.socket.remoteAddress;
+  const peer = normalizeIp(raw);
+  if (policy === undefined || policy.header === "" || policy.trusted.length === 0) {
+    return { ip: peer, warning: undefined };
+  }
+  // 非 TCP 传输（Unix socket）没有对端地址：只可能来自本机，按与回环同级的本机信任处理。
+  const localTransport = raw === undefined || raw === "";
+  const trustedPeer = localTransport || policy.trusted.some((n) => cidrContains(n, peer));
+  if (!trustedPeer) {
     const origin = peer === "" ? "unknown" : peer;
     return {
       ip: peer,
       warning: {
-        key: "untrusted-peer",
+        key: `untrusted-peer:${origin}`,
         message: `client ip header "${policy.header}" ignored: peer ${origin} is not a trusted proxy`,
       },
     };
   }
   const value = headerValue(req, policy.header);
-  const candidates = value === undefined ? [] : parseCandidates(value);
-  const client = rightmostUntrusted(candidates, policy.trusted);
+  const client = value === undefined ? undefined : rightmostUntrusted(value, policy.trusted);
   if (client === undefined) {
     return {
       ip: peer,
@@ -155,21 +166,17 @@ function headerValue(req: IncomingMessage, name: string): string | undefined {
   return value.length > HEADER_VALUE_LIMIT ? undefined : value;
 }
 
-/** 逗号分隔 → 归一化候选（顺带容忍引号/端口装饰）；不可解析的段直接丢弃。 */
-function parseCandidates(value: string): string[] {
-  const candidates: string[] = [];
-  for (const part of value.split(",")) {
-    const normalized = normalizeIp(part.trim().replace(/^"|"$/g, ""));
-    if (normalized !== "") candidates.push(normalized);
-  }
-  return candidates;
-}
-
-/** 从右往左跳过受信跳，取第一个非受信地址；全是受信 → undefined（头里没有客户端信息）。 */
-function rightmostUntrusted(candidates: string[], trusted: CidrNetwork[]): string | undefined {
-  for (let index = candidates.length - 1; index >= 0; index -= 1) {
-    const candidate = candidates[index] ?? "";
-    if (!trusted.some((network) => cidrContains(network, candidate))) return candidate;
+/**
+ * 从右往左数第一个「合法且非受信」的地址；任何一段（含空段）不是合法 IP → `undefined`，
+ * 整头作废。**不跳过**右侧垃圾段：那会把 key 左移到客户端可预置的伪造地址。
+ */
+function rightmostUntrusted(value: string, trusted: CidrNetwork[]): string | undefined {
+  const segments = value.split(",");
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const segment = (segments[index] ?? "").trim().replace(/^"|"$/g, "").trim();
+    const address = normalizeIp(segment);
+    if (address === "") return undefined;
+    if (!trusted.some((network) => cidrContains(network, address))) return address;
   }
   return undefined;
 }

@@ -8,7 +8,11 @@ import {
   type ClientIpResolver,
 } from "../../shared/index.js";
 import type { SessionStore } from "../../session/index.js";
+import { buildChallengeValue, CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import { registerPasswordEndpoints, type PasswordEndpointsDeps } from "./password-endpoints.js";
+
+/** 与 harness 的 `challengeMacKey` 同一把密钥（D10 测试密钥）。 */
+const MAC_KEY = Buffer.alloc(32, 7);
 
 interface FakeRes {
   status: number | undefined;
@@ -56,12 +60,13 @@ interface Harness {
   post(body: string, headers: Record<string, string>, remoteAddress?: string): Promise<number>;
 }
 
-function makeHarness(clientIp?: ClientIpResolver): Harness {
+function makeHarness(clientIp?: ClientIpResolver, totp = false): Harness {
   const routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[] = [];
   const limiter = new LoginRateLimiter({ now: () => 1_000_000 });
+  const bob = { passwordHash: "h-bob", disabled: false, ...(totp ? { totpSecret: "SECRET" } : {}) };
   const users = new Map([
     ["alice", { passwordHash: "h-alice", disabled: false }],
-    ["bob", { passwordHash: "h-bob", disabled: false }],
+    ["bob", bob],
   ]);
   const deps: PasswordEndpointsDeps = {
     register: (route) => {
@@ -84,11 +89,11 @@ function makeHarness(clientIp?: ClientIpResolver): Harness {
     loadUsers: () => Promise.resolve({ snapshot: { users }, missing: false }),
     verify: (password, storedHash) =>
       Promise.resolve(password === "pw" && storedHash.startsWith("h-")),
-    totpMode: "off",
-    verifyTotp: () => undefined,
+    totpMode: totp ? "optional" : "off",
+    verifyTotp: () => (totp ? 1 : undefined),
     replayCheck: () => true,
     now: () => 1_700_000_000_000,
-    challengeMacKey: Buffer.alloc(32, 7),
+    challengeMacKey: MAC_KEY,
     limiter,
     ...(clientIp === undefined ? {} : { clientIp }),
     logger: { error: () => undefined, info: () => undefined, warn: () => undefined },
@@ -166,5 +171,20 @@ describe("POST /auth/login: client identity behind a reverse proxy (issue #74)",
     const harness = proxyHarness();
     await failFiveTimes(harness, {}, "127.0.0.1");
     expect(await harness.post(rightBob, {}, "127.0.0.1")).toBe(429);
+  });
+
+  it("keys the TOTP second stage on the same client", async () => {
+    const harness = makeHarness(
+      makeClientIpResolver(parseClientIpPolicy("cf-connecting-ip", undefined)),
+      true,
+    );
+    await failFiveTimes(harness, { "cf-connecting-ip": "203.0.113.7" }, "127.0.0.1");
+    const cookie = `${CHALLENGE_COOKIE}=${buildChallengeValue("bob", 1_700_000_060_000, MAC_KEY)}`;
+    expect(await harness.post("code=123456", { "cf-connecting-ip": "198.51.100.4", cookie })).toBe(
+      302,
+    );
+    expect(await harness.post("code=123456", { "cf-connecting-ip": "203.0.113.7", cookie })).toBe(
+      429,
+    );
   });
 });
