@@ -75,14 +75,14 @@ dsh-auth proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
 
 ### 2.2 配置项
 
-| 参数                    | 默认                      | 说明                                                                                  |
-| ----------------------- | ------------------------- | ------------------------------------------------------------------------------------- |
-| `--listen`              | `127.0.0.1:8443`          | 必须回环；程序在非回环地址时**拒绝启动**                                              |
-| `--target`              | `https://dsh.example.com` | 上游；默认要求 https 并校验 TLS                                                       |
-| `--unsafe-plain-target` | 关                        | 允许 `--target http://…`（仅本地验证场景）                                            |
-| `--strip-secure-cookie` | 开                        | 本地明文 http 时去掉 `Set-Cookie` 的 `Secure`（Chrome/Firefox 一般可留，Safari 兜底） |
-| `--local-token-env`     | 空                        | 可选第二把锁：经代理的请求必须带 `Authorization: Bearer <env值>`                      |
-| `--mark-proxy`          | 关                        | 每请求加 `X-Dsh-Proxy: 1` 头（Phase 2.1 deny-list 标记）                              |
+| 参数                    | 默认             | 说明                                                                                  |
+| ----------------------- | ---------------- | ------------------------------------------------------------------------------------- |
+| `--listen`              | `127.0.0.1:8443` | 必须回环；程序在非回环地址时**拒绝启动**                                              |
+| `--target`              | 必填             | 上游 origin；不传则拒绝启动。默认 https 并校验 TLS                                    |
+| `--unsafe-plain-target` | 关               | 允许 `--target http://…`（仅本地验证场景）                                            |
+| `--strip-secure-cookie` | 开               | 本地明文 http 时去掉 `Set-Cookie` 的 `Secure`（Chrome/Firefox 一般可留，Safari 兜底） |
+| `--local-token-env`     | 空               | 可选第二把锁：经代理的请求必须带 `Authorization: Bearer <env值>`                      |
+| `--mark-proxy`          | 关               | 每请求加 `X-Dsh-Proxy: 1` 头（Phase 2.1 deny-list 标记）                              |
 
 ### 2.3 行为规格
 

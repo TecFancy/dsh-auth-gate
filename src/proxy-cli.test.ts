@@ -4,14 +4,21 @@ import { parseProxyArgs } from "./proxy-cli.js";
 const env: Record<string, string | undefined> = {};
 
 describe("parseProxyArgs", () => {
-  it("applies defaults", () => {
-    const { options } = parseProxyArgs([], env);
+  it("applies the optional defaults", () => {
+    const { options } = parseProxyArgs(["--target", "https://example.com"], env);
     expect(options.listen).toBe("127.0.0.1:8443");
-    expect(options.target).toBe("https://dsh.example.com");
+    expect(options.target).toBe("https://example.com");
     expect(options.stripSecureCookie).toBe(true);
     expect(options.markProxy).toBe(false);
     expect(options.localToken).toBe("");
     expect(options.unsafePlainTarget).toBe(false);
+  });
+
+  it("requires --target", () => {
+    expect(() => parseProxyArgs([], env)).toThrow(/--target is required/);
+    expect(() => parseProxyArgs(["--listen", "127.0.0.1:9000"], env)).toThrow(
+      /--target is required/,
+    );
   });
 
   it("parses explicit flags", () => {
@@ -35,18 +42,27 @@ describe("parseProxyArgs", () => {
   });
 
   it("resolves --local-token-env from the environment", () => {
-    const { options } = parseProxyArgs(["--local-token-env", "DSH_PROXY_TOKEN"], {
-      DSH_PROXY_TOKEN: "s3cret",
-    });
+    const { options } = parseProxyArgs(
+      ["--target", "https://example.com", "--local-token-env", "DSH_PROXY_TOKEN"],
+      {
+        DSH_PROXY_TOKEN: "s3cret",
+      },
+    );
     expect(options.localToken).toBe("s3cret");
   });
 
   it("throws when --local-token-env has no value or the variable is unset", () => {
-    expect(() => parseProxyArgs(["--local-token-env"], env)).toThrow(/requires a variable name/);
-    expect(() => parseProxyArgs(["--local-token-env", "MISSING_VAR"], env)).toThrow(/is not set/);
-    expect(() => parseProxyArgs(["--local-token-env", "MISSING_VAR"], { MISSING_VAR: "" })).toThrow(
-      /is not set/,
-    );
+    expect(() =>
+      parseProxyArgs(["--target", "https://example.com", "--local-token-env"], env),
+    ).toThrow(/requires a variable name/);
+    expect(() =>
+      parseProxyArgs(["--target", "https://example.com", "--local-token-env", "MISSING_VAR"], env),
+    ).toThrow(/is not set/);
+    expect(() =>
+      parseProxyArgs(["--target", "https://example.com", "--local-token-env", "MISSING_VAR"], {
+        MISSING_VAR: "",
+      }),
+    ).toThrow(/is not set/);
   });
 
   it("throws when a value flag is missing its value", () => {

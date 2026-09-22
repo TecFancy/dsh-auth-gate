@@ -8,6 +8,8 @@
 `docs/specs/development.md` 的约定：真实部署域名不进入仓库，也不出现在随 npm 发布的
 产物（`lib/`、`docs/demo/`、`.agents/skills/`）里。
 
+后续（D17）：那个默认值被移除，`--target` 改必填。
+
 ## 背景
 
 本插件是自用部署的产物：`docs/deployed/*` 记录了线上 Caddy + systemd 拓扑，早期文档、
