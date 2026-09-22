@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { installSkill } from "./skill-install.js";
+import { bundledSkillDir, installSkill } from "./skill-install.js";
 
 /** 在 tmp 下构造源/目标目录，返回路径与释放函数。 */
 function makeDirs(): { source: string; target: string; cleanup: () => Promise<void> } {
@@ -78,5 +78,15 @@ describe("dsh-auth skill install (installSkill)", () => {
     });
     expect(result.status).toBe("source-missing");
     await expect(fs.stat(dirs.target)).rejects.toThrow();
+  });
+});
+
+describe("bundled skill shape (D18)", () => {
+  it("ships a single SKILL.md and no references/ directory", async () => {
+    const dir = bundledSkillDir();
+    await expect(fs.readFile(path.join(dir, "SKILL.md"), "utf8")).resolves.toContain(
+      "dsh-auth-gate",
+    );
+    await expect(fs.stat(path.join(dir, "references"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
