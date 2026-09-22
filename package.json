@@ -1,6 +1,6 @@
 {
   "name": "dsh-auth-gate",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "Login gate for a dsh web instance: application-layer authentication with password or token sign-in, optional TOTP two-factor, rate limiting and a user CLI",
   "type": "module",
   "license": "MIT",
