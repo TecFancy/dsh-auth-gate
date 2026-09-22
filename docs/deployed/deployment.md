@@ -314,14 +314,14 @@ node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.example.com -
 # Open http://127.0.0.1:8443 in the browser -> auth-gate login -> edit the settings pages
 ```
 
-| Flag                      | Default                   | Purpose                                                                                                             |
-| ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `--listen`                | `127.0.0.1:8443`          | Must be loopback (startup refuses anything else; no LAN trampoline)                                                 |
-| `--target`                | `https://dsh.example.com` | Upstream; requires https with TLS verification by default                                                           |
-| `--strip-secure-cookie`   | on (`--no-…` disables)    | Remove `Secure` over plain-text loopback HTTP                                                                       |
-| `--mark-proxy`            | off                       | Add `X-Dsh-Proxy: 1` to every request (enables the §9.3 deny-list)                                                  |
-| `--local-token-env <VAR>` | none                      | Every request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors if the variable is unset) |
-| `--unsafe-plain-target`   | off                       | Allow `http://` upstreams (local verification only)                                                                 |
+| Flag                      | Default                | Purpose                                                                                                             |
+| ------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `--listen`                | `127.0.0.1:8443`       | Must be loopback (startup refuses anything else; no LAN trampoline)                                                 |
+| `--target`                | required               | Upstream origin; the program refuses to start without it. Requires https with TLS verification by default           |
+| `--strip-secure-cookie`   | on (`--no-…` disables) | Remove `Secure` over plain-text loopback HTTP                                                                       |
+| `--mark-proxy`            | off                    | Add `X-Dsh-Proxy: 1` to every request (enables the §9.3 deny-list)                                                  |
+| `--local-token-env <VAR>` | none                   | Every request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors if the variable is unset) |
+| `--unsafe-plain-target`   | off                    | Allow `http://` upstreams (local verification only)                                                                 |
 
 ### 9.3 Security Boundary: the `X-Dsh-Proxy` Deny-List (Phase 2.1)
 

@@ -159,10 +159,21 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 
 真实部署域名从文档、部署样例、测试与代码默认值中移除，统一写 `dsh.example.com`
 （隔离实例 `dsh-test.example.com`），`dsh-auth-proxy --target` 默认值随之改为保留域名；
-规则写进开发约定。
+规则写进开发约定。（后续 D17 移除了该默认值：`--target` 改必填。）
 **替代方案**：只改文档、保留默认值（仍随 `lib/` 发到 npm）；`--target` 改必填（CLI 行为
 变更，另议）；加门禁脚本扫描（脚本自身得写下被禁字符串，等于放进仓库）；重写 git 历史。
 **为什么**：RFC 2606 保留域名永不指向真实服务，规则一眼可验；顺带修掉「公开包默认把
 流量导向作者生产环境」这个真实缺陷。
 → [zh](decisions/implemented/2026-09-22-example-domain-in-examples.zh.md) ·
 [en](decisions/implemented/2026-09-22-example-domain-in-examples.en.md)
+
+## D17. `dsh-auth-proxy` 的 `--target` 改必填（不再有默认上游）
+
+`--target` 缺参数即抛 `--target is required`、打印用法并退出 1，不连接任何上游；USAGE 里不再带
+方括号，文档配置表的「默认」一列写「必填」，D16 留下的保留域名默认值随之移除。
+**替代方案**：保留 `example.com` 默认值（默认行为无意义，报错远离病因）；只改文档写明必须显式传；
+从环境变量取默认（多一条隐式来源）；从 `publicHost` 推断（越过 D14 划定的展示边界）。
+**为什么**：上游 origin 只有调用方知道，没有可推断的默认值；必填让「忘传」得到一条可直接处置的
+报错，而不是远端 TLS 错误，与仓库 fail-closed 纪律一致。
+→ [zh](decisions/implemented/2026-09-22-required-proxy-target.zh.md) ·
+[en](decisions/implemented/2026-09-22-required-proxy-target.en.md)

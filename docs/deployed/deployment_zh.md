@@ -273,14 +273,14 @@ node lib/proxy-cli.js --listen 127.0.0.1:8443 --target https://dsh.example.com -
 # 浏览器打开 http://127.0.0.1:8443 → auth-gate 登录 → 「设置 → 模型」即可编辑
 ```
 
-| 参数                      | 默认                      | 说明                                                                                         |
-| ------------------------- | ------------------------- | -------------------------------------------------------------------------------------------- |
-| `--listen`                | `127.0.0.1:8443`          | 必须回环（非回环拒绝启动，防局域网跳板）                                                     |
-| `--target`                | `https://dsh.example.com` | 上游；默认 https 并校验 TLS                                                                  |
-| `--strip-secure-cookie`   | 开（`--no-…` 关闭）       | 本地明文 http 下去掉 `Secure`                                                                |
-| `--mark-proxy`            | 关                        | 每请求加 `X-Dsh-Proxy: 1`（启用 §9.3 的 deny-list）                                          |
-| `--local-token-env <VAR>` | 无                        | 所有经代理请求须带 `Authorization: Bearer <环境变量值>`（fail-closed：变量未设置则拒绝启动） |
-| `--unsafe-plain-target`   | 关                        | 允许 `http://` 上游（仅本机验证场景）                                                        |
+| 参数                      | 默认                | 说明                                                                                         |
+| ------------------------- | ------------------- | -------------------------------------------------------------------------------------------- |
+| `--listen`                | `127.0.0.1:8443`    | 必须回环（非回环拒绝启动，防局域网跳板）                                                     |
+| `--target`                | 必填                | 上游 origin；不传则拒绝启动。默认 https 并校验 TLS                                           |
+| `--strip-secure-cookie`   | 开（`--no-…` 关闭） | 本地明文 http 下去掉 `Secure`                                                                |
+| `--mark-proxy`            | 关                  | 每请求加 `X-Dsh-Proxy: 1`（启用 §9.3 的 deny-list）                                          |
+| `--local-token-env <VAR>` | 无                  | 所有经代理请求须带 `Authorization: Bearer <环境变量值>`（fail-closed：变量未设置则拒绝启动） |
+| `--unsafe-plain-target`   | 关                  | 允许 `http://` 上游（仅本机验证场景）                                                        |
 
 ### 9.3 安全边界：`X-Dsh-Proxy` deny-list（Phase 2.1）
 

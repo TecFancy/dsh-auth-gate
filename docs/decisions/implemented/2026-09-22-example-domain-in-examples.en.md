@@ -9,6 +9,8 @@ accordingly. The rule lands in `docs/specs/development.md` under Conventions: th
 deployment domain does not enter the repository, and it never appears in the published
 npm artifacts (`lib/`, `docs/demo/`, `.agents/skills/`).
 
+Follow-up (D17): that default is removed and `--target` is required.
+
 ## Context
 
 This plugin grew out of a self-hosted deployment: `docs/deployed/*` documents the live

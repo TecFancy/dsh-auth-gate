@@ -71,7 +71,7 @@ dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
 | Flag                      | Default                   | Purpose                                                                                                                  |
 | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `--listen`                | `127.0.0.1:8443`          | Must be loopback; the program refuses to start on anything else                                                          |
-| `--target`                | `https://dsh.example.com` | Upstream; requires https with TLS verification by default                                                                |
+| `--target`                | required                  | Upstream origin; the program refuses to start without it. Requires https with TLS verification by default                |
 | `--strip-secure-cookie`   | on (disable via `--no-…`) | Remove `Secure` from forwarded `Set-Cookie` over plain-text loopback (Chrome/Firefox generally keep it; Safari fallback) |
 | `--mark-proxy`            | off                       | Add `X-Dsh-Proxy: 1` to every request (hook for the §3 deny-list)                                                        |
 | `--local-token-env <VAR>` | none                      | Every proxied request must carry `Authorization: Bearer <env value>` (fail-closed: startup errors when unset)            |

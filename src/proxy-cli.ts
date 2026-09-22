@@ -23,9 +23,12 @@ const defaultIo: CliIo = {
 };
 
 const USAGE = `Usage:
-  dsh-auth-proxy [--listen 127.0.0.1:8443] [--target https://dsh.example.com]
+  dsh-auth-proxy --target <upstream-url> [--listen 127.0.0.1:8443]
                  [--strip-secure-cookie | --no-strip-secure-cookie]
-                 [--mark-proxy] [--local-token-env <VAR>] [--unsafe-plain-target]`;
+                 [--mark-proxy] [--local-token-env <VAR>] [--unsafe-plain-target]
+
+--target is required: it names the upstream origin and is never guessed
+(https with TLS verification unless --unsafe-plain-target is set).`;
 
 /** 环境变量名 → 值；未设置时报错（fail-closed，与 auth-gate 纪律一致）。 */
 function resolveLocalToken(
@@ -53,6 +56,15 @@ function valueOf(argv: string[], name: string, fallback: string): string {
   return value;
 }
 
+/** 取必填参数值；缺失即报错（代理没有可猜的上游）。 */
+function required(argv: string[], name: string): string {
+  const at = argv.indexOf(name);
+  if (at === -1) throw new Error(`${name} is required`);
+  const value = argv[at + 1];
+  if (value === undefined || value.startsWith("--")) throw new Error(`${name} requires a value`);
+  return value;
+}
+
 /** 解析参数并完成校验（含回环监听、target 协议）。 */
 export function parseProxyArgs(
   argv: string[],
@@ -61,7 +73,7 @@ export function parseProxyArgs(
   return {
     options: {
       listen: valueOf(argv, "--listen", "127.0.0.1:8443"),
-      target: valueOf(argv, "--target", "https://dsh.example.com"),
+      target: required(argv, "--target"),
       stripSecureCookie: !flag(argv, "--no-strip-secure-cookie"),
       markProxy: flag(argv, "--mark-proxy"),
       localToken: flag(argv, "--local-token-env") ? (resolveLocalToken(argv, env) ?? "") : "",
