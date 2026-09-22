@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { loginPageHtml, parseFormBody, validateNext } from "../../shared/index.js";
+import {
+  loginPageHtml,
+  parseFormBody,
+  resolvePublicHost,
+  validateNext,
+} from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
 import {
   authCatchAll,
@@ -21,6 +26,11 @@ export interface AuthEndpointsDeps {
   /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
   logoutOrder: number;
   validateToken: (token: string) => Promise<boolean>; // 恒时校验（index.ts 注入 safeEqual 闭包）
+  /**
+   * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+   * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+   */
+  publicHost?: string | undefined;
   logger: { error(message: unknown): void; info(message: unknown): void };
 }
 
@@ -58,7 +68,7 @@ function handleLogin(
   res: ServerResponse,
 ): void | Promise<void> {
   if (req.method === "GET") {
-    serveLoginPage(req, res);
+    serveLoginPage(deps, req, res);
     return;
   }
   if (req.method === "POST") {
@@ -68,11 +78,13 @@ function handleLogin(
 }
 
 /** GET：恒渲染登录页（不查会话、不重定向，M20）。 */
-function serveLoginPage(req: IncomingMessage, res: ServerResponse): void {
+function serveLoginPage(deps: AuthEndpointsDeps, req: IncomingMessage, res: ServerResponse): void {
   const next = validateNext(queryOf(req).get("next") ?? "/");
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(loginPageHtml(next));
+  res.end(
+    loginPageHtml(next, undefined, { host: resolvePublicHost(deps.publicHost, req.headers.host) }),
+  );
 }
 
 async function loginAttempt(

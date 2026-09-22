@@ -1,7 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  loginPath,
   parseCookieHeader,
   passwordLoginPageHtml,
+  resolvePublicHost,
   totpChallengePageHtml,
   validateNext,
 } from "../../shared/index.js";
@@ -14,6 +16,7 @@ import {
   queryOf,
 } from "../../http/index.js";
 import { handlePasswordLogin, type PasswordLoginDeps } from "./password-login.js";
+import { buildSetCookie } from "../../session/index.js";
 import { CHALLENGE_COOKIE, parseChallengeValue } from "./challenge-cookie.js";
 
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
@@ -57,8 +60,16 @@ function handleLogin(
 ): void | Promise<void> {
   if (req.method === "GET") {
     const next = validateNext(queryOf(req).get("next") ?? "/");
+    const host = resolvePublicHost(deps.publicHost, req.headers.host);
     res.setHeader("cache-control", "no-store");
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+    // 2026-09-17 重设计：TOTP 段提供「换一个账号」回退。GET ?stage=password 显式清掉
+    // 挑战 cookie 并渲染密码页。只清 cookie、不放行任何凭据：下次提交仍需密码 + TOTP。
+    if (queryOf(req).get("stage") === "password") {
+      res.setHeader("set-cookie", buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure));
+      res.end(passwordLoginPageHtml(next, undefined, { host }));
+      return;
+    }
     // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
     // off 模式忽略 TOTP（T4）：残留/伪造 cookie 一律渲染密码页。
     const challenge = parseChallengeValue(
@@ -67,7 +78,15 @@ function handleLogin(
       deps.challengeMacKey,
     );
     const showTotp = challenge !== undefined && deps.totpMode !== "off";
-    res.end(showTotp ? totpChallengePageHtml(next) : passwordLoginPageHtml(next));
+    res.end(
+      showTotp
+        ? totpChallengePageHtml(next, undefined, {
+            host,
+            who: challenge,
+            resetHref: loginPath(next, "password"),
+          })
+        : passwordLoginPageHtml(next, undefined, { host }),
+    );
     return;
   }
   if (req.method === "POST") {

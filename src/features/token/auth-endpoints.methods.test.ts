@@ -73,15 +73,15 @@ function makeRes(): FakeRes {
   return Object.assign(state, { res });
 }
 
-function makeReq(options: { method?: string; url?: string }): IncomingMessage {
+function makeReq(options: { method?: string; url?: string; host?: string }): IncomingMessage {
   return {
     method: options.method ?? "GET",
     url: options.url ?? "/",
-    headers: {},
+    headers: options.host === undefined ? {} : { host: options.host },
   } as unknown as IncomingMessage;
 }
 
-function makeHarness(): {
+function makeHarness(publicHost?: string): {
   deps: AuthEndpointsDeps;
   routes: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }[];
 } {
@@ -101,6 +101,7 @@ function makeHarness(): {
       cookieSecure: true,
       sessionTtl: 604800,
       logoutOrder: 1000,
+      publicHost,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: () => undefined,
@@ -151,13 +152,18 @@ describe("prefix catch-all", () => {
 });
 
 describe("loginPageHtml", () => {
-  it("escapes error text and renders the error paragraph", () => {
+  it("escapes error text and renders the alert paragraph", () => {
     const html = loginPageHtml("/", `bad <script> & "quotes"`);
-    expect(html).toContain('<p class="error">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>');
+    expect(html).toContain(
+      '<p class="error" id="err" role="alert">bad &lt;script&gt; &amp; &quot;quotes&quot;</p>',
+    );
+    expect(html).toContain('aria-invalid="true" aria-describedby="err"');
   });
 
   it("omits the error paragraph when no error is given", () => {
-    expect(loginPageHtml("/")).not.toContain('class="error"');
+    const html = loginPageHtml("/");
+    expect(html).not.toContain('class="error"');
+    expect(html).not.toContain('aria-invalid="true"');
   });
 
   it("escapes next in the hidden input", () => {
@@ -165,8 +171,65 @@ describe("loginPageHtml", () => {
   });
 
   it("autofocuses the token input (M2 §4.4)", () => {
-    expect(loginPageHtml("/")).toContain(
-      'autocomplete="current-password" placeholder="Paste your token" required autofocus>',
-    );
+    const html = loginPageHtml("/");
+    expect(html).toContain('id="token"');
+    expect(html).toContain('name="token"');
+    expect(html).toContain('autocomplete="current-password"');
+    expect(html).toContain("autofocus");
+  });
+
+  it("renders the identity block (kicker + host) and escapes the host", () => {
+    const html = loginPageHtml("/", undefined, { host: `evil"><script>alert(1)</script>` });
+    expect(html).toContain('<h1 class="kicker">Sign in</h1>');
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("caps the rendered host at 253 characters (visual truncation is CSS)", () => {
+    const html = loginPageHtml("/", undefined, { host: "a".repeat(300) });
+    expect(html).toContain(`title="${"a".repeat(253)}"`);
+    expect(html).not.toContain("a".repeat(254));
+  });
+
+  it("omits the host line when no host is given", () => {
+    expect(loginPageHtml("/")).not.toContain('class="host"');
+  });
+});
+
+describe("publicHost (D14)", () => {
+  it("falls back to the request Host header when publicHost is unset", async () => {
+    const harness = makeHarness();
+    registerAuthEndpoints(harness.deps);
+    const res = makeRes();
+    await handlerOf(
+      harness,
+      "exact",
+      "/auth/login",
+    )(makeReq({ url: "/auth/login?next=/", host: "dsh.example.com" }), res.res);
+    expect(res.status).toBe(200);
+    expect(res.body).toContain('<p class="host" title="dsh.example.com" dir="ltr">');
+    expect(res.body).toContain("dsh.example.com</p>");
+  });
+
+  it("prefers the configured publicHost over a rewritten request Host header", async () => {
+    // 半外壳反代把 Host 改写成回环地址：身份块必须显示运营侧配置的对外域名。
+    const harness = makeHarness("dsh.example.com");
+    registerAuthEndpoints(harness.deps);
+    const res = makeRes();
+    await handlerOf(
+      harness,
+      "exact",
+      "/auth/login",
+    )(makeReq({ url: "/auth/login?next=/", host: "127.0.0.1:3080" }), res.res);
+    expect(res.body).toContain("dsh.example.com");
+    expect(res.body).not.toContain("127.0.0.1:3080");
+  });
+
+  it("renders the configured publicHost even without a request Host header", async () => {
+    const harness = makeHarness("dsh.example.com");
+    registerAuthEndpoints(harness.deps);
+    const res = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(makeReq({ url: "/auth/login" }), res.res);
+    expect(res.body).toContain('<p class="host" title="dsh.example.com"');
   });
 });

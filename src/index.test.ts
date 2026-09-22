@@ -10,19 +10,18 @@ import {
 import { apply, Config, inject, name, type AuthConfig, type AuthService } from "./index.js";
 import { SessionStore, type Session } from "./session/index.js";
 import { TokenGate } from "./features/token/index.js";
-function cfg(): AuthConfig {
-  return {
-    mode: "token",
-    sessionTtl: 604800,
-    cookieName: "dsh_auth",
-    tokenRef: "DSH_AUTH_TOKEN",
-    cookieSecure: true,
-    usersFile: "",
-    revokeSweepMs: 5000,
-    totp: "off",
-    logoutOrder: 1000,
-  };
-}
+const cfg = (): AuthConfig => ({
+  mode: "token",
+  sessionTtl: 604800,
+  cookieName: "dsh_auth",
+  tokenRef: "DSH_AUTH_TOKEN",
+  cookieSecure: true,
+  usersFile: "",
+  publicHost: "",
+  revokeSweepMs: 5000,
+  totp: "off",
+  logoutOrder: 1000,
+});
 function makeFakeServer(): WrappableServer {
   const exact = new Map<string, WrappableRoute>();
   const prefixes = new Map<string, WrappableRoute>();

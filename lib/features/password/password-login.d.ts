@@ -23,6 +23,11 @@ export interface PasswordLoginDeps {
     /** 挑战 cookie HMAC 密钥（进程级，apply() 生成；D10）。 */
     challengeMacKey: Uint8Array;
     /**
+     * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
+     * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
+     */
+    publicHost?: string | undefined;
+    /**
      * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
      * 登录成功后 302 到 `launchTokenBridge()` 的相对 `/?token=`（浏览器自动 mint dsh
      * cookie，沿用当前 origin）；返回 undefined / 抛错 / 未配置 → 原 302(next)。

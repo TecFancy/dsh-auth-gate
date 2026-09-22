@@ -35,6 +35,14 @@ export interface AuthConfig {
   /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
   usersFile: string;
   /**
+   * 登录页反钓鱼身份块显示的 host（D14，形如 `dsh.example.com` 或 `host:port`）。
+   * `""`（默认）= 回退请求头 Host。半外壳反代改写了 Host（Caddy
+   * `header_up Host 127.0.0.1:3080`）时必须显式配置，否则卡片会渲染回环地址、
+   * 与浏览器地址栏不一致。只决定展示文本，不参与任何鉴权判定。
+   * 容器/URL 形态（`https://host/path`）会被归一化成 `host`。
+   */
+  publicHost: string;
+  /**
    * 禁用用户会话的扫描间隔（毫秒，password 模式）：`dsh-auth user disable` 之后，
    * 该用户**已发出**的会话最多在这么久内被吊销（默认 5000）；`<= 0` 关闭周期扫描，
    * 退回 M3 行为（禁用只拦新登录）。
@@ -64,6 +72,7 @@ export const Config: z<AuthConfig> = z.object({
     .default("DSH_AUTH_TOKEN"),
   cookieSecure: z.boolean().default(true),
   usersFile: z.string().default(""),
+  publicHost: z.string().default(""),
   revokeSweepMs: z.natural().default(5000),
   totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
@@ -194,6 +203,7 @@ function mountAuthEndpoints(
         sessionTtl: config.sessionTtl,
         usersPath,
         loadUsers: () => loadUsersFile(usersPath),
+        publicHost: config.publicHost,
         verify: verifyPassword,
         limiter,
         totpMode: config.totp,
@@ -213,6 +223,7 @@ function mountAuthEndpoints(
         cookieSecure: config.cookieSecure,
         sessionTtl: config.sessionTtl,
         logoutOrder: config.logoutOrder,
+        publicHost: config.publicHost,
         validateToken: async (token) => {
           const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
           return stored !== undefined && safeEqual(token, stored);

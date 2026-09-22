@@ -3,6 +3,8 @@ import { buildChallengeValue, CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import {
   aliceChallengeCookie,
   makeHarness,
+  makeReq,
+  makeRes,
   post,
   SECRET_ALICE,
   TEST_CHALLENGE_KEY,
@@ -18,6 +20,32 @@ describe("TOTP: challenge submit path", () => {
     expect(res.body).toContain('inputmode="numeric"');
   });
 
+  it("shows the pending account and a real 'Use a different account' GET link", async () => {
+    const h = makeHarness();
+    const res = await post(h, "GET", aliceChallengeCookie());
+    expect(res.status).toBe(200);
+    expect(res.body).toContain("Signing in as alice");
+    expect(res.body).toContain('href="/auth/login?next=%2F&amp;stage=password"');
+  });
+
+  it("?stage=password clears the challenge cookie and falls back to the password page", async () => {
+    const h = makeHarness();
+    const res = makeRes();
+    await h.handlerOf("exact", "/auth/login")(
+      makeReq({
+        method: "GET",
+        url: "/auth/login?stage=password&next=%2Fmodels",
+        cookie: aliceChallengeCookie(),
+      }),
+      res.res,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers["set-cookie"]).toContain(`${CHALLENGE_COOKIE}=;`);
+    expect(res.headers["set-cookie"]).toContain("Max-Age=0");
+    expect(res.body).toContain('name="password"');
+    expect(res.body).not.toContain('name="code"');
+  });
+
   it("renders the password page without a challenge cookie (GET, M3 unchanged)", async () => {
     const h = makeHarness();
     const res = await post(h, "GET");
@@ -25,7 +53,9 @@ describe("TOTP: challenge submit path", () => {
     expect(res.body).toContain('name="username"');
     expect(res.body).not.toContain('name="code"');
   });
+});
 
+describe("TOTP: challenge submit path (session issuing & limits)", () => {
   it("correct code: clears challenge cookie and issues session", async () => {
     const h = makeHarness();
     h.setVerifyImpl((secret, code) =>
