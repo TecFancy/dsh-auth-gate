@@ -34,6 +34,20 @@ export interface AuthConfig {
      */
     revokeSweepMs: number;
     /**
+     * 客户端 IP 请求头（D19）：**仅当**直连 peer ∈ `trustedProxyCidrs` 时读它当限速桶 key；
+     * `""`（默认）= 一个头都不读，key = 归一化后的 `socket.remoteAddress`。
+     * 同主机反代（Caddy / Cloudflare Tunnel / nginx / Docker host 网络）下必须配置
+     * （`cf-connecting-ip` 或 `x-forwarded-for`），否则所有客户端共用一个锁定桶；
+     * 任何一台设备错几次密码就会把整台实例锁在门外（issue #74）。
+     */
+    clientIpHeader: string;
+    /**
+     * 受信反代地址集合（CIDR，D19）：默认只信回环（`127.0.0.0/8`、`::1/128`）。
+     * 非法项被丢弃并降级为「只信回环」，前缀 0（`0.0.0.0/0`、`::/0`，等于信任所有人）一律拒绝；
+     * 降级只打 error 日志，不卸载守卫（配置写错绝不放宽、也不 fail-open）。
+     */
+    trustedProxyCidrs: string[];
+    /**
      * TOTP 两段式模式（M4 T4）：off 忽略 secret（纯密码）；optional 有 secret 的用户
      * 走两段式；required 全员必须两段式（无 secret 的用户登录失败，统一 401）。
      */

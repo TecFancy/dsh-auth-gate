@@ -188,7 +188,10 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] 口令哈希为 scrypt（`docs/implemented/impl-m3_zh.md` P1）；文件零明文。
 - [ ] `dsh-auth user disable <name>` 既拦新登录，也**吊销该用户已发的会话**（插件按 `revokeSweepMs`
       周期扫描 users.yaml，默认 5000 毫秒；设 0 = 退回 M3「只拦新登录」的旧行为）。
-- [ ] 限速内存态重启清零；反代部署时限速按出口 IP 聚合（不信任 X-Forwarded-For）。
+- [ ] 限速内存态重启清零。同主机反代部署必须显式配置 `clientIpHeader`（`x-forwarded-for`；
+      Cloudflare 在边缘时用 `cf-connecting-ip`）：不配就是所有客户端共用一个桶，任何人错 5 次
+      密码全家都登不上（issue #74）。只有 `trustedProxyCidrs`（默认回环）内的受信 peer 才有
+      资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。
 
 ## 8. 公网部署变体（2026-08-15 起，dsh.example.com 生效）：半外壳
 

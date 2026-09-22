@@ -30,6 +30,8 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     cookieSecure: true,
     usersFile,
     publicHost: "",
+    clientIpHeader: "",
+    trustedProxyCidrs: ["127.0.0.0/8", "::1/128"],
     revokeSweepMs: 0,
     totp: "off",
     logoutOrder: 1000,
@@ -145,4 +147,32 @@ describe("apply: password mode", () => {
     const deps = capturedDeps.current as { usersPath: string } | undefined;
     expect(deps?.usersPath).toBe("/x/users.yaml");
   });
+
+  it("wires the configured client IP header into the login endpoints (D19)", () => {
+    const server = makeFakeServer();
+    const { ctx } = makeCtx(server);
+    apply(ctx, { ...cfg("password"), clientIpHeader: "cf-connecting-ip" });
+    const deps = capturedDeps.current as ClientIpDeps | undefined;
+    const proxied = {
+      headers: { "cf-connecting-ip": "203.0.113.7" },
+      socket: { remoteAddress: "127.0.0.1" },
+    };
+    expect(deps?.clientIp?.(proxied)).toBe("203.0.113.7");
+  });
+
+  it("keys on the socket address when no client IP header is configured (D19)", () => {
+    const server = makeFakeServer();
+    const { ctx } = makeCtx(server);
+    apply(ctx, cfg("password"));
+    const deps = capturedDeps.current as ClientIpDeps | undefined;
+    const forged = {
+      headers: { "cf-connecting-ip": "203.0.113.7" },
+      socket: { remoteAddress: "198.51.100.9" },
+    };
+    expect(deps?.clientIp?.(forged)).toBe("198.51.100.9");
+  });
 });
+
+interface ClientIpDeps {
+  clientIp?: ((req: unknown) => string) | undefined;
+}

@@ -126,7 +126,7 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
 | --------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------- |
 | 设置页 `transport failure ... HTTP 403` | 栅栏 loopback 钉死；反代透传了公网 Host                                      | 半外壳重写（§4.2）               |
 | 登录后 `/api` 全 401                    | 会话 cookie 过期或没透传（重启不会让会话失效：落盘在 `$DSH_HOME/storages/`） | 重新登录；检查 cookie 透传       |
-| 登录 `429`                              | 限速锁定（按反代出口 IP 聚合）                                               | 等 `retry-after`，或重启 dsh-web |
+| 登录 `429`                              | 限速锁定（按客户端地址分桶，见 §7）                                          | 等 `retry-after`，或重启 dsh-web |
 | 浏览器存不住会话                        | `cookieSecure: true` 但没有 https                                            | 反代终结 TLS                     |
 | 无 cookie 的 WS `401`                   | 门卫拒升级                                                                   | 预期 fail-closed；先登录         |
 
@@ -136,4 +136,10 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Accept: application/json" https://d
   模型 API key（任何人都能白嫖你的额度）。
 - 会话能扛住 dsh-web 重启（按实例落盘在 `$DSH_HOME/storages/`；吊销用 `POST /auth/logout`）。
   重启只清进程级状态：限速、TOTP 防重放记录、在途 TOTP 挑战。
-- 限速按反代出口 IP 聚合（不要信任 `X-Forwarded-For`）。
+- 限速按**真实客户端地址**分桶。同主机反代（§2 的拓扑：所有请求都从 `127.0.0.1` 进来）下不配置
+  `clientIpHeader` 就是所有客户端共用一个桶 —— 任何一处错 5 次密码，整台实例在锁定期内都登不上
+  （issue #74）。显式配置 `clientIpHeader: "x-forwarded-for"`（Cloudflare 在边缘时用
+  `cf-connecting-ip`）：只有 peer ∈ `trustedProxyCidrs`（默认回环）才会读该头，取从右往左
+  数第一个「合法且非受信」的地址。反代必须**覆盖写入**该头、不能把客户端带来的同名头透传，
+  而且必须写合法 IP：任何别的内容（字面量 `unknown`、主机名、空段）都会让整头作废，退回
+  按 socket 地址分桶。

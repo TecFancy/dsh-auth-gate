@@ -190,3 +190,19 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 降到一份，并有测试拦住 schema 与技能正文的漂移。
 → [zh](decisions/implemented/2026-09-22-single-file-bundled-skill.zh.md) ·
 [en](decisions/implemented/2026-09-22-single-file-bundled-skill.en.md)
+
+## D19. 限速桶的客户端身份改走受信反代头（`clientIpHeader` + `trustedProxyCidrs`）
+
+新增 `clientIpHeader`（默认 `""` = 一个头都不读）与 `trustedProxyCidrs`（默认只信回环
+`127.0.0.0/8`、`::1/128`）：只有直连 peer 落在受信集合内才读该头，取「从右往左跳过受信跳后的第一个
+合法 IP」，缺失/不可解析/超长则回退 peer 并告警（每类一条）；密码路径与 TOTP 第二段共用同一个取值点。
+这是对 P10（「IP 取 `socket.remoteAddress`，不读 XFF」）的**显式例外**：默认语义逐字节不变，配置写错
+只会变窄（非法头名 → 不读头；非法 CIDR → 只信回环；`0.0.0.0/0`、`::/0` 一律拒绝），绝不卸载或放宽守卫。
+**替代方案**：无条件信任指定的转发头（issue #74 原文；可伪造换桶、定向锁人、灌满 `byIp`）；只按账号
+分桶或 `(peer, username)` 组合键（没恢复 per-client 预算，还会掩盖「头没配上」）；默认读 XFF 或取最左
+值；缺头即 503（配置笔误变全站登录不可用）；只改文档（继续接受「任何人 5 次错密码全家登不上」）。
+**为什么**：与 express `trust proxy` / nginx `real_ip` 同一模型 —— 可信性来自 peer 而不是头本身；
+默认配置对所有既有部署零变化；「从右往左跳过受信跳」是 XFF 链唯一安全方向；归一化保证同一客户端
+始终落在同一个桶。
+→ [zh](decisions/implemented/2026-09-22-trusted-proxy-client-ip.zh.md) ·
+[en](decisions/implemented/2026-09-22-trusted-proxy-client-ip.en.md)

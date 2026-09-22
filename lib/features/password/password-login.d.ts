@@ -12,6 +12,12 @@ export interface PasswordLoginDeps {
     /** 与 verifyPassword 同形 `(password, storedHash)`：index.ts 直接注入 verifyPassword。 */
     verify: (password: string, storedHash: string) => Promise<boolean>;
     limiter: LoginRateLimiter;
+    /**
+     * 客户端标识（D19）：index.ts 注入「读受信反代写入的 IP 头 + 归一化」的解析器；
+     * 缺省回退 `socket.remoteAddress`（历史行为）。同主机反代下不注入 ⇒ 所有客户端共用
+     * 一个锁定桶（issue #74：任何一台设备错几次密码就把整台实例锁在门外）。
+     */
+    clientIp?: ((req: IncomingMessage) => string) | undefined;
     /** TOTP 模式（M4 T4）：off 忽略 secret；optional 有 secret 才两段式；required 全员两段式。 */
     totpMode: "off" | "optional" | "required";
     /** 注入的 TOTP 校验（index.ts 从 features/totp 装配；命中返回匹配 counter）。 */
