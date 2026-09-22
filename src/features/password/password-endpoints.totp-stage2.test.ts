@@ -180,6 +180,20 @@ describe("TOTP: submit hardening (disabled / off)", () => {
     expect(res.body).toContain("invalid credentials");
     expect(h.replayCalls).toEqual([]);
   });
+
+  it("D14: TOTP page and reject page render the configured publicHost, not the rewritten Host", async () => {
+    const h = makeHarness();
+    h.deps.publicHost = "dsh.example.com";
+    const page = await post(h, "GET", aliceChallengeCookie());
+    expect(page.status).toBe(200);
+    expect(page.body).toContain('title="dsh.example.com"');
+    expect(page.body).not.toContain("127.0.0.1");
+
+    h.setVerifyImpl(() => undefined);
+    const rejected = await post(h, "POST", "code=000000", aliceChallengeCookie());
+    expect(rejected.status).toBe(401);
+    expect(rejected.body).toContain('title="dsh.example.com"');
+  });
 });
 
 describe("TOTP: rate-limit & replay semantics", () => {

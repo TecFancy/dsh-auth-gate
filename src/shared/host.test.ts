@@ -26,4 +26,27 @@ describe("resolvePublicHost (D14)", () => {
   it("keeps a configured host even when the request carries none", () => {
     expect(resolvePublicHost("dsh.example.com", undefined)).toBe("dsh.example.com");
   });
+
+  it("strips userinfo so credentials never reach the card", () => {
+    expect(resolvePublicHost("https://alice:s3cret@dsh.example.com/x", "")).toBe("dsh.example.com");
+    expect(resolvePublicHost("alice@dsh.example.com", "")).toBe("dsh.example.com");
+  });
+
+  it("strips query and fragment without a path", () => {
+    expect(resolvePublicHost("dsh.example.com?x=1", "")).toBe("dsh.example.com");
+    expect(resolvePublicHost("dsh.example.com#frag", "")).toBe("dsh.example.com");
+  });
+
+  it("accepts a protocol-relative value and IPv6 authorities", () => {
+    expect(resolvePublicHost("//dsh.example.com", "")).toBe("dsh.example.com");
+    expect(resolvePublicHost("[::1]:3080", "")).toBe("[::1]:3080");
+    expect(resolvePublicHost("https://[::1]:3080/", "")).toBe("[::1]:3080");
+  });
+
+  it("falls back to the request header when normalisation leaves nothing", () => {
+    expect(resolvePublicHost("/", "dsh.example.com")).toBe("dsh.example.com");
+    expect(resolvePublicHost("https://", "dsh.example.com")).toBe("dsh.example.com");
+    expect(resolvePublicHost("//", "dsh.example.com")).toBe("dsh.example.com");
+    expect(resolvePublicHost("https://user@", "")).toBe("");
+  });
 });

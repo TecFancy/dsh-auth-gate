@@ -6,7 +6,10 @@
  * - `publicHost` 有值 → 用它（运营侧配置，不可被请求伪造；半外壳反代改写 Host 时唯一正确来源）；
  * - `publicHost` 为空 → 回退请求头 Host（直连/原样透传拓扑下的默认行为，向后兼容）。
  *
- * 顺手做运维容错：粘成 `https://host/path` 也能用（剥掉 scheme 与路径，只留 `host[:port]`）。
+ * 顺手做运维容错：粘成 `https://host/path`、`//host` 也能用（剥 scheme、userinfo、路径、
+ * 查询与片段，只留 `host[:port]`）；归一化后为空（`"/"`、`"https://"`）则回退请求头，
+ * 避免身份块凭空消失。
+ *
  * 注意：本函数只决定**展示文本**，不参与任何鉴权判定。
  */
 export declare function resolvePublicHost(publicHost: string | undefined, requestHost: string | undefined): string;
