@@ -7,7 +7,7 @@ describe("parseProxyArgs", () => {
   it("applies defaults", () => {
     const { options } = parseProxyArgs([], env);
     expect(options.listen).toBe("127.0.0.1:8443");
-    expect(options.target).toBe("https://dsh.hi-ruofei.com");
+    expect(options.target).toBe("https://dsh.example.com");
     expect(options.stripSecureCookie).toBe(true);
     expect(options.markProxy).toBe(false);
     expect(options.localToken).toBe("");

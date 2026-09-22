@@ -19,7 +19,7 @@ describe("isLoopbackHostname", () => {
   });
 
   it("rejects non-loopback names and malformed octets", () => {
-    expect(isLoopbackHostname("dsh.hi-ruofei.com")).toBe(false);
+    expect(isLoopbackHostname("dsh.example.com")).toBe(false);
     expect(isLoopbackHostname("10.0.0.1")).toBe(false);
     expect(isLoopbackHostname("127.300.0.1")).toBe(false);
     expect(isLoopbackHostname("127.0.0")).toBe(false);

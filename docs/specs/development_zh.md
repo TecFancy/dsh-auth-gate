@@ -120,6 +120,9 @@ client/host 隔离、无法解析即失败）；增删切片请同步本结构�
 - **`.sort()`/`.toSorted()` 必须显式传比较器** —— 默认字典序在纯 ASCII 之外不可靠。
 - **行尾一律 LF**（`.editorconfig` + `.gitattributes`），Prettier 默认值：
   宽度 100、双引号、尾逗号。
+- **示例域名**：真实部署域名不写进仓库。文档、部署样例、测试、代码默认值与截图统一用
+  RFC 2606 保留域名 `example.com`（`dsh.example.com`；隔离实例 `dsh-test.example.com`）
+  —— 发布产物会随 `lib/`、`docs/demo/`、`.agents/skills/` 一起出去（D16）。
 - **提交风格**：`type(scope): subject`，scope 是模块名（`guard`、`session-store`、`ci`）。
   Conventional commits 驱动发布（见下文）。
 - **行文（Prose）**：写到足以保住契约为止，然后删掉其余部分。

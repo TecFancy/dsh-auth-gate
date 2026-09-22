@@ -127,6 +127,10 @@ byte-stable across Windows/Linux builders.
   lexicographic order is unreliable outside plain ASCII.
 - **Line endings LF everywhere** (`.editorconfig` + `.gitattributes`), Prettier
   defaults: 100 width, double quotes, trailing commas.
+- **Example domains**: the real deployment domain never enters the repo. Docs, deploy
+  samples, tests, code defaults and screenshots use the RFC 2606 reserved `example.com`
+  (`dsh.example.com`; isolated instances `dsh-test.example.com`) - the published tarball
+  ships `lib/`, `docs/demo/` and `.agents/skills/` (D16).
 - **Commit style**: `type(scope): subject`, scope is a module name
   (`guard`, `session-store`, `ci`). Conventional commits drive releases
   (see below).

@@ -154,3 +154,15 @@ cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
 正好服务这个页面的安全职责；取舍过程留档可查。
 → [zh](decisions/implemented/2026-09-22-login-page-identity-redesign.zh.md) ·
 [en](decisions/implemented/2026-09-22-login-page-identity-redesign.en.md)
+
+## D16. 示例域名一律用 example.com（真实部署域名不随包发布）
+
+真实部署域名从文档、部署样例、测试与代码默认值中移除，统一写 `dsh.example.com`
+（隔离实例 `dsh-test.example.com`），`dsh-auth-proxy --target` 默认值随之改为保留域名；
+规则写进开发约定。
+**替代方案**：只改文档、保留默认值（仍随 `lib/` 发到 npm）；`--target` 改必填（CLI 行为
+变更，另议）；加门禁脚本扫描（脚本自身得写下被禁字符串，等于放进仓库）；重写 git 历史。
+**为什么**：RFC 2606 保留域名永不指向真实服务，规则一眼可验；顺带修掉「公开包默认把
+流量导向作者生产环境」这个真实缺陷。
+→ [zh](decisions/implemented/2026-09-22-example-domain-in-examples.zh.md) ·
+[en](decisions/implemented/2026-09-22-example-domain-in-examples.en.md)
