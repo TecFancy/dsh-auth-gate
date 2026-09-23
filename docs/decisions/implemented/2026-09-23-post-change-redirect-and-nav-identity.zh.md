@@ -109,6 +109,6 @@ notice 可能丢失（最坏情况退化为一张普通登录卡，不影响安�
 
 **D24.1 残留**：垫片依赖宿主导航行的 DOM 形（`[icon, label]` 与哈希 class 无关），宿主改版后若
 匹配不上会**静默退回齿轮**（无破坏性）；宿主重渲染若把自插节点一起清掉，下一轮同步会补回，帧级
-验证只在当前宿主版本（0.1.5-rc.2）做过。README 配图：导航列特写 `docs/demo/account-nav-icon.png`
-（能同时看到宿主齿轮与我们盾牌）；兜底态（导航被拒绝时才出现）截图留档
-`docs/demo/account-password-changed.png`。
+验证只在当前宿主版本（0.1.5-rc.2）做过。README 配图：导航列特写 `docs/demo/account-nav-icon.{en,zh}.png`
+（能同时看到宿主齿轮与我们盾牌；随 GUI 语言成对）；兜底态（导航被拒绝时才出现）截图留档
+`docs/demo/account-password-changed.zh.png`。

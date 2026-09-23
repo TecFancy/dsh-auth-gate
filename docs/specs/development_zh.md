@@ -6,18 +6,18 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 命令
 
-| Task                       | Command                                                                                                                                                                                                        |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                         |
-| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                     |
-| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                      |
-| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                          |
-| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                           |
-| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                          |
-| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                       |
-| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                              |
-| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
-| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                   |
+| Task                       | Command                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                         |
+| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                                     |
+| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                                      |
+| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                          |
+| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                           |
+| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                                          |
+| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                                       |
+| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                                              |
+| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
+| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                                   |
 
 跑单个测试文件：`npm run test -- src/gate/guard.test.ts`
 按名称跑测试：`npm run test -- -t "guard"`

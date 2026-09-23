@@ -13,12 +13,27 @@
 给 [DeepSeek Harness](https://github.com/deepseek-ai/dsh)（dsh）网页版加一道登录门。部署到
 公网 dsh 实例前面之后，不登录就没人能碰到你的 agent、聊天会话和 LLM 凭证。
 
-## 基于 dsh-plugin-framework 构建
+> **在 dsh 官方推出认证功能之前，本仓库会一直维护。** dsh 目前还没有内置登录，这个仓库就是
+> 用来补上这道门的：我们持续跟进 dsh 新版本（挂载点、版本走廊、Linux/Windows 双平台 CI）、
+> 修复回归、正常发版。等官方认证落地，我们会给出迁移说明，并继续支持大家仍在用的 dsh 版本 -
+> 不会把人丢在一个没人管的 fork 上。
 
-本插件建立在 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework)
-（dsh 生态的参考插件框架）的工程约定之上：`src/` 分层（features/shared，跨 slice 只能走
-barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校验）和决策记录纪律
-全部对齐该框架——这些约定在 dsh 官方代码库中久经考验。好的工程实践，值得站在上面。
+## 目录
+
+- [它能做什么](#它能做什么)
+- [它不做什么](#它不做什么)
+- [快速开始](#快速开始)
+- [效果预览](#效果预览)
+- [配置](#配置)
+- [命令行工具](#命令行工具)
+- [内置配置技能](#内置配置技能)
+- [故障排查](#故障排查)
+- [部署](#部署)
+- [认证本地代理（可选）](#认证本地代理可选)
+- [环境要求](#环境要求)
+- [注意事项与局限](#注意事项与局限)
+- [开发](#开发)
+- [许可证](#许可证)
 
 ## 它能做什么
 
@@ -34,24 +49,23 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
 - **可选两步验证（TOTP）。** 密码模式下，账号绑定了 TOTP 密钥的用户登录时需要
   密码**加**验证器 App 的 6 位动态码（RFC 6238；配置 off/optional/required 三态）。
 - **默认就安全。** 密码只存哈希、登录有限速（反复输错会临时锁定该地址）、会话 cookie
-  带安全属性，而且配置缺失或损坏时**拒绝访问而不是悄悄开门**。
-- **一个管理用户的小命令行工具**：
+  带安全属性，而且配置缺失或损坏时**拒绝访问而不是悄悄开门**。用户名或密码错误时，登录卡会
+  就地重渲染并显示 `Invalid username or password.`：用户名保留、密码需重输；触发锁定
+  （HTTP 429 + `retry-after`）时同一张卡会显示剩余秒数与「仅限本网络」的提示——**刻意不显示
+  还能试几次**；开着 JS 时刷新页面不再多消耗一次失败。
 
-  ```sh
-  dsh-auth user add admin --password-stdin   # 添加用户（加 --admin 直接建管理员）
-  dsh-auth user list                          # 查看用户
-  dsh-auth user passwd admin                  # 改口令（读两次；刻意不提供 --password 明文参数）
-  dsh-auth user role admin user               # 授予/回收 admin 角色：user role <name> <admin|user>
-  dsh-auth user disable admin                 # 禁止某用户今后登录，并吊销其已发会话
-  dsh-auth user totp enable admin             # 生成 TOTP 密钥（打印 otpauth:// URI）
-  dsh-auth user totp disable admin            # 移除 TOTP 密钥
-  ```
+## 它不做什么
 
-  全局安装时 `dsh-auth` 直接在你的 PATH 上；`dsh plugin add` 安装后二进制在
-  profile 里，需要经由 profile 调用——见[快速开始](#快速开始)。
+先把边界说清楚，方便你安装前评估风险（完整清单与机制见
+`docs/deployed/known-limitations_zh.md`）：
 
-  `dsh-auth user passwd` 只改存储的哈希，**不会吊销该用户已登录的会话**；需要把会话
-  踢掉时用面板自助改密（或 `user disable` 的周期吊销）。
+- **不是服务器级安全。** 操作系统账号和配置文件仍要自己看好（`auth/users.yaml`、
+  `.credentials.yaml` 生成时即 `0600`）；本插件只守 dsh 的 **Web** 面。
+- **不是所有改口令入口都会踢会话。** `dsh-auth user disable` 会吊销该用户已发会话；
+  设置面板的自助改密会吊销该用户的全部会话；CLI 的 `dsh-auth user passwd` 只改哈希。
+- **不替代 HTTPS。** 配了 `cookieSecure: true` 就必须用 https 提供站点。
+- **不是完整 IdP。** 没有 OAuth/OIDC、没有自助注册、没有邮件重置；用户由管理员通过
+  CLI 创建和管理。
 
 ## 快速开始
 
@@ -77,7 +91,7 @@ printf '%s\n' '选一个强密码' | \
 
 ## 效果预览
 
-未登录的访客会被带到登录页：
+未登录的访客会被带到登录页（登录卡由插件在服务端渲染成英文，所以这张图与界面语言无关）：
 
 ![登录页](docs/demo/login-page.png)
 
@@ -88,7 +102,7 @@ Google Authenticator 等）里的 6 位验证码（先密码、后验证码）�
 
 登录后进入你的实例：
 
-![dsh 实例](docs/demo/dashboard.png)
+![dsh 实例](docs/demo/dashboard.zh.png)
 
 在 dsh 0.1.2-alpha 及更高版本（页面有 launch token 门）上，登录会自动桥接这道门：
 登录跳转会先经过一次相对 `/?token=…` 的短跳、mint 好 dsh cookie，再落到 `/`
@@ -108,9 +122,9 @@ Google Authenticator 等）里的 6 位验证码（先密码、后验证码）�
 所以插件用一层**临时 DOM 垫片**只替换自己那一行（找不到就静默退回齿轮）。dsh 官方支持
 `icon` 选项后，这层垫片与其代码会整体删除（迁移条件见 ADR D24.1）。
 
-![设置导航里的「账号安全」行](docs/demo/account-nav-icon.png)
+![设置导航里的「账号安全」行](docs/demo/account-nav-icon.zh.png)
 
-![改密面板](docs/demo/account-change-password.png)
+![改密面板](docs/demo/account-change-password.zh.png)
 
 面板向 `POST /auth/password` 提交（`current` / `password` / `code`，form-urlencoded）；
 成功后**该用户的全部会话都会被吊销，包括发起改密的当前会话**，客户端**立即**把当前设备送回
@@ -154,6 +168,26 @@ bundle 挂载行（id `dsh-auth-gate`，由 `dsh plugin add` 自动插入）使�
 给用户开启 TOTP：运行 `dsh-auth user totp enable <name>`，把打印出的密钥（或
 `otpauth://` URI 二维码）录入验证器 App（Google Authenticator、1Password 等）。
 动态码每 30 秒变化一次；前后一个窗口内的码也接受（容忍时钟漂移）。
+
+## 命令行工具
+
+`dsh-auth` 用命令行管理用户：
+
+```sh
+dsh-auth user add admin --password-stdin   # 添加用户（加 --admin 直接建管理员）
+dsh-auth user list                          # 查看用户
+dsh-auth user passwd admin                  # 改口令（读两次；刻意不提供 --password 明文参数）
+dsh-auth user role admin user               # 授予/回收 admin 角色：user role <name> <admin|user>
+dsh-auth user disable admin                 # 禁止某用户今后登录，并吊销其已发会话
+dsh-auth user totp enable admin             # 生成 TOTP 密钥（打印 otpauth:// URI）
+dsh-auth user totp disable admin            # 移除 TOTP 密钥
+```
+
+全局安装时 `dsh-auth` 直接在你的 PATH 上；`dsh plugin add` 安装后二进制在 profile 里，
+需要经由 profile 调用 - 见[快速开始](#快速开始)。
+
+`dsh-auth user passwd` 只改存储的哈希，**不会吊销该用户已登录的会话**；需要踢会话时用
+设置面板的自助改密（或 `user disable`）。
 
 ## 内置配置技能
 
@@ -218,7 +252,7 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
   （反代后设置页 `403`，以及为什么只加认证修不了它）、推荐的半外壳拓扑。
 - [docs/deployed/deployment_zh.md](docs/deployed/deployment_zh.md) —— 运维清单、验收步骤（A–I）与故障诊断。
 
-## 认证本地代理（可选，dsh-auth-proxy)
+## 认证本地代理（可选）
 
 > ⚠️ **已知限制（重要，任何 auth-gate 版本都不改变）**：dsh 的设置页（"设置 → 模型"等）
 > 只允许在**页面 origin 为回环**（`localhost`/`127.x`）时编辑。这是 dsh 客户端
@@ -258,26 +292,27 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 - dsh 的 `web` profile 正常运行（`dsh --profile web`）。
 - 如果 `cookieSecure` 是 `true`，站点必须走 https（浏览器在纯 http 下会拒绝安全 cookie）。
 
+## 注意事项与局限
+
+这里只列用户可见的部分；完整清单（含机制与 ADR 出处）见
+`docs/deployed/known-limitations_zh.md`。
+
+- 禁用用户只挡**今后**的登录；已经登录的会话到 TTL 到期前仍然有效。
+- 登录限速与 TOTP 同窗重放防护会在服务重启后清零。
+- 放在反向代理后面时必须配 `clientIpHeader`（以及 `trustedProxyCidrs`），否则所有
+  客户端共用同一个锁定桶 - 登录与自助改密各有一个桶。
+- 改密成功后即使"吊销旧会话"失败也依然按成功返回：失败会记 error 日志，旧 cookie 到
+  会话 TTL 到期前有效。
+- 本插件只保护 dsh 的 Web 面；操作系统账号与配置文件要自己保持私有。
+
+## 开发
+
+本仓库遵循 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework)
+的工程约定：跨 slice 只走 barrel、以 `npm run verify` 为门禁链、决策记录纪律。`verify`
+依次跑 format / lint / no-emdash / slice / lock / decisions / docs / readme-parity /
+type-check / 覆盖率 80% / build / bundle；测试、构建与发版流程见
+`docs/specs/development_zh.md`。
+
 ## 许可证
 
 [MIT](./LICENSE)
-
-## 注意事项与局限
-
-- 禁用用户会立即阻止**新**登录；**已发**会话由插件周期扫描吊销（`revokeSweepMs`，默认 5 秒内生效）。
-- 登录限速在服务器重启后清零；TOTP 防重放记录同样重启清零（同一 30 秒窗口内用过的
-  码在重启后重新可用——需要「重启 + 同窗口窃码」同时发生才能利用）。
-- TOTP 挑战态（「密码已过、等验证码」）最长 5 分钟。挑战 cookie 带 **HMAC 签名**
-  （进程级随机密钥，ADR D10）：无法伪造以跳过密码阶段。重启服务（或重载插件）后
-  在途挑战失效——验证码页上的用户需重新输入密码（窗口 ≤ 5 分钟）；提交时按
-  用户当前配置的密钥验证。
-- 反代部署时，限速按反代出口地址统计；自助改密（D22）的独立限速桶同样按
-  `clientIpHeader` 取客户端地址：未配受信反代客户端 IP 头时，同一主机上所有客户端
-  也会共用一个改密桶（与登录的问题同源，见 D19）。
-- 设置面板里有「退出登录」按钮：在 设置 → 通用设置 页最下方，文案随语言在
-  「退出登录」/ "Sign out" 间切换；`/auth/logout?next=/` 始终可作为兜底。
-- 改密的会话吊销发生在**新哈希写盘成功之后**。若吊销这一步失败，改密仍如实报告成功
-  （口令已经生效），失败只记 error 日志；此时旧 cookie 会一直有效到会话 TTL 到期。
-  「吊销失败重试/告警」留到管理面阶段再做。
-- 本插件只保护 dsh 的网页入口，不能替代服务器层面的安全：请保持服务器系统用户最小权限、
-  配置文件私密（`.credentials.yaml` 和 `auth/users.yaml` 创建时即为 `0600` 权限）。

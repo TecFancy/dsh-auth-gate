@@ -142,6 +142,6 @@ stay untouched:
 class names are not referenced), so a host rework that no longer matches will **silently fall back to
 the gear** (never destructive); if a host re-render removes the injected node, the next sync re-adds
 it, and the frame-level check was only run against the current host version (0.1.5-rc.2). README
-assets: the nav-rail close-up `docs/demo/account-nav-icon.png` (host gear and our shield side by
-side), and the archived fallback-state shot `docs/demo/account-password-changed.png` (only reachable
+assets: the nav-rail close-up `docs/demo/account-nav-icon.en.png` / `.zh.png` (host gear and our shield side by
+side), and the archived fallback-state shot `docs/demo/account-password-changed.zh.png` (only reachable
 when navigation is refused).

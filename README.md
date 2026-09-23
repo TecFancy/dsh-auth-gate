@@ -15,15 +15,29 @@ A login door for your [DeepSeek Harness](https://github.com/deepseek-ai/dsh)
 reach your agents, your chat sessions, or your LLM credentials without signing
 in first.
 
-## Built on dsh-plugin-framework
+> **Maintained until dsh ships authentication natively.** dsh has no built-in login
+> yet, and this repository is how we close that gap: new dsh releases are tracked (mount
+> points, version corridors, CI on Linux and Windows), regressions are fixed, and
+> releases keep shipping. When official authentication lands we will publish the
+> migration path and keep supporting the dsh versions still in use - nobody is left on
+> an abandoned fork.
 
-This plugin is developed on the engineering conventions of
-[dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework), the
-reference plugin framework for the dsh ecosystem. The `src/` layout
-(features/shared layers with barrel-only cross-slice imports), the engineering
-gates (`npm run verify`, bundle/slice/no-emdash checks) and the decision-record
-discipline all align with it - conventions that have held up across the dsh
-codebase. Solid engineering worth building on.
+## Contents
+
+- [What it does](#what-it-does)
+- [What it does not do](#what-it-does-not-do)
+- [Quick start](#quick-start)
+- [See it in action](#see-it-in-action)
+- [Configuration](#configuration)
+- [Command-line tool](#command-line-tool)
+- [Bundled configuration skill](#bundled-configuration-skill)
+- [Troubleshooting](#troubleshooting)
+- [Deployment](#deployment)
+- [Authenticated local proxy (optional)](#authenticated-local-proxy-optional)
+- [Requirements](#requirements)
+- [Notes & limitations](#notes--limitations)
+- [Development](#development)
+- [License](#license)
 
 ## What it does
 
@@ -49,25 +63,22 @@ codebase. Solid engineering worth building on.
   shows the same card with the retry seconds and a message scoped to "this
   network"; the number of remaining attempts is deliberately never shown, and
   with JavaScript a page refresh no longer spends another failure.
-- **A small command-line tool** for managing users:
 
-  ```sh
-  dsh-auth user add admin --password-stdin   # add a user (--admin creates an administrator)
-  dsh-auth user list                          # list users
-  dsh-auth user passwd admin                  # change a password (read twice; there is no --password flag)
-  dsh-auth user role admin user               # grant/revoke the admin role: user role <name> <admin|user>
-  dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
-  dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
-  dsh-auth user totp disable admin            # remove the TOTP secret
-  ```
+## What it does not do
 
-  `dsh-auth` is directly on your PATH when the package is installed globally.
-  After `dsh plugin add` the binary lives inside the profile and must be called
-  through it — see [Quick start](#quick-start).
+Honest boundaries, so you can size the risk before installing (the full list with
+mechanisms is in `docs/deployed/known-limitations.md`):
 
-  `dsh-auth user passwd` only rewrites the stored hash: it does **not** revoke that
-  user's live sessions. Use the Settings panel change (or `user disable`) when those
-  sessions must be evicted.
+- **Not server-level security.** Keep the OS user locked down and the config files
+  private (`auth/users.yaml` and `.credentials.yaml` are created `0600`); this plugin
+  guards dsh's **web** surface only.
+- **Not every password path evicts sessions.** `dsh-auth user disable` revokes a user's
+  live sessions, and the Settings panel's self-service change revokes every session of
+  that user; the CLI's `dsh-auth user passwd` only rewrites the stored hash.
+- **Not a replacement for HTTPS.** With `cookieSecure: true` you must serve the site
+  over https.
+- **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
+  reset; users are created and managed by an administrator through the CLI.
 
 ## Quick start
 
@@ -93,7 +104,8 @@ printf '%s\n' 'choose-a-strong-password' | \
 
 ## See it in action
 
-Visitors without a session are sent to the login page:
+Visitors without a session are sent to the login page (the card is rendered by the plugin
+server-side in English, so this shot is the same in every locale):
 
 ![Login page](docs/demo/login-page.png)
 
@@ -104,7 +116,7 @@ When TOTP is enabled for your account, signing in continues with a second step �
 
 After signing in, they land on your instance:
 
-![dsh instance](docs/demo/dashboard.png)
+![dsh instance](docs/demo/dashboard.en.png)
 
 On dsh 0.1.2-alpha+ (which guards pages with a launch token), signing in
 auto-bridges the token gate: the login redirect goes through a short relative
@@ -131,9 +143,9 @@ our own row and nothing else (if it cannot find the row it silently falls back t
 the gear). Once dsh offers an `icon` option, the stopgap and its code are removed
 (see ADR D24.1 for the migration conditions).
 
-![Account security row in the settings nav](docs/demo/account-nav-icon.png)
+![Account security row in the settings nav](docs/demo/account-nav-icon.en.png)
 
-![Change-password panel](docs/demo/account-change-password.png)
+![Change-password panel](docs/demo/account-change-password.en.png)
 
 The panel posts to `POST /auth/password` (`current` / `password` / `code`,
 form-urlencoded) and, on success, **every session of that user is revoked,
@@ -184,6 +196,28 @@ To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
 Authenticator, 1Password, etc.). The code changes every 30 seconds; a code from
 the previous or next window is also accepted (drift tolerance).
+
+## Command-line tool
+
+`dsh-auth` manages users from the shell:
+
+```sh
+dsh-auth user add admin --password-stdin   # add a user (--admin creates an administrator)
+dsh-auth user list                          # list users
+dsh-auth user passwd admin                  # change a password (read twice; there is no --password flag)
+dsh-auth user role admin user               # grant/revoke the admin role: user role <name> <admin|user>
+dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
+dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
+dsh-auth user totp disable admin            # remove the TOTP secret
+```
+
+`dsh-auth` is directly on your PATH when the package is installed globally. After
+`dsh plugin add` the binary lives inside the profile and must be called through it -
+see [Quick start](#quick-start).
+
+`dsh-auth user passwd` only rewrites the stored hash: it does **not** revoke that user's
+live sessions. Use the Settings panel change (or `user disable`) when those sessions
+must be evicted.
 
 ## Bundled configuration skill
 
@@ -259,7 +293,7 @@ reads — the global copy is just a launcher.
   (A–I) and troubleshooting. Chinese version:
   [`docs/deployed/deployment_zh.md`](docs/deployed/deployment_zh.md).
 
-## Authenticated local proxy (optional, dsh-auth-proxy)
+## Authenticated local proxy (optional)
 
 > ⚠️ **Known limitation (unaffected by any auth-gate release)**: dsh's settings pages
 > ("Settings -> Models", etc.) are editable only when the page origin is loopback
@@ -308,45 +342,30 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).
 
+## Notes & limitations
+
+The short list; the full version, including the mechanisms and the ADRs behind them,
+is in `docs/deployed/known-limitations.md`.
+
+- Disabling a user only stops **new** logins; sessions already signed in stay valid
+  until they expire.
+- Login rate limiting and the TOTP replay guard reset when the server restarts.
+- Behind a reverse proxy, set `clientIpHeader` (and `trustedProxyCidrs`): otherwise
+  every client shares one lockout bucket, for both login and the self-service change.
+- A password change reports success even if revoking the old sessions fails; the
+  failure is logged and the old cookie stays valid until its session TTL.
+- The plugin protects dsh's web surface only. Keep the OS user and the config files
+  private.
+
+## Development
+
+Built on the engineering conventions of
+[dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework): barrel-only
+cross-slice imports, the `npm run verify` gate chain, and decision records. `verify`
+runs format / lint / no-emdash / slice / lock / decisions / docs / readme-parity /
+type-check / coverage 80% / build / bundle; tests, build and the release flow are
+documented in `docs/specs/development.md`.
+
 ## License
 
 [MIT](./LICENSE)
-
-## Notes & limitations
-
-- Disabling a user only stops **new** logins; already-signed-in sessions stay
-  valid until they expire.
-- Login rate limiting resets when the server restarts; so does the TOTP
-  replay guard (a used code in the same 30s window becomes acceptable again
-  after a restart — restart and code-stealing in the same window are both
-  needed to exploit this).
-- A TOTP challenge (the "password ok, code pending" state) lasts at most 5
-  minutes. The challenge cookie is **HMAC-signed with a process-generated key**
-  (ADR D10): it cannot be forged to skip the password stage. Restarting the
-  server (or reloading the plugin) invalidates in-flight challenges — users on
-  the code page must re-enter their password (window ≤ 5 minutes). The code is
-  validated against the user's configured secret at submit time.
-- Rate limiting counts by the real client address. Behind a reverse proxy on the
-  same host every request arrives from the proxy's address, so all clients would
-  share one lockout bucket (five mistyped passwords from anywhere then block
-  everyone: issue #74). Set `clientIpHeader` to the header your proxy writes
-  (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare); it is only read
-  when the peer is inside `trustedProxyCidrs` (loopback by default), and the
-  rightmost address that is not itself a trusted hop is used. The self-service
-  password change (D22) keys its own, separate bucket the same way, so it needs
-  the same `clientIpHeader` setup: without a trusted proxy client-IP header,
-  every client on that host also shares one password-change bucket (the same
-  root cause as the login case, D19).
-- Sign out from the GUI: a prominent "Sign out / 退出登录" button sits in the
-  Settings panel (Settings → General, bottom) — client half, requires the
-  web app's client bundle (dsh 0.1.0-rc.6+); the direct
-  `/auth/logout?next=/` URL always works as a fallback.
-- Changing a password revokes the user's sessions only **after** the new hash is on
-  disk. If that revocation step fails, the change still reports success (the password
-  is already in force) and the failure is logged as an error; the old cookie then
-  stays valid until the session TTL expires. Retrying or alerting on a failed
-  revocation is deferred to the admin-surface phase.
-- The plugin only protects dsh's web surface. It is not a replacement for
-  server-level security: keep the server OS user locked down and the config
-  files private (`.credentials.yaml` and `auth/users.yaml` are created with
-  `0600` permissions).
