@@ -260,8 +260,11 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 ## Requirements
 
 - Node ≥ 22.19 and pnpm on the server.
-- dsh `0.1.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2`, last
-  verified against `0.1.5-rc.2`). The plugin runs on the host's own
+- dsh `0.1.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2 ||
+^0.1.7-alpha.1`). Runtime-verified against `0.1.5-rc.2` (production) and
+  `0.1.7-alpha.1` (isolated instance); the `0.1.6-*` prereleases are not
+  enumerated because no plugin version was verified against them (stable
+  `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the host's own
   `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis` copies — both are
   peer dependencies, never bundled — so a profile booted from the dsh base
   bundle already provides them.
