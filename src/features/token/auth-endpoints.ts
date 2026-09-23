@@ -15,6 +15,13 @@ import {
 } from "../../http/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 
+/**
+ * 错 token 的唯一常量文案（D21）：所有拒绝共用同一响应形态，且绝不读 query、绝不反射
+ * 请求文本（与密码段 `INVALID_CREDENTIALS` / P9 / D20 同一条纪律）。令牌模式只有一个
+ * 共享秘密，本就没有账号枚举面，这条规则防的是「用请求内容拼文案」的开放重定向式用法。
+ */
+export const INVALID_TOKEN = "Invalid access token.";
+
 export interface AuthEndpointsDeps {
   /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
   register(route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): () => void;
@@ -98,6 +105,7 @@ async function loginAttempt(
   } catch (error) {
     const failed = error as { status?: number; message?: string };
     if (typeof failed.status !== "number") throw error; // 不带 status 的流异常：向上抛（webserver 400）
+    // 413/415 是协议层拒绝（非浏览器表单可达）：D21 刻意保留 text/plain 与 M19 语义。
     res.setHeader("cache-control", "no-store");
     if (failed.status === 413) res.setHeader("connection", "close"); // M19
     res.writeHead(failed.status, { "content-type": "text/plain" });
@@ -107,14 +115,20 @@ async function loginAttempt(
   const token = params.get("token") ?? "";
   const next = validateNext(params.get("next") ?? "/");
   if (!(await deps.validateToken(token))) {
+    // D21：401 保持，body 换成登录卡片（error slot），否则浏览器导航只看到空白纯文本页。
     res.setHeader("cache-control", "no-store");
-    res.writeHead(401, { "content-type": "text/plain" });
-    res.end("invalid token");
+    res.writeHead(401, { "content-type": "text/html; charset=utf-8" });
+    res.end(
+      loginPageHtml(next, INVALID_TOKEN, {
+        host: resolvePublicHost(deps.publicHost, req.headers.host),
+      }),
+    );
     deps.logger.info("login rejected");
     return;
   }
   const store = deps.sessions();
   if (store === undefined) {
+    // 运维故障（会话域未就绪）：D21 刻意保留 text/plain，用户无从修复，机器可读更有用。
     res.setHeader("cache-control", "no-store");
     res.writeHead(503, { "content-type": "text/plain" });
     res.end("session store unavailable");

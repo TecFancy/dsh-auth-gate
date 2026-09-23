@@ -192,7 +192,7 @@ describe("TOTP: submit hardening (disabled / off)", () => {
     expect(res.headers["content-type"]).toContain("text/html");
     expect(res.body).toContain('class="error"');
     expect(res.body).toContain('name="code"');
-    expect(res.body).toContain("invalid credentials");
+    expect(res.body).toContain("Invalid or expired code.");
     expect(h.replayCalls).toEqual([]);
   });
 

@@ -226,6 +226,11 @@ GET/POST `/auth/login` **cannot** register two exact routes):
     `next = validateNext(params.get("next") ?? "/")`;
     `await deps.validateToken(token)` fails → `401` + `text/plain` `"invalid token"` +
     `cache-control: no-store` + `logger.info("login rejected")`;
+    **D21 amendment (2026-09-23):** the 401 now renders the token login card instead of
+    `text/plain "invalid token"` (`content-type: text/html; charset=utf-8`, error slot filled by the
+    single constant `Invalid access token.`, the submitted token never echoed, the token field keeps
+    `autofocus`); the 401 status, `no-store` and this log line are unchanged, and the 413/415 and 503
+    bodies deliberately stay `text/plain` (protocol-level / operator-level failures);
     success → `const store = deps.sessions(); store === undefined` → `503` + `text/plain`
     `"session store unavailable"` + no-store + `logger.error("login failed: session store unavailable")`
     (fail-closed, does not silently allow); otherwise
@@ -374,7 +379,7 @@ sessions (accessor form) + fake validateToken:
 1. Registration shape: 4 routes — prefix `/auth`, exact `/auth/login`, `/auth/logout`, `/auth/status` (M15).
 2. GET login: 200 + HTML contains `<form`, hidden next is escaped (`next="/x?a=1&b=2"` → `&amp;` in HTML); the authenticated state (`sessions()` has a valid session) also always 200 renders (no redirect, M20).
 3. POST login success: validateToken true → 302 location=next + exact set-cookie string (secure=true and false) + `sessions().create` called (subject "token", ttl = sessionTtl*1000) + `logger.info("session issued")`.
-4. POST login failure: validateToken false → 401 "invalid token" + `logger.info("login rejected")`; no session created.
+4. POST login failure: validateToken false → 401 "invalid token" + `logger.info("login rejected")`; no session created. **D21 amendment (2026-09-23):** the 401 body is now the token login card (HTML, error slot = `Invalid access token.`, token never echoed); the status code and the log line are unchanged.
 5. POST login next validation: `next="//evil.com"` → 302 location "/"; `next="/ok/path"` → 302 "/ok/path"; **`next="/auth/login"` and `/auth/x` → "/" (M20)**.
 6. POST login `sessions()` undefined → 503 + `text/plain` + `logger.error`.
 7. POST logout: revoke called + set-cookie contains `Max-Age=0` + 302; next from the query (`?next=/x` → location `/x`); no body/no content-type works; missing cookie still 302 (idempotent, M22).
