@@ -226,6 +226,10 @@ GET/POST `/auth/login` **不能**注册两条 exact 路由）：
     `next = validateNext(params.get("next") ?? "/")`；
     `await deps.validateToken(token)` 失败 → `401` + `text/plain` `"invalid token"` +
     `cache-control: no-store` + `logger.info("login rejected")`；
+    **D21 修订（2026-09-23）**：该 401 不再返回 `text/plain "invalid token"`，改为渲染 token 版登录卡片
+    （`content-type: text/html; charset=utf-8`，error slot 填唯一常量 `Invalid access token.`，提交的
+    token 永不回填，令牌字段保持 `autofocus`）；401 状态码、`no-store` 与这行日志不变，413/415 与 503
+    的 body 刻意保持 `text/plain`（协议层 / 运维层失败）；
     成功 → `const store = deps.sessions(); store === undefined` → `503` + `text/plain`
     `"session store unavailable"` + no-store + `logger.error("login failed: session store unavailable")`
     （fail-closed，不静默放行）；否则
@@ -374,7 +378,7 @@ sessions（访问器形态）+ fake validateToken：
 1. 注册形状：4 条路由——prefix `/auth`、exact `/auth/login`、`/auth/logout`、`/auth/status`（M15）。
 2. GET login：200 + HTML 含 `<form`、hidden next 已 escape（`next="/x?a=1&b=2"` → HTML 里 `&amp;`）；已认证态（`sessions()` 有有效会话）也恒 200 渲染（不重定向，M20）。
 3. POST login 成功：validateToken true → 302 location=next + set-cookie 精确串（secure=true 与 false 两种）+ `sessions().create` 被调用（subject "token"、ttl = sessionTtl*1000）+ `logger.info("session issued")`。
-4. POST login 失败：validateToken false → 401 "invalid token" + `logger.info("login rejected")`；无会话创建。
+4. POST login 失败：validateToken false → 401 "invalid token" + `logger.info("login rejected")`；无会话创建。**D21 修订（2026-09-23）**：401 的 body 现为 token 版登录卡片（HTML，error slot = `Invalid access token.`，token 永不回填）；状态码与日志行不变。
 5. POST login next 校验：`next="//evil.com"` → 302 location "/"；`next="/ok/path"` → 302 "/ok/path"；**`next="/auth/login"` 与 `/auth/x` → "/"（M20）**。
 6. POST login `sessions()` undefined → 503 + `text/plain` + `logger.error`。
 7. POST logout：revoke 被调 + set-cookie 含 `Max-Age=0` + 302；next 从 query（`?next=/x` → location `/x`）；无 body/无 content-type 可用；cookie 缺失也 302（幂等，M22）。

@@ -228,3 +228,27 @@ RFC 9110 §15.5.2 并记录在此）。
 6KB CSS 预算、切片边界与依赖集合全部不变，且与 0.11.1 起已发布并有测试覆盖的 TOTP 修复同构。
 → [zh](decisions/implemented/2026-09-22-login-failure-html-card.zh.md) ·
 [en](decisions/implemented/2026-09-22-login-failure-html-card.en.md)
+
+## D21. token 模式登录失败渲染登录卡片（HTML），不再返回裸文本页
+
+错 token **保持 401**（+ `no-store`），content-type 改 `text/html`，body 换成 token 版登录卡片 + error
+slot（唯一常量 `Invalid access token.`，`INVALID_TOKEN`）；令牌字段**永不回填**（回显秘密＝写进页面/
+响应缓存/浏览器历史），保持 `autofocus` + `aria-invalid`/`aria-describedby`，`<title>` 加 `Error: `
+前缀；反钓鱼身份块照旧按 `publicHost`/Host 渲染（D14）。**刻意不改**：415（表单恒发 urlencoded，浏览器
+不可达）与 503（运维故障，用户无从修复，机器可读更有用）；413 也保留 `text/plain` 与 M19
+`connection: close` 精确语义（粘贴超 16 KB 可达，但自作自受且无可操作，改卡片要新增文案＋动冻结形状）
+—— 记为已知残留。**刻意不加**：D20 的提交守卫脚本 —— token 模式没有失败预算可消耗（无限速器），双击/
+刷新都锁不住人；但刷新重放的是**原来那条带原 token 的 POST**（不是卡片上的空字段），所以
+`replaceState` 本有卫生价值（别让秘密留在可重放历史项里），只是要动共享页面 API，本次推迟并如实记录。
+同趟收尾 TOTP 第二段遗留文案：`rejectTotp` 的 `invalid credentials` → `Invalid or expired code.`
+（`INVALID_TOTP_CODE`；同一常量纪律但不复用凭据常量 —— 那时口令已通过，失败手因是验证码）。**取代 D20
+里「token mode keeps its `text/plain` 401」一句**（`impl-m3` P14 同句一并修订），D20 其余全部有效。
+**替代方案**：维持裸文本 + 写文档（死胡同就是缺陷本身）；303 PRG / 200 重渲染（破坏冻结 401，同 D20）；
+专用 token 错误页（新 CSS 撞 6KB 预算 + 丢反钓鱼身份块）；回填提交的 token 帮用户自查（等于把秘密写
+进页面/历史/缓存）；TOTP 复用 `INVALID_CREDENTIALS`（手因错位）；413/415/503 一并改 HTML（协议层/运维
+层失败，机器可读更有用）。
+**为什么**：与 D20 同构的最小改动，状态码、一常量规则、不反射规则、日志纪律、无 JS 提交路径、6KB CSS
+预算、切片边界与依赖集合全部不变；真实入口集成测试（`integration.auth.test.ts`）从「只断言状态码」
+升级为断言 HTML 失败体，退回 `text/plain` 会在 CI 被拦。
+→ [zh](decisions/implemented/2026-09-23-token-failure-html-card.zh.md) ·
+[en](decisions/implemented/2026-09-23-token-failure-html-card.en.md)

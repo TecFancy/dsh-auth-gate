@@ -1,5 +1,11 @@
 import { type HttpHandler } from "../../gate/index.js";
 import { type SessionStore } from "../../session/index.js";
+/**
+ * 错 token 的唯一常量文案（D21）：所有拒绝共用同一响应形态，且绝不读 query、绝不反射
+ * 请求文本（与密码段 `INVALID_CREDENTIALS` / P9 / D20 同一条纪律）。令牌模式只有一个
+ * 共享秘密，本就没有账号枚举面，这条规则防的是「用请求内容拼文案」的开放重定向式用法。
+ */
+export declare const INVALID_TOKEN = "Invalid access token.";
 export interface AuthEndpointsDeps {
     /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
     register(route: {

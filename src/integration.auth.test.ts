@@ -146,6 +146,14 @@ describe("integration: auth endpoints over real HTTP", () => {
         body: "token=wrong",
       });
       expect(bad.status).toBe(401);
+      // D21：真实入口（cordis + webserver + storage）上错 token 也必须拿到卡片，而不是裸文本。
+      expect(bad.headers.get("content-type")).toContain("text/html");
+      expect(bad.headers.get("cache-control")).toBe("no-store");
+      const badBody = await bad.text();
+      expect(badBody).toContain('class="error"');
+      expect(badBody).toContain("Invalid access token.");
+      expect(badBody).not.toContain("wrong"); // 提交的 token 不回显
+      expect(badBody).toContain('name="token"');
 
       const good = await fetch(`${base}/auth/login`, {
         method: "POST",

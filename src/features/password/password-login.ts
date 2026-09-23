@@ -10,7 +10,12 @@ import { DUMMY_HASH } from "./password.js";
 import { LoginRateLimiter, loginPath, type UsersLoadResult } from "../../shared/index.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 import { issueSession } from "./session-issue.js";
-import { sendInvalidCredentials, sendLockout, sendTotpLockout } from "./login-failure-pages.js";
+import {
+  INVALID_TOTP_CODE,
+  sendInvalidCredentials,
+  sendLockout,
+  sendTotpLockout,
+} from "./login-failure-pages.js";
 import {
   buildChallengeValue,
   CHALLENGE_COOKIE,
@@ -230,8 +235,9 @@ async function handlePasswordSubmit(
   await issueSession(deps, res, store, username, next, undefined);
 }
 
-/** TOTP 拒绝路径（P1.3）：401 + 挑战页 HTML（error slot 固定文案，浏览器表单可见；
- * 不读 query error=，避免开放重定向式任意文案；挑战 cookie 保留，可重试）。 */
+/** TOTP 拒绝路径（P1.3）：401 + 挑战页 HTML（error slot 固定常量文案，浏览器表单可见；
+ * 不读 query error=，避免开放重定向式任意文案；挑战 cookie 保留，可重试）。
+ * 文案取 `INVALID_TOTP_CODE`（D21）：走到这一步口令是对的，不能复用凭据常量。 */
 function rejectTotp(
   deps: PasswordLoginDeps,
   host: string,
@@ -243,7 +249,7 @@ function rejectTotp(
   res.setHeader("cache-control", "no-store");
   res.writeHead(401, { "content-type": "text/html; charset=utf-8" });
   res.end(
-    totpChallengePageHtml(next, "invalid credentials", {
+    totpChallengePageHtml(next, INVALID_TOTP_CODE, {
       host,
       who: username,
       resetHref: loginPath(next, "password"),
