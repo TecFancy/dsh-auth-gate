@@ -1,9 +1,12 @@
 import { type AccountTranslate } from "./account-copy.ts";
-/** 改密表单 props：`t` 来自槽位 locale seat，`close` 是宿主 owner props。 */
+/**
+ * 改密表单 props：`t` 来自槽位 locale seat。
+ * 宿主 owner props 里还有 `close`（关闭设置弹窗），P1.1 起**刻意不再使用**：成功后去向由
+ * 服务端会话状态决定（去登录页），关掉弹窗只会在死会话 SPA 上留下用户。
+ */
 export interface AccountPasswordFormProps {
     t: AccountTranslate;
-    close?: (() => void) | undefined;
 }
-/** 已登录时的自助改密表单（成功后整页换成提示 + owner 的 close 按钮）。 */
-export declare function AccountPasswordForm({ t, close }: AccountPasswordFormProps): import("react").JSX.Element;
+/** 已登录时的自助改密表单（成功后整页换成提示 + 「重新登录」按钮）。 */
+export declare function AccountPasswordForm({ t }: AccountPasswordFormProps): import("react").JSX.Element;
 //# sourceMappingURL=account-form.d.ts.map

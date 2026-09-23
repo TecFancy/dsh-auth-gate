@@ -21,6 +21,7 @@ import { handlePasswordChange, type PasswordChangeDeps } from "./password-change
 import { hashPassword } from "./password.js";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
 import { CHALLENGE_COOKIE, parseChallengeValue } from "./challenge-cookie.js";
+import { resolveLoginNotice } from "./login-notice.js";
 
 /** 改密端点的接线（§5）：写盘 / 哈希 / 独立限速桶 / 防重放 / 撤销会话，由 index.ts 注入。 */
 export interface PasswordChangeWiring {
@@ -170,6 +171,10 @@ function handleLogin(
   if (req.method === "GET") {
     const next = validateNext(queryOf(req).get("next") ?? "/");
     const host = resolvePublicHost(deps.publicHost, req.headers.host);
+    // P1.1 / D24：改密后客户端跳回本页说明原因。白名单解析（只认常量键），
+    // 未知/注入值一律忽略；卡片文案永不来自请求文本。**只挂在密码卡上**：TOTP 挑战页
+    // 的下一步是输验证码，"用新密码登录"那半句在那里是错的。
+    const notice = resolveLoginNotice(queryOf(req).get("notice"));
     // 2026-09-17 重设计：TOTP 段提供「换一个账号」回退。GET ?stage=password 显式清掉
     // 挑战 cookie 并渲染密码页。只清 cookie、不放行任何凭据：下次提交仍需密码 + TOTP。
     // 注意顺序：set-cookie 必须早于 writeHead（Node 在 headers sent 之后 setHeader 会抛
@@ -181,7 +186,7 @@ function handleLogin(
     }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     if (resetStage) {
-      res.end(passwordLoginPageHtml(next, undefined, { host }));
+      res.end(passwordLoginPageHtml(next, undefined, { host, notice }));
       return;
     }
     // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
@@ -199,7 +204,7 @@ function handleLogin(
             who: challenge,
             resetHref: loginPath(next, "password"),
           })
-        : passwordLoginPageHtml(next, undefined, { host }),
+        : passwordLoginPageHtml(next, undefined, { host, notice }),
     );
     return;
   }

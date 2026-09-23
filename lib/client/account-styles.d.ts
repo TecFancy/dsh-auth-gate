@@ -6,6 +6,8 @@ import type { CSSProperties } from "react";
 /** 面板根部：纵向排布；`minHeight: 0` 让本页在设置内容列里参与收缩，列内可滚动。 */
 export declare const PANEL_STYLE: CSSProperties;
 export declare const TITLE_STYLE: CSSProperties;
+/** 标题行（P1.1）：自带图标 + 文案横排，图标随文字色（currentColor）跟随主题。 */
+export declare const TITLE_ROW_STYLE: CSSProperties;
 export declare const HINT_STYLE: CSSProperties;
 export declare const FORM_STYLE: CSSProperties;
 export declare const LABEL_STYLE: CSSProperties;

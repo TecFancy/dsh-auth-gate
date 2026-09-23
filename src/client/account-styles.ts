@@ -24,6 +24,14 @@ export const TITLE_STYLE: CSSProperties = {
   color: "var(--dsw-alias-label-primary)",
 };
 
+/** 标题行（P1.1）：自带图标 + 文案横排，图标随文字色（currentColor）跟随主题。 */
+export const TITLE_ROW_STYLE: CSSProperties = {
+  ...TITLE_STYLE,
+  display: "flex",
+  alignItems: "center",
+  gap: 8,
+};
+
 export const HINT_STYLE: CSSProperties = {
   margin: 0,
   fontSize: 13,

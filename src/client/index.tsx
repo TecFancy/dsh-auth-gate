@@ -8,16 +8,19 @@ const AUTH_NS = "auth";
 /** 命名词典里登出键。 */
 const LOGOUT_KEY = "logout";
 
-/** 「账户」设置页（自助改密）的 section id。 */
+/** 「账号安全」设置页（自助改密）的 section id。 */
 const ACCOUNT_SECTION_ID = "dsh-auth-gate-account";
 /**
- * 「账户」页在设置导航里的排列位置。
- * 宿主自带条目：general 0 / models 10 / plugins 15 / agent-presets 20；姊妹包
- * dsh-plugin-subscriptions 的订阅页是 90。账户页属低频安全设置，排在已知条目
- * 之后：500 与姊妹包 90 不冲突，中间 91-499 留给后续第三方页面，同时远小于
- * 登出 CTA 的 1000，两者互不遮挡。
+ * 「账号安全」页在设置导航里的排列位置。
+ *
+ * 已知占用：宿主 general 0 / models 10 / plugins 15 / agent-presets 20（0.1.7 起还有官方云账户
+ * `account` -10），姊妹包 dsh-plugin-subscriptions 的订阅页 90，全部远小于 900，所以 900
+ * 表示「大于已知的全部条目、落在导航靠后」（账号安全压轴是设置页惯例，宿主 nav 列也没有滚动条）。
+ *
+ * **不保证全局最后**：宿主只按 order 升序排、没有并列决胜（同值按插件注册顺序，跨安装不稳定），
+ * 后来者随时可能注册更大或相同的值。谁先到谁先用 900，撞车时按 901/902 递增（ADR D24 已记录）。
  */
-const ACCOUNT_SECTION_ORDER = 500;
+const ACCOUNT_SECTION_ORDER = 900;
 
 /**
  * 默认槽位 order：注册时先用它（与 host 端 Config 默认一致），随后 `/auth/status`
@@ -42,9 +45,13 @@ const DEFAULT_LOGOUT_ORDER = 1000;
  * 词典（zh/en），再以 `locale: "auth"` 给注册条目注入 `t` seat，按钮文字随界面
  * 语言在「退出登录」/ "Sign out" 间实时切换。不改任何服务端端点/会话语义。
  *
- * 同一次 apply 还注册「账户」设置页（`settings.section`，id
- * dsh-auth-gate-account，order 500）：内容为自助改密表单（见 account-section.tsx），
+ * 同一次 apply 还注册「账号安全」设置页（`settings.section`，id
+ * dsh-auth-gate-account，order 900）：内容为自助改密表单（见 account-section.tsx），
  * 文案复用同一个 `auth` 词典的 account 键。登出按钮的注册逻辑与 order 语义不变。
+ *
+ * 导航行图标：宿主 `settings.section` 没有 `icon` 选项（只有 id/order/label），第三方段的
+ * 图标恒为宿主默认齿轮；插件侧没有官方挂载点，因此不抢宿主 nav 的 DOM（评审 D24 已否掉
+ * 该方案），自设计图标只画在我们自己的内容区里（见 account-form.tsx 的 AccountIcon）。
  */
 export const inject = ["slots", "locale"];
 
@@ -99,7 +106,7 @@ export function apply(ctx: AuthContext): void {
     return () => dispose?.();
   });
 
-  // 「账户」设置页：注册 `settings.section`（root 作用域、可追加列表槽，导航按
+  // 「账号安全」设置页：注册 `settings.section`（root 作用域、可追加列表槽，导航按
   // order 升序）。内容是自助改密表单，未登录由组件自查 `/auth/status` 后隐藏。
   ctx.slots.inject("settings.section", () =>
     ctx.slots.register(

@@ -7,6 +7,8 @@ import {
   type MutableRefObject,
 } from "react";
 import { ACCOUNT_KEYS, type AccountTranslate } from "./account-copy.ts";
+import { ACCOUNT_ICON_PATHS, ACCOUNT_ICON_VIEW_BOX } from "./account-icon.ts";
+import { redirectToLoginNow, scheduleRedirectToLogin } from "./account-redirect.ts";
 import { ACCOUNT_STATUS_ID, PasswordFields, StatusLine } from "./account-fields.tsx";
 import {
   BUTTON_BUSY_STYLE,
@@ -15,7 +17,7 @@ import {
   HINT_STYLE,
   PANEL_STYLE,
   SUCCESS_TEXT_STYLE,
-  TITLE_STYLE,
+  TITLE_ROW_STYLE,
 } from "./account-styles.ts";
 import {
   EMPTY_VALUES,
@@ -26,6 +28,35 @@ import {
   type FormValues,
 } from "./account-submit.ts";
 
+/**
+ * 本插件自设计的图标（P1.1 / D24）：盾 + 钥匙孔，16px outline。
+ *
+ * 为什么画在这里而不是导航行：宿主 `settings.section` 只投影 `id`/`order`/`label`，导航
+ * 图标由宿主 `navIcon(id)` 的硬编码 if 链给出（第三方段一律齿轮）；插件侧没有官方挂载点，
+ * 去改宿主 React 树里的 nav 是"抢 DOM"，评审结论是砍掉。图标画在我们自己的内容区：
+ * 可测、可卸载、零宿主耦合。路径数据与 `docs/demo/account-security.svg` 同源。
+ */
+function AccountIcon() {
+  return (
+    <svg
+      viewBox={ACCOUNT_ICON_VIEW_BOX}
+      width={16}
+      height={16}
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      {ACCOUNT_ICON_PATHS.map((d) => (
+        <path key={d} d={d} />
+      ))}
+    </svg>
+  );
+}
+
 /** 提交控制器：四种 UI 状态 = idle/submitting(lock)/ok(success)/error(failure)。 */
 interface PasswordChangeController {
   values: FormValues;
@@ -35,6 +66,8 @@ interface PasswordChangeController {
   composing: MutableRefObject<boolean>;
   setValue: (field: FieldName, value: string) => void;
   submit: () => Promise<void>;
+  /** 成功态的「重新登录」动作：清掉待跳定时器后立即 replace（幂等，允许连点）。 */
+  relogin: () => void;
 }
 
 /**
@@ -95,18 +128,49 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     }
   };
 
-  return { values, submitting, failure, success, composing, setValue, submit };
+  /**
+   * P1.1 / D24：改密成功后**不再**留在面板上（服务端此刻已清 cookie 并吊销全部会话，
+   * 停在这里等于停在一个所有请求都 401 的死会话 SPA 上）→ 约定时间后回登录页。
+   *
+   * 定时器归 `account-redirect.ts` 的模块作用域管，**这里刻意不写 cleanup**：成功态会被宿主
+   * 关弹窗 / 切分区 / status 翻转拆掉，卸载即取消跳转的话，人反而被留在死会话壳里（复审结论）。
+   */
+  useEffect(() => {
+    if (success === null) return;
+    scheduleRedirectToLogin();
+  }, [success]);
+
+  return {
+    values,
+    submitting,
+    failure,
+    success,
+    composing,
+    setValue,
+    submit,
+    relogin: redirectToLoginNow,
+  };
 }
 
-/** 改密表单 props：`t` 来自槽位 locale seat，`close` 是宿主 owner props。 */
+/**
+ * 改密表单 props：`t` 来自槽位 locale seat。
+ * 宿主 owner props 里还有 `close`（关闭设置弹窗），P1.1 起**刻意不再使用**：成功后去向由
+ * 服务端会话状态决定（去登录页），关掉弹窗只会在死会话 SPA 上留下用户。
+ */
 export interface AccountPasswordFormProps {
   t: AccountTranslate;
-  close?: (() => void) | undefined;
 }
 
-/** 已登录时的自助改密表单（成功后整页换成提示 + owner 的 close 按钮）。 */
-export function AccountPasswordForm({ t, close }: AccountPasswordFormProps) {
+/** 已登录时的自助改密表单（成功后整页换成提示 + 「重新登录」按钮）。 */
+export function AccountPasswordForm({ t }: AccountPasswordFormProps) {
   const form = usePasswordChange(t);
+  const reloginButton = useRef<HTMLButtonElement | null>(null);
+
+  // 成功态不再是"关掉就好"：把焦点交给「重新登录」，键盘/读屏用户不必等 2.5s 自动跳。
+  useEffect(() => {
+    if (form.success !== null) reloginButton.current?.focus();
+  }, [form.success]);
+
   const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
     if (form.composing.current) return;
@@ -121,23 +185,28 @@ export function AccountPasswordForm({ t, close }: AccountPasswordFormProps) {
   if (form.success !== null) {
     return (
       <section style={PANEL_STYLE}>
-        <h2 style={TITLE_STYLE}>{t(ACCOUNT_KEYS.title)}</h2>
+        <h2 style={TITLE_ROW_STYLE}>
+          <AccountIcon />
+          {t(ACCOUNT_KEYS.title)}
+        </h2>
         <p id={ACCOUNT_STATUS_ID} role="status" aria-live="polite" style={SUCCESS_TEXT_STYLE}>
           {form.success}
         </p>
-        {typeof close === "function" ? (
-          <button type="button" onClick={close} style={BUTTON_STYLE}>
-            {t(ACCOUNT_KEYS.close)}
-          </button>
-        ) : null}
+        <button ref={reloginButton} type="button" onClick={form.relogin} style={BUTTON_STYLE}>
+          {t(ACCOUNT_KEYS.relogin)}
+        </button>
       </section>
     );
   }
   const isInvalid = (field: FieldName): boolean => form.failure?.fields.includes(field) === true;
   return (
     <section style={PANEL_STYLE}>
-      <h2 style={TITLE_STYLE}>{t(ACCOUNT_KEYS.title)}</h2>
+      <h2 style={TITLE_ROW_STYLE}>
+        <AccountIcon />
+        {t(ACCOUNT_KEYS.title)}
+      </h2>
       <p style={HINT_STYLE}>{t(ACCOUNT_KEYS.intro)}</p>
+      <p style={HINT_STYLE}>{t(ACCOUNT_KEYS.scope)}</p>
       <form
         style={FORM_STYLE}
         noValidate

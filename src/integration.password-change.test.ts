@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { verifyPassword } from "./features/password/index.js";
+import {
+  PASSWORD_CHANGED_NOTICE,
+  PASSWORD_CHANGED_TEXT,
+  verifyPassword,
+} from "./features/password/index.js";
 import {
   changeBody,
   changePassword,
@@ -181,6 +185,85 @@ describe("integration: password change rejection paths", () => {
       const res = await changePassword(base, cookie, changeBody(OLD_PASSWORD, NEW_PASSWORD));
       expect(res.status).toBe(503);
       expect(await stillAuthenticated(base, cookie)).toBe(true);
+    } finally {
+      await unmountStack(stack);
+    }
+  });
+});
+
+/**
+ * P1.1 / D24：改密后客户端把当前设备送回登录页，登录卡要说明原因。
+ * 这里用真实 HTTP 串起两侧字面量（客户端不 import 服务端 shared，只能靠测试钉住咬合）。
+ */
+describe("integration: login notice after a password change (P1.1)", () => {
+  it("pins the client redirect key to the server-rendered copy", async () => {
+    const stack = await mountPasswordChangeStack();
+    try {
+      // 客户端半边不 import 服务端 shared（切片门禁 + host 侧 tsconfig 无 DOM lib），两侧各写一份
+      // 字面量：用服务端常量打真实 HTTP，客户端那份由下面 source-pin 用例按源码文本对齐。
+      const notice = PASSWORD_CHANGED_NOTICE;
+      const res = await fetch(`${stack.base}/auth/login?next=%2F&notice=${notice}`, {
+        redirect: "manual",
+      });
+      const html = await res.text();
+      expect(res.status).toBe(200);
+      expect(res.headers.get("cache-control")).toBe("no-store");
+      expect(html).toContain(`<p class="notice" role="status">${PASSWORD_CHANGED_TEXT}</p>`);
+      expect(html).toContain('action="/auth/login"');
+    } finally {
+      await unmountStack(stack);
+    }
+  });
+
+  it("never reflects a hostile value and leaves the 401 failure page untouched", async () => {
+    const stack = await mountPasswordChangeStack();
+    try {
+      const hostile = await fetch(
+        `${stack.base}/auth/login?notice=${encodeURIComponent("<script>alert(1)</script>")}`,
+        { redirect: "manual" },
+      );
+      const html = await hostile.text();
+      expect(html).not.toContain('class="notice"');
+      expect(html).not.toContain("alert(1)");
+
+      const failure = await fetch(`${stack.base}/auth/login?notice=password-changed`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "username=admin&password=definitely-wrong",
+        redirect: "manual",
+      });
+      const failureHtml = await failure.text();
+      expect(failure.status).toBe(401);
+      expect(failureHtml).toContain("Invalid username or password.");
+      expect(failureHtml).not.toContain('class="notice"');
+    } finally {
+      await unmountStack(stack);
+    }
+  });
+
+  it("keeps the notice off the TOTP challenge page (只在密码卡上说这件事)", async () => {
+    const stack = await mountPasswordChangeStack({
+      totp: "required",
+      totpSecret: "JBSWY3DPEHPK3PXP",
+    });
+    try {
+      const stage1 = await fetch(`${stack.base}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `username=admin&password=${encodeURIComponent(OLD_PASSWORD)}`,
+        redirect: "manual",
+      });
+      expect(stage1.status).toBe(302);
+      const challenge = stage1.headers.get("set-cookie")!.split(";")[0]!;
+
+      const page = await fetch(`${stack.base}/auth/login?notice=password-changed`, {
+        headers: { cookie: challenge },
+        redirect: "manual",
+      });
+      const html = await page.text();
+      expect(page.status).toBe(200);
+      expect(html).toContain("Two-factor");
+      expect(html).not.toContain('class="notice"');
     } finally {
       await unmountStack(stack);
     }

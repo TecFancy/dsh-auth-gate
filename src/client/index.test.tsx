@@ -80,7 +80,7 @@ describe("apply registration", () => {
     ]);
   });
 
-  it("registers the account section with the frozen id, order 500 and a locale thunk label", () => {
+  it("registers the account section with the frozen id, order 900 and a locale thunk label", () => {
     const h = makeHarness();
     apply(h.ctx);
     mountSlot(h, "settings.section");
@@ -89,12 +89,20 @@ describe("apply registration", () => {
     expect(opts.name).toBe("settings.section");
     expect(opts.id).toBe("dsh-auth-gate-account");
     expect(opts.locale).toBe("auth");
-    expect(opts.order).toBe(500);
+    expect(opts.order).toBe(900);
     expect(component).toBe(SettingsAccountSection);
     expect(typeof opts.label).toBe("function");
-    // order 选址：高于姊妹包订阅页 90，低于本插件登出 CTA 的 1000（注释见 index.tsx）。
+    // order 选址：大于全部已知条目（宿主 0/10/15/20、姊妹包订阅页 90），落在导航靠后。
     expect(opts.order).toBeGreaterThan(90);
     expect(opts.order).toBeLessThan(1000);
+  });
+
+  it("never takes the host's reserved `account` section id (0.1.7 官方云账户页占用它)", () => {
+    const h = makeHarness();
+    apply(h.ctx);
+    mountSlot(h, "settings.section");
+    // 同 id 会被 `only` 过滤同时挂载（双段内容），且语义错位：官方那段是 DeepSeek 云账户。
+    expect(h.registers[0]!.opts.id).not.toBe("account");
   });
 
   it("re-projects the section label from the active locale on the same thunk", () => {
@@ -102,9 +110,9 @@ describe("apply registration", () => {
     apply(h.ctx);
     mountSlot(h, "settings.section");
     const label = h.registers[0]!.opts.label as () => string;
-    expect(label()).toBe("账户");
+    expect(label()).toBe("账号安全");
     h.switchLocale({ logout: "Sign out", ...ACCOUNT_DICT_EN });
-    expect(label()).toBe("Account");
+    expect(label()).toBe("Account security");
   });
 
   it("keeps the logout CTA registration semantics unchanged (id, order 1000, zh label)", () => {

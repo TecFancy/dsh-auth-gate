@@ -118,15 +118,27 @@ for light/dark), and its label follows the GUI language through the same
 locale mechanism the Settings language switch uses. Clicking it runs the same
 native `POST /auth/logout?next=/` flow as before.
 
-A signed-in user can also change their own password from the **Account** section of
-the Settings panel (password mode only): current password, the new password typed
-twice, and a TOTP code whenever the account has a secret. The panel posts to
-`POST /auth/password` (`current` / `password` / `code`, form-urlencoded) and, on
-success, **every session of that user is revoked, including the one making the
-change**, so it tells you to sign in again. Passwords must be at least 14 characters,
-contain four character classes and differ from the current one. With TOTP on, a code
-already spent in the current 30-second window is rejected as a replay: wait for the
-next code.
+A signed-in user can also change their own password from the **Account security**
+section of the Settings panel (password mode only): current password, the new
+password typed twice, and a TOTP code whenever the account has a secret. The panel
+title carries the plugin's own mark (a shield + keyhole outlined at 16px); the
+icon next to the section name in the nav is drawn by the host, which currently has
+no per-section icon option, so third-party sections keep the default gear.
+
+![Change-password panel](docs/demo/account-change-password.png)
+
+The panel posts to `POST /auth/password` (`current` / `password` / `code`,
+form-urlencoded) and, on success, **every session of that user is revoked,
+including the one making the change**. The copy stays on screen for 2.5 s, then the
+device is sent back to the login page with a reason, and the card explains why:
+
+![Password changed](docs/demo/account-password-changed.png)
+
+![Login page explaining the sign-out](docs/demo/login-password-changed.png)
+
+Passwords must be at least 14 characters, contain four character classes and
+differ from the current one. With TOTP on, a code already spent in the current
+30-second window is rejected as a replay: wait for the next code.
 
 ## Configuration
 

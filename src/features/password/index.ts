@@ -27,3 +27,8 @@ export {
   CHALLENGE_TTL_SECONDS,
   parseChallengeValue,
 } from "./challenge-cookie.js";
+export {
+  PASSWORD_CHANGED_NOTICE,
+  PASSWORD_CHANGED_TEXT,
+  resolveLoginNotice,
+} from "./login-notice.js";

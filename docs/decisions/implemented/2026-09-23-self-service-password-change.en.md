@@ -179,3 +179,16 @@ Independent evaluation and evidence index: the feasibility evaluation
 `notes/tech/dsh-auth-gate/password-change-feasibility-2026-09-23.md` §3 (server-side key points 1
 to 13) and §6 (decided by the owner on 2026-09-23 16:49). The frozen implementation contract lives
 in the workspace at `tmp/auth-pwchange/CONTRACT.md` §1, §4, §5 and §6.
+
+## Follow-up revision (P1.1 / D24, 2026-09-23)
+
+Three client-side details frozen in D22 were revised by D24 (the server contract is unchanged):
+
+- the settings nav `order` moved from 500 to **900** and the nav label from "Account" to
+  **"Account security"** (to avoid clashing with the host's official cloud-account section in
+  0.1.7); the section id stays `dsh-auth-gate-account`;
+- success no longer leaves the user on the panel: the copy stays 2.5 s, then `location.replace`
+  returns the device to the login page, and the button reads "Sign in again";
+- the login page gained a whitelisted `notice` slot that explains the sign-out (see D24).
+
+The earlier "the panel tells you to sign in again" wording is superseded by the above.

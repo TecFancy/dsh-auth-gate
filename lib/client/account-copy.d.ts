@@ -13,6 +13,8 @@ export declare const ACCOUNT_KEYS: {
     readonly nav: "account";
     readonly title: "account.title";
     readonly intro: "account.intro";
+    /** 作用域说明（P1.1）：0.1.7 起宿主有官方「账户」段，这里要讲清"管的是本地登录凭据"。 */
+    readonly scope: "account.scope";
     readonly loading: "account.loading";
     readonly loginRequired: "account.loginRequired";
     readonly current: "account.current";
@@ -24,7 +26,11 @@ export declare const ACCOUNT_KEYS: {
     readonly submit: "account.submit";
     readonly submitting: "account.submitting";
     readonly success: "account.success";
-    readonly close: "account.close";
+    /**
+     * 成功态按钮（P1.1 / D24）：不再是「关闭」：服务端此刻已吊销全部会话，关掉弹窗只会
+     * 停在「死会话 SPA」上；改为直接去登录页。
+     */
+    readonly relogin: "account.relogin";
     readonly currentRequired: "account.currentRequired";
     readonly passwordRequired: "account.passwordRequired";
     readonly mismatch: "account.mismatch";

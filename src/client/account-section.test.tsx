@@ -5,6 +5,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, formatCopy } from "./account-copy.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
 
+// 跳转是副作用：这里替换成 spy，测试只断言"什么时候请求跳、跳几次"；时间语义与真实 URL 由
+// account-redirect.test.ts 钉住，跨侧常量一致性由 integration.password-change.test.ts 的 source-pin 钉住。
+const redirectApi = vi.hoisted(() => ({
+  scheduleRedirectToLogin: vi.fn(),
+  redirectToLoginNow: vi.fn(),
+  cancelScheduledRedirect: vi.fn(),
+}));
+vi.mock("./account-redirect.ts", () => ({
+  LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
+  LOGIN_REDIRECT_DELAY_MS: 2500,
+  ...redirectApi,
+}));
+
 // React 18 的 act() 需要显式声明测试环境（否则只警告不生效）。
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -24,7 +37,8 @@ const en = makeT(ACCOUNT_DICT_EN);
 
 interface SectionProps {
   t?: typeof zh;
-  close?: () => void;
+  /** 宿主 owner props（close 等）可透传：组件已不再使用它们，留作回归断言。 */
+  [key: string]: unknown;
 }
 
 /** 渲染组件到独立容器（jsdom），返回 root 供卸载。 */
@@ -122,6 +136,7 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   fetchMock.mockReset();
+  for (const fn of Object.values(redirectApi)) fn.mockReset();
 });
 
 describe("SettingsAccountSection gate", () => {
@@ -129,6 +144,12 @@ describe("SettingsAccountSection gate", () => {
     routeFetch(() => statusOk(true));
     const { root, container } = await render({ t: zh });
     expect(container.querySelector("h2")?.textContent).toBe("修改密码");
+    // P1.1：自设计图标画在我们自己的内容区（宿主 nav 没有 icon 挂载点，见 D24）
+    const mark = container.querySelector("h2 svg");
+    expect(mark).not.toBeNull();
+    expect(mark?.getAttribute("aria-hidden")).toBe("true");
+    expect(mark?.getAttribute("viewBox")).toBe("0 0 16 16");
+    expect(container.textContent).toContain("与 DeepSeek 云账户无关");
     expect(container.querySelectorAll("form input")).toHaveLength(4);
     expect(inputByName(container, "current").getAttribute("autocomplete")).toBe("current-password");
     expect(inputByName(container, "password").getAttribute("autocomplete")).toBe("new-password");
@@ -185,19 +206,19 @@ describe("SettingsAccountSection gate", () => {
     expect(container.querySelector("button[type=submit]")?.textContent).toBe("Change password");
     expect(container.textContent).toContain("Current password");
     expect(container.textContent).toContain("Sign in again with your new password");
+    expect(container.textContent).toContain("not your DeepSeek account");
     cleanup(root, container);
   });
 });
 
 describe("SettingsAccountSection submit", () => {
-  it("POSTs urlencoded credentials, asserts the body, then reports the device-wide sign-out", async () => {
-    const close = vi.fn();
+  it("POSTs urlencoded credentials, asserts the body, then hands the device its way out", async () => {
     const posts: [string, RequestInit][] = [];
     routeFetch((url, init) => {
       posts.push([url, init]);
       return url === "/auth/status" ? statusOk(true) : jsonResponse(200, { ok: true });
     });
-    const { root, container } = await render({ t: zh, close });
+    const { root, container } = await render({ t: zh });
     fillValid(container);
     submitForm(container);
     await settle();
@@ -213,10 +234,31 @@ describe("SettingsAccountSection submit", () => {
     expect(container.querySelector("form")).toBeNull();
     expect(container.textContent).toContain("密码已改，请重新登录");
     expect(container.textContent).toContain("当前设备也已登出");
-    const closeButton = container.querySelector("button");
-    expect(closeButton?.textContent).toBe("关闭");
-    closeButton?.click();
-    expect(close).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("button")?.textContent).toBe("重新登录");
+    // 成功后只请求排程，不立刻跳（时间语义与 URL 见 account-redirect.test.ts / account-relogin.test.tsx）
+    expect(redirectApi.scheduleRedirectToLogin).toHaveBeenCalledTimes(1);
+    expect(redirectApi.redirectToLoginNow).not.toHaveBeenCalled();
+    cleanup(root, container);
+  });
+});
+
+describe("SettingsAccountSection host props", () => {
+  it("ignores the host close prop after success (去向由会话状态决定，不是关弹窗)", async () => {
+    const close = vi.fn();
+    routeFetch((url) =>
+      url === "/auth/status" ? statusOk(true) : jsonResponse(200, { ok: true }),
+    );
+    const { root, container } = await render({ t: zh, close });
+    fillValid(container);
+    submitForm(container);
+    await settle();
+    const relogin = container.querySelector("button");
+    expect(relogin?.textContent).toBe("重新登录");
+    act(() => {
+      relogin?.click();
+    });
+    expect(close).not.toHaveBeenCalled();
+    expect(redirectApi.redirectToLoginNow).toHaveBeenCalledTimes(1);
     cleanup(root, container);
   });
 });

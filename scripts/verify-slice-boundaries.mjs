@@ -54,6 +54,7 @@ const ROOT_FILES = new Set([
   "integration.password.test.ts",
   "integration.password-change.test.ts",
   "integration.password-change.totp.test.ts",
+  "integration.p11-pins.test.ts",
   "integration.password.rate.test.ts",
   "integration.revoke.test.ts",
   "integration.session.test.ts",

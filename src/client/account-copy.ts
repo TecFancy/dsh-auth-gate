@@ -15,6 +15,8 @@ export const ACCOUNT_KEYS = {
   nav: "account",
   title: "account.title",
   intro: "account.intro",
+  /** 作用域说明（P1.1）：0.1.7 起宿主有官方「账户」段，这里要讲清"管的是本地登录凭据"。 */
+  scope: "account.scope",
   loading: "account.loading",
   loginRequired: "account.loginRequired",
   current: "account.current",
@@ -26,7 +28,11 @@ export const ACCOUNT_KEYS = {
   submit: "account.submit",
   submitting: "account.submitting",
   success: "account.success",
-  close: "account.close",
+  /**
+   * 成功态按钮（P1.1 / D24）：不再是「关闭」：服务端此刻已吊销全部会话，关掉弹窗只会
+   * 停在「死会话 SPA」上；改为直接去登录页。
+   */
+  relogin: "account.relogin",
   currentRequired: "account.currentRequired",
   passwordRequired: "account.passwordRequired",
   mismatch: "account.mismatch",
@@ -78,9 +84,10 @@ export function translateFrom(dict: Record<string, string>): AccountTranslate {
 
 /** 中文词典。 */
 export const ACCOUNT_DICT_ZH: Record<string, string> = {
-  [ACCOUNT_KEYS.nav]: "账户",
+  [ACCOUNT_KEYS.nav]: "账号安全",
   [ACCOUNT_KEYS.title]: "修改密码",
   [ACCOUNT_KEYS.intro]: "改密成功后，当前设备也会被登出，需要用新密码重新登录。",
+  [ACCOUNT_KEYS.scope]: "这里是本实例的本地登录凭据，与 DeepSeek 云账户无关。",
   [ACCOUNT_KEYS.loading]: "正在确认登录状态...",
   [ACCOUNT_KEYS.loginRequired]: "请先登录后再修改密码。",
   [ACCOUNT_KEYS.current]: "当前密码",
@@ -93,7 +100,7 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.submit]: "修改密码",
   [ACCOUNT_KEYS.submitting]: "提交中...",
   [ACCOUNT_KEYS.success]: "密码已改，请重新登录。当前设备也已登出。",
-  [ACCOUNT_KEYS.close]: "关闭",
+  [ACCOUNT_KEYS.relogin]: "重新登录",
   [ACCOUNT_KEYS.currentRequired]: "请输入当前密码。",
   [ACCOUNT_KEYS.passwordRequired]: "请输入新密码。",
   [ACCOUNT_KEYS.mismatch]: "两次输入的新密码不一致。",
@@ -115,10 +122,12 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
 
 /** 英文词典。 */
 export const ACCOUNT_DICT_EN: Record<string, string> = {
-  [ACCOUNT_KEYS.nav]: "Account",
+  [ACCOUNT_KEYS.nav]: "Account security",
   [ACCOUNT_KEYS.title]: "Change password",
   [ACCOUNT_KEYS.intro]:
     "After the change, this device is signed out too. Sign in again with your new password.",
+  [ACCOUNT_KEYS.scope]:
+    "These are this instance's local sign-in credentials, not your DeepSeek account.",
   [ACCOUNT_KEYS.loading]: "Checking your session...",
   [ACCOUNT_KEYS.loginRequired]: "Sign in first to change your password.",
   [ACCOUNT_KEYS.current]: "Current password",
@@ -133,7 +142,7 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
   [ACCOUNT_KEYS.submitting]: "Submitting...",
   [ACCOUNT_KEYS.success]:
     "Password changed. Please sign in again. This device has been signed out too.",
-  [ACCOUNT_KEYS.close]: "Close",
+  [ACCOUNT_KEYS.relogin]: "Sign in again",
   [ACCOUNT_KEYS.currentRequired]: "Enter your current password.",
   [ACCOUNT_KEYS.passwordRequired]: "Enter a new password.",
   [ACCOUNT_KEYS.mismatch]: "The two new passwords do not match.",
