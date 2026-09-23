@@ -5,16 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, formatCopy } from "./account-copy.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
 
-// 跳转是副作用：这里替换成 spy，测试只断言"什么时候请求跳、跳几次"；时间语义与真实 URL 由
-// account-redirect.test.ts 钉住，跨侧常量一致性由 integration.password-change.test.ts 的 source-pin 钉住。
+// 跳转是副作用：这里替换成 spy，测试只断言"什么时候请求跳、跳几次"；真实 URL 与 replace 语义由
+// account-redirect.test.ts 钉住，跨侧常量一致性由 integration.p11-pins.test.ts 的 source-pin 钉住。
 const redirectApi = vi.hoisted(() => ({
-  scheduleRedirectToLogin: vi.fn(),
-  redirectToLoginNow: vi.fn(),
-  cancelScheduledRedirect: vi.fn(),
+  redirectToLogin: vi.fn(),
 }));
 vi.mock("./account-redirect.ts", () => ({
   LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
-  LOGIN_REDIRECT_DELAY_MS: 2500,
   ...redirectApi,
 }));
 
@@ -235,9 +232,8 @@ describe("SettingsAccountSection submit", () => {
     expect(container.textContent).toContain("密码已改，请重新登录");
     expect(container.textContent).toContain("当前设备也已登出");
     expect(container.querySelector("button")?.textContent).toBe("重新登录");
-    // 成功后只请求排程，不立刻跳（时间语义与 URL 见 account-redirect.test.ts / account-relogin.test.tsx）
-    expect(redirectApi.scheduleRedirectToLogin).toHaveBeenCalledTimes(1);
-    expect(redirectApi.redirectToLoginNow).not.toHaveBeenCalled();
+    // D24.1：成功响应一到就请求跳转（URL 与 replace 语义见 account-redirect.test.ts）
+    expect(redirectApi.redirectToLogin).toHaveBeenCalledTimes(1);
     cleanup(root, container);
   });
 });
@@ -258,7 +254,7 @@ describe("SettingsAccountSection host props", () => {
       relogin?.click();
     });
     expect(close).not.toHaveBeenCalled();
-    expect(redirectApi.redirectToLoginNow).toHaveBeenCalledTimes(1);
+    expect(redirectApi.redirectToLogin).toHaveBeenCalledTimes(2); // 成功时一次 + 手动点一次
     cleanup(root, container);
   });
 });

@@ -121,18 +121,26 @@ native `POST /auth/logout?next=/` flow as before.
 A signed-in user can also change their own password from the **Account security**
 section of the Settings panel (password mode only): current password, the new
 password typed twice, and a TOTP code whenever the account has a secret. The panel
-title carries the plugin's own mark (a shield + keyhole outlined at 16px); the
-icon next to the section name in the nav is drawn by the host, which currently has
-no per-section icon option, so third-party sections keep the default gear.
+title carries the plugin's own mark (a shield + keyhole outlined at 16px).
+
+The mark next to the section name in the nav is the plugin's too: the host has no
+per-section icon option yet (`settings.section` carries only `id`/`order`/`label`,
+and nav icons come from the host's hard-coded `navIcon(id)`, which falls back to
+the default gear for third-party sections), so a **temporary DOM stopgap** replaces
+our own row and nothing else (if it cannot find the row it silently falls back to
+the gear). Once dsh offers an `icon` option, the stopgap and its code are removed
+(see ADR D24.1 for the migration conditions).
+
+![Account security row in the settings nav](docs/demo/account-nav-icon.png)
 
 ![Change-password panel](docs/demo/account-change-password.png)
 
 The panel posts to `POST /auth/password` (`current` / `password` / `code`,
 form-urlencoded) and, on success, **every session of that user is revoked,
-including the one making the change**. The copy stays on screen for 2.5 s, then the
-device is sent back to the login page with a reason, and the card explains why:
-
-![Password changed](docs/demo/account-password-changed.png)
+including the one making the change**. The client **immediately** sends the device
+back to the login page with a reason, and the card explains why (the success panel
+only stays on screen when the environment refuses to navigate; its "Sign in again"
+button is then the fallback way out):
 
 ![Login page explaining the sign-out](docs/demo/login-password-changed.png)
 

@@ -92,11 +92,56 @@ functional impact); and until the host offers an icon API the nav row keeps the 
 
 ## Migration conditions (what to do when the host upgrades)
 
-| Trigger                                                                                           | Action                                                                                                                                                             |
-| :------------------------------------------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| The host adds an `icon` option to `settings.section`, or `navIcon` learns `dsh-auth-gate-account` | Switch to the official API for the icon; the self-drawn content-area mark can then be removed (avoid two marks on one screen)                                      |
-| Another plugin also registers `order: 900`                                                        | We step aside to 901/902 (first come, first served, as above)                                                                                                      |
-| The host adds a tie-breaker to nav sorting (e.g. by id)                                           | 900 stays valid; do not fight for "last"                                                                                                                           |
-| The host's global 401 handling navigates first within those 2.5 s                                 | The notice is lost and the page degrades to an ordinary login card (no security impact, known)                                                                     |
-| The official cloud-account section is labelled "Account" in every locale                          | The label "Account security" plus the content-area "local sign-in credentials" line already separate the semantics; **do not** take the id to grab the person icon |
-| The host unmounts the section that shows the success state                                        | The redirect survives because its timer is module-scoped (see `account-redirect.ts`)                                                                               |
+| Trigger                                                                                           | Action                                                                                                                                                                                                                             |
+| :------------------------------------------------------------------------------------------------ | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The host adds an `icon` option to `settings.section`, or `navIcon` learns `dsh-auth-gate-account` | Switch to the official API for the icon; **delete `src/client/account-nav-icon.ts` and its install call in `index.tsx`** (the D24.1 stopgap); the self-drawn content-area mark can then be removed (avoid two marks on one screen) |
+| Another plugin also registers `order: 900`                                                        | We step aside to 901/902 (first come, first served, as above)                                                                                                                                                                      |
+| The host adds a tie-breaker to nav sorting (e.g. by id)                                           | 900 stays valid; do not fight for "last"                                                                                                                                                                                           |
+| The host's global 401 handling navigates first                                                    | Resolved by D24.1: the client replaces as soon as the 200 arrives, with no grace period, so the notice is kept                                                                                                                     |
+| The official cloud-account section is labelled "Account" in every locale                          | The label "Account security" plus the content-area "local sign-in credentials" line already separate the semantics; **do not** take the id to grab the person icon                                                                 |
+| The host unmounts the section that shows the success state                                        | The success state is only a fallback (D24.1 navigates at success time), so a torn-down panel cannot strand the user                                                                                                                |
+
+## Follow-up revision (D24.1, 2026-09-23)
+
+After reviewing D24 the owner asked for two changes. Item 1 above (the 2500 ms stay) and item 4 above
+(no nav DOM) are superseded by this section; the server side and the `POST /auth/password` contract
+stay untouched:
+
+1. **A successful change goes to the login page immediately** (no 2500 ms stay). As soon as the 200
+   arrives the client runs `location.replace("/auth/login?next=%2F&notice=password-changed")`; the
+   success copy and the "Sign in again" button **become a fallback state** (if navigation is refused
+   by the environment the panel is still there, with focus on the button). Reason: the host's global
+   401 handling also navigates to the login page but without the reason key, so every millisecond of
+   the grace period was a race window; leaving first keeps the notice. `account-redirect.ts` therefore
+   keeps only `LOGIN_REDIRECT_URL` + `redirectToLogin()`; the timer, the cancel API and the
+   schedule API are gone.
+2. **Nav-row icon: a temporary DOM stopgap** (`src/client/account-nav-icon.ts`). It recognises only
+   our own row (a `<button>` whose last element child is a `<span>` whose text is `Account security` /
+   `账号安全`), sets the host gear to `display:none` and inserts the same shield SVG before the label.
+   When the row is missing, the structure differs, or there is no DOM at all it does **nothing** (the
+   host gear stays: never worse than the baseline). Every relevant DOM change re-runs the sync, so
+   host re-renders and repeated syncs never stack duplicated icons; the disposer disconnects the
+   observer **and restores the row** (host gear back, our glyph removed), so unloading returns to the
+   "never installed" state.
+   - **No flicker**: the observer is installed at `apply()` time, the host's React commit is followed
+     by the MutationObserver callback as a **microtask** in the same task, and the browser paints after
+     microtasks drain - so no frame ever shows the gear in our row. Verified on an isolated instance
+     with a per-frame rAF probe (it records the row icon each frame): the first frame already carries
+     our shield.
+   - **It answers D24's two objections**: D24 feared reconciliation would drop the injected node
+     (flicker) and that a visible label is an unstable selector. Both proved manageable - we only
+     **insert** a node (never delete a React-owned one) and add an inline `display:none` to the host
+     svg, neither of which React manages; and a failed label match degrades silently back to the gear,
+     with no functional or security impact.
+   - **Temporary by construction**: on the day dsh adds an `icon` option to `settings.section` (or maps
+     our id in `navIcon`), the whole file and the install call in `index.tsx` are deleted in favour of
+     the official field (first row of the table above). The upstream ask is drafted in the workspace at
+     `notes/tech/dsh-auth-gate/references/pwchange-p1-2026-09-23/proposal-nav-icon/`.
+
+**D24.1 residuals**: the stopgap depends on the host's nav row shape (`[icon, label]`; the hashed
+class names are not referenced), so a host rework that no longer matches will **silently fall back to
+the gear** (never destructive); if a host re-render removes the injected node, the next sync re-adds
+it, and the frame-level check was only run against the current host version (0.1.5-rc.2). README
+assets: the nav-rail close-up `docs/demo/account-nav-icon.png` (host gear and our shield side by
+side), and the archived fallback-state shot `docs/demo/account-password-changed.png` (only reachable
+when navigation is refused).

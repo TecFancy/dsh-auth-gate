@@ -8,7 +8,7 @@ import {
 } from "react";
 import { ACCOUNT_KEYS, type AccountTranslate } from "./account-copy.ts";
 import { ACCOUNT_ICON_PATHS, ACCOUNT_ICON_VIEW_BOX } from "./account-icon.ts";
-import { redirectToLoginNow, scheduleRedirectToLogin } from "./account-redirect.ts";
+import { redirectToLogin } from "./account-redirect.ts";
 import { ACCOUNT_STATUS_ID, PasswordFields, StatusLine } from "./account-fields.tsx";
 import {
   BUTTON_BUSY_STYLE,
@@ -31,10 +31,9 @@ import {
 /**
  * 本插件自设计的图标（P1.1 / D24）：盾 + 钥匙孔，16px outline。
  *
- * 为什么画在这里而不是导航行：宿主 `settings.section` 只投影 `id`/`order`/`label`，导航
- * 图标由宿主 `navIcon(id)` 的硬编码 if 链给出（第三方段一律齿轮）；插件侧没有官方挂载点，
- * 去改宿主 React 树里的 nav 是"抢 DOM"，评审结论是砍掉。图标画在我们自己的内容区：
- * 可测、可卸载、零宿主耦合。路径数据与 `docs/demo/account-security.svg` 同源。
+ * 内容区标题行这一份是**我们自己的 React 树**：不依赖宿主任何内部结构，可测、可卸载。
+ * 导航行那一份由 `account-nav-icon.ts` 的临时 DOM 垫片贴上去（宿主没有 `icon` 挂载点，
+ * 见 D24.1）。两处共用 `account-icon.ts` 的路径数据，与 `docs/demo/account-security.svg` 同源。
  */
 function AccountIcon() {
   return (
@@ -66,7 +65,7 @@ interface PasswordChangeController {
   composing: MutableRefObject<boolean>;
   setValue: (field: FieldName, value: string) => void;
   submit: () => Promise<void>;
-  /** 成功态的「重新登录」动作：清掉待跳定时器后立即 replace（幂等，允许连点）。 */
+  /** 兜底的「重新登录」动作：跳到登录页（幂等，允许连点）。 */
   relogin: () => void;
 }
 
@@ -115,7 +114,15 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
       const result = await submitPassword(values, controller.signal, t);
       if (!live()) return;
       if (result.kind === "ok") {
+        // D24.1：成功响应一到就跳（服务端此刻已清 cookie 并吊销全部会话）。先落成功态再跳，
+        // 导航若被环境拒绝，面板上就是"成功文案 + 重新登录按钮"的兜底态。
         setSuccess(t(ACCOUNT_KEYS.success));
+        try {
+          redirectToLogin();
+        } catch {
+          // 导航被环境拒绝（沙箱/异常宿主）：密码已经改完，绝不能把这条异常变成"修改失败"。
+          // 停在成功态 + 「重新登录」按钮就好（复审结论）。
+        }
         return;
       }
       if (result.kind === "failure") setFailure(result.failure);
@@ -128,18 +135,6 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     }
   };
 
-  /**
-   * P1.1 / D24：改密成功后**不再**留在面板上（服务端此刻已清 cookie 并吊销全部会话，
-   * 停在这里等于停在一个所有请求都 401 的死会话 SPA 上）→ 约定时间后回登录页。
-   *
-   * 定时器归 `account-redirect.ts` 的模块作用域管，**这里刻意不写 cleanup**：成功态会被宿主
-   * 关弹窗 / 切分区 / status 翻转拆掉，卸载即取消跳转的话，人反而被留在死会话壳里（复审结论）。
-   */
-  useEffect(() => {
-    if (success === null) return;
-    scheduleRedirectToLogin();
-  }, [success]);
-
   return {
     values,
     submitting,
@@ -148,25 +143,25 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     composing,
     setValue,
     submit,
-    relogin: redirectToLoginNow,
+    relogin: redirectToLogin,
   };
 }
 
 /**
  * 改密表单 props：`t` 来自槽位 locale seat。
  * 宿主 owner props 里还有 `close`（关闭设置弹窗），P1.1 起**刻意不再使用**：成功后去向由
- * 服务端会话状态决定（去登录页），关掉弹窗只会在死会话 SPA 上留下用户。
+ * 服务端会话状态决定（立即去登录页），关掉弹窗只会在死会话 SPA 上留下用户。
  */
 export interface AccountPasswordFormProps {
   t: AccountTranslate;
 }
 
-/** 已登录时的自助改密表单（成功后整页换成提示 + 「重新登录」按钮）。 */
+/** 已登录时的自助改密表单（成功后立即跳登录页；成功态面板只是兜底）。 */
 export function AccountPasswordForm({ t }: AccountPasswordFormProps) {
   const form = usePasswordChange(t);
   const reloginButton = useRef<HTMLButtonElement | null>(null);
 
-  // 成功态不再是"关掉就好"：把焦点交给「重新登录」，键盘/读屏用户不必等 2.5s 自动跳。
+  // 兜底态也要可达：跳转被环境拒绝时面板留着，焦点先落到唯一出路（WCAG 2.2.1 不必摸黑找按钮）。
   useEffect(() => {
     if (form.success !== null) reloginButton.current?.focus();
   }, [form.success]);

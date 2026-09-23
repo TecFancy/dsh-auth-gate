@@ -299,22 +299,26 @@ admin 数由 >0 变 0 即拒绝，`disable` / `role demote` 自动受保护）�
 
 ## D24. 改密后的去向、登录页原因提示，与设置导航身份（文案/order/图标）
 
-改密成功后不再停在"死会话"设置面板上：成功文案保留 **2500ms** 后
-`location.replace("/auth/login?next=%2F&notice=password-changed")`，按钮由"关闭"改
-**「重新登录」**（立即跳 + 清定时器）并自动获得焦点；`GET /auth/login` 用**精确白名单**把
+改密成功后不再停在"死会话"设置面板上：**D24.1 起成功响应一到就**
+`location.replace("/auth/login?next=%2F&notice=password-changed")`（原先的 2500ms 缓冲由主人
+拍板取消：宿主全局 401 处理也往登录页导航但不带原因键，缓冲期就是竞态窗口），成功文案与
+**「重新登录」**按钮降级为兜底态；`GET /auth/login` 用**精确白名单**把
 `notice` 映射成编译期常量（独立 `role="status"` 槽、只挂密码卡，TOTP 页/失败页/POST 重渲染
 都不带），query 只"选"文案、绝不拼接或回显。设置导航身份改为 id 保持
 `dsh-auth-gate-account`（**不抢**宿主 0.1.7 官方云账户的 `account`）、nav 文案
 **「账号安全 / Account security」**、`order` 500 → **900**（大于已知全部条目、落在导航靠后，
 但不承诺全局最后——宿主排序没有并列决胜）。图标：宿主 `settings.section` 没有 `icon` 选项
-（`navIcon(id)` 是宿主硬编码 if 链，第三方段恒为默认齿轮），故**不做**导航行 DOM 增强，自设计
-图标（盾 + 钥匙孔）只画在插件自己的内容区，资产见 `docs/demo/account-security.svg`。
+（`navIcon(id)` 是宿主硬编码 if 链，第三方段恒为默认齿轮），D24 原本只画在内容区；**D24.1 起**
+补一层临时 DOM 垫片 `src/client/account-nav-icon.ts`：只认我们自己那一行（`<button>` 最后一个
+元素子节点是文案 span），藏宿主齿轮、插入同一枚盾牌 SVG，找不到就静默退回齿轮，宿主重渲染后
+自愈，"上游支持 `icon` 后整体删除"写进迁移表；"不闪"由隔离实例的 rAF 逐帧探针验证
+（观察器回调是微任务，先于绘制）。
 **替代方案**：服务端 302（吞掉冻结的 200 JSON）；`location.assign`（死页面留在历史栈/bfcache）；
 flash cookie 携带 notice（扩大会话面）；抢 `id: "account"`（0.1.7 双挂载 + 语义错位）；
-导航行 `MutationObserver` 替换（与宿主 React 抢 DOM，评审否掉，提案源码留档在 notes）；
 order 保持 500（更易撞车，且 `-10 … 20` 之间没有契约空隙）。
 **为什么**：改密闭环的最后一跳要"走得了、看得懂、回得来"；所有新文案都是编译期常量 + 白名单
 选择，既解释原因又不引入反射面；导航身份的唯一硬约束是**不与宿主官方段撞名撞 id**，而 order
-只能声明"大于已知条目"，不能声明"最后"。
+只能声明"大于已知条目"，不能声明"最后"；D24.1 的导航垫片是"视觉临时、逻辑可退"的取舍 -
+匹配不上就退回齿轮，不动功能与安全，代价是宿主改版时要按 D24.1 迁移表复核。
 → [zh](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.zh.md) ·
 [en](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.en.md)

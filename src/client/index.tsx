@@ -1,4 +1,5 @@
 import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
+import { installAccountNavIcon } from "./account-nav-icon.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
 import type { AuthContext } from "./context.ts";
 import { SettingsLogoutAction } from "./logout-action.tsx";
@@ -49,9 +50,9 @@ const DEFAULT_LOGOUT_ORDER = 1000;
  * dsh-auth-gate-account，order 900）：内容为自助改密表单（见 account-section.tsx），
  * 文案复用同一个 `auth` 词典的 account 键。登出按钮的注册逻辑与 order 语义不变。
  *
- * 导航行图标：宿主 `settings.section` 没有 `icon` 选项（只有 id/order/label），第三方段的
- * 图标恒为宿主默认齿轮；插件侧没有官方挂载点，因此不抢宿主 nav 的 DOM（评审 D24 已否掉
- * 该方案），自设计图标只画在我们自己的内容区里（见 account-form.tsx 的 AccountIcon）。
+ * 导航行图标（D24.1）：宿主 `settings.section` 没有 `icon` 选项（只有 id/order/label），
+ * 第三方段的图标恒为宿主默认齿轮；插件侧没有官方挂载点，所以 `account-nav-icon.ts` 只对
+ * 我们这一行做一次临时 DOM 垫片（自设计盾牌图标），上游支持 `icon` 后整体删除。
  */
 export const inject = ["slots", "locale"];
 
@@ -119,5 +120,13 @@ export function apply(ctx: AuthContext): void {
       },
       SettingsAccountSection,
     ),
+  );
+
+  // 导航行图标垫片（D24.1）：只替换我们自己那一行，找不到就保持宿主齿轮；没有 DOM 的环境
+  // （node 单测）直接 no-op。上游给 `settings.section` 加 `icon` 后，这一行与
+  // account-nav-icon.ts 一起删除。
+  ctx.effect(
+    () => installAccountNavIcon(globalThis.document),
+    "auth: account nav icon shim (D24.1)",
   );
 }

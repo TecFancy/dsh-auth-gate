@@ -180,15 +180,19 @@ Independent evaluation and evidence index: the feasibility evaluation
 to 13) and §6 (decided by the owner on 2026-09-23 16:49). The frozen implementation contract lives
 in the workspace at `tmp/auth-pwchange/CONTRACT.md` §1, §4, §5 and §6.
 
-## Follow-up revision (P1.1 / D24, 2026-09-23)
+## Follow-up revision (P1.1 / D24 + D24.1, 2026-09-23)
 
-Three client-side details frozen in D22 were revised by D24 (the server contract is unchanged):
+Four client-side details frozen in D22 were revised by D24 / D24.1 (the server contract is unchanged):
 
 - the settings nav `order` moved from 500 to **900** and the nav label from "Account" to
   **"Account security"** (to avoid clashing with the host's official cloud-account section in
   0.1.7); the section id stays `dsh-auth-gate-account`;
-- success no longer leaves the user on the panel: the copy stays 2.5 s, then `location.replace`
-  returns the device to the login page, and the button reads "Sign in again";
-- the login page gained a whitelisted `notice` slot that explains the sign-out (see D24).
+- success no longer leaves the user on the panel: **as soon as the 200 arrives** the client runs
+  `location.replace` back to the login page (D24 kept the copy for 2.5 s; D24.1 dropped the grace
+  period), the button reads "Sign in again", and the success state is only the fallback when
+  navigation is refused;
+- the login page gained a whitelisted `notice` slot that explains the sign-out (see D24);
+- the nav-row icon is now our self-designed shield, applied by a temporary DOM stopgap (D24.1;
+  removed once the host supports an `icon` option).
 
 The earlier "the panel tells you to sign in again" wording is superseded by the above.
