@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main, type CliIo } from "./cli.js";
 import { verifyPassword } from "./features/password/index.js";
@@ -90,10 +90,17 @@ async function runRealCli(
 ): Promise<{ code: number | null; out: string; err: string }> {
   const hook = path.join(dir, "resolve-js.mjs");
   await fs.writeFile(hook, RESOLVE_HOOK);
+  // `--import` 收的是**模块 specifier**：Windows 上直接喂 `C:\…` 会被当成 scheme `c:`，
+  // 子进程抛 ERR_UNSUPPORTED_ESM_URL_SCHEME（Linux 恰好能过，所以只在 windows-latest 红）。
+  // 入口脚本反过来要给**路径**：Node 会自己转成 file URL，喂 URL 反被 resolve 钩子按相对路径拼接。
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, ["--import", hook, CLI_PATH, ...args], {
-      stdio: ["pipe", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      ["--import", pathToFileURL(hook).href, CLI_PATH, ...args],
+      {
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    );
     let out = "";
     let err = "";
     child.stdout.on("data", (chunk: Buffer) => {
