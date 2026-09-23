@@ -34,7 +34,9 @@ so ask the instance owner if you are stuck.` `N` is the current `retry-after` in
   escaped `value` field plus a `username` render option; `src/shared/login-page-assets.ts` gained
   `SUBMIT_SCRIPT`.
 
-Deliberately unchanged: token mode keeps its `text/plain` 401 (frozen by M2), the lock and backoff
+Deliberately unchanged at the time: token mode's `text/plain` 401 (frozen by M2) — **superseded on
+2026-09-23, see D21**: token mode now renders its own failure card; the rest of this record stands.
+The lock and backoff
 semantics are untouched (issue #81), the shared-NAT bucket key is untouched (#82), the 6 KB CSS
 budget is untouched (this change adds no CSS), and the 401 sends **no** `WWW-Authenticate` header.
 

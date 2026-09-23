@@ -24,7 +24,8 @@ so ask the instance owner if you are stuck.`（`N` 取当前 `retry-after` 整�
   `sendInvalidCredentials`、`sendLockout`、`sendTotpLockout`）；`src/shared/login-page.ts` 增加
   转义 `value` 字段与 `username` 渲染选项；`src/shared/login-page-assets.ts` 增加 `SUBMIT_SCRIPT`。
 
-**刻意不动**：token 模式仍是 `text/plain` 401（M2 冻结）；锁定与退避语义不动（另见 issue #81）；
+**刻意不动（当时）**：token 模式仍是 `text/plain` 401（M2 冻结）—— **2026-09-23 已被 D21 取代**：
+token 模式现在渲染自己的失败卡片，本记录其余内容继续有效；锁定与退避语义不动（另见 issue #81）；
 NAT 共用出口的桶键不动（#82）；6KB CSS 预算不动（本次零新 CSS）；401 仍然**不发**
 `WWW-Authenticate`。
 

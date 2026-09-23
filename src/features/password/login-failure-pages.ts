@@ -11,6 +11,13 @@ import { loginPath, passwordLoginPageHtml, totpChallengePageHtml } from "../../s
 export const INVALID_CREDENTIALS = "Invalid username or password.";
 
 /**
+ * TOTP 第二段拒绝的唯一常量（D21）：错码、重放码、账号已无 secret 三态共用。
+ * 不复用 `INVALID_CREDENTIALS`：走到这一步口令是对的，说「用户名或密码错」会指向错误的
+ * 手因；也不能细分重放/过期/漂移，否则等于给攻击者一个反馈探针。
+ */
+export const INVALID_TOTP_CODE = "Invalid or expired code.";
+
+/**
  * 锁定文案（429）：按「这个网络」而非「你的账号」陈述，桶按客户端 IP（#82）时不会指控错人；
  * 不显示剩余次数，也不承诺自助重置（本产品没有）。
  */
