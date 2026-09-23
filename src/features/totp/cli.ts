@@ -1,10 +1,9 @@
 import { generateTotpSecret } from "./totp.js";
 import {
-  loadUsersFile,
+  mutateUsersFile,
   USERNAME_RE,
-  writeUsersFile,
-  type UsersSnapshot,
   UsersFileError,
+  type UsersSnapshot,
 } from "../../shared/index.js";
 
 /** otpauth URI 的 issuer（M4 T3）。 */
@@ -17,8 +16,9 @@ export interface TotpCliIo {
 
 /**
  * `dsh-auth user totp <enable|disable> <name>`（M4 T14）。
- * enable：生成新 secret（已存在则拒绝），写回 users.yaml，输出 base32 + otpauth URI。
- * disable：移除 secret（幂等）。
+ * enable：生成新 secret（已存在则拒绝），锁内写回 users.yaml，输出 base32 + otpauth URI。
+ * disable：移除 secret（幂等）。两条路径都 spread 既有 record，role/mustChangePassword
+ * 不会被抹掉（P1 评审 A1：旧实现手工重建 record，新 schema 下会丢字段）。
  */
 export async function handleUserTotp(
   file: string,
@@ -37,30 +37,16 @@ async function enableTotp(file: string, name: string | undefined, io: TotpCliIo)
     io.err("Usage: dsh-auth user totp enable <name> [--file <path>]");
     return 1;
   }
-  let snapshot: UsersSnapshot;
-  try {
-    snapshot = (await loadUsersFile(file)).snapshot;
-  } catch (error) {
-    io.err(errorMessage(error));
-    return 1;
-  }
-  const user = snapshot.users.get(name);
-  if (user === undefined) {
-    io.err(`user ${name} not found`);
-    return 1;
-  }
-  if (user.totpSecret !== undefined) {
-    io.err(`user ${name} already has a TOTP secret (disable first)`);
-    return 1;
-  }
   const secret = generateTotpSecret();
-  try {
+  const saved = await mutate(file, io, (snapshot) => {
+    const user = snapshot.users.get(name);
+    if (user === undefined) throw new UsersFileError(`user ${name} not found`);
+    if (user.totpSecret !== undefined) {
+      throw new UsersFileError(`user ${name} already has a TOTP secret (disable first)`);
+    }
     snapshot.users.set(name, { ...user, totpSecret: secret });
-    await writeUsersFile(file, snapshot);
-  } catch (error) {
-    io.err(errorMessage(error));
-    return 1;
-  }
+  });
+  if (!saved) return 1;
   io.out(`TOTP secret for ${name}: ${secret}`);
   io.out(totpUri(name, secret));
   io.out("Add it to your authenticator app, then verify by logging in.");
@@ -72,27 +58,31 @@ async function disableTotp(file: string, name: string | undefined, io: TotpCliIo
     io.err("Usage: dsh-auth user totp disable <name> [--file <path>]");
     return 1;
   }
-  let snapshot: UsersSnapshot;
-  try {
-    snapshot = (await loadUsersFile(file)).snapshot;
-  } catch (error) {
-    io.err(errorMessage(error));
-    return 1;
-  }
-  const user = snapshot.users.get(name);
-  if (user === undefined) {
-    io.err(`user ${name} not found`);
-    return 1;
-  }
-  try {
-    snapshot.users.set(name, { passwordHash: user.passwordHash, disabled: user.disabled });
-    await writeUsersFile(file, snapshot); // 幂等：无 secret 也照写（重建对象不含 totpSecret）
-  } catch (error) {
-    io.err(errorMessage(error));
-    return 1;
-  }
+  const saved = await mutate(file, io, (snapshot) => {
+    const user = snapshot.users.get(name);
+    if (user === undefined) throw new UsersFileError(`user ${name} not found`);
+    const next = { ...user };
+    delete next.totpSecret;
+    snapshot.users.set(name, next);
+  });
+  if (!saved) return 1;
   io.out(`user ${name} TOTP disabled`);
   return 0;
+}
+
+/** 锁内变更 + 统一错误出口（enable/disable 自动获得锁/CAS/last-admin 保护）。 */
+async function mutate(
+  file: string,
+  io: TotpCliIo,
+  run: (snapshot: UsersSnapshot) => void,
+): Promise<boolean> {
+  try {
+    await mutateUsersFile(file, run);
+    return true;
+  } catch (error) {
+    io.err(errorMessage(error));
+    return false;
+  }
 }
 
 /** otpauth://totp/<issuer>:<name>?secret=<BASE32>&issuer=<issuer>（label 与 secret 均 URL 编码）。 */

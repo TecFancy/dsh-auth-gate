@@ -4,8 +4,9 @@ export interface TotpCliIo {
 }
 /**
  * `dsh-auth user totp <enable|disable> <name>`（M4 T14）。
- * enable：生成新 secret（已存在则拒绝），写回 users.yaml，输出 base32 + otpauth URI。
- * disable：移除 secret（幂等）。
+ * enable：生成新 secret（已存在则拒绝），锁内写回 users.yaml，输出 base32 + otpauth URI。
+ * disable：移除 secret（幂等）。两条路径都 spread 既有 record，role/mustChangePassword
+ * 不会被抹掉（P1 评审 A1：旧实现手工重建 record，新 schema 下会丢字段）。
  */
 export declare function handleUserTotp(file: string, command: string | undefined, name: string | undefined, io: TotpCliIo): Promise<number>;
 /** otpauth://totp/<issuer>:<name>?secret=<BASE32>&issuer=<issuer>（label 与 secret 均 URL 编码）。 */

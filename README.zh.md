@@ -38,8 +38,10 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
 - **一个管理用户的小命令行工具**：
 
   ```sh
-  dsh-auth user add admin --password-stdin   # 添加用户
+  dsh-auth user add admin --password-stdin   # 添加用户（加 --admin 直接建管理员）
   dsh-auth user list                          # 查看用户
+  dsh-auth user passwd admin                  # 改口令（读两次；刻意不提供 --password 明文参数）
+  dsh-auth user role admin user               # 授予/回收 admin 角色：user role <name> <admin|user>
   dsh-auth user disable admin                 # 禁止某用户今后登录，并吊销其已发会话
   dsh-auth user totp enable admin             # 生成 TOTP 密钥（打印 otpauth:// URI）
   dsh-auth user totp disable admin            # 移除 TOTP 密钥
@@ -47,6 +49,9 @@ barrel）、工程门禁（`npm run verify` 全链、bundle/slice/no-emdash 校�
 
   全局安装时 `dsh-auth` 直接在你的 PATH 上；`dsh plugin add` 安装后二进制在
   profile 里，需要经由 profile 调用——见[快速开始](#快速开始)。
+
+  `dsh-auth user passwd` 只改存储的哈希，**不会吊销该用户已登录的会话**；需要把会话
+  踢掉时用面板自助改密（或 `user disable` 的周期吊销）。
 
 ## 快速开始
 
@@ -93,6 +98,12 @@ Google Authenticator 等）里的 6 位验证码（先密码、后验证码）�
 页的最下方（最后一条设置项之后）。它是居中排布的填充式危险按钮（16px 门形图标 +
 本地化文字，配色用主题 token、深浅色自适应）；文案跟随界面语言（复用「设置」里
 语言切换的同一套 locale 机制）；点击走原有的原生 `POST /auth/logout?next=/` 登出流程。
+
+已登录用户还可以在设置面板的**「账号」**分区里自助改密（仅 password 模式）：当前口令、
+输入两次的新口令，账号绑定了 TOTP 时再加一枚验证码。面板向 `POST /auth/password` 提交
+（`current` / `password` / `code`，form-urlencoded）；成功后**该用户的全部会话都会被吊销，
+包括发起改密的当前会话**，所以面板会提示重新登录。新口令要求至少 14 位、覆盖四类字符、
+且不得与当前口令相同。启用 TOTP 时，当前 30 秒窗口内已用过的验证码会被判重放，需等下一枚。
 
 ## 配置
 
@@ -243,8 +254,13 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
   （进程级随机密钥，ADR D10）：无法伪造以跳过密码阶段。重启服务（或重载插件）后
   在途挑战失效——验证码页上的用户需重新输入密码（窗口 ≤ 5 分钟）；提交时按
   用户当前配置的密钥验证。
-- 反代部署时，限速按反代出口地址统计。
+- 反代部署时，限速按反代出口地址统计；自助改密（D22）的独立限速桶同样按
+  `clientIpHeader` 取客户端地址：未配受信反代客户端 IP 头时，同一主机上所有客户端
+  也会共用一个改密桶（与登录的问题同源，见 D19）。
 - 设置面板里有「退出登录」按钮：在 设置 → 通用设置 页最下方，文案随语言在
   「退出登录」/ "Sign out" 间切换；`/auth/logout?next=/` 始终可作为兜底。
+- 改密的会话吊销发生在**新哈希写盘成功之后**。若吊销这一步失败，改密仍如实报告成功
+  （口令已经生效），失败只记 error 日志；此时旧 cookie 会一直有效到会话 TTL 到期。
+  「吊销失败重试/告警」留到管理面阶段再做。
 - 本插件只保护 dsh 的网页入口，不能替代服务器层面的安全：请保持服务器系统用户最小权限、
   配置文件私密（`.credentials.yaml` 和 `auth/users.yaml` 创建时即为 `0600` 权限）。

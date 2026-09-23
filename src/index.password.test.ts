@@ -173,6 +173,56 @@ describe("apply: password mode", () => {
   });
 });
 
+// D22 反退化：password 模式必须总是注入改密三件套（可选注入 = 静默不注册的空间），
+// 且改密限速器必须是独立实例（与登录共用桶会互相 DoS 放大）。
+describe("apply: password mode self-service wiring (D22)", () => {
+  afterEach(() => {
+    capturedDeps.current = undefined;
+  });
+
+  it("always injects the self-service password-change deps", () => {
+    const server = makeFakeServer();
+    const { ctx } = makeCtx(server);
+    apply(ctx, cfg("password"));
+    const deps = capturedDeps.current as PasswordChangeDeps | undefined;
+    expect(deps?.passwordChange).toBeDefined();
+    expect(typeof deps?.passwordChange?.mutateUsers).toBe("function");
+    expect(typeof deps?.passwordChange?.hash).toBe("function");
+    expect(deps?.passwordChange?.limiter).toBeDefined();
+    expect(deps?.passwordChange?.limiter).not.toBe(deps?.limiter);
+  });
+
+  // 同一条改密端点必须复用登录注入的同一 replayGuard（不同实例会让同窗重放被放过）。
+  it("shares one TOTP replay guard between login and password change", () => {
+    const server = makeFakeServer();
+    const { ctx } = makeCtx(server);
+    apply(ctx, cfg("password"));
+    const deps = capturedDeps.current as PasswordChangeDeps | undefined;
+    const guard = deps?.replayCheck;
+    const changeGuard = deps?.passwordChange?.replayCheck;
+    expect(typeof guard).toBe("function");
+    expect(changeGuard).toBe(guard);
+  });
+
+  it("does not inject the self-service deps in token mode", () => {
+    const server = makeFakeServer();
+    const { ctx } = makeCtx(server);
+    apply(ctx, cfg("token"));
+    expect(capturedDeps.current).toBeUndefined();
+  });
+});
+
 interface ClientIpDeps {
   clientIp?: ((req: unknown) => string) | undefined;
+}
+
+interface PasswordChangeDeps {
+  limiter?: unknown;
+  replayCheck?: (username: string, counter: number, code: string) => boolean;
+  passwordChange?: {
+    mutateUsers: unknown;
+    hash: unknown;
+    limiter: unknown;
+    replayCheck?: (username: string, counter: number, code: string) => boolean;
+  };
 }

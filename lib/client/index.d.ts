@@ -13,6 +13,10 @@ import type { AuthContext } from "./context.ts";
  * 文案挂进 dsh 现有的 locale 机制（与「设置」里的语言切换同一套）：注册 `auth`
  * 词典（zh/en），再以 `locale: "auth"` 给注册条目注入 `t` seat，按钮文字随界面
  * 语言在「退出登录」/ "Sign out" 间实时切换。不改任何服务端端点/会话语义。
+ *
+ * 同一次 apply 还注册「账户」设置页（`settings.section`，id
+ * dsh-auth-gate-account，order 500）：内容为自助改密表单（见 account-section.tsx），
+ * 文案复用同一个 `auth` 词典的 account 键。登出按钮的注册逻辑与 order 语义不变。
  */
 export declare const inject: string[];
 export declare function apply(ctx: AuthContext): void;

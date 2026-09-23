@@ -1,3 +1,5 @@
+import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
+import { SettingsAccountSection } from "./account-section.tsx";
 import type { AuthContext } from "./context.ts";
 import { SettingsLogoutAction } from "./logout-action.tsx";
 
@@ -5,6 +7,18 @@ import { SettingsLogoutAction } from "./logout-action.tsx";
 const AUTH_NS = "auth";
 /** 命名词典里登出键。 */
 const LOGOUT_KEY = "logout";
+
+/** 「账户」设置页（自助改密）的 section id。 */
+const ACCOUNT_SECTION_ID = "dsh-auth-gate-account";
+/**
+ * 「账户」页在设置导航里的排列位置。
+ * 宿主自带条目：general 0 / models 10 / plugins 15 / agent-presets 20；姊妹包
+ * dsh-plugin-subscriptions 的订阅页是 90。账户页属低频安全设置，排在已知条目
+ * 之后：500 与姊妹包 90 不冲突，中间 91-499 留给后续第三方页面，同时远小于
+ * 登出 CTA 的 1000，两者互不遮挡。
+ */
+const ACCOUNT_SECTION_ORDER = 500;
+
 /**
  * 默认槽位 order：注册时先用它（与 host 端 Config 默认一致），随后 `/auth/status`
  * 探针读到 host 配置的 `logoutOrder` 时按配置重注册。1000 已大于 dsh 自带条目
@@ -27,17 +41,21 @@ const DEFAULT_LOGOUT_ORDER = 1000;
  * 文案挂进 dsh 现有的 locale 机制（与「设置」里的语言切换同一套）：注册 `auth`
  * 词典（zh/en），再以 `locale: "auth"` 给注册条目注入 `t` seat，按钮文字随界面
  * 语言在「退出登录」/ "Sign out" 间实时切换。不改任何服务端端点/会话语义。
+ *
+ * 同一次 apply 还注册「账户」设置页（`settings.section`，id
+ * dsh-auth-gate-account，order 500）：内容为自助改密表单（见 account-section.tsx），
+ * 文案复用同一个 `auth` 词典的 account 键。登出按钮的注册逻辑与 order 语义不变。
  */
 export const inject = ["slots", "locale"];
 
 export function apply(ctx: AuthContext): void {
-  // 词典注册（zh/en 双语，挂 fiber 卸载级联）。
+  // 词典注册（zh/en 双语，挂 fiber 卸载级联）：登出 CTA + 账户页共用 auth 命名域。
   ctx.effect(
     () => [
-      ctx.locale.register(AUTH_NS, "zh", { [LOGOUT_KEY]: "退出登录" }),
-      ctx.locale.register(AUTH_NS, "en", { [LOGOUT_KEY]: "Sign out" }),
+      ctx.locale.register(AUTH_NS, "zh", { [LOGOUT_KEY]: "退出登录", ...ACCOUNT_DICT_ZH }),
+      ctx.locale.register(AUTH_NS, "en", { [LOGOUT_KEY]: "Sign out", ...ACCOUNT_DICT_EN }),
     ],
-    "auth: logout dictionary",
+    "auth: zh/en dictionaries (logout + account)",
   );
 
   // 绑定 translate：读取活动语言（thunk 每次投影重读，跟随语言切换）。
@@ -80,4 +98,19 @@ export function apply(ctx: AuthContext): void {
     }
     return () => dispose?.();
   });
+
+  // 「账户」设置页：注册 `settings.section`（root 作用域、可追加列表槽，导航按
+  // order 升序）。内容是自助改密表单，未登录由组件自查 `/auth/status` 后隐藏。
+  ctx.slots.inject("settings.section", () =>
+    ctx.slots.register(
+      {
+        name: "settings.section",
+        id: ACCOUNT_SECTION_ID,
+        locale: AUTH_NS,
+        order: ACCOUNT_SECTION_ORDER,
+        label: () => t(ACCOUNT_KEYS.nav),
+      },
+      SettingsAccountSection,
+    ),
+  );
 }

@@ -15,8 +15,8 @@ export {
 } from "./password.js";
 export { DEFAULT_REVOKE_SWEEP_MS, DisabledSessionSweeper } from "./disabled-sweeper.js";
 export type { DisabledSweeperOptions } from "./disabled-sweeper.js";
-export { registerPasswordEndpoints } from "./password-endpoints.js";
-export type { PasswordEndpointsDeps } from "./password-endpoints.js";
+export { makePasswordChangeWiring, registerPasswordEndpoints } from "./password-endpoints.js";
+export type { PasswordChangeWiring, PasswordEndpointsDeps } from "./password-endpoints.js";
 export { PasswordGate } from "./password-gate.js";
 export type { PasswordGateOptions } from "./password-gate.js";
 export { handlePasswordLogin } from "./password-login.js";

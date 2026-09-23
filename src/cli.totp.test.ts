@@ -16,7 +16,7 @@ function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[]
     io: {
       out: (line) => out.push(line),
       err: (line) => err.push(line),
-      readLine: () => Promise.resolve(queue.shift() ?? ""),
+      readLines: (count: number) => Promise.resolve(queue.splice(0, count)),
     },
   };
 }

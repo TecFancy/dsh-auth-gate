@@ -6,9 +6,11 @@ import {
   compareNames,
   defaultUsersFilePath,
   loadUsersFile,
+  mutateUsersFile,
   renameWithRetry,
   UsersFileError,
   writeUsersFile,
+  type UserRecord,
   type UsersSnapshot,
 } from "./users-file.js";
 
@@ -21,6 +23,11 @@ users:
   bob:
     passwordHash: scrypt$65536$8$1$enp6enp6enp6enp6enp6eg$qhquFN2piwx7cxC6jYN4yREJCPln_GQTzBbLmm4bj1k
 `;
+
+/** 最小记录：默认值显式写全（role user / mustChangePassword false）。 */
+function user(passwordHash: string): UserRecord {
+  return { passwordHash, disabled: false, role: "user", mustChangePassword: false };
+}
 
 describe("defaultUsersFilePath", () => {
   afterEach(() => {
@@ -38,28 +45,26 @@ describe("defaultUsersFilePath", () => {
   });
 });
 
+let dir: string;
+let file: string;
+
+beforeEach(async () => {
+  dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-users-"));
+  file = path.join(dir, "users.yaml");
+  await fs.writeFile(file, VALID_YAML, { mode: 0o600 });
+});
+
+afterEach(async () => {
+  await fs.rm(dir, { recursive: true, force: true });
+});
+
 describe("loadUsersFile", () => {
-  let dir: string;
-  let file: string;
-
-  beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-users-"));
-    file = path.join(dir, "users.yaml");
-    await fs.writeFile(file, VALID_YAML, { mode: 0o600 });
-  });
-
-  afterEach(async () => {
-    await fs.rm(dir, { recursive: true, force: true });
-  });
-
   it("loads a valid file with defaults applied", async () => {
     const { snapshot, missing } = await loadUsersFile(file);
     expect(missing).toBe(false);
     expect([...snapshot.users.keys()].sort(compareNames)).toEqual(["alice", "bob"]);
-    const alice = snapshot.users.get("alice");
-    expect(alice?.passwordHash).toMatch(/^scrypt\$/);
-    expect(alice?.totpSecret).toBe("BASE32SECRET");
-    expect(alice?.disabled).toBe(true);
+    expect(snapshot.users.get("alice")?.totpSecret).toBe("BASE32SECRET");
+    expect(snapshot.users.get("alice")?.disabled).toBe(true);
     expect(snapshot.users.get("bob")?.disabled).toBe(false);
     expect(snapshot.users.get("bob")?.totpSecret).toBeUndefined();
   });
@@ -91,6 +96,9 @@ describe("loadUsersFile", () => {
       "version: 1\nusers:\n  alice:\n    disabled: true\n", // 缺 passwordHash
       "version: 1\nusers:\n  bad name!:\n    passwordHash: a\n",
       "version: 1\nusers:\n  alice:\n    totpSecret: 42\n    passwordHash: a\n",
+      "version: 1\nusers:\n  alice:\n    passwordHash: a\n    role: 7\n",
+      "version: 1\nusers:\n  alice:\n    passwordHash: a\n    role: root\n",
+      "version: 1\nusers:\n  alice:\n    passwordHash: a\n    must_change_password: nope\n",
     ];
     for (const text of cases) {
       await fs.writeFile(file, text);
@@ -108,29 +116,46 @@ describe("loadUsersFile", () => {
   );
 });
 
-describe("writeUsersFile", () => {
-  let dir: string;
-  let file: string;
-
-  beforeEach(async () => {
-    dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-users-"));
-    file = path.join(dir, "sub", "users.yaml");
+describe("loadUsersFile role / must_change_password", () => {
+  it("defaults role to user and mustChangePassword to false", async () => {
+    const { snapshot } = await loadUsersFile(file);
+    expect(snapshot.users.get("alice")?.role).toBe("user");
+    expect(snapshot.users.get("alice")?.mustChangePassword).toBe(false);
+    expect(snapshot.users.get("bob")?.role).toBe("user");
+    expect(snapshot.users.get("bob")?.mustChangePassword).toBe(false);
   });
 
-  afterEach(async () => {
-    await fs.rm(dir, { recursive: true, force: true });
+  it("reads role and must_change_password when present", async () => {
+    await fs.writeFile(
+      file,
+      `version: 1
+users:
+  alice:
+    passwordHash: a
+    role: admin
+    must_change_password: true
+`,
+    );
+    const { snapshot } = await loadUsersFile(file);
+    expect(snapshot.users.get("alice")?.role).toBe("admin");
+    expect(snapshot.users.get("alice")?.mustChangePassword).toBe(true);
+  });
+});
+
+describe("writeUsersFile", () => {
+  beforeEach(() => {
+    file = path.join(dir, "sub", "users.yaml");
   });
 
   it("writes deterministic content with sorted users and no tmp residue", async () => {
     const snapshot: UsersSnapshot = {
       users: new Map([
-        ["bob", { passwordHash: "h1", disabled: false }],
-        ["alice", { passwordHash: "h2", totpSecret: "S3", disabled: true }],
+        ["bob", user("h1")],
+        ["alice", { ...user("h2"), totpSecret: "S3", disabled: true }],
       ]),
     };
     await writeUsersFile(file, snapshot);
-    const text = await fs.readFile(file, "utf8");
-    expect(text).toBe(`version: 1
+    expect(await fs.readFile(file, "utf8")).toBe(`version: 1
 users:
   alice:
     passwordHash: h2
@@ -142,15 +167,75 @@ users:
     await expect(fs.stat(`${file}.tmp`)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("creates parent directories automatically", async () => {
-    await writeUsersFile(file, { users: new Map() });
-    await expect(fs.readFile(file, "utf8")).resolves.toContain("version: 1");
+  it(
+    "creates parent directories automatically and writes with mode 0600",
+    { skip: process.platform === "win32" },
+    async () => {
+      await writeUsersFile(file, { users: new Map() });
+      await expect(fs.readFile(file, "utf8")).resolves.toContain("version: 1");
+      expect((await fs.stat(file)).mode & 0o777).toBe(0o600);
+    },
+  );
+});
+
+describe("writeUsersFile role / mustChangePassword", () => {
+  beforeEach(() => {
+    file = path.join(dir, "sub", "users.yaml");
   });
 
-  it("writes with mode 0600 (POSIX only)", { skip: process.platform === "win32" }, async () => {
-    await writeUsersFile(file, { users: new Map() });
-    const stat = await fs.stat(file);
-    expect(stat.mode & 0o777).toBe(0o600);
+  it("persists admin and must_change_password, leaving defaults unwritten", async () => {
+    await writeUsersFile(file, {
+      users: new Map([["alice", { ...user("h2"), role: "admin", mustChangePassword: true }]]),
+    });
+    expect(await fs.readFile(file, "utf8")).toBe(`version: 1
+users:
+  alice:
+    passwordHash: h2
+    role: admin
+    must_change_password: true
+`);
+  });
+
+  it("round-trips the legacy fixture without changing its bytes", async () => {
+    const legacy = path.join(dir, "legacy.yaml");
+    await fs.writeFile(legacy, VALID_YAML, { mode: 0o600 });
+    const { snapshot } = await loadUsersFile(legacy);
+    await writeUsersFile(file, snapshot);
+    expect(await fs.readFile(file, "utf8")).toBe(VALID_YAML);
+  });
+});
+
+describe("mutateUsersFile backup", () => {
+  it(
+    "rolls a single 0600 .bak holding the previous bytes",
+    { skip: process.platform === "win32" },
+    async () => {
+      await mutateUsersFile(file, (snapshot) => {
+        snapshot.users.set("carol", user("h3"));
+      });
+      expect(await fs.readFile(`${file}.bak`, "utf8")).toBe(VALID_YAML);
+      expect((await fs.stat(`${file}.bak`)).mode & 0o777).toBe(0o600);
+      const afterFirst = await fs.readFile(file, "utf8");
+      await mutateUsersFile(file, (snapshot) => {
+        snapshot.users.set("dave", user("h4"));
+      });
+      expect(await fs.readFile(`${file}.bak`, "utf8")).toBe(afterFirst);
+    },
+  );
+
+  it("still writes when the backup cannot be created", async () => {
+    await fs.mkdir(`${file}.bak`);
+    await mutateUsersFile(file, (snapshot) => {
+      snapshot.users.set("carol", user("h3"));
+    });
+    expect((await loadUsersFile(file)).snapshot.users.has("carol")).toBe(true);
+  });
+
+  it("reports a UsersFileError when the users directory cannot be created", async () => {
+    const blocker = path.join(dir, "blocker");
+    await fs.writeFile(blocker, "x");
+    const target = path.join(blocker, "users.yaml");
+    await expect(mutateUsersFile(target, () => undefined)).rejects.toBeInstanceOf(UsersFileError);
   });
 });
 

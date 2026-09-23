@@ -52,8 +52,10 @@ codebase. Solid engineering worth building on.
 - **A small command-line tool** for managing users:
 
   ```sh
-  dsh-auth user add admin --password-stdin   # add a user
+  dsh-auth user add admin --password-stdin   # add a user (--admin creates an administrator)
   dsh-auth user list                          # list users
+  dsh-auth user passwd admin                  # change a password (read twice; there is no --password flag)
+  dsh-auth user role admin user               # grant/revoke the admin role: user role <name> <admin|user>
   dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
   dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
   dsh-auth user totp disable admin            # remove the TOTP secret
@@ -62,6 +64,10 @@ codebase. Solid engineering worth building on.
   `dsh-auth` is directly on your PATH when the package is installed globally.
   After `dsh plugin add` the binary lives inside the profile and must be called
   through it — see [Quick start](#quick-start).
+
+  `dsh-auth user passwd` only rewrites the stored hash: it does **not** revoke that
+  user's live sessions. Use the Settings panel change (or `user disable`) when those
+  sessions must be evicted.
 
 ## Quick start
 
@@ -111,6 +117,16 @@ danger-styled filled button (16px door icon + localized label, theme tokens
 for light/dark), and its label follows the GUI language through the same
 locale mechanism the Settings language switch uses. Clicking it runs the same
 native `POST /auth/logout?next=/` flow as before.
+
+A signed-in user can also change their own password from the **Account** section of
+the Settings panel (password mode only): current password, the new password typed
+twice, and a TOTP code whenever the account has a secret. The panel posts to
+`POST /auth/password` (`current` / `password` / `code`, form-urlencoded) and, on
+success, **every session of that user is revoked, including the one making the
+change**, so it tells you to sign in again. Passwords must be at least 14 characters,
+contain four character classes and differ from the current one. With TOTP on, a code
+already spent in the current 30-second window is rejected as a replay: wait for the
+next code.
 
 ## Configuration
 
@@ -296,11 +312,20 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
   everyone: issue #74). Set `clientIpHeader` to the header your proxy writes
   (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare); it is only read
   when the peer is inside `trustedProxyCidrs` (loopback by default), and the
-  rightmost address that is not itself a trusted hop is used.
+  rightmost address that is not itself a trusted hop is used. The self-service
+  password change (D22) keys its own, separate bucket the same way, so it needs
+  the same `clientIpHeader` setup: without a trusted proxy client-IP header,
+  every client on that host also shares one password-change bucket (the same
+  root cause as the login case, D19).
 - Sign out from the GUI: a prominent "Sign out / 退出登录" button sits in the
   Settings panel (Settings → General, bottom) — client half, requires the
   web app's client bundle (dsh 0.1.0-rc.6+); the direct
   `/auth/logout?next=/` URL always works as a fallback.
+- Changing a password revokes the user's sessions only **after** the new hash is on
+  disk. If that revocation step fails, the change still reports success (the password
+  is already in force) and the failure is logged as an error; the old cookie then
+  stays valid until the session TTL expires. Retrying or alerting on a failed
+  revocation is deferred to the admin-surface phase.
 - The plugin only protects dsh's web surface. It is not a replacement for
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with
