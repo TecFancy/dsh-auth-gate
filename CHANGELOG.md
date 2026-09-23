@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.3](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.2...v0.14.3) (2026-09-23)
+
+
+### Bug Fixes
+
+* **login:** render the login card for a failed token login ([b9aa2ce](https://github.com/TecFancy/dsh-auth-gate/commit/b9aa2cee2361208a024cacea2385901c6dfb5fa7))
+
 ## [0.14.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.1...v0.14.2) (2026-09-22)
 
 
