@@ -23,6 +23,13 @@ export function digestToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * 会话类别（P2 ④）：`full` = 常规会话；`password-change-only` = 受限会话，
+ * 仅由「登录时用户带 `must_change_password`」签发，TTL 短且入口受限。
+ * 缺省/缺字段一律按 `full` 解释（既有行兼容）。
+ */
+export type SessionKind = "full" | "password-change-only";
+
 export interface Session {
   /** 审计用：产生该会话的凭证身份（M1 恒 "token"，M2 为用户名）。 */
   subject: string;
@@ -31,6 +38,8 @@ export interface Session {
   /** epoch ms。 */
   expiresAt: number;
   revoked: boolean;
+  /** P2 ④：缺省 = `full`（旧行无此字段仍解析）。 */
+  kind?: SessionKind | undefined;
 }
 
 export interface IssuedSession {
@@ -43,6 +52,10 @@ const sessionRowSchema = z.object({
   createdAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().nonnegative(),
   revoked: z.boolean(),
+  // 可选：P2 之前写入的行没有该字段，必须继续可解析（缺省按 full 处理）。
+  // 注意：本仓库的 zod 是 v4（`z.enum`/`z.literal`），没有 `z.const`
+  // （后者是 @deepseek-ai/schemastery 的 API，见 src/index.ts 的 Config）。
+  kind: z.enum(["full", "password-change-only"]).optional(),
 });
 
 /** 键 = digest（sha256 hex），不进 row；row 只存以上四字段。 */
@@ -61,7 +74,7 @@ export class SessionStore {
     this.table = table;
   }
 
-  async create(subject: string, ttlMs: number): Promise<IssuedSession> {
+  async create(subject: string, ttlMs: number, kind: SessionKind = "full"): Promise<IssuedSession> {
     await this.pruneExpired();
     const token = randomBytes(32).toString("base64url");
     const now = Date.now();
@@ -70,6 +83,7 @@ export class SessionStore {
       createdAt: now,
       expiresAt: now + ttlMs,
       revoked: false,
+      kind,
     };
     await this.table.put(digestToken(token), session);
     return { token, session };

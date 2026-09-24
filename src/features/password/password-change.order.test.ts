@@ -9,7 +9,7 @@ import {
   writeUsersFile,
 } from "../../shared/index.js";
 import type { UserRecord, UsersSnapshot } from "../../shared/index.js";
-import type { PasswordChangeDeps } from "./password-change.js";
+import { handlePasswordChange, type PasswordChangeDeps } from "./password-change.js";
 import {
   CURRENT,
   GOOD_BODY,
@@ -19,8 +19,20 @@ import {
   formBody,
   jsonBody,
   makeHarness,
-  send,
+  makeReq,
+  makeRes,
+  type FakeRes,
+  type ReqOptions,
 } from "../../../test/password-change-harness.js";
+
+/** P2 §6：改密 POST 要求同源证明（浏览器恒带 Sec-Fetch-Site: same-origin）；共享夹具不在本任务写域。 */
+async function send(deps: PasswordChangeDeps, options: ReqOptions = {}): Promise<FakeRes> {
+  const res = makeRes();
+  const req = makeReq(options);
+  req.headers["sec-fetch-site"] = "same-origin";
+  await handlePasswordChange(deps, req, res.res);
+  return res;
+}
 
 describe("processing order (frozen, §1)", () => {
   it("write failure never revokes sessions (no kick-out without a real password change)", async () => {

@@ -9,15 +9,28 @@ import {
   makeHarness,
   makeReq,
   makeRes,
-  send,
+  type FakeRes,
+  type ReqOptions,
 } from "../../../test/password-change-harness.js";
-import { handlePasswordChange } from "./password-change.js";
+import { handlePasswordChange, type PasswordChangeDeps } from "./password-change.js";
+
+/**
+ * P2 §6：改密 POST 要求同源证明；浏览器表单与同源 fetch 恒带 `Sec-Fetch-Site: same-origin`。
+ * 共享夹具 test/ 不在本任务写域内，故就地重写 send，只多补这一个头。
+ */
+async function send(deps: PasswordChangeDeps, options: ReqOptions = {}): Promise<FakeRes> {
+  const res = makeRes();
+  const req = makeReq(options);
+  req.headers["sec-fetch-site"] = "same-origin";
+  await handlePasswordChange(deps, req, res.res);
+  return res;
+}
 
 describe("rows 1-3: method and body gates", () => {
-  it("row 1: non-POST → 405 + allow: POST + no-store", async () => {
-    const res = await send(makeHarness().deps, { method: "GET" });
+  it("row 1: non-GET/POST → 405 + allow: GET, POST + no-store", async () => {
+    const res = await send(makeHarness().deps, { method: "PUT" });
     expect(res.status).toBe(405);
-    expect(res.headers["allow"]).toBe("POST");
+    expect(res.headers["allow"]).toBe("GET, POST");
     expect(res.headers["cache-control"]).toBe("no-store");
   });
 
@@ -58,6 +71,7 @@ describe("rows 4-5: session and rate limit", () => {
     const { deps } = makeHarness();
     const req = makeReq({ cookie: null, body: GOOD_BODY });
     req.headers.authorization = "Bearer good";
+    req.headers["sec-fetch-site"] = "same-origin"; // P2 §6 同源证明
     const res = makeRes();
     await handlePasswordChange(deps, req, res.res);
     expect(res.status).toBe(401);
