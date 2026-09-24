@@ -2,16 +2,16 @@
 
 dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
 
-| 目录                                                        | 内容                                                                                                                                                                                                          | 阅读时机                  |
-| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| [`deployed/`](deployed/)                                    | 部署运维：deployment（验收清单 A–I、升级 5.1）、reverse-proxy（反代部署）、local-proxy（配置面本地代理）、entry-coverage-0.1.5-rc.2（0.1.5-rc.2 全部入口未认证覆盖证据，61/61 被拒）                          | 部署 / 排障 / 升级时      |
-| [`specs/`](specs/)                                          | 路线图与工程：dsh-auth-plan（M0–M5 分期 + 威胁模型）、development（命令/门禁/约定/release）、src-refactor-plan（分层 src）                                                                                    | 接下阶段任务、改代码前    |
-| [`handoff/`](handoff/)                                      | 执行交接（每阶段新 session 必读）：handoff-m2 / m3 / m4（m4 含 0.11.1 修订）                                                                                                                                  | 新 session 执行对应规格前 |
-| [`implemented/`](implemented/)                              | 已交付规格与规划：impl-m1~m4（当前实现基准，m4 最新）、impl-launch-token-bridge（0.1.2-alpha 兼容层）、impl-client-logout、login-page-polish-plan（已落地视觉基线）、totp-fix-plan（0.11.1 修复计划，已实施） | 核对「当前行为依据」时    |
-| [`plans/`](plans/)                                          | 进行中规划：pr53-login-page-fix-plan（#53 移植）                                                                                                                                                              | #53 落地时                |
-| [`decisions.md`](decisions.md) + [`decisions/`](decisions/) | 重大决策编号索引 D1–D20（双语记录，proposed / implemented / archived）                                                                                                                                        | 理解「为什么」时          |
-| [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例）                                                                                                                                                                | README 引用               |
-| [`reviews/`](reviews/)                                      | 外部评审记录（grok-4.6 launch-token bridge review 等）                                                                                                                                                        | 变更合入前对照            |
+| 目录                                                        | 内容                                                                                                                                                                                                                                              | 阅读时机                  |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| [`deployed/`](deployed/)                                    | 部署运维：deployment（验收清单 A–J、升级 5.1）、reverse-proxy（反代部署）、local-proxy（配置面本地代理）、known-limitations（README 短清单的完整版：机制 + ADR 出处）、entry-coverage-0.1.5-rc.2（0.1.5-rc.2 全部入口未认证覆盖证据，61/61 被拒） | 部署 / 排障 / 升级时      |
+| [`specs/`](specs/)                                          | 路线图与工程：dsh-auth-plan（M0–M5 分期 + 威胁模型）、development（命令/门禁/约定/release）、src-refactor-plan（分层 src）                                                                                                                        | 接下阶段任务、改代码前    |
+| [`handoff/`](handoff/)                                      | 执行交接（每阶段新 session 必读）：handoff-m2 / m3 / m4（m4 含 0.11.1 修订）                                                                                                                                                                      | 新 session 执行对应规格前 |
+| [`implemented/`](implemented/)                              | 已交付规格与规划：impl-m1~m4（当前实现基准，m4 最新）、impl-launch-token-bridge（0.1.2-alpha 兼容层）、impl-client-logout、login-page-polish-plan（已落地视觉基线）、totp-fix-plan（0.11.1 修复计划，已实施）                                     | 核对「当前行为依据」时    |
+| [`plans/`](plans/)                                          | 进行中规划：pr53-login-page-fix-plan（#53 移植）                                                                                                                                                                                                  | #53 落地时                |
+| [`decisions.md`](decisions.md) + [`decisions/`](decisions/) | 重大决策编号索引 D1–D23（双语记录，proposed / implemented / archived）                                                                                                                                                                            | 理解「为什么」时          |
+| [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例 / 设置导航「账号安全」行 / 改密面板；**统一英文界面 + 浅色主题**，中英共用同一套）                                                                                                                   | README 引用               |
+| [`reviews/`](reviews/)                                      | 外部评审记录（grok-4.6 launch-token bridge review 等）                                                                                                                                                                                            | 变更合入前对照            |
 
 ## 阅读路径
 
@@ -39,3 +39,8 @@ dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
    `README.md` / `README.zh.md`；围栏代码块（以三个反引号开头的行）内的 `#` 行不算
    标题，H1 不在扫描范围，标题比较忽略大小写。
 6. 新文档无法满足 1-5 时先改这里的规则再提交，不让 `docs:check` 静默变红。
+7. **根 README 必须对称**：`README.md` 与 `README.zh.md` 的 `##` 段数、每段的列表项 / 围栏代码块 /
+   `###` 小节数 / 表格行（含列数）、图片集合、链接目标集合（语言后缀归一后）、以及目录锚点都必须一致，
+   由 `npm run readme:parity` 强制（已挂 `verify` 链）。截图**统一英文界面**，`docs/demo/` 下不允许
+   再出现 `*.zh.png`：插件面板原本跟随 GUI 语言，现在两版共用同一套 `*.en.png`；登录页等由插件
+   **服务端渲染**的页面本来就是英文，与语言无关。

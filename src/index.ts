@@ -6,6 +6,7 @@ import { wrapServer, type Gate, type WrappableServer } from "./gate/index.js";
 import {
   DisabledSessionSweeper,
   PasswordGate,
+  makePasswordChangeWiring,
   registerPasswordEndpoints,
   verifyPassword,
 } from "./features/password/index.js";
@@ -219,6 +220,9 @@ function mountAuthEndpoints(
 ): () => void {
   const policy = parseClientIpPolicy(config.clientIpHeader, config.trustedProxyCidrs);
   const clientIp = makeClientIpResolver(policy, log);
+  // 同一个 replayGuard 单例：登录与改密共用（D22；不同实例会放过同窗重放）。
+  const replayCheck = (username: string, counter: number, code: string): boolean =>
+    replayGuard.checkAndRecord(username, counter, code);
   return config.mode === "password"
     ? registerPasswordEndpoints({
         register: (route) => server.register(route), // 包装后的 register（增量保险路径）
@@ -234,13 +238,15 @@ function mountAuthEndpoints(
         clientIp,
         totpMode: config.totp,
         verifyTotp: (secretB32, code, nowMs) => verifyTotpCode(secretB32, code, nowMs),
-        replayCheck: (username, counter, code) =>
-          replayGuard.checkAndRecord(username, counter, code),
+        replayCheck,
         now: Date.now,
         challengeMacKey,
         launchTokenBridge,
         logoutOrder: config.logoutOrder,
         logger: log,
+        // P1 §5 改密接线：独立限速桶 + 锁内写盘入口 + hashPassword + 撤销会话，
+        // 装配在 password 切片内（root 只保留接线语义）。恒定注入，不存在静默不注册。
+        passwordChange: makePasswordChangeWiring(usersPath, auth, replayCheck, log),
       })
     : registerAuthEndpoints({
         register: (route) => server.register(route),

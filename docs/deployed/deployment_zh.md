@@ -56,6 +56,11 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
    替代方式（运行时不依赖 pnpm）：
    `node "$DSH_HOME/profiles/web/node_modules/dsh-auth-gate/lib/cli.js" ...`。
    多管理员：重复 `user add`；禁用：`dsh-auth user disable <name>`。
+   口令轮换与角色：`dsh-auth user passwd <name>` 分两次读入新口令（管道或 TTY 隐藏回显），
+   **刻意不提供 `--password` 明文参数**；策略与自助改密表单完全一致（14 位以上、四类字符、
+   不得等于旧口令）。`dsh-auth user role <name> <admin|user>` 是授予/回收 admin 角色的唯一
+   通道（建号时另有 `user add --admin`）；禁用或降级最后一个在用的 admin 会被拒绝。CLI 的
+   全部写操作与插件走同一把锁文件与写前 CAS，实例运行中执行也安全。
 2. **配置覆盖**：把仓库 `deploy/cordis.patch.yml` 复制为 `$DSH_HOME/cordis.patch.yml`
    ——0.4.1 起该模板是纯配置覆盖（无 `insert`；挂载本身由 `dsh plugin add` 通过
    `dsh.bundle` manifest 注册）。按需调整（`cookieSecure` 必须与 TLS 环境一致；
@@ -125,6 +130,15 @@ curl -s -i -d "username=admin&password=<口令>" http://127.0.0.1:3081/auth/logi
 #    登录 → 进入实例；设置面板里有醒目的「退出登录 / Sign out」按钮
 #    （设置 → 通用设置 页最下方；client 半边，0.6.5+），
 #    也可 URL 访问 /auth/logout?next=/ 登出。
+
+# J. 自助改密（仅 password 模式；D22）。放最后：它会改掉口令。
+curl -s -i -b jar -X POST http://127.0.0.1:3081/auth/password \
+  -d "current=<口令>&password=<新口令>&code=<启用 TOTP 时的验证码>" | head -3   # 200 {"ok":true} + 清 cookie
+curl -s -o /dev/null -w "%{http_code}\n" -b jar http://127.0.0.1:3081/__dsh_api   # 401：该用户全部会话被吊销，含这里用的那条
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:3081/auth/password  # 无会话 cookie → 401
+curl -s -o /dev/null -w "%{http_code}\n" -X GET  http://127.0.0.1:3081/auth/password  # 405 + allow: POST
+# token 模式：该路径未注册 → 404（只在 password 模式注册）。
+# 验收后恢复原口令：dsh-auth user passwd admin（同样会清掉该用户会话）。
 ```
 
 预期全绿 = 部署验收通过。**全部失败路径必须是失败**（401/403 语义不吞错）——任何"静默放行"
@@ -191,7 +205,9 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] 限速内存态重启清零。同主机反代部署必须显式配置 `clientIpHeader`（`x-forwarded-for`；
       Cloudflare 在边缘时用 `cf-connecting-ip`）：不配就是所有客户端共用一个桶，任何人错 5 次
       密码全家都登不上（issue #74）。只有 `trustedProxyCidrs`（默认回环）内的受信 peer 才有
-      资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。
+      资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。自助改密（D22）用的是独立
+      限速桶，但同样按这个头取客户端地址：未配受信反代客户端 IP 头时，同一主机上所有客户端
+      也会共用一个改密桶。
 
 ## 8. 公网部署变体（2026-08-15 起，dsh.example.com 生效）：半外壳
 

@@ -17,7 +17,7 @@ function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[]
     io: {
       out: (line) => out.push(line),
       err: (line) => err.push(line),
-      readLine: () => Promise.resolve(queue.shift() ?? ""),
+      readLines: (count: number) => Promise.resolve(queue.splice(0, count)),
     },
   };
 }
@@ -60,6 +60,14 @@ describe("dsh-auth user add", () => {
     expect(code).toBe(0);
     const { snapshot } = await loadUsersFile(file);
     expect(snapshot.users.get("alice")?.disabled).toBe(true);
+  });
+
+  it("supports --admin", async () => {
+    const { io } = makeIo(["pw"]);
+    const args = ["user", "add", "root", "--password-stdin", "--admin", "--file", file];
+    expect(await main(args, io)).toBe(0);
+    const { snapshot } = await loadUsersFile(file);
+    expect(snapshot.users.get("root")?.role).toBe("admin");
   });
 
   it("creates the parent directory automatically", async () => {
@@ -176,7 +184,7 @@ describe("dsh-auth user disable", () => {
     const { io, err } = makeIo();
     const code = await main(["user", "disable", "ghost", "--file", file], io);
     expect(code).toBe(1);
-    expect(err).toEqual(["user not found"]);
+    expect(err).toEqual(["user ghost not found"]);
   });
 });
 
@@ -193,6 +201,13 @@ describe("dsh-auth arg handling", () => {
     const code = await main(["user", "explode"], io);
     expect(code).toBe(1);
     expect(err.join("\n")).toContain("Usage:");
+  });
+
+  it("documents the passwd and role commands in USAGE", async () => {
+    const { io, err } = makeIo();
+    expect(await main(["user", "explode"], io)).toBe(1);
+    expect(err.join("\n")).toContain("user passwd <name>");
+    expect(err.join("\n")).toContain("user role <name> <admin|user>");
   });
 
   it("fails when --file has no value", async () => {

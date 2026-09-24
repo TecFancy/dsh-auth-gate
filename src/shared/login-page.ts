@@ -34,6 +34,11 @@ export interface LoginPageOptions {
    * 否则「只有真用户才回填」本身就是账号存在性预言机。密码字段永不回填。
    */
   username?: string | undefined;
+  /**
+   * 卡片顶部的「原因」提示（P1.1 / D24）。只接受服务端白名单常量（调用方负责），
+   * 绝不来自请求文本：本字段一律 escapeHtml，且不改变 error/hint 槽语义。
+   */
+  notice?: string | undefined;
 }
 
 interface FieldSpec {
@@ -85,6 +90,12 @@ function renderLoginCard(spec: LoginCardOptions): string {
     opts.who === undefined || opts.who === ""
       ? ""
       : `<p class="who">Signing in as ${escapeHtml(opts.who)}</p>`;
+  // P1.1：原因提示（改密后跳回登录页时说明"为什么"）。排在 error 之前：两者同时出现
+  // （理论上不会）时先读原因再读失败信息，比"先报错再祝贺"顺。
+  const noticeHtml =
+    opts.notice === undefined || opts.notice === ""
+      ? ""
+      : `<p class="notice" role="status">${escapeHtml(opts.notice)}</p>`;
   const errorHtml =
     spec.error === undefined
       ? ""
@@ -132,7 +143,7 @@ function renderLoginCard(spec: LoginCardOptions): string {
 </div>
 <form method="post" action="/auth/login">
 <input type="hidden" name="next" value="${escapeHtml(spec.next)}">
-${errorHtml}${hintHtml}${fieldsHtml}
+${noticeHtml}${errorHtml}${hintHtml}${fieldsHtml}
 <button type="submit">${escapeHtml(spec.submitLabel)}</button>
 </form>
 ${resetHtml}

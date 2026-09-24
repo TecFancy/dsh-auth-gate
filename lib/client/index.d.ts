@@ -13,6 +13,14 @@ import type { AuthContext } from "./context.ts";
  * 文案挂进 dsh 现有的 locale 机制（与「设置」里的语言切换同一套）：注册 `auth`
  * 词典（zh/en），再以 `locale: "auth"` 给注册条目注入 `t` seat，按钮文字随界面
  * 语言在「退出登录」/ "Sign out" 间实时切换。不改任何服务端端点/会话语义。
+ *
+ * 同一次 apply 还注册「账号安全」设置页（`settings.section`，id
+ * dsh-auth-gate-account，order 900）：内容为自助改密表单（见 account-section.tsx），
+ * 文案复用同一个 `auth` 词典的 account 键。登出按钮的注册逻辑与 order 语义不变。
+ *
+ * 导航行图标（D24.1）：宿主 `settings.section` 没有 `icon` 选项（只有 id/order/label），
+ * 第三方段的图标恒为宿主默认齿轮；插件侧没有官方挂载点，所以 `account-nav-icon.ts` 只对
+ * 我们这一行做一次临时 DOM 垫片（自设计盾牌图标），上游支持 `icon` 后整体删除。
  */
 export declare const inject: string[];
 export declare function apply(ctx: AuthContext): void;

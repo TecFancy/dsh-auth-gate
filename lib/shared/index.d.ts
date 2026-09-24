@@ -12,10 +12,12 @@ export { resolvePublicHost } from "./host.js";
 export { cidrContains, normalizeIp, parseCidr } from "./ip-address.js";
 export type { CidrNetwork } from "./ip-address.js";
 export { loginPageHtml, loginPath, passwordLoginPageHtml, totpChallengePageHtml, } from "./login-page.js";
+export { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, } from "./password-policy.js";
+export type { PasswordPolicyOptions, PasswordPolicyResult, PasswordRule, } from "./password-policy.js";
 export { LoginRateLimiter } from "./rate-limit.js";
 export type { RateLimitCheck, RateLimitOptions } from "./rate-limit.js";
 export { bundledSkillDir, installSkill, SKILL_NAME, userSkillDir } from "./skill-install.js";
 export type { InstallSkillOptions, InstallSkillResult } from "./skill-install.js";
-export { compareNames, defaultUsersFilePath, dshHomeDir, loadUsersFile, USERNAME_RE, UsersFileError, writeUsersFile, } from "./users-file.js";
-export type { UserRecord, UsersLoadResult, UsersSnapshot } from "./users-file.js";
+export { compareNames, defaultUsersFilePath, dshHomeDir, loadUsersFile, mutateUsersFile, USERNAME_RE, UsersFileError, writeUsersFile, } from "./users-file.js";
+export type { UserRecord, UserRole, UsersLoadResult, UsersSnapshot } from "./users-file.js";
 //# sourceMappingURL=index.d.ts.map
