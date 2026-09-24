@@ -64,6 +64,32 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   that line is the only signal the Origin check produces, so it is kept rather
   than dropped, and the payload is bounded instead. Add audit-log dedup or
   retention if that volume matters.
+- The admin block lives in the **client half** (Settings → Account security): it needs the host web
+  app's client bundle and only appears after the page is reloaded once that bundle is in place. The
+  CLI and the HTTP endpoints stay available without it.
+- A non-admin, or a restricted session, never sees the admin block, but that is presentation only:
+  the server authorizes every admin request by re-reading `role` and `disabled` from `users.yaml`,
+  so a direct `GET /auth/users` with a non-admin cookie still answers `403`.
+- The panel's user list deliberately omits whether a target currently has live sessions (the
+  server's projection is field-minimal), so a successful reset reports whether the revocation
+  succeeded (`sessionsRevoked`), not whether that user was signed in anywhere.
+- The admin plane cannot reset **your own** password (the server answers `403 forbidden` as a
+  backstop and the panel's dropdown excludes you): use the self-service form above the block, and an
+  administrator who has forgotten their own password can only reset it offline with
+  `dsh-auth user passwd <name>`.
+- The panel's reset neither displays nor changes the target's TOTP state: the list projection omits
+  it by design (only a `totpEnabled` badge is shown) and a reset never rotates `totpSecret`, so a
+  user who lost their authenticator still has to be handled with
+  `dsh-auth user totp disable <name>`.
+- The post-reset list refresh **fails silently**. After a successful reset the client re-fetches
+  `/auth/users` to refresh the `must-change` badges; if that second request fails, the rows keep
+  their previous values and the operator has to reload the page. Only the first load degrades
+  visibly (`admin.unavailable`).
+- Audit events go through the structured logger, and dsh 0.1.5-rc.2 does **not** persist
+  `ctx.logger` info/error output to disk, so on that version verification rests on observable
+  runtime behaviour plus the in-process full-stack audit tests in this repository (32 cases across
+  the two audit unit suites and the three P2 integration suites). That is a logging-visibility
+  limitation, not a missing audit trail.
 - The plugin only protects dsh's web surface. It is not a replacement for
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with

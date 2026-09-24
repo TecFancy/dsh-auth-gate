@@ -120,3 +120,50 @@ export const BUTTON_BUSY_STYLE: CSSProperties = {
   opacity: 0.6,
   cursor: "default",
 };
+
+// ---------------------------------------------------------------------------
+// P2 PR2 管理块（admin）：以下全部为**追加**常量，上面既有值一个都不动
+// （自助改密页像素稳定性，契约 §2 account-styles 行）。
+// ---------------------------------------------------------------------------
+
+/** 管理块根部：与上方自助改密区之间用一条分隔线 + 上间距，纵向排布。 */
+export const ADMIN_BLOCK_STYLE: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 8,
+  marginTop: 4,
+  paddingTop: 12,
+  borderTop: "1px solid var(--dsw-alias-border-l2)",
+};
+
+/** 用户表：占满宽度、折叠边框；只做排版，不自绘视觉。 */
+export const ADMIN_TABLE_STYLE: CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: 13,
+  lineHeight: "20px",
+  color: "var(--dsw-alias-label-primary)",
+};
+
+export const ADMIN_TH_STYLE: CSSProperties = {
+  textAlign: "left",
+  padding: "6px 8px 6px 0",
+  fontWeight: 500,
+  color: "var(--dsw-alias-label-tertiary)",
+};
+
+export const ADMIN_TD_STYLE: CSSProperties = {
+  padding: "6px 8px 6px 0",
+  borderTop: "1px solid var(--dsw-alias-border-l2)",
+};
+
+/** 只读徽标（角色 / 状态 / 两步验证 / 本人）：浅底 + 次级文字色，随主题切换。 */
+export const ADMIN_BADGE_STYLE: CSSProperties = {
+  display: "inline-block",
+  padding: "0 6px",
+  borderRadius: 6,
+  background: "var(--dsw-alias-bg-layer-2)",
+  color: "var(--dsw-alias-label-secondary)",
+  fontSize: 12,
+  lineHeight: "18px",
+};

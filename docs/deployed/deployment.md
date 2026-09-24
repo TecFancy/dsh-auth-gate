@@ -240,6 +240,15 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
       The self-service password change (D22) has its own, separate rate-limit bucket but derives the
       client address the same way, so it needs the same `clientIpHeader` setup: without a trusted
       proxy client-IP header, every client on that host also shares one password-change bucket.
+- [ ] The panel's user-management block and the password-change endpoints reject any authenticated
+      POST whose `Origin` does not match the instance, so production must configure `publicHost`
+      (with the scheme, `https://host`, when TLS terminates at the reverse proxy): with
+      `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, and a script call without
+      an `Origin` gets `403` (requirement added by D25, the admin surface).
+- [ ] Enable TOTP for every administrator (`dsh-auth user totp enable <name>`): with TOTP off, a
+      stolen admin cookie alone is enough to reset other users' passwords, and the panel does not
+      warn about that. Re-authentication is conditional by design, and auditing is then the only
+      remaining control.
 
 ## 8. Public Deployment Variant (effective 2026-08-15 on dsh.example.com): Semi-Shell
 

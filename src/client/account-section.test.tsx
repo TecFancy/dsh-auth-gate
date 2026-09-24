@@ -15,6 +15,13 @@ vi.mock("./account-redirect.ts", () => ({
   ...redirectApi,
 }));
 
+// 管理块只标记渲染门（真组件的列表/表单语义由 client-view 的测试覆盖）：本文件只断言
+// 「旧服务端缺身份字段时不渲染管理块、也不发管理请求」。
+vi.mock("./admin-block.tsx", async () => {
+  const { createElement: h } = await import("react");
+  return { AdminUsersBlock: () => h("div", { "data-testid": "admin-block" }) };
+});
+
 // React 18 的 act() 需要显式声明测试环境（否则只警告不生效）。
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -255,6 +262,19 @@ describe("SettingsAccountSection host props", () => {
     });
     expect(close).not.toHaveBeenCalled();
     expect(redirectApi.redirectToLogin).toHaveBeenCalledTimes(2); // 成功时一次 + 手动点一次
+    cleanup(root, container);
+  });
+
+  it("renders no admin block for an old server that omits the identity fields", async () => {
+    const urls: string[] = [];
+    routeFetch((url) => {
+      urls.push(url);
+      return statusOk(true); // 只有 authenticated/logoutOrder（PR2 之前的服务端）
+    });
+    const { root, container } = await render({ t: zh });
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(container.querySelector('[data-testid="admin-block"]')).toBeNull();
+    expect(urls).toEqual(["/auth/status"]);
     cleanup(root, container);
   });
 });
