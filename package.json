@@ -1,6 +1,6 @@
 {
   "name": "dsh-auth-gate",
-  "version": "0.14.3",
+  "version": "0.15.0",
   "description": "Login gate for DeepSeek Harness (dsh) web instances: password or shared-token sign-in, optional TOTP two-factor, session cookies, rate limiting, self-service password change and a user-management CLI",
   "type": "module",
   "license": "MIT",
