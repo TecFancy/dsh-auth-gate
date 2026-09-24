@@ -65,6 +65,14 @@ dsh plugin --profile web add dsh-auth-gate   # forwards to pnpm, resolved from p
    Alternative (no pnpm needed at runtime):
    `node "$DSH_HOME/profiles/web/node_modules/dsh-auth-gate/lib/cli.js" ...`.
    Multiple administrators: repeat `user add`; disable: `dsh-auth user disable <name>`.
+   Password rotation and roles: `dsh-auth user passwd <name>` reads the new password
+   twice (piped or a hidden TTY prompt) and deliberately has **no `--password` flag**;
+   it enforces the same policy as the self-service form (14+ characters, four
+   character classes, different from the old password). `dsh-auth user role <name>
+<admin|user>` is the only channel that grants or revokes the admin role (plus
+   `user add --admin` at creation time); disabling or demoting the last active
+   administrator is refused. All CLI writes go through the same lock file and
+   compare-and-swap as the plugin, so they are safe to run while the instance is up.
 2. **Config override**: copy the repo's `deploy/cordis.patch.yml` to
    `$DSH_HOME/cordis.patch.yml` — since 0.4.1 the template is a pure config
    override (no `insert`; the mount itself is registered by `dsh plugin add` via
@@ -139,6 +147,15 @@ curl -s -i -d "username=admin&password=<password>" http://127.0.0.1:3081/auth/lo
 # I. Browser path (optional, requires an https environment): incognito window → visit → 302 to /auth/login →
 #    login → enter the instance; a prominent "Sign out / 退出登录" button sits inside the Settings panel
 #    (Settings → General, bottom; client half, 0.6.5+), or visit /auth/logout?next=/ via URL to log out.
+
+# J. Self-service password change (password mode only; D22). Run last: it changes the password.
+curl -s -i -b jar -X POST http://127.0.0.1:3081/auth/password \
+  -d "current=<password>&password=<new-password>&code=<totp-code-if-enabled>" | head -3   # 200 {"ok":true} + set-cookie clearing
+curl -s -o /dev/null -w "%{http_code}\n" -b jar http://127.0.0.1:3081/__dsh_api           # 401: every session of that user is revoked, including the one used here
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:3081/auth/password      # 401 without a session cookie
+curl -s -o /dev/null -w "%{http_code}\n" -X GET  http://127.0.0.1:3081/auth/password      # 405 + allow: POST
+# Token mode: the path is not registered → 404 (registered in password mode only).
+# Restore the original password afterwards: dsh-auth user passwd admin (it also clears that user's sessions).
 ```
 
 All green = deployment acceptance passes. **Every failure path must fail** (401/403 semantics,
@@ -220,6 +237,9 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
       edge); without it every client shares one bucket and five mistyped passwords lock out the
       whole instance (issue #74). Only peers inside `trustedProxyCidrs` (loopback by default) may
       supply that header, and the proxy must overwrite it rather than pass a client value through.
+      The self-service password change (D22) has its own, separate rate-limit bucket but derives the
+      client address the same way, so it needs the same `clientIpHeader` setup: without a trusted
+      proxy client-IP header, every client on that host also shares one password-change bucket.
 
 ## 8. Public Deployment Variant (effective 2026-08-15 on dsh.example.com): Semi-Shell
 

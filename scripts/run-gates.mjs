@@ -28,6 +28,7 @@ const SCENE_OF = {
   "lock:check": "hygiene",
   "decisions:check": "hygiene",
   "docs:check": "hygiene",
+  "readme:parity": "hygiene",
   "type-check": "types",
   typecheck: "types",
   "test:coverage": "tests",

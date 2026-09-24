@@ -6,18 +6,18 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 命令
 
-| Task                       | Command                                                                                                                                                                                                        |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                         |
-| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                     |
-| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                      |
-| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                          |
-| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                           |
-| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                          |
-| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                       |
-| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                              |
-| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
-| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                   |
+| Task                       | Command                                                                                                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                         |
+| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                                     |
+| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                                      |
+| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                          |
+| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                           |
+| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                                          |
+| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                                       |
+| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                                              |
+| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
+| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                                   |
 
 跑单个测试文件：`npm run test -- src/gate/guard.test.ts`
 按名称跑测试：`npm run test -- -t "guard"`
@@ -64,7 +64,8 @@ src/
 │   │   ├── challenge-cookie.ts # TOTP 挑战 cookie 签发/校验（HMAC 签名，D10）
 │   │   ├── session-issue.ts   # 会话签发 + launch-token 桥（password 侧）
 │   │   ├── disabled-sweeper.ts # 定期撤销已禁用用户的会话（`revokeSweepMs`）
-│   │   └── password-endpoints.ts # password 模式 /auth 兜底 + 三个 exact 端点
+│   │   ├── password-endpoints.ts # password 模式 /auth 兜底 + exact 端点（D22 后 4 条，含 /auth/password）
+│   │   └── password-change.ts  # POST /auth/password 逻辑：策略/TOTP 确认/写盘/全踢会话（D22 新增）
 │   ├── totp/
 │   │   ├── index.ts
 │   │   ├── totp.ts            # RFC 6238：自写 base32 + HOTP/TOTP + 恒时验证（M4 新增）
@@ -80,9 +81,10 @@ src/
 │   ├── cookie.ts       # Cookie 头解析
 │   ├── form-body.ts    # urlencoded body 读取
 │   ├── login-page.ts   # 自包含登录页（token + password + TOTP 挑战三版）
+│   ├── password-policy.ts # 新口令策略：≥14 位 + 四类字符 + ≠旧口令 + maxLength（D23 新增）
 │   ├── rate-limit.ts   # 双桶登录限速器（M3 新增）
 │   ├── skill-install.ts # dsh-auth skill install（M3 新增）
-│   └── users-file.ts   # users.yaml 加载/校验/原子写 + 默认路径解析（M3 新增）
+│   └── users-file.ts   # users.yaml 加载/校验/原子写 + 独立锁内 RMW/CAS/.bak（D23 加固）
 ├── client/            # client 半边（与 host 互不 import）
 ├── *.test.ts          # 单元测试（与源码同居；integration 测试留在根）
 └── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试

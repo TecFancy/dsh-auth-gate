@@ -53,6 +53,14 @@ function makeApplyHarness() {
   return { ctx, localeRegisters, slots, injectCalls };
 }
 
+/** apply 现在同时注册账户设置页：登出断言只筛 id = dsh-auth-gate-logout 的注册调用。 */
+function logoutRegisters(h: ReturnType<typeof makeApplyHarness>): unknown[][] {
+  const register = h.slots.register as ReturnType<typeof vi.fn>;
+  return register.mock.calls.filter(
+    (call) => (call[0] as { id?: string }).id === "dsh-auth-gate-logout",
+  );
+}
+
 describe("apply", () => {
   const fetchMock = vi.fn();
 
@@ -76,20 +84,21 @@ describe("apply", () => {
     apply(h.ctx);
     for (const [, callback] of h.injectCalls) callback();
     await flushMicrotasks();
-    expect(h.localeRegisters).toEqual([
-      ["auth", "zh", { logout: "退出登录" }],
-      ["auth", "en", { logout: "Sign out" }],
-    ]);
+    // auth 词典现在与账户页共用（完整键集见 index.test.tsx）：这里只钉登出键。
+    const dicts = new Map(h.localeRegisters.map(([ns, loc, dict]) => [`${ns}:${loc}`, dict]));
+    expect(h.localeRegisters.every(([ns]) => ns === "auth")).toBe(true);
+    expect(dicts.get("auth:zh")?.["logout"]).toBe("退出登录");
+    expect(dicts.get("auth:en")?.["logout"]).toBe("Sign out");
     expect(h.injectCalls.map(([key]) => key).sort((a, b) => a.localeCompare(b))).toEqual([
       "settings.general.item",
+      "settings.section",
     ]);
-    const register = h.slots.register as ReturnType<typeof vi.fn>;
-    expect(register).toHaveBeenCalledTimes(1);
-    const call = register.mock.calls[0] as unknown as [
+    const logout = logoutRegisters(h);
+    expect(logout).toHaveLength(1);
+    const [opts, component] = logout[0] as [
       { name: string; id: string; locale: string; order: number; label: unknown },
       unknown,
     ];
-    const [opts, component] = call;
     expect(opts.name).toBe("settings.general.item");
     expect(opts.id).toBe("dsh-auth-gate-logout");
     expect(opts.locale).toBe("auth");
@@ -106,11 +115,11 @@ describe("apply", () => {
     const h = makeApplyHarness();
     apply(h.ctx);
     for (const [, callback] of h.injectCalls) callback();
-    const register = h.slots.register as ReturnType<typeof vi.fn>;
     await flushMicrotasks();
-    expect(register).toHaveBeenCalledTimes(2);
-    const first = register.mock.calls[0]![0] as { order: number };
-    const second = register.mock.calls[1]![0] as { order: number };
+    const logout = logoutRegisters(h);
+    expect(logout).toHaveLength(2);
+    const first = logout[0]![0] as { order: number };
+    const second = logout[1]![0] as { order: number };
     expect(first.order).toBe(1000);
     expect(second.order).toBe(5000);
   });
@@ -120,10 +129,10 @@ describe("apply", () => {
     const h = makeApplyHarness();
     apply(h.ctx);
     for (const [, callback] of h.injectCalls) callback();
-    const register = h.slots.register as ReturnType<typeof vi.fn>;
     await flushMicrotasks();
-    expect(register).toHaveBeenCalledTimes(1);
-    expect((register.mock.calls[0]![0] as { order: number }).order).toBe(1000);
+    const logout = logoutRegisters(h);
+    expect(logout).toHaveLength(1);
+    expect((logout[0]![0] as { order: number }).order).toBe(1000);
   });
 
   it("keeps a single default-order registration when the probe returns a non-numeric order", async () => {
@@ -133,9 +142,8 @@ describe("apply", () => {
     const h = makeApplyHarness();
     apply(h.ctx);
     for (const [, callback] of h.injectCalls) callback();
-    const register = h.slots.register as ReturnType<typeof vi.fn>;
     await flushMicrotasks();
-    expect(register).toHaveBeenCalledTimes(1);
+    expect(logoutRegisters(h)).toHaveLength(1);
   });
 });
 

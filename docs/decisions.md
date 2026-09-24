@@ -252,3 +252,78 @@ slot（唯一常量 `Invalid access token.`，`INVALID_TOKEN`）；令牌字段*
 升级为断言 HTML 失败体，退回 `text/plain` 会在 CI 被拦。
 → [zh](decisions/implemented/2026-09-23-token-failure-html-card.zh.md) ·
 [en](decisions/implemented/2026-09-23-token-failure-html-card.en.md)
+
+## D22. 设置面板自助改密：POST /auth/password，写盘成功后全踢会话
+
+已登录用户在设置面板自助改密，服务端只新增一条精确路由 `POST /auth/password`（仅 password 模式
+注册，urlencoded：`current` / `password` / `code`）。处理顺序冻结，**先写盘成功、再吊销该 subject
+的全部会话（含当前会话）**：写盘失败只回 503 并保留全部会话，绝不出现「全被踢但密码没改」；成功
+后清 cookie + `200 {"ok":true}`。TOTP 二次确认共用登录路径的同一 `replayGuard` 单例（同窗
+重放判 401 `invalid_totp`，需等下一枚验证码）；独立限速桶（IP + subject，成功即清桶，避免锁人
+放大与自锁）。路由模型由「1 prefix + 3 exact」修订为「1 prefix + 4 exact」，M2 规格 M5/M15 行与
+正文按惯例加 D22 修订注记。**已知残留**：写盘成功后 `revokeBySubject` 抛错时不重试、仍如实返回 200
+（只记 error 日志），极端情况下「新口令已生效但旧 cookie 仍可用」，窗口由会话 TTL（默认 7 天）兜底；
+P2 候选 = 撤销失败重试/告警。
+**替代方案**：单独改密页 + 302 + form 提交（fetch 会把失败读成成功导航、新页面撞 6 KB CSS 预算）；
+只踢其他设备（无法区分哪个会话是攻击者的）；免 TOTP 确认（会话被偷即永久接管）；登录路径强制改密
+分流（本期只预留 `must_change_password`）；与登录共用限速桶（DoS 放大器）；改密端点自建
+`replayGuard`（同一枚验证码同窗被接受两次）。
+**为什么**：最小服务端改动，全部复用生产已验证部件（恒时口令验证、`DUMMY_HASH` 存在性等时、
+`LoginRateLimiter`、`TotpReplayGuard` 单例、清 cookie），不加依赖、不开新提权面；顺序硬约束把最糟
+的失败模式结构性排除，全踢含当前会话让「改密 = 终点」可断言。
+→ [zh](decisions/implemented/2026-09-23-self-service-password-change.zh.md) ·
+[en](decisions/implemented/2026-09-23-self-service-password-change.en.md)
+
+## D23. 口令策略（≥14 位四类字符）与 users.yaml 变更面（独立锁 + CAS）
+
+新口令策略独立成 shared 叶子模块 `src/shared/password-policy.ts`：≥14 位 + 四类字符
+（`[A-Z]` / `[a-z]` / `[0-9]` / 非字母数字）+ 不得等于旧口令 + `maxLength` 256；**不 trim、不截断、
+不做 NFKC**（会作废存量哈希）；规则枚举即 400 `policy` 的 `rules`；校验顺序 = 长度 → 字符类 →
+旧哈希（最贵放最后），`sameAsOld` 经注入比较器判定，shared 不依赖 features。
+`users.yaml` 的变更收敛到 `mutateUsersFile` 锁内 RMW：独立 `users.yaml.lock`（`wx` 0600 + pid/mtime
+陈旧兜底，**绝不锁在会被 tmp→rename 换 inode 的 users.yaml 上**）、写前 mtime/size CAS（≤3 次重跑）、
+写前 `.bak`（0600）+ 原子写、`finally` 释放锁、统一 `UsersFileError`、**last-admin 不变量**（变更后
+admin 数由 >0 变 0 即拒绝，`disable` / `role demote` 自动受保护）。角色用
+`role: "user" | "admin"` 枚举、缺省不落盘（既有 YAML 字节不变）、**授予只走 CLI**
+（`user role` / `user add --admin`，不开 HTTP 提权面），`must_change_password` 本期只预留、登录路径
+不读。CLI 新增 `user passwd`（禁 `--password` 明文参数；管道读两行、TTY 隐藏回显），既有 `add` /
+`disable` 同样改走 `mutateUsersFile`。
+**替代方案**：bcrypt/argon2（作废全部存量哈希）；密码历史（schema 与写盘形态变大）；boolean
+`admin`（无法表达第三角色、语义藏在字段存在性里）；锁在 `users.yaml` 本身（rename 换 inode 等于
+没锁）；无锁直写（并发丢更新 = 静默数据损坏）；只加锁不做写前 CAS（挡不住锁外的编辑器/备份还原）；
+引入 SQLite（依赖与迁移成本，体量不需要）。
+**为什么**：把「不该静默发生的事」变成显式的、可测试的、机器可读的失败；P1 只做策略 + 锁 + CLI +
+自助端点所需公共面，schema 一次定死保证 P2 管理面只加不返工。
+→ [zh](decisions/implemented/2026-09-23-password-policy-and-users-lock.zh.md) ·
+[en](decisions/implemented/2026-09-23-password-policy-and-users-lock.en.md)
+
+## D24. 改密后的去向、登录页原因提示，与设置导航身份（文案/order/图标）
+
+改密成功后不再停在"死会话"设置面板上：**D24.1 起成功响应一到就**
+`location.replace("/auth/login?next=%2F&notice=password-changed")`（原先的 2500ms 缓冲由主人
+拍板取消：宿主全局 401 处理也往登录页导航但不带原因键，缓冲期就是竞态窗口），成功文案与
+**「重新登录」**按钮降级为兜底态；`GET /auth/login` 用**精确白名单**把
+`notice` 映射成编译期常量（独立 `role="status"` 槽、只挂密码卡，TOTP 页/失败页/POST 重渲染
+都不带），query 只"选"文案、绝不拼接或回显。设置导航身份改为 id 保持
+`dsh-auth-gate-account`（**不抢**宿主 0.1.7 官方云账户的 `account`）、nav 文案
+**「账号安全 / Account security」**、`order` 500 → **900**（大于已知全部条目、落在导航靠后，
+但不承诺全局最后——宿主排序没有并列决胜）。图标：宿主 `settings.section` 没有 `icon` 选项
+（`navIcon(id)` 是宿主硬编码 if 链，第三方段恒为默认齿轮），D24 原本只画在内容区；**D24.1 起**
+补一层临时 DOM 垫片 `src/client/account-nav-icon.ts`：只认我们自己那一行（`<button>` 最后一个
+元素子节点是文案 span），藏宿主齿轮、插入同一枚盾牌 SVG，找不到就静默退回齿轮，宿主重渲染后
+自愈，"上游支持 `icon` 后整体删除"写进迁移表；"不闪"由隔离实例的 rAF 逐帧探针验证
+（观察器回调是微任务，先于绘制）。
+**替代方案**：服务端 302（吞掉冻结的 200 JSON）；`location.assign`（死页面留在历史栈/bfcache）；
+flash cookie 携带 notice（扩大会话面）；抢 `id: "account"`（0.1.7 双挂载 + 语义错位）；
+order 保持 500（更易撞车，且 `-10 … 20` 之间没有契约空隙）。
+**为什么**：改密闭环的最后一跳要"走得了、看得懂、回得来"；所有新文案都是编译期常量 + 白名单
+选择，既解释原因又不引入反射面；导航身份的唯一硬约束是**不与宿主官方段撞名撞 id**，而 order
+只能声明"大于已知条目"，不能声明"最后"；D24.1 的导航垫片是"视觉临时、逻辑可退"的取舍 -
+匹配不上就退回齿轮，不动功能与安全，代价是宿主改版时要按 D24.1 迁移表复核。
+**D24.3（2026-09-24）**：截图改回**一套英文界面**（`*.zh.png` 全部删除；parity 门禁改为"两版图片
+集合相同 + `docs/demo/` 不得出现 `*.zh.png`"，并补上**表格行/列数**比较——正是这条抓出中文配置表
+漏了 `clientIpHeader`/`trustedProxyCidrs` 两行）；中文 README 按中文技术写作习惯重写（骨架与事实
+不变，去掉直译词、统一术语），grok-4.6 双语评审；npm `description` 随 0.15.0 发版生效，GitHub
+仓库描述与 topics 单独更新。
+→ [zh](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.zh.md) ·
+[en](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.en.md)
