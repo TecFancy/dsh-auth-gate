@@ -142,6 +142,33 @@ stay untouched:
 class names are not referenced), so a host rework that no longer matches will **silently fall back to
 the gear** (never destructive); if a host re-render removes the injected node, the next sync re-adds
 it, and the frame-level check was only run against the current host version (0.1.5-rc.2). README
-assets: the nav-rail close-up `docs/demo/account-nav-icon.en.png` / `.zh.png` (host gear and our shield side by
-side), and the archived fallback-state shot `docs/demo/account-password-changed.zh.png` (only reachable
-when navigation is refused).
+assets: the nav-rail close-up `docs/demo/account-nav-icon.en.png` (host gear and our shield side by
+side); every README screenshot uses the English UI and the same set serves both locales (D24.3). The
+success panel is the fallback for a refused navigation: no shot is kept for it, because a
+browser-level refusal is the only way in and a network-level block commits an error page instead -
+that branch is pinned by `src/client/account-relogin.test.tsx`.
+
+## Follow-up revision (D24.3, 2026-09-24)
+
+After reading the shipped READMEs the owner asked for three things: screenshots must not mix
+languages, the Chinese file must not read like a word-for-word translation, and the npm listing and
+the GitHub repository description must say the same thing as the README.
+
+1. **One English screenshot set.** The locale-suffixed pair shipped in D24.2 is retired: a page
+   carrying English server-rendered cards next to Chinese panels read as an accident, and the English
+   UI is what an evaluator sees first anyway. Both READMEs now reference the same English-UI light-theme
+   assets and every `*.zh.png` file is deleted. The parity gate enforces the new invariant (identical
+   image sets on both sides, no `*.zh.png` under `docs/demo/`).
+2. **Native Chinese, not a calque.** `README.zh.md` was rewritten in Chinese technical prose -
+   same skeleton, same facts, same links - dropping literal transfers such as "version corridors"
+   (版本走廊), "fix regressions" (修复回归) and "login card" (登录卡), and unifying terminology
+   (密码 throughout, no 密码/口令 mix). Reviewed by grok-4.6 acting as a bilingual editor.
+3. **Structural drift the rewrite exposed.** The Chinese configuration table was missing two rows
+   (`clientIpHeader`, `trustedProxyCidrs`) that the English table had carried since D19; the parity
+   gate only counted list items, code fences and `###`, so it had never seen them. The gate now also
+   compares table rows and their column counts.
+
+**D24.3 residuals**: the fallback success panel still has no screenshot (a browser-level refusal is
+the only way to reach it, and a network-level block commits an error page instead - see D24.1
+residuals); the npm `description` only reaches the registry on the next publish (0.15.0), while the
+GitHub description and topics are repository metadata that can be updated on their own.

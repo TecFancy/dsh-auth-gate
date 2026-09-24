@@ -3,17 +3,18 @@
  * README parity gate (`npm run readme:parity`).
  *
  * The two root READMEs are this product's front door in English and Chinese, and they
- * drifted before: the Chinese file was 283 lines against the English 352, having
- * silently dropped half of `Notes & limitations`, and both shared the same (Chinese)
- * screenshots. Prose is translated, structure is not negotiable, so this gate compares
- * the parts that must stay identical and fails loudly on drift:
+ * drifted before: the Chinese file was 283 lines against the English 352, having silently
+ * dropped half of `Notes & limitations` and two whole configuration rows. Prose is
+ * translated, structure is not negotiable, so this gate compares the parts that must stay
+ * identical and fails loudly on drift:
  *
  * 1. **Sections** - both files carry the same number of `##` sections.
- * 2. **Shape** - per section, the same number of list items, fenced code blocks and
- *    `###` subsections (a translation may be shorter, it may not lose blocks).
- * 3. **Images** - same count, every path exists on disk, and locale-suffixed assets stay
- *    on their side: `*.zh.png` must not appear in README.md, `*.en.png` not in
- *    README.zh.md.
+ * 2. **Shape** - per section, the same number of list items, fenced code blocks, `###`
+ *    subsections and table rows (with matching column counts): a translation may be
+ *    shorter, it may not lose blocks or rows.
+ * 3. **Images** - one English-UI screenshot set shared by both READMEs: the two reference
+ *    lists must be identical, every path must exist on disk, and no `*.zh.png` asset may
+ *    be referenced or kept in `docs/demo/` (locale-split screenshots were retired).
  * 4. **Link targets** - the same set of relative repository paths is referenced by both
  *    after collapsing language suffixes (`deployment.md` == `deployment_zh.md`), so a
  *    translation cannot silently drop a reference; the language switch is excluded.
@@ -22,7 +23,7 @@
  *
  * Run via `npm run verify`. Exits non-zero with every violation listed.
  */
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -42,9 +43,10 @@ function sectionsOf(text) {
   return sections.map((section) => ({ title: section.title, body: section.body.join("\n") }));
 }
 
-/** 一段的结构指纹：列表项、围栏代码块、`###` 小节。 */
+/** 一段的结构指纹：列表项、围栏代码块、`###` 小节、表格行（含每行占几列）。 */
 function shapeOf(body) {
-  const counts = { bullets: 0, code: 0, h3: 0 };
+  const counts = { bullets: 0, code: 0, h3: 0, rows: 0, cols: "" };
+  const widths = [];
   let fenced = false;
   for (const line of body.split("\n")) {
     if (/^\s*```/.test(line)) {
@@ -55,7 +57,12 @@ function shapeOf(body) {
     if (fenced) continue;
     if (/^([-*]|\d+\.) /.test(line)) counts.bullets += 1;
     if (/^### /.test(line)) counts.h3 += 1;
+    if (line.startsWith("|")) {
+      counts.rows += 1;
+      widths.push(line.split("|").length - 2);
+    }
   }
+  counts.cols = widths.join(",");
   return counts;
 }
 
@@ -116,7 +123,7 @@ const shared = Math.min(en.sections.length, zh.sections.length);
 for (let index = 0; index < shared; index += 1) {
   const a = shapeOf(en.sections[index].body);
   const b = shapeOf(zh.sections[index].body);
-  const diff = ["bullets", "code", "h3"].filter((key) => a[key] !== b[key]);
+  const diff = ["bullets", "code", "h3", "rows", "cols"].filter((key) => a[key] !== b[key]);
   if (diff.length > 0) {
     const detail = diff.map((key) => `${key} ${a[key]} vs ${b[key]}`).join(", ");
     note(
@@ -128,12 +135,25 @@ for (let index = 0; index < shared; index += 1) {
 if (en.images.length !== zh.images.length) {
   note(`image count: ${en.images.length} vs ${zh.images.length}`);
 }
+const enImages = new Set(en.images);
+const zhImages = new Set(zh.images);
+for (const path of enImages)
+  if (!zhImages.has(path)) note(`${zh.file}: missing shared image ${path}`);
+for (const path of zhImages)
+  if (!enImages.has(path)) note(`${en.file}: missing shared image ${path}`);
 for (const [locale, data] of Object.entries(parsed)) {
   for (const path of data.images) {
     if (!existsSync(join(ROOT, path))) note(`${data.file}: missing image ${path}`);
-    if (locale === "en" && path.includes(".zh.")) note(`${data.file}: Chinese-only asset ${path}`);
-    if (locale === "zh" && path.includes(".en.")) note(`${data.file}: English-only asset ${path}`);
+    if (path.includes(".zh."))
+      note(`${data.file}: screenshots must use the English UI, found ${path}`);
   }
+}
+const demoDir = join(ROOT, "docs/demo");
+for (const asset of readdirSync(demoDir)) {
+  if (asset.endsWith(".zh.png"))
+    note(
+      `docs/demo/${asset}: locale-split screenshots were retired, keep the English-UI shot only`,
+    );
 }
 
 const enTargets = new Set(en.targets);

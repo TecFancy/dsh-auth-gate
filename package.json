@@ -1,12 +1,13 @@
 {
   "name": "dsh-auth-gate",
   "version": "0.14.3",
-  "description": "Login gate for a dsh web instance: application-layer authentication with password or token sign-in, optional TOTP two-factor, rate limiting and a user CLI",
+  "description": "Login gate for DeepSeek Harness (dsh) web instances: password or shared-token sign-in, optional TOTP two-factor, session cookies, rate limiting, self-service password change and a user-management CLI",
   "type": "module",
   "license": "MIT",
   "keywords": [
     "dsh",
     "dsh-plugin",
+    "deepseek-harness",
     "auth",
     "authentication",
     "login",

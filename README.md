@@ -16,11 +16,11 @@ reach your agents, your chat sessions, or your LLM credentials without signing
 in first.
 
 > **Maintained until dsh ships authentication natively.** dsh has no built-in login
-> yet, and this repository is how we close that gap: new dsh releases are tracked (mount
-> points, version corridors, CI on Linux and Windows), regressions are fixed, and
-> releases keep shipping. When official authentication lands we will publish the
-> migration path and keep supporting the dsh versions still in use - nobody is left on
-> an abandoned fork.
+> yet, and this repository is how we close that gap: new dsh releases are tracked
+> (mount-point changes, supported version ranges, Linux/Windows CI), regressions are
+> fixed, and releases keep shipping. When official authentication lands we will publish
+> the migration path and keep supporting the dsh versions still in use, so nobody is left
+> on an abandoned fork.
 
 ## Contents
 
@@ -57,24 +57,25 @@ in first.
 - **Safe by default.** Passwords are stored hashed, logins are rate-limited
   (repeated wrong attempts temporarily lock the address), session cookies are
   secure, and any missing or broken configuration **blocks access instead of
-  silently opening the door**. A wrong username or password re-renders the
-  login card with an inline `Invalid username or password.`: the username is
-  kept, the password must be retyped. A lockout (HTTP 429 + `retry-after`)
-  shows the same card with the retry seconds and a message scoped to "this
-  network"; the number of remaining attempts is deliberately never shown, and
-  with JavaScript a page refresh no longer spends another failure.
+  silently opening the door**. A wrong username or password makes the login card
+  re-render with an inline `Invalid username or password.`: the username is kept, the
+  password must be retyped. A lockout (HTTP 429 + `retry-after`) shows the same card
+  with the retry seconds and a message saying the lockout applies to "this network".
+  The number of remaining attempts is deliberately never shown, and with JavaScript a
+  page refresh no longer consumes another failed attempt.
 
 ## What it does not do
 
-Honest boundaries, so you can size the risk before installing (the full list with
+Honest boundaries, so you can gauge the risk before installing (the full list with
 mechanisms is in `docs/deployed/known-limitations.md`):
 
 - **Not server-level security.** Keep the OS user locked down and the config files
   private (`auth/users.yaml` and `.credentials.yaml` are created `0600`); this plugin
   guards dsh's **web** surface only.
-- **Not every password path evicts sessions.** `dsh-auth user disable` revokes a user's
-  live sessions, and the Settings panel's self-service change revokes every session of
-  that user; the CLI's `dsh-auth user passwd` only rewrites the stored hash.
+- **Not every way of changing a password evicts sessions.** `dsh-auth user disable`
+  blocks future logins and revokes the sessions that user was issued (within
+  `revokeSweepMs`, 5 s by default); the Settings panel's self-service change revokes every
+  session of that user; the CLI's `dsh-auth user passwd` only rewrites the stored hash.
 - **Not a replacement for HTTPS.** With `cookieSecure: true` you must serve the site
   over https.
 - **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
@@ -104,6 +105,10 @@ printf '%s\n' 'choose-a-strong-password' | \
 
 ## See it in action
 
+Every screenshot below uses the **English UI**, and both READMEs share the same set of
+images (the plugin's own panels follow the GUI language; the server-rendered pages are
+English in every locale).
+
 Visitors without a session are sent to the login page (the card is rendered by the plugin
 server-side in English, so this shot is the same in every locale):
 
@@ -119,8 +124,8 @@ After signing in, they land on your instance:
 ![dsh instance](docs/demo/dashboard.en.png)
 
 On dsh 0.1.2-alpha+ (which guards pages with a launch token), signing in
-auto-bridges the token gate: the login redirect goes through a short relative
-`/?token=…` hop that mints the dsh cookie, then lands on `/` (details in
+auto-bridges the token gate: the login redirect takes a short relative
+`/?token=…` hop that sets the dsh cookie, then lands on `/` (details in
 `docs/implemented/impl-launch-token-bridge.md`).
 
 A prominent **Sign out / 退出登录** button sits inside the **Settings panel**
@@ -216,8 +221,9 @@ dsh-auth user totp disable admin            # remove the TOTP secret
 see [Quick start](#quick-start).
 
 `dsh-auth user passwd` only rewrites the stored hash: it does **not** revoke that user's
-live sessions. Use the Settings panel change (or `user disable`) when those sessions
-must be evicted.
+live sessions. Use the Settings panel change when sessions must be evicted right away;
+`dsh-auth user disable` also blocks future logins, but the sessions already issued are
+dropped by the periodic sweep (`revokeSweepMs`, ~5 s by default).
 
 ## Bundled configuration skill
 
@@ -236,8 +242,8 @@ dsh's skill discovery picks up automatically. Re-running without
 from the package.
 
 The skill is a **user-only skill** (`disable-model-invocation: true` in its
-frontmatter): it stays out of the model's auto-invocable skill catalog so it
-does not sit in every agent turn, and you open it explicitly from the skill
+frontmatter): it stays out of the model's auto-invocable skill catalog so it is
+not injected into every agent turn, and you open it explicitly from the skill
 panel whenever you need the config reference (the UI marks it `user-only`).
 If you prefer the agent to answer configuration questions automatically,
 remove that frontmatter field after installation.
@@ -306,19 +312,20 @@ reads — the global copy is just a launcher.
 
 > After the semi-shell fixed the server-side `/api` fence, dsh's **client** still requires
 > "page origin must be loopback"; the local proxy provides a loopback page entry on the user's
-> machine, composing with auth-gate for "remote config editing with authentication throughout",
-> without touching dsh sources. Full design: [docs/deployed/local-proxy.md](docs/deployed/local-proxy.md)
+> machine, used together with auth-gate so remote config editing stays authenticated
+> end-to-end, without touching dsh sources. Full design: [docs/deployed/local-proxy.md](docs/deployed/local-proxy.md)
 > (Chinese: [docs/deployed/local-proxy_zh.md](docs/deployed/local-proxy_zh.md)).
 
 - Zero-dependency Node bin (`dsh-auth-proxy`): strictly bound to `127.0.0.1`, stateless
-  pass-through for pages/API, `events.mux`/`events.host` WebSocket tunneling, and a
-  `Set-Cookie` `Secure`-attribute adaption (Safari fallback).
+  pass-through for pages/API, `events.mux`/`events.host` WebSocket tunneling, and
+  stripping of the `Secure` attribute from `Set-Cookie` (Safari fallback).
 - Authentication reuses auth-gate (password and token modes): the login page and session
   cookies pass through untouched.
 - **Security boundary (deny-list, Phase 2.1)**: combined with `--mark-proxy`, the server-side
   guard answers `403` for marked requests hitting `host.pickDirectory`/`host.openPath`/
-  `settings.openDocument`/`llm.discoverModels`; unmarked traffic behaves exactly as if the
-  proxy were not deployed.
+  `settings.openDocument`/`llm.discoverModels`, so a remote authenticated user cannot reach
+  the host's native capabilities; unmarked traffic behaves exactly as if the proxy were not
+  deployed.
 
 ```sh
 dsh-auth-proxy --listen 127.0.0.1:8443 --target https://your-domain.example --mark-proxy
@@ -347,13 +354,15 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 The short list; the full version, including the mechanisms and the ADRs behind them,
 is in `docs/deployed/known-limitations.md`.
 
-- Disabling a user only stops **new** logins; sessions already signed in stay valid
-  until they expire.
+- Disabling a user only stops **new** logins; sessions already issued are revoked by the
+  periodic sweep (`revokeSweepMs`, 5 s by default - with `0` they stay valid until they
+  expire).
 - Login rate limiting and the TOTP replay guard reset when the server restarts.
-- Behind a reverse proxy, set `clientIpHeader` (and `trustedProxyCidrs`): otherwise
-  every client shares one lockout bucket, for both login and the self-service change.
-- A password change reports success even if revoking the old sessions fails; the
-  failure is logged and the old cookie stays valid until its session TTL.
+- Behind a reverse proxy, set `clientIpHeader` (and `trustedProxyCidrs`): otherwise all
+  clients share one lockout bucket, and login plus the self-service change each have their
+  own, so both are affected.
+- A password change reports success even if revoking the old sessions fails; the failure is
+  logged at error level and the old cookie stays valid until its session TTL.
 - The plugin protects dsh's web surface only. Keep the OS user and the config files
   private.
 

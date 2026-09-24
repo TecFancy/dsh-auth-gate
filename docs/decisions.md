@@ -320,5 +320,10 @@ order 保持 500（更易撞车，且 `-10 … 20` 之间没有契约空隙）�
 选择，既解释原因又不引入反射面；导航身份的唯一硬约束是**不与宿主官方段撞名撞 id**，而 order
 只能声明"大于已知条目"，不能声明"最后"；D24.1 的导航垫片是"视觉临时、逻辑可退"的取舍 -
 匹配不上就退回齿轮，不动功能与安全，代价是宿主改版时要按 D24.1 迁移表复核。
+**D24.3（2026-09-24）**：截图改回**一套英文界面**（`*.zh.png` 全部删除；parity 门禁改为"两版图片
+集合相同 + `docs/demo/` 不得出现 `*.zh.png`"，并补上**表格行/列数**比较——正是这条抓出中文配置表
+漏了 `clientIpHeader`/`trustedProxyCidrs` 两行）；中文 README 按中文技术写作习惯重写（骨架与事实
+不变，去掉直译词、统一术语），grok-4.6 双语评审；npm `description` 随 0.15.0 发版生效，GitHub
+仓库描述与 topics 单独更新。
 → [zh](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.zh.md) ·
 [en](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.en.md)

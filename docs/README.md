@@ -10,7 +10,7 @@ dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
 | [`implemented/`](implemented/)                              | 已交付规格与规划：impl-m1~m4（当前实现基准，m4 最新）、impl-launch-token-bridge（0.1.2-alpha 兼容层）、impl-client-logout、login-page-polish-plan（已落地视觉基线）、totp-fix-plan（0.11.1 修复计划，已实施）                                     | 核对「当前行为依据」时    |
 | [`plans/`](plans/)                                          | 进行中规划：pr53-login-page-fix-plan（#53 移植）                                                                                                                                                                                                  | #53 落地时                |
 | [`decisions.md`](decisions.md) + [`decisions/`](decisions/) | 重大决策编号索引 D1–D23（双语记录，proposed / implemented / archived）                                                                                                                                                                            | 理解「为什么」时          |
-| [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例；随 GUI 语言区分 `*.en.png` / `*.zh.png`，服务端渲染的登录卡不分语言）                                                                                                                               | README 引用               |
+| [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例 / 设置导航「账号安全」行 / 改密面板；**统一英文界面 + 浅色主题**，中英共用同一套）                                                                                                                   | README 引用               |
 | [`reviews/`](reviews/)                                      | 外部评审记录（grok-4.6 launch-token bridge review 等）                                                                                                                                                                                            | 变更合入前对照            |
 
 ## 阅读路径
@@ -40,6 +40,7 @@ dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
    标题，H1 不在扫描范围，标题比较忽略大小写。
 6. 新文档无法满足 1-5 时先改这里的规则再提交，不让 `docs:check` 静默变红。
 7. **根 README 必须对称**：`README.md` 与 `README.zh.md` 的 `##` 段数、每段的列表项 / 围栏代码块 /
-   `###` 小节数、图片数、链接目标集合（语言后缀归一后）、以及目录锚点都必须一致，由
-   `npm run readme:parity` 强制（已挂 `verify` 链）。配图按 GUI 语言区分：`*.en.png` 只出现在英文、
-   `*.zh.png` 只出现在中文；登录页 / TOTP 页是插件**服务端渲染的英文**，中英共用同一张图。
+   `###` 小节数 / 表格行（含列数）、图片集合、链接目标集合（语言后缀归一后）、以及目录锚点都必须一致，
+   由 `npm run readme:parity` 强制（已挂 `verify` 链）。截图**统一英文界面**，`docs/demo/` 下不允许
+   再出现 `*.zh.png`：插件面板原本跟随 GUI 语言，现在两版共用同一套 `*.en.png`；登录页等由插件
+   **服务端渲染**的页面本来就是英文，与语言无关。
