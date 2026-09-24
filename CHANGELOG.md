@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.3...v0.15.0) (2026-09-24)
+
+
+### Features
+
+* self-service password change in the settings panel ([2c1b06d](https://github.com/TecFancy/dsh-auth-gate/commit/2c1b06d04848350de912b6d604b3de5b42c11688))
+
 ## [0.14.3](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.2...v0.14.3) (2026-09-23)
 
 
