@@ -327,3 +327,36 @@ order 保持 500（更易撞车，且 `-10 … 20` 之间没有契约空隙）�
 仓库描述与 topics 单独更新。
 → [zh](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.zh.md) ·
 [en](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.en.md)
+
+## D25. 管理员重置口令与强制改密登录门
+
+新增两条管理端点（仅 password 模式）：`GET /auth/users`（字段白名单列表，非 admin / 受限会话
+`403`）与 `POST /auth/users/password`（admin 重置他人口令，`target` 只认 body，`code` 只在 actor
+自己启用 TOTP 时要求）；口令模式路由模型变为 **1 prefix + 6 exact**（token 模式仍 3 exact）。
+处理顺序硬约束：Origin → 401 → 非 admin 403 → 受限 403 → 限流 → 目标名 400 → 404 →
+`target === actor` 403 → 策略 400 → 条件式 TOTP 401 → 锁内写盘（置 `must_change_password`，
+**不动目标 `totpSecret`**）→ 吊销目标全部会话（不含 actor）→ 清目标两个桶 → 成功 `200`
+（body `{"ok":true,"sessionsRevoked":boolean}`）+ 审计。P1 预留的 `must_change_password` 变成真门：登录
+通过后签发 **受限会话**（`kind: "password-change-only"`，15 分钟、不续期），只允许
+`GET`/`POST /auth/password`（POST 仍必须带 `current`）、`GET /auth/status`、`POST /auth/logout`，
+`/auth/users*` 一律 403，宿主 /api、静态、`/plugins`、WS 全 deny（导航 `302 /auth/password`，
+API `401`），gate **只信 `session.kind`**。`GET /auth/password` 服务端渲染**零外链、无 JS** 的
+改密表单（未认证 → `302 /auth/login?next=/auth/password`），`allow` 修为 `GET, POST`。
+`/auth/status` 加法追加 `name`/`role`/`disabled`/`totpEnabled`/`mustChangePassword`/`sessionKind`
+（未认证键集合相等，不新增 `/auth/me`）。已认证状态变更 POST 加 fail-closed 的
+`Origin` / `Sec-Fetch-Site` 校验（`publicHost` 未配置时**不得**用 `Host` 比对放行，不给脚本豁免），
+CLI 顺带补 `dsh-auth user enable`。
+**替代方案**：正常会话 + 全路径 302 强制改密（漏一条就等于没做）；新增 `GET /auth/me`
+（多一条路由与鉴权面）；独立 `/auth/password-change` 页路由；用 `Accept` 子串判导航（假绿）；
+Origin 也覆盖 `/auth/login`（未认证易锁死）；`disabled` 目标拒绝重置 409（挡掉运维救命场景）；
+给脚本开 Origin 豁免；`target` 也认 query；写 audit 文件或往 `users.yaml` 追加审计行。
+**为什么**：受限会话是闸门唯一能**证明否定命题**的形态（这枚 cookie 除了改密表单哪儿都到不了，
+不需要给任何宿主路径开白名单）；复用 `GET /auth/password` 让路由只增长两条管理端点；重置流程保持
+P1 的顺序不变量并按评审加两处（写盘打标记、吊销失败如实上报 `sessionsRevoked:false`）；列表走
+字段白名单、状态走加法字段、授权每请求现读 `users.yaml`（CLI 改角色/禁用立即生效），审计只走
+结构化日志。
+**残留（如实记档）**：Origin 不覆盖 `/auth/login`（仍只有 `SameSite=Lax`）；revoke 失败仍 `200`
+且不重试/不告警；CLI `user passwd` 不设标记；重置仍 `disabled` 的账号不会让它能登录（需先
+`user enable`）；同站子域 CSRF 未收口；锁夺取 0 字节窗口未修；admin 未开 TOTP 时管理面是单因素。
+→ [zh](decisions/implemented/2026-09-24-admin-password-reset.zh.md) ·
+[en](decisions/implemented/2026-09-24-admin-password-reset.en.md)

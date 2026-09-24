@@ -85,6 +85,11 @@ describe("POST /auth/login: rejection", () => {
       ["//evil.com", "/"],
       ["/ok/path", "/ok/path"],
       ["/auth/", "/"], // /auth 与 /auth/* 同一规则（next !== "/auth" && !startsWith("/auth/")）
+      // 控制符：TAB 会被浏览器在解析 URL 前剥掉，"/\t/evil.com" 等于 "//evil.com"；
+      // CR/LF/NUL 则让 Node writeHead 抛 ERR_INVALID_CHAR，宿主 webserver 兜成 400。
+      ["/\t/evil.com", "/"],
+      ["/x\r\nSet-Cookie: y=1", "/"],
+      ["/x\u0000y", "/"],
     ] as const) {
       const res = makeRes();
       await handlerOf(

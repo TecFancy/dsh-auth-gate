@@ -87,6 +87,20 @@ function makeSessionRevoker(
   };
 }
 
+/**
+ * 管理面两条路由的注入面（P2 ① ②）。**结构性类型**：features 之间禁止互相 import，
+ * 因此这里不引用 `features/admin` 的类型；root（`src/index.ts`）把
+ * `makeAdminRoutes(...)` 的返回值直接传进来，结构匹配即可。
+ * 缺省 = 不注册管理路由（既有 harness 的对象字面量不必改动）；
+ * token 模式也走缺省（契约 §1：管理路由只在 password 模式注册）。
+ */
+export interface AdminRouteSet {
+  /** `GET /auth/users`（405 allow 在 handler 内）。 */
+  readonly users: HttpHandler;
+  /** `POST /auth/users/password`（同上）。 */
+  readonly resetPassword: HttpHandler;
+}
+
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
   /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
   register(route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): () => void;
@@ -98,11 +112,14 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
    * 不存在「静默不注册」的空间（反退化测试见 password-change.test.ts）。
    */
   passwordChange?: PasswordChangeWiring | undefined;
+  /** 管理面接线（P2）。缺省 → 不注册 `/auth/users` 与 `/auth/users/password`。 */
+  admin?: AdminRouteSet | undefined;
 }
 
 /**
  * 注册 prefix `/auth` 兜底 + 三个 exact 端点（password 模式，P16）+（接线存在时）
- * 第 4 个 exact `/auth/password`（P1，§1 路由模型：1 prefix + 4 exact）。
+ * `/auth/password`（P1）+（接线存在时）`/auth/users`、`/auth/users/password`（P2）。
+ * 路由模型 **1 prefix + 6 exact**（token 模式仍 3 exact，管理路由不注册）。
  * 返回合并 disposer。路由模型同 M15：webserver 无 method 路由，exact handler 内部按
  * `req.method` 分发。
  */
@@ -125,12 +142,17 @@ export function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => vo
   });
   if (deps.passwordChange !== undefined) {
     const change = toPasswordChangeDeps(deps, deps.passwordChange);
-    // 405（allow: POST）在 handlePasswordChange 内（§1 处理顺序第 1 步）；此处是薄委托。
+    // 405（allow: GET, POST）在 handlePasswordChange 内（§1 处理顺序第 1 步）；此处是薄委托。
     track({
       kind: "exact",
       path: "/auth/password",
       handler: (req, res) => handlePasswordChange(change, req, res),
     });
+  }
+  if (deps.admin !== undefined) {
+    // P2：405/401/403/... 顺序全在各自 handler 内（契约 §1、§2）；此处只挂两条 exact。
+    track({ kind: "exact", path: "/auth/users", handler: deps.admin.users });
+    track({ kind: "exact", path: "/auth/users/password", handler: deps.admin.resetPassword });
   }
   return () => {
     for (const disposer of [...disposers].reverse()) disposer();
@@ -150,6 +172,8 @@ function toPasswordChangeDeps(
     loadUsers: deps.loadUsers,
     verify: deps.verify,
     clientIp: deps.clientIp,
+    // P2 §6：自助改密的 POST 也要 Origin/Sec-Fetch-Site 校验，来源取运营侧配置。
+    publicHost: deps.publicHost,
     totpMode: deps.totpMode,
     verifyTotp: deps.verifyTotp,
     replayCheck: wiring.replayCheck,

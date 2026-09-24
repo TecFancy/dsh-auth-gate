@@ -36,14 +36,18 @@ import { fileURLToPath } from "node:url";
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_DIR = join(ROOT, "src");
 const CODE_EXT = /\.(ts|tsx)$/;
-const FEATURE_SLICES = new Set(["token", "password", "proxy", "totp"]);
+const FEATURE_SLICES = new Set(["token", "password", "proxy", "totp", "admin"]);
 const ROOT_FILES = new Set([
   "index.ts",
+  "admin-wiring.ts",
+  "token-resolver.ts",
+  "cli-skill.ts",
   "launch-token-bridge.ts",
   "index.test.ts",
   "index.password.test.ts",
   "cli.ts",
   "cli.test.ts",
+  "cli.enable.test.ts",
   "cli.totp.test.ts",
   "cli.passwd.test.ts",
   "cli.passwd.stdin.test.ts",
@@ -55,12 +59,16 @@ const ROOT_FILES = new Set([
   "integration.password-change.test.ts",
   "integration.password-change.totp.test.ts",
   "integration.p11-pins.test.ts",
+  "integration.p2-admin.test.ts",
+  "integration.p2-admin-hardening.test.ts",
+  "integration.p2-restricted.test.ts",
   "integration.password.rate.test.ts",
   "integration.revoke.test.ts",
   "integration.session.test.ts",
   "integration.totp.test.ts",
   "integration.totp-hardening.test.ts",
   "integration-totp-helpers.ts",
+  "integration-p2-helpers.ts",
   "integration-password-change-helpers.ts",
   "guard-proxy-deny.test.ts",
 ]);

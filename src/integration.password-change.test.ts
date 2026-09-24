@@ -116,13 +116,17 @@ describe("integration: password change rejection paths", () => {
         headers: {
           "content-type": "application/x-www-form-urlencoded",
           authorization: `Bearer ${cookie.split("=")[1]}`,
+          // P2 §6：先过同源门（缺省 fail-closed），才能测到"只认 cookie"这条。
+          "sec-fetch-site": "same-origin",
         },
         body: changeBody(OLD_PASSWORD, NEW_PASSWORD),
         redirect: "manual",
       });
       expect(bearer.status).toBe(401); // 只认 cookie（M5 同款）
 
-      expect((await changePassword(base, cookie, "", "GET")).status).toBe(405);
+      // P2 修订：`/auth/password` 的 allow 由 `POST` 改为 `GET, POST`（GET = SSR 改密页），
+      // 405 用真正非法的方法断言（allow 头的逐条断言在 password-endpoints.p2-routes.test.ts）。
+      expect((await changePassword(base, cookie, "", "GET")).status).toBe(200);
       expect((await changePassword(base, cookie, "", "PUT")).status).toBe(405);
     } finally {
       await unmountStack(stack);

@@ -113,12 +113,18 @@ export interface UserRec {
   passwordHash: string;
   totpSecret?: string;
   disabled: boolean;
+  /** P2 ④：登录门标记（YAML `must_change_password`）；缺省 = false（旧行兼容）。 */
+  mustChangePassword?: boolean;
 }
 
 export interface Harness {
   deps: PasswordEndpointsDeps;
   handlerOf(kind: "exact" | "prefix", path: string): HttpHandler;
   users: Map<string, UserRec>;
+  /** 会话表（P2 用例直接断言 kind / TTL / 是否发过会话）。 */
+  table: MemTable;
+  /** 当前会话存储（`setStore` 之后取到的是新值）。 */
+  storeOf(): SessionStore | undefined;
   setVerifyImpl(fn: (secret: string, code: string, nowMs: number) => number | undefined): void;
   nowMs: number;
   replayCalls: { username: string; counter: number; code: string }[];
@@ -185,6 +191,8 @@ export function makeHarness(): Harness {
   return {
     deps,
     users,
+    table,
+    storeOf: () => storeRef,
     setVerifyImpl: (fn) => {
       verifyImpl = fn;
     },
@@ -215,6 +223,17 @@ export function aliceChallengeCookie(): string {
     1_700_000_000_000 + (CHALLENGE_TTL_SECONDS * 1000) / 2,
     TEST_CHALLENGE_KEY,
   )}`;
+}
+
+/**
+ * 从响应头里取 `dsh_auth` 会话 token（harness 的 setHeader 会把数组 String() 成
+ * 逗号串；`dsh_auth_challenge=` 不会误命中，正则要求 `dsh_auth=` 紧邻等号）。
+ */
+export function sessionToken(headers: Record<string, string>): string {
+  const raw = headers["set-cookie"] ?? "";
+  const match = /dsh_auth=([A-Za-z0-9_-]+)/.exec(raw);
+  if (match === null) throw new Error(`no session cookie in: ${raw}`);
+  return match[1]!;
 }
 
 /** 一次请求直达响应的便捷封装（用例内省去 handler/res 样板）。 */

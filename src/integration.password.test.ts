@@ -140,7 +140,9 @@ describe("integration: password flow over real HTTP", () => {
       expect(await page.text()).toContain('name="username"');
 
       const nav = await fetch(`${base}/__probe`, {
-        headers: { accept: "text/html" },
+        // P2 §3：导航判定只认 Sec-Fetch（Accept 子串匹配已废除）；undici 会改写
+        // sec-fetch-mode，故这里用 sec-fetch-dest: document 表达浏览器导航。
+        headers: { accept: "text/html", "sec-fetch-dest": "document" },
         redirect: "manual",
       });
       expect(nav.status).toBe(302);
@@ -155,8 +157,16 @@ describe("integration: password flow over real HTTP", () => {
       const cookie = good.cookie!;
 
       expect((await fetch(`${base}/__probe`, { headers: { cookie } })).status).toBe(200);
+      // P2：已认证 status 追加「关于我」字段；形状矩阵在专用测试里，这里只锁真栈可用性。
       const status = await fetch(`${base}/auth/status`, { headers: { cookie } });
-      expect(await status.text()).toBe('{"authenticated":true,"logoutOrder":1000}');
+      const body = (await status.json()) as Record<string, unknown>;
+      expect(body).toMatchObject({
+        authenticated: true,
+        logoutOrder: 1000,
+        name: "admin",
+        role: "user",
+        sessionKind: "full",
+      });
     } finally {
       await unmountStack(fibers, root);
     }

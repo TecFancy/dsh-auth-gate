@@ -8,6 +8,12 @@ export declare const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
 export declare function buildSetCookie(cookieName: string, token: string, maxAgeSeconds: number, secure?: boolean): string;
 /** 会话 token 的落盘键：sha256 hex 小写（64 字符）；介质上永不出现原始 token。 */
 export declare function digestToken(token: string): string;
+/**
+ * 会话类别（P2 ④）：`full` = 常规会话；`password-change-only` = 受限会话，
+ * 仅由「登录时用户带 `must_change_password`」签发，TTL 短且入口受限。
+ * 缺省/缺字段一律按 `full` 解释（既有行兼容）。
+ */
+export type SessionKind = "full" | "password-change-only";
 export interface Session {
     /** 审计用：产生该会话的凭证身份（M1 恒 "token"，M2 为用户名）。 */
     subject: string;
@@ -16,6 +22,8 @@ export interface Session {
     /** epoch ms。 */
     expiresAt: number;
     revoked: boolean;
+    /** P2 ④：缺省 = `full`（旧行无此字段仍解析）。 */
+    kind?: SessionKind | undefined;
 }
 export interface IssuedSession {
     token: string;
@@ -31,6 +39,7 @@ export declare const sessionDomainSpec: {
             createdAt: number;
             expiresAt: number;
             revoked: boolean;
+            kind?: "full" | "password-change-only" | undefined;
         }>;
     };
 };
@@ -38,7 +47,7 @@ export declare const sessionDomainSpec: {
 export declare class SessionStore {
     private readonly table;
     constructor(table: KvTable<string, Session>);
-    create(subject: string, ttlMs: number): Promise<IssuedSession>;
+    create(subject: string, ttlMs: number, kind?: SessionKind): Promise<IssuedSession>;
     /** 同步内存读 + 校验；有效则返回行（不修改），否则 undefined。 */
     getByToken(token: string): Session | undefined;
     /** 吊销 = 删除行（登出语义，写盘）；不存在返回 false。 */

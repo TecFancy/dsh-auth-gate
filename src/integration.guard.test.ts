@@ -83,11 +83,16 @@ describe("integration: real webserver + guard", () => {
       ctx.get("auth")!.gate = denyGate;
 
       const nav = await fetch(`${base}/probe`, {
-        headers: { accept: "text/html" },
+        // undici 会把 sec-fetch-mode 强制改写成 "cors"，故导航标记只能用 sec-fetch-dest。
+        headers: { accept: "text/html", "sec-fetch-dest": "document" },
         redirect: "manual",
       });
       expect(nav.status).toBe(302);
       expect(nav.headers.get("location")).toBe("/auth/login?next=%2Fprobe");
+
+      // P2 §3：Accept 子串匹配已废除（只认 Sec-Fetch）→ 缺头时 fail-closed 按 API 401。
+      const acceptOnly = await fetch(`${base}/probe`, { headers: { accept: "text/html" } });
+      expect(acceptOnly.status).toBe(401);
 
       const api = await fetch(`${base}/probe`, {
         headers: { accept: "application/json" },
@@ -97,7 +102,7 @@ describe("integration: real webserver + guard", () => {
       expect((await fetch(`${base}/pfx/x`)).status).toBe(401);
 
       const fallback = await fetch(`${base}/`, {
-        headers: { accept: "text/html" },
+        headers: { accept: "text/html", "sec-fetch-dest": "document" },
         redirect: "manual",
       });
       expect(fallback.status).toBe(302);

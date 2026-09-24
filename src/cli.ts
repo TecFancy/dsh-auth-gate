@@ -4,17 +4,14 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { hashPassword, verifyPassword } from "./features/password/index.js";
 import { handleUserTotp } from "./features/totp/index.js";
+import { installSkillCommand } from "./cli-skill.js";
 import {
-  bundledSkillDir,
   checkPasswordPolicy,
   compareNames,
   defaultUsersFilePath,
-  installSkill,
   loadUsersFile,
   mutateUsersFile,
-  SKILL_NAME,
   USERNAME_RE,
-  userSkillDir,
   UsersFileError,
   type UserRecord,
   type UsersSnapshot,
@@ -49,6 +46,7 @@ const USAGE = `Usage:
   dsh-auth user role <name> <admin|user> [--file <path>]
   dsh-auth user list [--file <path>]
   dsh-auth user disable <name> [--file <path>]
+  dsh-auth user enable <name> [--file <path>]
   dsh-auth user totp <enable|disable> <name> [--file <path>]
   dsh-auth skill install [--force]`;
 
@@ -97,7 +95,8 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
     passwd: () => passwdUser(ctx, args[2]),
     role: () => setRole(ctx, args[2], args[3]),
     list: () => listUsers(ctx),
-    disable: () => disableUser(ctx, args[2]),
+    disable: () => setDisabledUser(ctx, args[2], true),
+    enable: () => setDisabledUser(ctx, args[2], false),
     totp: () => handleUserTotp(file, args[2], args[3], io),
   };
   const handler = handlers[args[1] ?? ""];
@@ -260,26 +259,22 @@ async function listUsers(ctx: CliCtx): Promise<number> {
   return 0;
 }
 
-/** `dsh-auth skill install [--force]`：把包内配置速查技能装到 $DSH_HOME/skills/。 */
-async function installSkillCommand(ctx: CliCtx): Promise<number> {
-  const target = userSkillDir();
-  const force = ctx.argv.includes("--force");
-  const result = await installSkill({ sourceDir: bundledSkillDir(), targetDir: target, force });
-  if (result.status === "source-missing") {
-    ctx.io.err("bundled skill not found (package layout changed?)");
-    return 1;
-  }
-  const current = result.status === "up-to-date";
-  const note = current ? " (use --force to update)" : "";
-  const verb = current ? "already installed at" : "installed to";
-  ctx.io.out(`skill ${SKILL_NAME} ${verb} ${target}${note}`);
-  return 0;
-}
+/** `dsh-auth skill install [--force]` 在 `src/cli-skill.ts`（拆出以守住文件行数上限）。 */
 
-async function disableUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
+/**
+ * `user disable|enable <name>`：翻转 `disabled`（P2 补齐 disable 的反向操作）。
+ * admin 重置口令会设 `must_change_password` 标记，而登录路径恒拒 disabled 用户，
+ * 因此"重置一个被禁用账号"的闭环必须能重新启用它；此前只能手改 yaml。
+ * 其余字段（role/totpSecret/标记/哈希）原样保留，last-admin 不变量与禁用无关，不会误触发。
+ */
+async function setDisabledUser(
+  ctx: CliCtx,
+  name: Maybe<string>,
+  disabled: boolean,
+): Promise<number> {
   if (name === undefined) return usage(ctx.io);
-  if (!(await edit(ctx, name, (user) => ({ ...user, disabled: true })))) return 1;
-  ctx.io.out(`user ${name} disabled`);
+  if (!(await edit(ctx, name, (user) => ({ ...user, disabled })))) return 1;
+  ctx.io.out(`user ${name} ${disabled ? "disabled" : "enabled"}`);
   return 0;
 }
 

@@ -30,6 +30,7 @@ in first.
 - [See it in action](#see-it-in-action)
 - [Configuration](#configuration)
 - [Command-line tool](#command-line-tool)
+- [Admin tools: list users and reset a password](#admin-tools-list-users-and-reset-a-password)
 - [Bundled configuration skill](#bundled-configuration-skill)
 - [Troubleshooting](#troubleshooting)
 - [Deployment](#deployment)
@@ -51,6 +52,10 @@ in first.
   - **Token**: one shared secret token for the whole instance.
 - **Works for browsers and scripts.** Browsers use the login page; scripts and
   curl can pass `Authorization: Bearer <token>` and skip the page entirely.
+- **Admin tools.** In password mode an administrator can list users and reset another user's
+  password over HTTP (`GET /auth/users`, `POST /auth/users/password`); a reset revokes that
+  user's sessions and forces a new password at their next sign-in before they can reach anything
+  else. A Settings-panel block for these actions is planned for a follow-up release.
 - **Optional two-factor authentication (TOTP).** In password mode, a user with
   a TOTP secret added to their account signs in with password **plus** a 6-digit
   code from an authenticator app (RFC 6238, configurable off/optional/required).
@@ -182,20 +187,20 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
     cookieSecure: true # keep true when you use https
 ```
 
-| Option              | Default                      | What it does                                                                                                                                                                                                                                                                                                         |
-| ------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `mode`              | `"token"`                    | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                                                                                                |
-| `totp`              | `"off"`                      | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration)                                                                  |
-| `sessionTtl`        | `604800`                     | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                                                                                       |
-| `cookieName`        | `dsh_auth`                   | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                                                                                   |
-| `tokenRef`          | `"DSH_AUTH_TOKEN"`           | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                                                                                  |
-| `cookieSecure`      | `true`                       | Set to `false` only if you are testing over plain http                                                                                                                                                                                                                                                               |
-| `usersFile`         | `""`                         | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                                   |
-| `publicHost`        | `""`                         | Host rendered in the login page identity block (the anti-phishing "which instance is this" line). Empty = use the request `Host` header. Set it when a reverse proxy rewrites `Host` (e.g. Caddy `header_up Host 127.0.0.1:3080`), otherwise the card shows a loopback address instead of your public domain         |
-| `revokeSweepMs`     | `5000`                       | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                                                                                    |
-| `clientIpHeader`    | `""`                         | Header carrying the real client address for rate limiting (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare). Empty = read no header at all. Only read when the request's peer is inside `trustedProxyCidrs`; without it a same-host reverse proxy makes every client share one lockout bucket (issue #74) |
-| `trustedProxyCidrs` | `["127.0.0.0/8", "::1/128"]` | Which peers may supply `clientIpHeader` (default: loopback only; a peer without an address, i.e. a Unix socket, counts as local). Invalid entries are dropped with an error log and trust narrows to loopback, an explicit `[]` means "trust nobody", and `0.0.0.0/0` / `::/0` are always rejected                   |
-| `logoutOrder`       | `1000`                       | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                                                                                          |
+| Option              | Default                      | What it does                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`              | `"token"`                    | `"password"` = username/password login; `"token"` = one shared secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `totp`              | `"off"`                      | Password mode only. `"optional"`: users with a TOTP secret sign in with password + code; `"required"`: all users must have a secret (users without one get the uniform 401 at the password stage, same body as a wrong password — anti-enumeration)                                                                                                                                                                                                                                                                                                                                                            |
+| `sessionTtl`        | `604800`                     | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `cookieName`        | `dsh_auth`                   | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `tokenRef`          | `"DSH_AUTH_TOKEN"`           | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `cookieSecure`      | `true`                       | Set to `false` only if you are testing over plain http                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `usersFile`         | `""`                         | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `publicHost`        | `""`                         | Host rendered in the login page identity block (the anti-phishing "which instance is this" line). Empty = use the request `Host` header. Set it when a reverse proxy rewrites `Host` (e.g. Caddy `header_up Host 127.0.0.1:3080`), otherwise the card shows a loopback address instead of your public domain. With D25 it also lets the admin and password-change endpoints validate an `Origin` header: with `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, so production deployments should set it, and write it with the scheme (`https://host`) when TLS terminates at a reverse proxy |
+| `revokeSweepMs`     | `5000`                       | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| `clientIpHeader`    | `""`                         | Header carrying the real client address for rate limiting (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare). Empty = read no header at all. Only read when the request's peer is inside `trustedProxyCidrs`; without it a same-host reverse proxy makes every client share one lockout bucket (issue #74)                                                                                                                                                                                                                                                                                           |
+| `trustedProxyCidrs` | `["127.0.0.0/8", "::1/128"]` | Which peers may supply `clientIpHeader` (default: loopback only; a peer without an address, i.e. a Unix socket, counts as local). Invalid entries are dropped with an error log and trust narrows to loopback, an explicit `[]` means "trust nobody", and `0.0.0.0/0` / `::/0` are always rejected                                                                                                                                                                                                                                                                                                             |
+| `logoutOrder`       | `1000`                       | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
@@ -212,6 +217,7 @@ dsh-auth user list                          # list users
 dsh-auth user passwd admin                  # change a password (read twice; there is no --password flag)
 dsh-auth user role admin user               # grant/revoke the admin role: user role <name> <admin|user>
 dsh-auth user disable admin                 # block future logins + revoke that user's live sessions
+dsh-auth user enable admin                  # re-enable a disabled user (a reset alone does not let them in)
 dsh-auth user totp enable admin             # generate a TOTP secret (prints an otpauth:// URI)
 dsh-auth user totp disable admin            # remove the TOTP secret
 ```
@@ -224,6 +230,44 @@ see [Quick start](#quick-start).
 live sessions. Use the Settings panel change when sessions must be evicted right away;
 `dsh-auth user disable` also blocks future logins, but the sessions already issued are
 dropped by the periodic sweep (`revokeSweepMs`, ~5 s by default).
+
+## Admin tools: list users and reset a password
+
+In password mode an administrator can list users and reset another user's password **over HTTP**
+(`/auth/users` is a field-whitelisted list, `/auth/users/password` is the reset). A Settings-panel
+block for the same actions is planned for a follow-up release; this release ships the server side
+plus the CLI. Every authenticated state-changing POST is checked against its `Origin`, so a script
+must send one (there is no exemption):
+
+```sh
+# List users (admin session cookie in jar).
+curl -s -H "Origin: https://dsh.example.com" -b jar https://dsh.example.com/auth/users
+
+# Reset someone's password. `code` is required only when YOUR own account has TOTP enabled.
+curl -s -H "Origin: https://dsh.example.com" -b jar \
+  -d "target=alice&password=<new>&confirm=<new>&code=<your-totp>" \
+  https://dsh.example.com/auth/users/password
+```
+
+A request without an `Origin`, or with one that does not match the instance, is rejected with
+`403` (fail-closed); the only other accepted signal is the browser's own
+`Sec-Fetch-Site: same-origin`. **Configure `publicHost`** when a reverse proxy rewrites `Host`:
+without it the server cannot derive its own origin, and the change/reset endpoints then accept
+`Sec-Fetch-Site: same-origin` alone, which the commands above do not send. Write it **with the
+scheme** (`https://dsh.example.com`) when TLS terminates at the proxy: with a bare `host:port` the
+scheme is inferred from whether the incoming connection itself is TLS, so an http hop from the
+proxy makes script `Origin` checks fail (browsers are unaffected).
+
+The reset marks the target account as "must change password" and revokes every session that
+user had (the acting admin's own session is untouched). At the target's next sign-in they get a
+**restricted session** (15 minutes, never renewed): it can reach only the plugin's own password
+form at `GET /auth/password` and nothing else, not even the host UI. That form is
+server-rendered and works without JavaScript (no external assets, no script); submitting it
+still requires the current password, and success clears the mark and signs the user out so they
+can sign in normally. A reset does **not** touch the target's TOTP secret, and resetting a
+disabled account does not let it sign in: the login path rejects disabled users, so run
+`dsh-auth user enable <name>` first. The full contract is in
+[D25](docs/decisions/implemented/2026-09-24-admin-password-reset.en.md).
 
 ## Bundled configuration skill
 
@@ -363,6 +407,14 @@ is in `docs/deployed/known-limitations.md`.
   own, so both are affected.
 - A password change reports success even if revoking the old sessions fails; the failure is
   logged at error level and the old cookie stays valid until its session TTL.
+- The `Origin` check covers the two authenticated state-changing POSTs only: `POST /auth/login`
+  keeps `SameSite=Lax` as its only cross-site defence, and a reset whose session revocation
+  fails still answers `200` with `sessionsRevoked:false` (plus an error log), so a stale cookie
+  can survive until the session TTL expires.
+- A reset never touches the target's TOTP secret, and resetting a disabled account does not let
+  it sign in (the login path rejects disabled users), so run `dsh-auth user enable <name>` first.
+- An administrator without TOTP makes the admin endpoints single-factor; enable TOTP for
+  administrators in production.
 - The plugin protects dsh's web surface only. Keep the OS user and the config files
   private.
 

@@ -173,7 +173,12 @@ describe("GET /auth/status", () => {
       "/auth/status",
     )(makeReq({ method: "GET", url: "/auth/status", cookie: `dsh_auth=${token}` }), res.res);
     expect(res.status).toBe(200);
-    expect(res.body).toBe('{"authenticated":true,"logoutOrder":1000}');
+    // P2 起已认证时在既有两字段上追加「关于我」字段（形状矩阵见 p2-status 测试）。
+    expect(JSON.parse(res.body)).toMatchObject({
+      authenticated: true,
+      logoutOrder: 1000,
+      name: "alice",
+    });
   });
 
   it("echoes the configured logoutOrder for the client logout CTA", async () => {
