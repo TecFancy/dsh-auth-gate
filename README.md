@@ -53,9 +53,12 @@ in first.
 - **Works for browsers and scripts.** Browsers use the login page; scripts and
   curl can pass `Authorization: Bearer <token>` and skip the page entirely.
 - **Admin tools.** In password mode an administrator can list users and reset another user's
-  password over HTTP (`GET /auth/users`, `POST /auth/users/password`); a reset revokes that
-  user's sessions and forces a new password at their next sign-in before they can reach anything
-  else. A Settings-panel block for these actions is planned for a follow-up release.
+  password, either from the **Account security** section of the Settings panel or over HTTP
+  (`GET /auth/users`, `POST /auth/users/password`); a reset revokes that user's sessions and
+  forces a new password at their next sign-in before they can reach anything else. Only an
+  administrator on a full session sees the panel block, and the admin plane refuses to reset your
+  own account (use the self-service form above it, or the CLI when you have forgotten your
+  password).
 - **Optional two-factor authentication (TOTP).** In password mode, a user with
   a TOTP secret added to their account signs in with password **plus** a 6-digit
   code from an authenticator app (RFC 6238, configurable off/optional/required).
@@ -80,7 +83,8 @@ mechanisms is in `docs/deployed/known-limitations.md`):
 - **Not every way of changing a password evicts sessions.** `dsh-auth user disable`
   blocks future logins and revokes the sessions that user was issued (within
   `revokeSweepMs`, 5 s by default); the Settings panel's self-service change revokes every
-  session of that user; the CLI's `dsh-auth user passwd` only rewrites the stored hash.
+  session of that user, and so does an administrator's reset of someone else's password;
+  the CLI's `dsh-auth user passwd` only rewrites the stored hash.
 - **Not a replacement for HTTPS.** With `cookieSecure: true` you must serve the site
   over https.
 - **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
@@ -170,6 +174,21 @@ Passwords must be at least 14 characters, contain four character classes and
 differ from the current one. With TOTP on, a code already spent in the current
 30-second window is rejected as a replay: wait for the next code.
 
+An administrator on a full session also gets a **user management block** below that form: a
+read-only list (name, role, a mutually exclusive disabled / must-change-password / normal badge
+and a two-factor badge, with "You" on their own row) plus a reset form for another user. A reset
+forces the target to pick a new password at the next sign-in and revokes every session that user
+had, while the acting administrator's own session is untouched. When the administrator's own
+account has TOTP enabled, the reset asks for a current code as well. The block renders only for
+`role === "admin"` on a full (not forced-change) session, and a non-admin client never requests
+the user list at all. Resetting **your own** account is not possible: the server refuses it and
+the dropdown excludes you, so an administrator who has forgotten their own password must reset it
+on the server with `dsh-auth user passwd <name>`.
+
+![User management block: the user list and the reset form](docs/demo/admin-users-panel.en.png)
+
+![Successful reset: green confirmation and cleared fields](docs/demo/admin-reset-success.en.png)
+
 ## Configuration
 
 The bundle mount (id `dsh-auth-gate`, inserted by `dsh plugin add`) uses the
@@ -233,11 +252,11 @@ dropped by the periodic sweep (`revokeSweepMs`, ~5 s by default).
 
 ## Admin tools: list users and reset a password
 
-In password mode an administrator can list users and reset another user's password **over HTTP**
-(`/auth/users` is a field-whitelisted list, `/auth/users/password` is the reset). A Settings-panel
-block for the same actions is planned for a follow-up release; this release ships the server side
-plus the CLI. Every authenticated state-changing POST is checked against its `Origin`, so a script
-must send one (there is no exemption):
+In password mode an administrator can list users and reset another user's password from the
+**Account security** section of the Settings panel, or **over HTTP** for scripts
+(`/auth/users` is a field-whitelisted list, `/auth/users/password` is the reset). Both routes
+behave identically, and every authenticated state-changing POST is checked against its `Origin`,
+so a script must send one (there is no exemption):
 
 ```sh
 # List users (admin session cookie in jar).

@@ -21,4 +21,12 @@ export declare const RULES_STYLE: CSSProperties;
 export declare const BUTTON_STYLE: CSSProperties;
 /** 提交中（双锁的可见态）：置灰但不移除，避免布局跳动。 */
 export declare const BUTTON_BUSY_STYLE: CSSProperties;
+/** 管理块根部：与上方自助改密区之间用一条分隔线 + 上间距，纵向排布。 */
+export declare const ADMIN_BLOCK_STYLE: CSSProperties;
+/** 用户表：占满宽度、折叠边框；只做排版，不自绘视觉。 */
+export declare const ADMIN_TABLE_STYLE: CSSProperties;
+export declare const ADMIN_TH_STYLE: CSSProperties;
+export declare const ADMIN_TD_STYLE: CSSProperties;
+/** 只读徽标（角色 / 状态 / 两步验证 / 本人）：浅底 + 次级文字色，随主题切换。 */
+export declare const ADMIN_BADGE_STYLE: CSSProperties;
 //# sourceMappingURL=account-styles.d.ts.map
