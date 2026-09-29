@@ -211,6 +211,22 @@ merge commit and each PR contributes exactly one changelog entry.
 `docs:`/`chore:`/`ci:`/`test:` commits do not trigger a release. 0.x
 semantics: `fix:` → 0.0.x, `feat:` → 0.x.0.
 
+**Release notes vs. the changelog.** release-please writes both the CHANGELOG entry and the GitHub
+Release body from the **subject line** of each commit on `main`: commit bodies, PR descriptions and
+the hidden types (`docs:`/`chore:`/`ci:`/`test:`/`build:`/`refactor:`/`style:`) never appear, which
+is why the changelog carries only `Features` and `Bug Fixes` sections. A promotion PR is squashed
+into one commit, so a **batch** of changes promoted together yields a single entry: promote one
+change per PR when each deserves its own line, or accept the terse entry and curate the release page
+once the tag exists (`release-pr`, then `wait-publish`, then):
+
+```bash
+gh release edit v<version> --notes-file notes.md
+```
+
+Curating the release body is the one sanctioned hand-edit; `CHANGELOG.md` itself stays generated (see
+above), so the two surfaces differ by design. Keep the PR number in the squash subject
+(`<title> (#<n>)`) so the generated entry still links the discussion.
+
 ## Branch hygiene
 
 Two mistakes from 2026-08-30 promotion runs that cost a fix cycle — both are

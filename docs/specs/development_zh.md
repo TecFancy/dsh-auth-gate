@@ -192,6 +192,20 @@ _以及_（对 merge commit 而言）该 merge commit 关联的 PR 标题，所�
 `docs:`/`chore:`/`ci:`/`test:` 提交不触发发布。0.x 语义：`fix:` → 0.0.x，
 `feat:` → 0.x.0。
 
+**发布说明 vs. CHANGELOG。** release-please 只用 `main` 上每个 commit 的**主题行**生成 CHANGELOG 条目
+与 GitHub Release 正文：commit 正文、PR 描述，以及被隐藏的类型（`docs:`/`chore:`/`ci:`/`test:`/
+`build:`/`refactor:`/`style:`）都不会出现 —— 所以 changelog 里只有 `Features` 与 `Bug Fixes`
+两种小节。又因为 promotion PR 会被 squash 成一条 commit，**一次批量晋升只得到一条条目**：想让每个变更
+各占一行，就一次只晋升一个变更；否则接受这条简短条目，在 tag 发布后手工把 release 正文补全
+（`release-pr` → `wait-publish` 之后）：
+
+```bash
+gh release edit v<版本> --notes-file notes.md
+```
+
+手工编辑 release 正文是唯一被认可的手改；`CHANGELOG.md` 本身保持自动生成（见上），两个界面因此
+**有意**不同。squash 标题里保留 PR 编号（`<标题> (#<n>)`），生成的条目才能链到那次讨论。
+
 ## 分支卫生
 
 2026-08-30 晋升（promotion）演练中犯过两个错误，各花掉一个修复周期 —— 现在都写进文档，
