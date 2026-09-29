@@ -400,14 +400,19 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 ## Requirements
 
 - Node ≥ 22.19 and pnpm on the server.
-- dsh `0.1.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2 ||
-^0.1.7-alpha.1`). Runtime-verified against `0.1.5-rc.2` (production) and
-  `0.1.7-alpha.1` (isolated instance); the `0.1.6-*` prereleases are not
-  enumerated because no plugin version was verified against them (stable
-  `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the host's own
-  `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis` copies — both are
-  peer dependencies, never bundled — so a profile booted from the dsh base
-  bundle already provides them.
+- dsh `0.1.x` / `0.2.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2 ||
+^0.1.7-alpha.1 || ^0.2.0-rc.1`). Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
+  order), plus `0.1.7-alpha.1` and `0.2.0-rc.2` (isolated instances); the full test
+  suite runs on the `0.2.0-rc.2` host packages. The `0.1.6-*`
+  prereleases are not enumerated because no plugin version was verified against
+  them (stable `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the
+  host's own `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis`
+  copies — both are peer dependencies, never bundled — so a profile booted from
+  the dsh base bundle already provides them. dsh `0.2.0-rc.2` (already on the `next` line) refuses to install, and at boot silently
+  skips, plugins whose `@deepseek-ai/dsh*` peer ranges do not cover the running host
+  version; that check reads peers only - `engines.dsh` is not consulted - and a plugin
+  declaring no such peer is not checked at all. The `0.2.0-rc.1` alternative is
+  therefore declared in **both** `engines.dsh` and the storage-domain peer.
 - The dsh `web` profile running (`dsh --profile web`).
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).

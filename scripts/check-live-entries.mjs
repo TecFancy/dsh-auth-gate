@@ -13,6 +13,7 @@
  *      `captureLegacy(path, {...})` 包装形态），得到入口清单 + 来源包。
  *   2. 未认证实打 — 每个入口发一条**不带任何凭证**的探测请求：
  *        exact / prefix → HTTP GET，期望非 2xx（门返回 401；302 登录页也算通过）
+ *        navigation     → 带 Sec-Fetch-* 的导航请求，期望**恰好** 302 → /auth/login
  *        upgrade        → node:net 手写 WebSocket 握手，期望非 101（门返回 401）
  *        fallback       → 随机路径，期望非 2xx
  *
@@ -52,10 +53,13 @@ const USAGE = `用法: node scripts/check-live-entries.mjs [选项]
 /** 门自己的包名：它注册的 /auth/* 是**设计上公开**的入口，单独归类。 */
 const GATE_PACKAGE = "dsh-auth-gate";
 
+/** 门的登录页路径：未认证的**浏览器导航**必须 302 到这里（`src/gate/guard.ts`）。 */
+const LOGIN_PATH = "/auth/login";
+
 /**
  * 显式补充表：静态发现覆盖不到的入口，每条都注明来源与理由。
  * group=guarded → 未认证必须被拦（期望非 2xx）；group=public → 设计上公开必须可达。
- * kind 取值：exact | prefix | upgrade | fallback-probe | public。
+ * kind 取值：exact | prefix | upgrade | fallback-probe | navigation | public。
  */
 const SUPPLEMENTS = [
   {
@@ -114,6 +118,14 @@ const SUPPLEMENTS = [
     source: "dsh-auth-gate lib/features/password/password-endpoints.js:22（token 模式同名）",
     expect: "200（未认证态 JSON）",
     note: "只返回认证态，不含凭证",
+  },
+  {
+    group: "public",
+    kind: "public",
+    path: "/manifest.webmanifest",
+    source: "dsh-auth-gate PUBLIC_STATIC_PATHS（精确白名单，见 D13）",
+    expect: "200（Web App Manifest）",
+    note: "浏览器抓 manifest 不带凭证（Chromium manifest_fetcher 默认 omit），必须无凭证可达",
   },
 ];
 
@@ -601,8 +613,8 @@ function discoverEntries(hostRoot) {
 
 // ─────────────────────────── 未认证探测 ───────────────────────────
 
-/** 未认证 HTTP GET（不带任何 cookie / Authorization）。 */
-function probeHttp(base, path, timeoutMs, accept = "*/*") {
+/** 未认证 HTTP GET（不带任何 cookie / Authorization）。`extraHeaders` 供导航探针等补充表使用。 */
+function probeHttp(base, path, timeoutMs, accept = "*/*", extraHeaders = {}) {
   return new Promise((resolveProbe) => {
     const url = new URL(path, base);
     const req = http.request(
@@ -612,7 +624,11 @@ function probeHttp(base, path, timeoutMs, accept = "*/*") {
         port: url.port,
         path: `${url.pathname}${url.search}`,
         method: "GET",
-        headers: { accept, "user-agent": "dsh-auth-gate-entry-coverage/1" },
+        headers: {
+          accept,
+          "user-agent": "dsh-auth-gate-entry-coverage/1",
+          ...extraHeaders,
+        },
       },
       (res) => {
         let body = "";
@@ -681,9 +697,16 @@ function probeUpgrade(base, path, timeoutMs, extraHeaders = {}) {
 }
 
 /** 判定：exact/prefix/fallback 非 2xx 通过；upgrade 非 101 通过。 */
+/**
+ * 判定：exact/prefix/fallback 非 2xx 通过；upgrade 非 101 通过；
+ * navigation 必须**恰好**是 302 且落到登录页（脱门时 SPA 直接 200 = FAIL）。
+ */
 function judge(kind, probe) {
   if (probe.error !== undefined) return "FAIL";
   if (kind === "upgrade") return probe.status === 101 ? "FAIL" : "PASS";
+  if (kind === "navigation") {
+    return probe.status === 302 && String(probe.location).startsWith(LOGIN_PATH) ? "PASS" : "FAIL";
+  }
   if (probe.status >= 200 && probe.status < 300) return "FAIL";
   return "PASS";
 }
@@ -862,15 +885,24 @@ async function main() {
     });
   }
 
-  // 浏览器导航分支：Accept: text/html → 302 登录页（真实用户路径）
-  const navProbe = await probeHttp(opts.base, "/", opts.timeoutMs, "text/html");
+  // 浏览器导航分支：真实浏览器导航带 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`
+  // （门的导航判定只认这两个头，见 src/gate/guard.ts；缺头一律按 API 处理 → 401）。
+  // 这一行**断言 302 → /auth/login**，而不是"非 2xx 即通过"：这是唯一能证明"未认证的
+  // 浏览器会被送去登录页"的探针，脱门（SPA 直接 200）必须失败。
+  const navProbe = await probeHttp(opts.base, "/", opts.timeoutMs, "text/html", {
+    "sec-fetch-mode": "navigate",
+    "sec-fetch-dest": "document",
+    "sec-fetch-site": "none",
+  });
   const navRow = {
-    kind: "fallback-probe",
-    path: "/ (Accept: text/html)",
+    kind: "navigation",
+    path: "/ (Accept: text/html + Sec-Fetch-Mode: navigate)",
     source: "浏览器导航分支（同 fallback 席位）",
-    observed: describe("fallback", navProbe),
-    verdict: judge("fallback", navProbe),
-    note: "浏览器导航应 302 → /auth/login?next=%2F",
+    observed: describe("navigation", navProbe),
+    verdict: judge("navigation", navProbe),
+    note: `浏览器导航应 302 → /auth/login?next=%2F；实际 ${navProbe.status}${
+      navProbe.location === "" ? "" : ` → ${navProbe.location}`
+    }`,
     files: [],
   };
 

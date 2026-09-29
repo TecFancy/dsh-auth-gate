@@ -341,11 +341,15 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 ## 环境要求
 
 - 服务器上需要 Node ≥ 22.19 和 pnpm。
-- dsh `0.1.x`（`engines.dsh` 声明为 `^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1`）。运行时
-  验证过的版本是 `0.1.5-rc.2`（生产）和 `0.1.7-alpha.1`（隔离实例）；`0.1.6-*` 预发布版没有列入
-  枚举，因为没有针对它们的版本验证（稳定版 `0.1.6` 由 `^0.1.5-rc.2` 覆盖）。插件使用的是宿主
-  自带的 `@deepseek-ai/dsh-storage-domain` 和 `@deepseek-ai/cordis`（两者都是 peer 依赖，不会
-  打进包），所以只要 profile 由 dsh 基础包启动，依赖就是齐的。
+- dsh `0.1.x` / `0.2.x`（`engines.dsh` 声明为
+  `^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1`）。运行时验证过的版本是 `0.1.5-rc.2` 与 `0.1.7-rc.2`（生产，按此顺序），以及
+  `0.1.7-alpha.1`、`0.2.0-rc.2`（隔离实例）；完整测试套件跑在 `0.2.0-rc.2` 的宿主包上；`0.1.6-*` 预发布版没有列入枚举，因为没有针对它们的版本验证（稳定版
+  `0.1.6` 由 `^0.1.5-rc.2` 覆盖）。插件使用的是宿主自带的
+  `@deepseek-ai/dsh-storage-domain` 和 `@deepseek-ai/cordis`（两者都是 peer 依赖，不会打进包），
+  所以只要 profile 由 dsh 基础包启动，依赖就是齐的。dsh `0.2.0-rc.2`（已在 `next` 线上）会拒绝安装、并在启动时**静默跳过**那些
+  `@deepseek-ai/dsh*` peer 范围不覆盖当前宿主版本的插件；这条判定**只读 peer**，不读
+  `engines.dsh`，而完全没有这类 peer 的插件根本不会被检查。所以 `0.2.0-rc.1` 这一个替代项在
+  `engines.dsh` 和 storage-domain peer **两处**都声明。
 - dsh 的 `web` profile 处于运行状态（`dsh --profile web`）。
 - 如果 `cookieSecure` 为 `true`，站点必须通过 https 提供服务（浏览器会拒绝在纯 http 下使用安全
   cookie）。

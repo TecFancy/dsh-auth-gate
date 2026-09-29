@@ -22,7 +22,7 @@
   ],
   "engines": {
     "node": ">=22.19.0",
-    "dsh": "^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1"
+    "dsh": "^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1"
   },
   "dsh": {
     "bundle": {
@@ -104,20 +104,21 @@
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1"
+    "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@deepseek-ai/cordis": "^4.0.1",
-    "@deepseek-ai/dsh-host-webserver": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-storage": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-storage-domain": "^0.1.0-rc.6",
-    "@deepseek-ai/dsh-storage-json": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-host-webserver": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-storage": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-storage-domain": "^0.2.0-rc.1",
+    "@deepseek-ai/dsh-storage-json": "^0.2.0-rc.1",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.2",
     "@types/react": "~18.3.1",
     "@types/react-dom": "~18.3.1",
+    "@types/semver": "^7.8.0",
     "@vitest/coverage-v8": "^4.1.5",
     "eslint": "^10.2.1",
     "eslint-import-resolver-typescript": "^4.4.4",
@@ -129,6 +130,7 @@
     "prettier": "^3.8.3",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "semver": "^7.8.5",
     "tsdown": "^0.22.2",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
