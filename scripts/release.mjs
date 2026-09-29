@@ -32,6 +32,8 @@
  *   - the PR title's conventional type drives the release-please bump
  *     (feat → minor, fix → patch)
  *   - release PRs usually carry no required checks; merge once they appear
+ *   - the squash subject keeps the PR number (`<title> (#n)`) so release-please
+ *     links the PR from the generated changelog entry
  */
 import { execSync, spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -131,7 +133,10 @@ async function mergePr(pr) {
   console.log(`  waiting for CI on PR #${pr}…`);
   gh(["pr", "checks", pr, "--watch"]);
   const title = gh(["pr", "view", pr, "--json", "title", "--jq", ".title"]);
-  gh(["pr", "merge", pr, "--squash", "--subject", title]);
+  // Keep the PR number: release-please renders `(#n)` as the discussion link in the changelog
+  // entry, and a batched promotion gets exactly one entry, so that link is the only way in.
+  const subject = title.includes(`(#${pr})`) ? title : `${title} (#${pr})`;
+  gh(["pr", "merge", pr, "--squash", "--subject", subject]);
   console.log(`✓ PR #${pr} squash-merged into main (no --delete-branch)`);
 }
 
