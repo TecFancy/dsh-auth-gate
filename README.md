@@ -159,7 +159,7 @@ the gear). Once dsh offers an `icon` option, the stopgap and its code are remove
 
 ![Account security row in the settings nav](docs/demo/account-nav-icon.en.png)
 
-![Change-password panel](docs/demo/account-change-password.en.png)
+![The Account security panel in an administrator's settings: the change-password form and, below it, the user management block](docs/demo/account-change-password.en.png)
 
 The panel posts to `POST /auth/password` (`current` / `password` / `code`,
 form-urlencoded) and, on success, **every session of that user is revoked,
@@ -174,20 +174,19 @@ Passwords must be at least 14 characters, contain four character classes and
 differ from the current one. With TOTP on, a code already spent in the current
 30-second window is rejected as a replay: wait for the next code.
 
-An administrator on a full session also gets a **user management block** below that form: a
-read-only list (name, role, a mutually exclusive disabled / must-change-password / normal badge
-and a two-factor badge, with "You" on their own row) plus a reset form for another user. A reset
-forces the target to pick a new password at the next sign-in and revokes every session that user
-had, while the acting administrator's own session is untouched. When the administrator's own
-account has TOTP enabled, the reset asks for a current code as well. The block renders only for
-`role === "admin"` on a full (not forced-change) session, and a non-admin client never requests
-the user list at all. Resetting **your own** account is not possible: the server refuses it and
-the dropdown excludes you, so an administrator who has forgotten their own password must reset it
-on the server with `dsh-auth user passwd <name>`.
+An administrator on a full session also gets a **user management block** below that form (the
+panel screenshot above shows it): a read-only list (name, role, a mutually exclusive
+disabled / must-change-password / normal badge and a two-factor badge, with "You" on their own
+row) plus a reset form for another user. A reset forces the target to pick a new password at the
+next sign-in and revokes every session that user had, while the acting administrator's own
+session is untouched. When the administrator's own account has TOTP enabled, the reset asks for a
+current code as well. The block renders only for `role === "admin"` on a full (not forced-change)
+session, and a non-admin client never requests the user list at all. Resetting **your own**
+account is not possible: the server refuses it and the dropdown excludes you, so an administrator
+who has forgotten their own password must reset it on the server with
+`dsh-auth user passwd <name>`.
 
-![User management block: the user list and the reset form](docs/demo/admin-users-panel.en.png)
-
-![Successful reset: green confirmation and cleared fields](docs/demo/admin-reset-success.en.png)
+![Successful reset in that block: the green confirmation, the target now marked "must change", and every field cleared](docs/demo/admin-reset-success.en.png)
 
 ## Configuration
 
