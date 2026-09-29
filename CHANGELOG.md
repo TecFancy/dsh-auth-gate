@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.15.0...v0.16.0) (2026-09-29)
+
+
+### Features
+
+* admin reset, settings user management, and the dsh 0.2.x host corridor ([#97](https://github.com/TecFancy/dsh-auth-gate/issues/97)) ([b0a023a](https://github.com/TecFancy/dsh-auth-gate/commit/b0a023a68912435d133e0961c705b6a87d6741e5))
+
 ## [0.15.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.14.3...v0.15.0) (2026-09-24)
 
 
