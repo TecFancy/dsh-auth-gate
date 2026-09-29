@@ -219,6 +219,9 @@ _以及_（对 merge commit 而言）该 merge commit 关联的 PR 标题，所�
   （本机可直接访问 npmjs）。新增或更新依赖时，一律用
   `npm install --registry=https://registry.npmjs.org/`。
 - `@deepseek-ai/cordis`、`@deepseek-ai/schemastery`、`zod` 是运行时依赖（npmjs 上均公开）。
-- `@deepseek-ai/dsh-storage-domain` 由 `docs/implemented/impl-m1.md` §3 锁定在 `^0.1.0-rc.6`：
-  已核实公共 registry 上存在，且与部署环境 dsh checkout 的 `0.1.0-rc.6` 一致。
+- `@deepseek-ai/dsh-storage-domain` 是 **peer**，与 `engines.dsh` 用同一条走廊串
+  （`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1`，见 D26）；dev/测试宿主
+  cohort（`dsh-host-webserver`、`dsh-storage`、`dsh-storage-domain`、`dsh-storage-json`）
+  跟随走廊下界（`^0.2.0-rc.1`）。`docs/implemented/impl-m1.md` §3 里的 `^0.1.0-rc.6` 是冻结的
+  历史记录，不是现行纪律。
 - `lint-staged` 保持在 `^16.1.0`：17.x 要求 Node ≥ 22.22.1，开发机可能跑更早的 22.x。

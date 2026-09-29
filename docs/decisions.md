@@ -360,3 +360,16 @@ P1 的顺序不变量并按评审加两处（写盘打标记、吊销失败如�
 `user enable`）；同站子域 CSRF 未收口；锁夺取 0 字节窗口未修；admin 未开 TOTP 时管理面是单因素。
 → [zh](decisions/implemented/2026-09-24-admin-password-reset.zh.md) ·
 [en](decisions/implemented/2026-09-24-admin-password-reset.en.md)
+
+## D26. 宿主走廊扩到 0.2.x：engines 与 storage-domain peer 同时声明 `^0.2.0-rc.1`
+
+`engines.dsh` 与 `@deepseek-ai/dsh-storage-domain` peer **同时**追加 `|| ^0.2.0-rc.1`（两串逐字相同），
+dev/测试宿主 cohort 上移到 `^0.2.0-rc.1`（解析 `0.2.0-rc.2`）；不改源码。
+**替代方案**：只改 engines（闸门不读，零效果）；只改 peer（徽章与 npm engine 检查仍是旧走廊，两处可漂移）；
+只留 `^0.2.0-rc.1`（丢掉生产在跑的 0.1.7-rc.2 与回滚路径）；dev cohort 留 0.1.x（新宿主零覆盖）；
+等 0.2.0 稳定（闸门已在 next 线生效，失败形态是 fail-open）；dev 包精确钉（与仓库 caret 风格不符，只增改动）。
+**为什么**：0.2.0 的兼容闸门只读 peer —— 声明 peer 才真正解锁安装，且不兼容的 bundle 会被**静默跳过**
+（门消失 = fail-open）；两串同文保住 D12 的单一徽章且不可能漂移；追加而非替换同时保住生产 0.1.7-rc.2；
+dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实入口覆盖都跑到新宿主上。
+→ [zh](decisions/implemented/2026-09-29-dsh-020-host-corridor.zh.md) ·
+[en](decisions/implemented/2026-09-29-dsh-020-host-corridor.en.md)

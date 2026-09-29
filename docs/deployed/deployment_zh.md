@@ -154,11 +154,20 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 2. 跑验收清单 B/D/F 三组（守卫 + 会话 + WS）；
 3. **重跑未认证入口覆盖探测**（只读、不带凭证）：`node scripts/check-live-entries.mjs`
    （默认打 `http://127.0.0.1:3080`）。脚本会从已加载 profile 里发现全部已注册入口
-   （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**未带会话却答 2xx** 就以非零码退出。
-   最近一次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
-   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 探测被拒（401，HTML 面 302 → `/auth/login`）。
+   （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**受守卫**入口**未带会话却答 2xx** 就以非零码退出
+   （门自己的公开端点单列判定——它们必须保持可达）。
+   最近两次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
+   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 被拒；以及
+   [`entry-coverage-0.2.0-rc.2_zh.md`](./entry-coverage-0.2.0-rc.2_zh.md) —— dsh `0.2.0-rc.2`，
+   10 个包共 62 条入口（含第三方插件路由表），67/67 被拒，且浏览器导航探针断言
+   `302 -> /auth/login`。导航探针必须带 `Sec-Fetch-Mode: navigate`
+   （`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`）：缺这两个头时门按设计返回
+   401 而不是 302。
 4. 检查 `boot.log` 无新增 error/warn；
-5. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
+5. **升 dsh 本身：先插件、后宿主。** 从 dsh `0.2.0` 起，`@deepseek-ai/dsh*` peer 不覆盖当前宿主的插件
+   会被 `dsh plugin add` 拒绝，并在启动时**被跳过**（只打一行 `skipping profile bundle`，实例照常服务）
+   ——登录门 fail-open 消失。**先把走廊覆盖目标宿主的插件版本装好，再动宿主。**
+6. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
    `/?token=`）——auth-gate 登录成功会自动桥接（相对跳转 `/?token=…`，见
    `docs/implemented/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
    cookie）跑一遍验收 A：登录成功即直达实例，不应撞 401 token 门；`boot.log` 里
