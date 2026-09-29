@@ -1,14 +1,24 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { checkPasswordPolicy, parseCookieHeader, parseFormBody } from "../../shared/index.js";
-import type {
-  LoginRateLimiter,
-  UserRecord,
-  UsersLoadResult,
-  UsersSnapshot,
+import {
+  checkPasswordPolicy,
+  checkRequestOrigin,
+  parseCookieHeader,
+  parseFormBody,
+  type LoginRateLimiter,
+  type UserRecord,
+  type UsersLoadResult,
+  type UsersSnapshot,
 } from "../../shared/index.js";
-import { buildSetCookie, type Session, type SessionStore } from "../../session/index.js";
+import { type Session, type SessionStore } from "../../session/index.js";
 import { methodNotAllowed } from "../../http/index.js";
 import { DUMMY_HASH } from "./password.js";
+import {
+  handlePasswordChangePage,
+  respondChanged,
+  respondFormError,
+  sendJson,
+  sendUnavailable,
+} from "./password-change.ssr.js";
 
 export interface PasswordChangeDeps {
   sessions: () => SessionStore | undefined;
@@ -31,6 +41,11 @@ export interface PasswordChangeDeps {
   limiter: LoginRateLimiter;
   /** 客户端 IP（D19）；缺省回退 socket.remoteAddress。 */
   clientIp?: ((req: IncomingMessage) => string) | undefined;
+  /**
+   * 配置的对外来源（P2 §6）：`Origin` 精确匹配用；**未配置时不得拿 `Host` 兜底**，
+   * 只信 `Sec-Fetch-Site: same-origin`（checkRequestOrigin 的既有语义）。
+   */
+  publicHost?: string | undefined;
   totpMode: "off" | "optional" | "required";
   verifyTotp: (secretB32: string, code: string, nowMs: number) => number | undefined;
   /** 防重放（index.ts 注入同一 replayGuard 单例）：同窗 counter 已用过 → false。 */
@@ -57,19 +72,26 @@ interface ChangeContext {
 }
 
 /**
- * POST /auth/password（P1 §1）。处理顺序冻结，不得重排：
- * method 405 → parseFormBody(415/413) → 会话 cookie(401) → 限速桶(429) → 读 users(503)
- * → 恒时验证旧口令(401) → TOTP(401) → 策略(400) → hash → 锁内写盘(503)
- * → recordSuccess + 撤销全部会话 → 清 cookie + 200。
+ * `/auth/password`（P1 §1 + P2 §1/§6）。GET 走 SSR 自足页；POST 处理顺序冻结：
+ * method 405（allow: GET, POST）→ parseFormBody(415/413) → Origin/Sec-Fetch-Site(403)
+ * → 会话 cookie(401) → 限速桶(429) → 读 users(503) → 恒时验证旧口令(401) → TOTP(401)
+ * → 策略(400) → hash → 锁内写盘(503) → recordSuccess + 撤销全部会话
+ * → 清 cookie +（nav=1 时 302 登录页，否则既有 200 JSON）。
  * 顺序硬约束：写盘成功后才撤销会话；写盘失败绝不允许出现「全被踢但密码没改」。
+ * Origin 放在 415/413 之后、401 之前：畸形 body 不必先做 CSRF 判定，缺来源的脚本
+ * 得到 403 而不是假 401。
  */
 export async function handlePasswordChange(
   deps: PasswordChangeDeps,
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  if (req.method === "GET") {
+    handlePasswordChangePage(deps, req, res);
+    return;
+  }
   if (req.method !== "POST") {
-    methodNotAllowed(res, "POST");
+    methodNotAllowed(res, "GET, POST");
     return;
   }
   let params: URLSearchParams;
@@ -79,6 +101,7 @@ export async function handlePasswordChange(
     respondFormError(res, error);
     return;
   }
+  if (!originAccepted(deps, req, res)) return;
 
   const { current, newPassword, code } = requestOf(params);
   const subject = locateSession(deps, req)?.subject;
@@ -131,13 +154,11 @@ export async function handlePasswordChange(
   if (!(await writeNewHash(deps, res, ctx, hashed))) return;
 
   deps.limiter.recordSuccess(ctx.ip, subject);
-  // 写盘已成功：撤销失败绝不改变 200 语义（口令确实改了），只进 error 日志。
+  // 写盘已成功：撤销失败绝不改变 200/302 语义（口令确实改了），只进 error 日志。
   // TODO(auth-p2): 撤销失败不重试 ⇒「新口令已生效但旧 cookie 仍可用」窗口由会话 TTL 兜底。
   await deps.revoke(subject);
-  res.setHeader("cache-control", "no-store");
-  res.setHeader("set-cookie", buildSetCookie(deps.cookieName, "", 0, deps.cookieSecure));
-  res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ ok: true }));
+  // P2 §1 响应整形：SSR 无 JS 表单的隐藏字段，精确匹配 nav=1（绝不用 Accept 子串判定）。
+  respondChanged(deps, res, params.get("nav") === "1");
   deps.logger.info("password changed");
 }
 
@@ -152,6 +173,21 @@ function requestOf(params: URLSearchParams): {
     newPassword: params.get("password") ?? "",
     code: params.get("code") ?? "",
   };
+}
+
+/**
+ * P2 §6：Origin / Sec-Fetch-Site 同源校验（fail-closed）；拒绝 → 403 JSON，不计限速。
+ * `checkRequestOrigin` 按结构读 `headers` / `socket`，直接透传 `req` 即可。
+ */
+function originAccepted(
+  deps: PasswordChangeDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+): boolean {
+  const verdict = checkRequestOrigin(req, deps.publicHost ?? "");
+  if (verdict.ok) return true;
+  sendJson(res, 403, { error: "bad_origin" });
+  return false;
 }
 
 /** 会话定位：只认 cookie（M5），Bearer 不参与；store/token 无效一律 undefined。 */
@@ -281,13 +317,6 @@ async function writeNewHash(
   }
 }
 
-/** 503 统一写出（users 文件读/写失败语义）。 */
-function sendUnavailable(res: ServerResponse): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(503, { "content-type": "text/plain" });
-  res.end("password change unavailable");
-}
-
 /** 限速门（P10）：锁定 → retry-after 秒数；放行 → undefined。 */
 function lockoutSeconds(deps: PasswordChangeDeps, ip: string, subject: string): number | undefined {
   const check = deps.limiter.check(ip, subject);
@@ -306,21 +335,4 @@ function safeError(error: unknown, secrets: readonly string[]): string {
     if (secret.length >= 4) message = message.split(secret).join("[redacted]");
   }
   return message;
-}
-
-/** 415/413 响应（M19 复刻：413 先写 `connection: close`，不调 req.destroy）；无 status 的异常向上抛。 */
-function respondFormError(res: ServerResponse, error: unknown): void {
-  const failed = error as { status?: number; message?: string };
-  if (typeof failed.status !== "number") throw error;
-  res.setHeader("cache-control", "no-store");
-  if (failed.status === 413) res.setHeader("connection", "close");
-  res.writeHead(failed.status, { "content-type": "text/plain" });
-  res.end(failed.message ?? "bad request");
-}
-
-/** JSON 写出：no-store 必须早于 writeHead（headers sent 之后 setHeader 会抛）。 */
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(status, { "content-type": "application/json" });
-  res.end(JSON.stringify(body));
 }

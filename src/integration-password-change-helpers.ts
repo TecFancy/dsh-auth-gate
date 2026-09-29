@@ -136,10 +136,18 @@ export async function changePassword(
   cookie: string,
   body: string,
   method = "POST",
+  extraHeaders: Record<string, string> = {},
 ): Promise<{ status: number; json: unknown; setCookie: string | null; text: string }> {
   const res = await fetch(`${base}/auth/password`, {
     method,
-    headers: { "content-type": "application/x-www-form-urlencoded", cookie },
+    headers: {
+      "content-type": "application/x-www-form-urlencoded",
+      cookie,
+      // P2 §6：写路径要求同源证明（fail-closed）。缺省模拟浏览器同源请求；
+      // 需要断言拒绝矩阵时由 extraHeaders 显式覆盖成不带/伪造来源。
+      "sec-fetch-site": "same-origin",
+      ...extraHeaders,
+    },
     ...(method === "GET" || method === "HEAD" ? {} : { body }),
     redirect: "manual",
   });

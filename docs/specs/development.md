@@ -244,8 +244,10 @@ now documented so nobody re-learns them:
   `npm install --registry=https://registry.npmjs.org/`.
 - `@deepseek-ai/cordis`, `@deepseek-ai/schemastery`, `zod` are runtime deps
   (all public on npmjs).
-- `@deepseek-ai/dsh-storage-domain` is pinned to `^0.1.0-rc.6` by
-  `docs/implemented/impl-m1.md` §3: verified present on the public registry and matching
-  the deployed dsh checkout's `0.1.0-rc.6`.
+- `@deepseek-ai/dsh-storage-domain` is a **peer** declared with the same corridor string as
+  `engines.dsh` (`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1`, see D26);
+  the dev/test host cohort (`dsh-host-webserver`, `dsh-storage`, `dsh-storage-domain`,
+  `dsh-storage-json`) follows the corridor floor (`^0.2.0-rc.1`). `docs/implemented/impl-m1.md` §3
+  records the original `^0.1.0-rc.6` pin as frozen history, not as current policy.
 - `lint-staged` stays on `^16.1.0`: 17.x requires Node ≥ 22.22.1, dev machines
   may run earlier 22.x.

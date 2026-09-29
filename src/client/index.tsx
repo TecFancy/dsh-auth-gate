@@ -1,6 +1,7 @@
 import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
 import { installAccountNavIcon } from "./account-nav-icon.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
+import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./admin-copy.ts";
 import type { AuthContext } from "./context.ts";
 import { SettingsLogoutAction } from "./logout-action.tsx";
 
@@ -57,13 +58,22 @@ const DEFAULT_LOGOUT_ORDER = 1000;
 export const inject = ["slots", "locale"];
 
 export function apply(ctx: AuthContext): void {
-  // 词典注册（zh/en 双语，挂 fiber 卸载级联）：登出 CTA + 账户页共用 auth 命名域。
+  // 词典注册（zh/en 双语，挂 fiber 卸载级联）：登出 CTA + 账户页 + 管理块共用 auth
+  // 命名域。admin 键（`admin.*`）与 account 键（`account.*`）、`logout` 不重名，可安全合并。
   ctx.effect(
     () => [
-      ctx.locale.register(AUTH_NS, "zh", { [LOGOUT_KEY]: "退出登录", ...ACCOUNT_DICT_ZH }),
-      ctx.locale.register(AUTH_NS, "en", { [LOGOUT_KEY]: "Sign out", ...ACCOUNT_DICT_EN }),
+      ctx.locale.register(AUTH_NS, "zh", {
+        [LOGOUT_KEY]: "退出登录",
+        ...ACCOUNT_DICT_ZH,
+        ...ADMIN_DICT_ZH,
+      }),
+      ctx.locale.register(AUTH_NS, "en", {
+        [LOGOUT_KEY]: "Sign out",
+        ...ACCOUNT_DICT_EN,
+        ...ADMIN_DICT_EN,
+      }),
     ],
-    "auth: zh/en dictionaries (logout + account)",
+    "auth: zh/en dictionaries (logout + account + admin)",
   );
 
   // 绑定 translate：读取活动语言（thunk 每次投影重读，跟随语言切换）。

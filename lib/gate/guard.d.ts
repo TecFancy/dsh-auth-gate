@@ -1,10 +1,22 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import type { Gate, GuardKind } from "./gate.js";
+import type { Gate, GateDeny, GuardKind } from "./gate.js";
 /** 挂在被包装 handler/方法上的守卫标记（幂等重包装 + 自检共用）。 */
 export declare const GUARDED: unique symbol;
-/** 登录页路径（拒绝时 302 的目标）。 */
+/** 登录页路径：`"deny"` 字符串分支（既有 token 门）的默认 302 目标。 */
 export declare const LOGIN_PATH = "/auth/login";
+/**
+ * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
+ * **禁止**用 `Accept` 子串匹配（面板 fetch 的 Accept 很杂，会假绿）；两个头都缺 →
+ * false（fail-closed：按 API 处理，401 而不是放行）。
+ */
+export declare function isNavigationRequest(req: IncomingMessage): boolean;
+/**
+ * Location 消毒（§6）：只允许站内相对路径（`/` 开头、非 `//`、无反斜杠、无控制符）。
+ * 判定与登录 `next` 共用 `shared` 的 `isSafeRelativeTarget`：同一条 302 出口纪律，
+ * 控制符会让浏览器把 `"/\t/evil.com"` 解析成协议相对的站外地址（见该文件注释）。
+ */
+export declare function isSafeLocation(location: string): boolean;
 /** auth 公共路径前缀（两种 gate 的白名单：登录/登出/状态端点免守卫）。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
 /**
@@ -51,20 +63,24 @@ export interface GuardLog {
 }
 export declare function isGuarded(target: (...args: never[]) => unknown): boolean;
 /**
- * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫写
- * 302/401，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
+ * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫按 gate 给出的
+ * 决策写 302/401/403，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
  */
 export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler): HttpHandler;
 /**
- * 给一个 upgrade handler 套守卫。deny 在 ws 协商前直接拒握手，不进入
- * 原 handler，也不为 socket 附加任何监听器。
+ * 给一个 upgrade handler 套守卫。**任何**非 allow 决策（含 `{deny:{upgrade:true}}`）
+ * 都在 ws 协商前直接拒握手，不进入原 handler，也不为 socket 附加任何监听器。
  */
 export declare function guardUpgrade(gate: () => Gate, handler: UpgradeHandler): UpgradeHandler;
 /**
- * 拒绝一个 HTTP 请求：浏览器导航（GET 且 Accept 含 text/html）→ 302 登录页
- * （带 next 回跳）；其余 → 401。两者都禁缓存。
+ * 拒绝一个 HTTP 请求，按 gate 决策渲染（P2；`decision` 缺省 = 字符串 `"deny"`）：
+ * - `{deny:{redirect}}` → 302 gate 给出的目标（消毒失败则退回 LOGIN_PATH）；
+ * - `{deny:{status}}` → 该 401/403；
+ * - `{deny:{upgrade:true}}` → 401 兜底（正常不会落到 HTTP 面）；
+ * - `"deny"`（旧门）→ 浏览器导航 302 登录页 + `next`，其余 401。
+ * 一律 `cache-control: no-store`。
  */
-export declare function denyHttp(req: IncomingMessage, res: ServerResponse): void;
+export declare function denyHttp(req: IncomingMessage, res: ServerResponse, decision?: GateDeny): void;
 /** 拒绝一个 WS 升级：写 401 响应行后销毁 socket，不进入 ws 协商。 */
 export declare function denyUpgrade(socket: Duplex): void;
 /** 403 拒绝（代理标记命中）：与 dsh /api 围栏同形（forbidden），禁缓存。 */

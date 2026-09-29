@@ -3,7 +3,7 @@
  * 通用件：next 校验 / cookie 解析 / 请求体解析 / 登录页 HTML / 限速 / CLI 技能安装 / users.yaml 仓库。
  * 2026-09-13：由 `export *` 改为显式清单；新增导出必须在此登记，防止公共面被意外撑大。
  */
-export { validateNext } from "./auth-common.js";
+export { isSafeRelativeTarget, validateNext } from "./auth-common.js";
 export { DEFAULT_TRUSTED_PROXIES, makeClientIpResolver, parseClientIpPolicy, resolveClientIp, } from "./client-ip.js";
 export type { ClientIpLogger, ClientIpPolicy, ClientIpResolver } from "./client-ip.js";
 export { parseCookieHeader } from "./cookie.js";
@@ -14,6 +14,8 @@ export type { CidrNetwork } from "./ip-address.js";
 export { loginPageHtml, loginPath, passwordLoginPageHtml, totpChallengePageHtml, } from "./login-page.js";
 export { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, } from "./password-policy.js";
 export type { PasswordPolicyOptions, PasswordPolicyResult, PasswordRule, } from "./password-policy.js";
+export { checkRequestOrigin } from "./origin.js";
+export type { OriginCheckRequest, OriginFailure, OriginVerdict } from "./origin.js";
 export { LoginRateLimiter } from "./rate-limit.js";
 export type { RateLimitCheck, RateLimitOptions } from "./rate-limit.js";
 export { bundledSkillDir, installSkill, SKILL_NAME, userSkillDir } from "./skill-install.js";

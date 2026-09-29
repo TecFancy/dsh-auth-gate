@@ -10,6 +10,7 @@ import {
   registerPasswordEndpoints,
   verifyPassword,
 } from "./features/password/index.js";
+import { makeAdminWiring } from "./admin-wiring.js";
 import { TotpReplayGuard, verifyTotpCode } from "./features/totp/index.js";
 import {
   DEFAULT_TRUSTED_PROXIES,
@@ -21,6 +22,7 @@ import {
 } from "./shared/index.js";
 import { assertGuarded } from "./gate/index.js";
 import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
+import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./session/index.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
@@ -110,48 +112,10 @@ export interface AuthService {
   gate: Gate;
 }
 
-/** credentials 服务的结构镜像（M2 spec §3.1）；本文件私有，不导出。 */
-interface CredentialRefResolver {
-  resolve(ref: string): Promise<{ value: string; source: string } | undefined>;
-}
-
 declare module "@deepseek-ai/cordis" {
   interface Context {
     auth?: AuthService;
   }
-}
-
-/**
- * 构造凭证解析器（每次调用惰性取服务。实测 harness 并行挂载行，credentials 行可能在
- * 本行 apply 之后才就绪；每次 resolve 现取既是 M2 的 per-operation 语义，也天然规避
- * 竞态）。服务缺失 → 首次解析时 log.error（fail-closed）；解析失败 → log.error 并返回
- * undefined（登录/门都按"无凭证"处理）。
- */
-function makeTokenResolver(
-  ctx: Context,
-  config: AuthConfig,
-  log: { error(message: unknown): void },
-): () => Promise<string | undefined> {
-  let warnedMissing = false;
-  return async () => {
-    const credentials = ctx.get("credentials") as unknown as CredentialRefResolver | undefined;
-    if (credentials === undefined) {
-      if (!warnedMissing) {
-        warnedMissing = true;
-        log.error("credentials service is unavailable: gate denies everything (fail-closed)");
-      }
-      return undefined;
-    }
-    try {
-      const resolved = await credentials.resolve(config.tokenRef);
-      return resolved?.value;
-    } catch (error) {
-      log.error(
-        `token resolution failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return undefined; // fail-closed：解析失败 = 无凭证
-    }
-  };
 }
 
 /**
@@ -223,45 +187,61 @@ function mountAuthEndpoints(
   // 同一个 replayGuard 单例：登录与改密共用（D22；不同实例会放过同窗重放）。
   const replayCheck = (username: string, counter: number, code: string): boolean =>
     replayGuard.checkAndRecord(username, counter, code);
-  return config.mode === "password"
-    ? registerPasswordEndpoints({
-        register: (route) => server.register(route), // 包装后的 register（增量保险路径）
-        sessions: () => auth.sessions,
-        cookieName: config.cookieName,
-        cookieSecure: config.cookieSecure,
-        sessionTtl: config.sessionTtl,
-        usersPath,
-        loadUsers: () => loadUsersFile(usersPath),
-        publicHost: config.publicHost,
-        verify: verifyPassword,
-        limiter,
-        clientIp,
-        totpMode: config.totp,
-        verifyTotp: (secretB32, code, nowMs) => verifyTotpCode(secretB32, code, nowMs),
-        replayCheck,
-        now: Date.now,
-        challengeMacKey,
-        launchTokenBridge,
-        logoutOrder: config.logoutOrder,
-        logger: log,
-        // P1 §5 改密接线：独立限速桶 + 锁内写盘入口 + hashPassword + 撤销会话，
-        // 装配在 password 切片内（root 只保留接线语义）。恒定注入，不存在静默不注册。
-        passwordChange: makePasswordChangeWiring(usersPath, auth, replayCheck, log),
-      })
-    : registerAuthEndpoints({
-        register: (route) => server.register(route),
-        sessions: () => auth.sessions,
-        cookieName: config.cookieName,
-        cookieSecure: config.cookieSecure,
-        sessionTtl: config.sessionTtl,
-        logoutOrder: config.logoutOrder,
-        publicHost: config.publicHost,
-        validateToken: async (token) => {
-          const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
-          return stored !== undefined && safeEqual(token, stored);
-        },
-        logger: log,
-      });
+  if (config.mode !== "password") {
+    return registerAuthEndpoints({
+      register: (route) => server.register(route),
+      sessions: () => auth.sessions,
+      cookieName: config.cookieName,
+      cookieSecure: config.cookieSecure,
+      sessionTtl: config.sessionTtl,
+      logoutOrder: config.logoutOrder,
+      publicHost: config.publicHost,
+      validateToken: async (token) => {
+        const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
+        return stored !== undefined && safeEqual(token, stored);
+      },
+      logger: log,
+    });
+  }
+  // P1 §5 改密接线：独立限速桶 + 锁内写盘入口 + hashPassword + 撤销会话，
+  // 装配在 password 切片内（root 只保留接线语义）。恒定注入，不存在静默不注册。
+  const passwordChange = makePasswordChangeWiring(usersPath, auth, replayCheck, log);
+  const loadUsers = () => loadUsersFile(usersPath);
+  return registerPasswordEndpoints({
+    register: (route) => server.register(route), // 包装后的 register（增量保险路径）
+    sessions: () => auth.sessions,
+    cookieName: config.cookieName,
+    cookieSecure: config.cookieSecure,
+    sessionTtl: config.sessionTtl,
+    usersPath,
+    loadUsers,
+    publicHost: config.publicHost,
+    verify: verifyPassword,
+    limiter,
+    clientIp,
+    totpMode: config.totp,
+    verifyTotp: (secretB32, code, nowMs) => verifyTotpCode(secretB32, code, nowMs),
+    replayCheck,
+    now: Date.now,
+    challengeMacKey,
+    launchTokenBridge,
+    logoutOrder: config.logoutOrder,
+    logger: log,
+    passwordChange,
+    // P2 管理面：装配细节（第三个独立限流桶、锁内写盘、吊销探针、双桶清理）在
+    // `src/admin-wiring.ts`；三条已认证路径共用同一个 replayGuard 单例。
+    admin: makeAdminWiring({
+      sessions: () => auth.sessions,
+      cookieName: config.cookieName,
+      usersPath,
+      publicHost: config.publicHost,
+      clientIp,
+      limiter,
+      passwordChangeLimiter: passwordChange.limiter,
+      replayCheck,
+      log,
+    }),
+  });
 }
 
 /**

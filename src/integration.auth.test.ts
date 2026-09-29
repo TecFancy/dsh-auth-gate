@@ -133,7 +133,9 @@ describe("integration: auth endpoints over real HTTP", () => {
       expect(await page.text()).toContain("<form");
 
       const nav = await fetch(`${base}/__probe`, {
-        headers: { accept: "text/html" },
+        // P2 §3：导航判定只认 Sec-Fetch（Accept 子串匹配已废除）；undici 会改写
+        // sec-fetch-mode，故这里用 sec-fetch-dest: document 表达浏览器导航。
+        headers: { accept: "text/html", "sec-fetch-dest": "document" },
         redirect: "manual",
       });
       expect(nav.status).toBe(302);

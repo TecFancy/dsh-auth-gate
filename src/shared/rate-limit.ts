@@ -69,6 +69,16 @@ export class LoginRateLimiter {
     }
   }
 
+  /**
+   * 只清某个账号桶（P2 管理重置：admin 重置口令后解除该用户的登录锁定）。
+   * **不动 IP 桶**：IP 桶记录的是该 IP 的连续失败，清掉等于给攻击者发豁免；
+   * 被锁 IP 仍按窗口/锁到期自行恢复。
+   */
+  clearAccount(account: string): void {
+    if (account === "") return;
+    this.byAccount.delete(account);
+  }
+
   /** 返回该桶当前剩余锁定毫秒数（>0 = 锁定中）；同时做锁到期/窗口衰减清零。 */
   private checkBucket(bucket: Map<string, BucketEntry>, key: string, now: number): number {
     const entry = bucket.get(key);

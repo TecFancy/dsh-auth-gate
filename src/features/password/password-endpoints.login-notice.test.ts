@@ -44,6 +44,15 @@ describe("GET /auth/login: notice (P1.1)", () => {
     expect(res.body).toContain(NOTICE);
   });
 
+  it("drops a TAB-split next from the rendered form too (P2 review)", async () => {
+    // %09 解码后是真 TAB：浏览器在解析 Location 前会剥掉它，"/\t/evil.com" 于是
+    // 等价于协议相对的 "//evil.com"。同一枚恶意值不得进表单隐藏域。
+    const res = await getLogin("/auth/login?next=%2F%09%2Fevil.com");
+    expect(res.status).toBe(200);
+    expect(res.body).toContain('<input type="hidden" name="next" value="/">');
+    expect(res.body).not.toContain("evil.com");
+  });
+
   it("never reads the notice on a POST failure re-render", async () => {
     const harness = makeHarness();
     registerPasswordEndpoints(harness.deps);

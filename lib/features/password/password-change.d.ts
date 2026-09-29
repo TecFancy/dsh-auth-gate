@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { LoginRateLimiter, UsersLoadResult, UsersSnapshot } from "../../shared/index.js";
+import { type LoginRateLimiter, type UsersLoadResult, type UsersSnapshot } from "../../shared/index.js";
 import { type SessionStore } from "../../session/index.js";
 export interface PasswordChangeDeps {
     sessions: () => SessionStore | undefined;
@@ -22,6 +22,11 @@ export interface PasswordChangeDeps {
     limiter: LoginRateLimiter;
     /** 客户端 IP（D19）；缺省回退 socket.remoteAddress。 */
     clientIp?: ((req: IncomingMessage) => string) | undefined;
+    /**
+     * 配置的对外来源（P2 §6）：`Origin` 精确匹配用；**未配置时不得拿 `Host` 兜底**，
+     * 只信 `Sec-Fetch-Site: same-origin`（checkRequestOrigin 的既有语义）。
+     */
+    publicHost?: string | undefined;
     totpMode: "off" | "optional" | "required";
     verifyTotp: (secretB32: string, code: string, nowMs: number) => number | undefined;
     /** 防重放（index.ts 注入同一 replayGuard 单例）：同窗 counter 已用过 → false。 */
@@ -36,11 +41,14 @@ export interface PasswordChangeDeps {
     };
 }
 /**
- * POST /auth/password（P1 §1）。处理顺序冻结，不得重排：
- * method 405 → parseFormBody(415/413) → 会话 cookie(401) → 限速桶(429) → 读 users(503)
- * → 恒时验证旧口令(401) → TOTP(401) → 策略(400) → hash → 锁内写盘(503)
- * → recordSuccess + 撤销全部会话 → 清 cookie + 200。
+ * `/auth/password`（P1 §1 + P2 §1/§6）。GET 走 SSR 自足页；POST 处理顺序冻结：
+ * method 405（allow: GET, POST）→ parseFormBody(415/413) → Origin/Sec-Fetch-Site(403)
+ * → 会话 cookie(401) → 限速桶(429) → 读 users(503) → 恒时验证旧口令(401) → TOTP(401)
+ * → 策略(400) → hash → 锁内写盘(503) → recordSuccess + 撤销全部会话
+ * → 清 cookie +（nav=1 时 302 登录页，否则既有 200 JSON）。
  * 顺序硬约束：写盘成功后才撤销会话；写盘失败绝不允许出现「全被踢但密码没改」。
+ * Origin 放在 415/413 之后、401 之前：畸形 body 不必先做 CSRF 判定，缺来源的脚本
+ * 得到 403 而不是假 401。
  */
 export declare function handlePasswordChange(deps: PasswordChangeDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
 //# sourceMappingURL=password-change.d.ts.map

@@ -173,13 +173,20 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 1. Start up (§3) — a fail-loud self-check means failure;
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
 3. **Re-run the unauthenticated entry-coverage probe** (read-only, no credentials):
-   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every
-   registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits
-   non-zero if any entry answers 2xx without a session. Latest verified run:
-   [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md) — dsh `0.1.5-rc.2`,
-   56 entries from 8 packages, 61/61 probes rejected (401, or 302 to `/auth/login` for HTML).
+   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits non-zero if any **guarded** entry answers 2xx without a session (the gate's own public endpoints are judged separately - they must stay reachable). Latest verified runs: [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md) — dsh `0.1.5-rc.2`,
+   56 entries from 8 packages, 61/61 probes rejected — and
+   [`entry-coverage-0.2.0-rc.2.md`](./entry-coverage-0.2.0-rc.2.md) — dsh `0.2.0-rc.2`, 62 entries from
+   10 packages (third-party route tables included), 67/67 rejected with the browser-navigation probe
+   asserting `302 -> /auth/login`. The navigation probe needs `Sec-Fetch-Mode: navigate`
+   (`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`): without those headers the gate
+   answers 401 by design, not 302.
 4. Check `boot.log` for any new error/warn;
-5. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
+5. **Upgrading dsh itself: plugin first, host second.** From dsh `0.2.0` on, a plugin whose
+   `@deepseek-ai/dsh*` peers do not cover the running host is refused by `dsh plugin add` and
+   **skipped at boot** (a single `skipping profile bundle` line, instance keeps serving) - the
+   login gate disappears fail-open. Install a plugin release whose corridor covers the target
+   host _before_ moving the host.
+6. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
    launch-token gate (a fresh browser needs `/?token=` once). dsh-auth-gate
    bridges it after a successful login via a relative `/?token=…` redirect (see
    `docs/implemented/impl-launch-token-bridge.md`). After the upgrade, run
@@ -240,6 +247,15 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
       The self-service password change (D22) has its own, separate rate-limit bucket but derives the
       client address the same way, so it needs the same `clientIpHeader` setup: without a trusted
       proxy client-IP header, every client on that host also shares one password-change bucket.
+- [ ] The panel's user-management block and the password-change endpoints reject any authenticated
+      POST whose `Origin` does not match the instance, so production must configure `publicHost`
+      (with the scheme, `https://host`, when TLS terminates at the reverse proxy): with
+      `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, and a script call without
+      an `Origin` gets `403` (requirement added by D25, the admin surface).
+- [ ] Enable TOTP for every administrator (`dsh-auth user totp enable <name>`): with TOTP off, a
+      stolen admin cookie alone is enough to reset other users' passwords, and the panel does not
+      warn about that. Re-authentication is conditional by design, and auditing is then the only
+      remaining control.
 
 ## 8. Public Deployment Variant (effective 2026-08-15 on dsh.example.com): Semi-Shell
 

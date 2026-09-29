@@ -54,7 +54,9 @@ describe("integration: TOTP two-stage flow over real HTTP", () => {
         200,
       );
       const status = await fetch(`${base}/auth/status`, { headers: { cookie: sessionCookie } });
-      expect(await status.text()).toBe('{"authenticated":true,"logoutOrder":1000}');
+      // P2：已认证 status 追加「关于我」字段，这里只锁既有两字段的值（形状细节在专用测试里）。
+      const statusBody = (await status.json()) as Record<string, unknown>;
+      expect(statusBody).toMatchObject({ authenticated: true, logoutOrder: 1000 });
     } finally {
       await unmountStack(fibers, root);
     }

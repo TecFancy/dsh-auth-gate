@@ -20,7 +20,7 @@ export declare function mountPasswordChangeStack(options?: {
 export declare function unmountStack(stack: PasswordChangeStack): Promise<void>;
 export declare function login(base: string, password: string): Promise<string>;
 export declare function changeBody(current: string, next: string, code?: string): string;
-export declare function changePassword(base: string, cookie: string, body: string, method?: string): Promise<{
+export declare function changePassword(base: string, cookie: string, body: string, method?: string, extraHeaders?: Record<string, string>): Promise<{
     status: number;
     json: unknown;
     setCookie: string | null;

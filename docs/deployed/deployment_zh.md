@@ -154,11 +154,20 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 2. 跑验收清单 B/D/F 三组（守卫 + 会话 + WS）；
 3. **重跑未认证入口覆盖探测**（只读、不带凭证）：`node scripts/check-live-entries.mjs`
    （默认打 `http://127.0.0.1:3080`）。脚本会从已加载 profile 里发现全部已注册入口
-   （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**未带会话却答 2xx** 就以非零码退出。
-   最近一次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
-   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 探测被拒（401，HTML 面 302 → `/auth/login`）。
+   （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**受守卫**入口**未带会话却答 2xx** 就以非零码退出
+   （门自己的公开端点单列判定——它们必须保持可达）。
+   最近两次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
+   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 被拒；以及
+   [`entry-coverage-0.2.0-rc.2_zh.md`](./entry-coverage-0.2.0-rc.2_zh.md) —— dsh `0.2.0-rc.2`，
+   10 个包共 62 条入口（含第三方插件路由表），67/67 被拒，且浏览器导航探针断言
+   `302 -> /auth/login`。导航探针必须带 `Sec-Fetch-Mode: navigate`
+   （`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`）：缺这两个头时门按设计返回
+   401 而不是 302。
 4. 检查 `boot.log` 无新增 error/warn；
-5. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
+5. **升 dsh 本身：先插件、后宿主。** 从 dsh `0.2.0` 起，`@deepseek-ai/dsh*` peer 不覆盖当前宿主的插件
+   会被 `dsh plugin add` 拒绝，并在启动时**被跳过**（只打一行 `skipping profile bundle`，实例照常服务）
+   ——登录门 fail-open 消失。**先把走廊覆盖目标宿主的插件版本装好，再动宿主。**
+6. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
    `/?token=`）——auth-gate 登录成功会自动桥接（相对跳转 `/?token=…`，见
    `docs/implemented/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
    cookie）跑一遍验收 A：登录成功即直达实例，不应撞 401 token 门；`boot.log` 里
@@ -208,6 +217,13 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
       资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。自助改密（D22）用的是独立
       限速桶，但同样按这个头取客户端地址：未配受信反代客户端 IP 头时，同一主机上所有客户端
       也会共用一个改密桶。
+- [ ] 面板里的用户管理块与改密端点会拒绝 `Origin` 与实例不匹配的已认证 POST，因此生产必须配置
+      `publicHost`（TLS 终止在反代后面时写成带 scheme 的 `https://host`）：`publicHost` 留空时
+      只认 `Sec-Fetch-Site: same-origin`，不带 `Origin` 的脚本调用一律 `403`（D25 管理面新增的
+      要求）。
+- [ ] 给每个管理员启用 TOTP（`dsh-auth user totp enable <name>`）：未启用时，仅凭一枚被盗的管理员
+      cookie 就能重置他人口令，而且面板不会对此给出提示；条件式再认证是刻意的设计，此时审计是
+      仅存的控制手段。
 
 ## 8. 公网部署变体（2026-08-15 起，dsh.example.com 生效）：半外壳
 

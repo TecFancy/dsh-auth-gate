@@ -210,9 +210,9 @@ describe("wrapServer: 幂等与还原", () => {
 });
 
 describe("denyHttp", () => {
-  it("redirects navigation with 302 + next and no-store", () => {
+  it("redirects Sec-Fetch navigation with 302 + next and no-store", () => {
     const res = makeRes();
-    denyHttp(makeReq("/some/path", "GET", "text/html"), res);
+    denyHttp(makeReq("/some/path", "GET", undefined, { "sec-fetch-mode": "navigate" }), res);
     expect(res.state.status).toBe(302);
     expect(res.state.headers!["location"]).toBe("/auth/login?next=%2Fsome%2Fpath");
     expect(res.state.headers!["cache-control"]).toBe("no-store");

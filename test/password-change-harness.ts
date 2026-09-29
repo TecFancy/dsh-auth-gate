@@ -58,16 +58,24 @@ export interface ReqOptions {
   cookie?: string | null;
   contentType?: string | undefined;
   body?: string | Buffer;
+  /**
+   * P2 §6：`/auth/password` 的 POST 有 Origin/Sec-Fetch-Site 门，缺省模拟浏览器同源请求。
+   * `null` = 两个头都不带（用于断言 fail-closed 403；正例矩阵在
+   * `src/features/password/password-change.origin.test.ts`）。
+   */
+  secFetchSite?: string | null;
 }
 
 export function makeReq(options: ReqOptions = {}): IncomingMessage {
   const cookie = options.cookie === undefined ? "dsh_auth=good" : options.cookie;
+  const secFetchSite = options.secFetchSite === undefined ? "same-origin" : options.secFetchSite;
   return {
     method: options.method ?? "POST",
     url: "/auth/password",
     headers: {
       "content-type": options.contentType ?? "application/x-www-form-urlencoded",
       ...(cookie === null ? {} : { cookie }),
+      ...(secFetchSite === null ? {} : { "sec-fetch-site": secFetchSite }),
     },
     socket: { remoteAddress: "127.0.0.1" },
     *[Symbol.asyncIterator](): Generator<Buffer> {
@@ -111,7 +119,13 @@ function makeStore(): SessionTable {
     ],
   ]);
   const store = {
-    getByToken: (token: string): Session | undefined => rows.get(token),
+    // 与真 SessionStore.getByToken 同语义：已吊销 / 已过期一律读不到。
+    // （旧版只看 key 是否存在，会让"过期会话改密 401"这类用例静默假绿。）
+    getByToken: (token: string): Session | undefined => {
+      const row = rows.get(token);
+      if (row === undefined || row.revoked || row.expiresAt <= Date.now()) return undefined;
+      return row;
+    },
     revokeBySubject: (subject: string): Promise<number> => {
       let count = 0;
       for (const [key, row] of rows) {

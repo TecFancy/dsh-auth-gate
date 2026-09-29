@@ -50,6 +50,8 @@ function makeReq(method: string, cookie: string | null, body: string): IncomingM
     url: "/auth/password",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
+      // P2 §6：改密 POST 要求同源证明（浏览器表单/同源 fetch 恒带该头）。
+      "sec-fetch-site": "same-origin",
       ...(cookie === null ? {} : { cookie }),
     },
     socket: { remoteAddress: "127.0.0.1" },
@@ -150,13 +152,13 @@ describe("route /auth/password registration (anti-regression, §1)", () => {
     ]);
   });
 
-  it("answers 405 + allow: POST on a non-POST method (thin delegation)", async () => {
+  it("answers 405 + allow: GET, POST on a non-GET/POST method (thin delegation)", async () => {
     const captured = makeDeps(true);
     registerPasswordEndpoints(captured.deps);
     const res = makeRes();
-    await routeOf(captured)(makeReq("GET", "dsh_auth=good", ""), res.res);
+    await routeOf(captured)(makeReq("PUT", "dsh_auth=good", ""), res.res);
     expect(res.status).toBe(405);
-    expect(res.headers["allow"]).toBe("POST");
+    expect(res.headers["allow"]).toBe("GET, POST");
     expect(res.headers["cache-control"]).toBe("no-store");
   });
 

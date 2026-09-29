@@ -43,6 +43,8 @@ function makeReq(body: string, cookie: string | null = "dsh_auth=good"): Incomin
     url: "/auth/password",
     headers: {
       "content-type": "application/x-www-form-urlencoded",
+      // P2 §6：改密 POST 要求同源证明（浏览器表单/同源 fetch 恒带该头）。
+      "sec-fetch-site": "same-origin",
       ...(cookie === null ? {} : { cookie }),
     },
     socket: { remoteAddress: "127.0.0.1" },
