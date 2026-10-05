@@ -99,6 +99,24 @@ describe("integration: token login bridges the dsh launch token (issue #99)", ()
     }
   });
 
+  it("keeps the plain next redirect when dsh registers no connection service at all", async () => {
+    const { port, token, fibers, root } = await mountStack({ withCredentials: true });
+    try {
+      const base = `http://127.0.0.1:${port}`;
+      const good = await fetch(`${base}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: `token=${token}&next=%2F__probe`,
+        redirect: "manual",
+      });
+      expect(good.status).toBe(302);
+      expect(good.headers.get("location")).toBe("/__probe");
+      expect(good.headers.get("set-cookie")).toContain("dsh_auth=");
+    } finally {
+      await unmountStack(fibers, root);
+    }
+  });
+
   it("keeps the plain next redirect when the connection service has no authenticatedUrl", async () => {
     const { port, token, fibers, root } = await mountStack({
       withCredentials: true,

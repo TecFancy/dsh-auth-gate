@@ -33,7 +33,7 @@ issue #99 补上另一半：**token 模式**（M2 共享口令）的登录成功
 | TOTP 两段式第二段成功                                          | 同上（清挑战 cookie + 发会话 + 相对跳转）                                                                                           |
 | 令牌登录成功（token 模式）                                     | 同上（同一座桥、同一失败语义）                                                                                                      |
 | 桥未配置 / connection 缺失 / 旧版 dsh（无 `authenticatedUrl`） | 302 原 `next`，跳转目标零变化（进程内 warn 一次：`launch-token bridge inactive: ...`；响应多一条 `referrer-policy`，见 D-bridge-8） |
-| `authenticatedUrl` 抛错 / 返回无 token                         | 302 原 `next`（进程内 warn 一次：`launch-token bridge unavailable: ...`）                                                           |
+| `authenticatedUrl` 抛错 / 返回无 token                         | 302 原 `next`（进程内 warn 一次：`launch-token bridge unavailable: ...`）；响应同样多一条 `referrer-policy`                         |
 | 登录失败（401/429/503）                                        | 与 M3/T4（密码）、M2（令牌）完全一致，桥不参与任何失败路径                                                                          |
 
 **fail-open 范围**：桥只影响「登录成功后的 redirect 目标」；denial 路径、限速、TOTP
@@ -126,8 +126,8 @@ issue #99 补上另一半：**token 模式**（M2 共享口令）的登录成功
 
 ## 6. 变更记录
 
-| commit    | 内容                                                                                                                                                                                                                                      |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `19c8431` | 首版：`makeLaunchTokenBridge` + `issueSession` 透传 host（绝对 URL）                                                                                                                                                                      |
-| `b7e48e5` | grok-4.6 review F1–F6 落地：相对跳转只取 token、两把闩、去 host 依赖、抽 `src/launch-token-bridge.ts`（root 层白名单）、集成测试锁装配边、本文档 + 反代文档附注                                                                           |
-| `#103`    | issue #99：token 模式接上同一座桥（D-bridge-7）；成功 302 与守卫登录跳转补 `referrer-policy: no-referrer`（D-bridge-8）；回落规则抽成两条成功路径共用的 `resolvePostLoginLocation`；记录 D-bridge-9（否决守卫保留 query）与多副本粘滞假设 |
+| commit    | 内容                                                                                                                                                                                                                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `19c8431` | 首版：`makeLaunchTokenBridge` + `issueSession` 透传 host（绝对 URL）                                                                                                                                                                                                                  |
+| `b7e48e5` | grok-4.6 review F1–F6 落地：相对跳转只取 token、两把闩、去 host 依赖、抽 `src/launch-token-bridge.ts`（root 层白名单）、集成测试锁装配边、本文档 + 反代文档附注                                                                                                                       |
+| `#103`    | issue #99：token 模式接上同一座桥（D-bridge-7）；成功 302 与守卫登录跳转补 `referrer-policy: no-referrer`（D-bridge-8）；回落规则抽成两条成功路径共用的 `resolvePostLoginLocation`；记录 D-bridge-9（否决守卫保留 query）；多副本粘滞约束记在 §4 与 `docs/deployed/reverse-proxy*.md` |
