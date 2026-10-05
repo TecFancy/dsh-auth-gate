@@ -54,6 +54,7 @@
       "types": "./lib/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -62,7 +63,8 @@
     "docs/demo",
     ".agents/skills",
     "cordis.patch.yml",
-    "icon.svg"
+    "icon.svg",
+    "locale/*.json"
   ],
   "sideEffects": false,
   "repository": {
