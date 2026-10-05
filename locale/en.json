@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Auth Gate",
+    "description": "A login gate for a dsh web instance: password or shared-token sign-in, optional TOTP two-factor, sessions, rate limiting and a user-management CLI."
+  }
+}
