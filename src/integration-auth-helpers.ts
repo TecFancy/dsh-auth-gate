@@ -13,8 +13,8 @@ import { apply, Config, inject, name, type AuthConfig } from "./index.js";
 
 /**
  * `integration.auth.test.ts` 的共享装配夹具：真实 cordis + webserver + storage 栈，
- * 外加一个探针路由与一条 WS 升级路由。`withConnection` 再提供一个假 connection
- * （模拟 dsh client-connection 的 `authenticatedUrl`），用于 launch-token 桥。
+ * 外加探针路由（`/__probe`、`/`）与一条 WS 升级路由。`connection` 选项再提供一个假
+ * connection（模拟 dsh client-connection 的 `authenticatedUrl`），用于 launch-token 桥。
  */
 
 export type RealServer = WrappableServer & { readonly port: number };
@@ -56,7 +56,12 @@ export async function waitFor(condition: () => boolean, timeoutMs = 5_000): Prom
 
 export async function mountStack(options: {
   withCredentials: boolean;
-  withConnection?: boolean;
+  /**
+   * 假 dsh connection 的形状：`authenticatedUrl` = dsh ≥ 0.1.2-alpha；`bare` = 服务在但没有
+   * 这个函数（旧版 dsh），桥应回落到 `next`。刻意在插件 apply **之后**才 provide，
+   * 用来锁住桥「登录时才 `ctx.get("connection")`」的惰性查找（晚注册的 connection 同样有效）。
+   */
+  connection?: "authenticatedUrl" | "bare";
 }): Promise<{
   ctx: Context;
   port: number;
@@ -73,12 +78,6 @@ export async function mountStack(options: {
         ref === "DSH_AUTH_TOKEN"
           ? Promise.resolve({ value: token, source: "test" })
           : Promise.resolve(undefined),
-    });
-  }
-  if (options.withConnection === true) {
-    // 假 connection：模拟 dsh 0.1.2-alpha client-connection 的 authenticatedUrl。
-    ctx.provide("connection", {
-      authenticatedUrl: (baseUrl: string) => `${baseUrl}/?token=launchTok-it`,
     });
   }
   const fibers: Fiber[] = [];
@@ -110,14 +109,7 @@ export async function mountStack(options: {
     await ctx.plugin({ name, inject, apply, Config }, { cookieSecure: false } as AuthConfig),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
-  server.register({
-    kind: "exact",
-    path: "/__probe",
-    handler: (_req, res) => {
-      res.writeHead(200);
-      res.end("probe");
-    },
-  });
+  registerProbes(server);
   server.registerUpgrade({
     path: "/events",
     handler: (_req, socket) => {
@@ -127,7 +119,38 @@ export async function mountStack(options: {
     },
   });
   await waitFor(() => ctx.get("auth")!.sessions !== undefined);
+  // 假 connection 在插件 apply 之后才注册（见 options.connection 注释）。
+  if (options.connection === "authenticatedUrl") {
+    ctx.provide("connection", {
+      // host 与额外 query 都被桥丢弃，只留 token（D-bridge-1）。
+      authenticatedUrl: () => "http://other.example:9999/deep/path?extra=1&token=launchTok-it",
+    });
+  }
+  if (options.connection === "bare") ctx.provide("connection", {});
   return { ctx, port: server.port, fibers, root, token };
+}
+
+/**
+ * 探针路由：`/__probe` 用于鉴权探测，`/` 用于观察「桥把浏览器送去 `/?token=` 之后，
+ * 门还认不认那张会话 cookie」。
+ */
+function registerProbes(server: RealServer): void {
+  server.register({
+    kind: "exact",
+    path: "/__probe",
+    handler: (_req, res) => {
+      res.writeHead(200);
+      res.end("probe");
+    },
+  });
+  server.register({
+    kind: "exact",
+    path: "/",
+    handler: (_req, res) => {
+      res.writeHead(200);
+      res.end("index");
+    },
+  });
 }
 
 export async function unmountStack(fibers: Fiber[], root: string): Promise<void> {

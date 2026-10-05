@@ -1,12 +1,13 @@
 import type { ServerResponse } from "node:http";
 import { type SessionStore } from "../../session/index.js";
+import { type LaunchTokenBridge } from "../../shared/index.js";
 /** issueSession 所需 deps 子集（结构化类型；PasswordEndpointsDeps 天然兼容）。 */
 export interface IssueSessionDeps {
     cookieName: string;
     cookieSecure: boolean;
     sessionTtl: number;
     /** 可选：dsh launch-token 桥（0.1.2-alpha+）。返回相对 `/?token=` 或 undefined。 */
-    launchTokenBridge?: () => Promise<string | undefined>;
+    launchTokenBridge?: LaunchTokenBridge | undefined;
     logger: {
         warn(message: unknown): void;
         info(message: unknown): void;

@@ -89,6 +89,8 @@ describe("integration: real webserver + guard", () => {
       });
       expect(nav.status).toBe(302);
       expect(nav.headers.get("location")).toBe("/auth/login?next=%2Fprobe");
+      // 被拒的 URL 可能自带 launch token：跳登录页时不给下游留 Referer。
+      expect(nav.headers.get("referrer-policy")).toBe("no-referrer");
 
       // P2 §3：Accept 子串匹配已废除（只认 Sec-Fetch）→ 缺头时 fail-closed 按 API 401。
       const acceptOnly = await fetch(`${base}/probe`, { headers: { accept: "text/html" } });

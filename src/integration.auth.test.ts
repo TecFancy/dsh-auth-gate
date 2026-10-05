@@ -58,7 +58,7 @@ describe("integration: token login bridges the dsh launch token (issue #99)", ()
   it("redirects to the relative token URL and still issues the session cookie", async () => {
     const { port, token, fibers, root } = await mountStack({
       withCredentials: true,
-      withConnection: true,
+      connection: "authenticatedUrl",
     });
     try {
       const base = `http://127.0.0.1:${port}`;
@@ -77,7 +77,8 @@ describe("integration: token login bridges the dsh launch token (issue #99)", ()
         redirect: "manual",
       });
       expect(good.status).toBe(302);
-      // 桥交出的是 dsh 进程的 launch token，不是表单里的共享 token（评审 A8）。
+      // 桥交出的是 dsh 进程的 launch token，不是表单里的共享 token（评审 A8）；
+      // 假 authenticatedUrl 带别的 host 与额外 query，桥必须只留 token（D-bridge-1）。
       expect(good.headers.get("location")).toBe("/?token=launchTok-it");
       expect(good.headers.get("location")).not.toContain(token!);
       expect(good.headers.get("referrer-policy")).toBe("no-referrer");
@@ -85,13 +86,24 @@ describe("integration: token login bridges the dsh launch token (issue #99)", ()
 
       const cookie = good.headers.get("set-cookie")!.split(";")[0]!;
       expect((await fetch(`${base}/__probe`, { headers: { cookie } })).status).toBe(200);
+      // 第二跳：浏览器带着会话 cookie 跟随 `/?token=`，门必须放行（不再 302 回登录页），
+      // 否则 dsh 的 authorizeIndex 根本没机会 mint（issue #99 的实际修复点）。
+      const second = await fetch(`${base}/?token=launchTok-it`, {
+        headers: { cookie },
+        redirect: "manual",
+      });
+      expect(second.headers.get("location")).toBeNull();
+      expect(second.status).toBe(200);
     } finally {
       await unmountStack(fibers, root);
     }
   });
 
-  it("keeps the plain next redirect when dsh exposes no connection service", async () => {
-    const { port, token, fibers, root } = await mountStack({ withCredentials: true });
+  it("keeps the plain next redirect when the connection service has no authenticatedUrl", async () => {
+    const { port, token, fibers, root } = await mountStack({
+      withCredentials: true,
+      connection: "bare",
+    });
     try {
       const base = `http://127.0.0.1:${port}`;
       const good = await fetch(`${base}/auth/login`, {
@@ -102,6 +114,7 @@ describe("integration: token login bridges the dsh launch token (issue #99)", ()
       });
       expect(good.status).toBe(302);
       expect(good.headers.get("location")).toBe("/__probe");
+      expect(good.headers.get("set-cookie")).toContain("dsh_auth=");
     } finally {
       await unmountStack(fibers, root);
     }

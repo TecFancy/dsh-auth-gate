@@ -28,14 +28,14 @@ that gap stayed open.
 
 ## 2. Behavior Contract
 
-| Scenario                                                                       | Behavior                                                                                                        |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Password sign-in success (no TOTP)                                             | Issue session cookie → 302 **relative** `/?token=<launchToken>`                                                 |
-| TOTP two-step, second step success                                             | Same as above (clear challenge cookie + issue session + relative redirect)                                      |
-| Shared-token sign-in success (token mode)                                      | Same as above (one bridge instance, one failure semantics)                                                      |
-| Bridge not configured / connection missing / older dsh (no `authenticatedUrl`) | 302 to the original `next`, zero behavioral change (warn once per process: `launch-token bridge inactive: ...`) |
-| `authenticatedUrl` throws / returns no token                                   | 302 to the original `next` (warn once per process: `launch-token bridge unavailable: ...`)                      |
-| Sign-in failure (401/429/503)                                                  | Exactly as in M3/T4 (password) and M2 (token), the bridge is not part of any failure path                       |
+| Scenario                                                                       | Behavior                                                                                                                                                                        |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Password sign-in success (no TOTP)                                             | Issue session cookie → 302 **relative** `/?token=<launchToken>`                                                                                                                 |
+| TOTP two-step, second step success                                             | Same as above (clear challenge cookie + issue session + relative redirect)                                                                                                      |
+| Shared-token sign-in success (token mode)                                      | Same as above (one bridge instance, one failure semantics)                                                                                                                      |
+| Bridge not configured / connection missing / older dsh (no `authenticatedUrl`) | 302 to the original `next`, redirect target unchanged (warn once per process: `launch-token bridge inactive: ...`; one extra `referrer-policy` response header, see D-bridge-8) |
+| `authenticatedUrl` throws / returns no token                                   | 302 to the original `next` (warn once per process: `launch-token bridge unavailable: ...`)                                                                                      |
+| Sign-in failure (401/429/503)                                                  | Exactly as in M3/T4 (password) and M2 (token), the bridge is not part of any failure path                                                                                       |
 
 **fail-open scope**: the bridge only affects the "redirect target after a successful sign-in"; denial paths,
 rate limiting, TOTP challenges and session issuance are all untouched. Bridge failure (returning undefined /
@@ -76,15 +76,28 @@ throwing) never affects sign-in success.
   contract has the same character as the override of `impl-m3.md` P14. Token mode has no restricted session
   (`must_change_password` is password-only), so its success path needs no branch that skips the bridge
   (issue #99).
-- **D-bridge-8 (no referrer)**: both success 302s carry `referrer-policy: no-referrer`, matching dsh
-  `authorizeIndex`'s 303. A redirect target that carries a token should not leave a Referer behind.
+- **D-bridge-8 (no referrer)**: `referrer-policy: no-referrer` is sent on three 302s: both of the guard's
+  navigation denials to the login page (`denyHttp`, the plain `"deny"` path and the `{deny:{redirect}}` path)
+  and both modes' success redirects. The guard's two are the ones that matter: a denied URL may itself carry
+  `/?token=`, and without the header the browser sends that full token-bearing URL as the Referer of the
+  follow-up login-page request. On the success redirects it is defence in depth (it suppresses the Referer of
+  the "login page URL → `/?token=`" hop); it is not the header protecting the token inside the Location —
+  Location, request target, access logs and browser history still show it (see D-bridge-5). Read "zero
+  behavioral change" for older dsh as "unchanged redirect target", with one extra response header.
 - **D-bridge-9 (rejected: keep the query in the guard's `next`)**: issue #99 suggested building `next` from
   `pathname + search` in the guard's navigation denial, so the original `?token=` would survive the login
-  round-trip. **Not adopted**: when the bridge hits, D-bridge-2 discards it anyway (zero functional gain); when
-  the bridge fails, it replays a stale client-supplied token into `authorizeIndex`, which answers 401 for a
-  token on any non-`/` path even with a valid cookie, leaving the user stuck; and it writes the process launch
-  token into the **unauthenticated** login document URL and its Referer, in a `token%3D` encoding that slips
-  past the `token=` log redaction D-bridge-5 recommends. If query fidelity is ever wanted, it belongs in a
+  round-trip. **Not adopted**, in order of weight: (1) it writes the process launch token into the
+  **unauthenticated** login document URL and its Referer, encoded as `token%3D`, which slips past the `token=`
+  log redaction D-bridge-5 recommends; (2) when the bridge hits, D-bridge-2 discards `next` anyway, so the main
+  path gains nothing; (3) a client-supplied token that lands on any path other than `/` is answered with 401 by
+  `authorizeIndex` even when a valid cookie exists.
+  One boundary worth stating: if the bridge is **unavailable** (`authenticatedUrl` throws or returns an empty
+  token while the page gate is still active), this PR does not self-rescue — the user still sees issue #99's
+  symptom and still recovers by reopening the launch URL printed at startup. Bridge failure is fail-open inside
+  the contract, not a scenario this PR claims to fix.
+  Note also that keeping the query would mint a cookie for a _fresh_ launch URL (pathname is `/` and the token
+  is this process's), so it is not a functionally empty option; declining it trades that extra self-rescue path
+  for not reflecting the token into an unauthenticated page. If query fidelity is ever wanted, it belongs in a
   separate change that strips credential-shaped parameters before composing `next`.
 
 ## 4. Deployment Notes (relation to reverse-proxy topology)
@@ -110,19 +123,24 @@ throwing) never affects sign-in success.
 - `src/features/password/password-endpoints.login-bridge.test.ts` (4 cases): hit (relative URL + Set-Cookie
   still contains `dsh_auth`) / undefined fallback / throw fallback / TOTP second-step hit (incl. challenge-cookie
   cleanup assertion).
-- `src/features/token/auth-endpoints.login-bridge.test.ts` (6 cases): hit (relative URL + Set-Cookie +
-  `referrer-policy`) / undefined fallback / throw fallback with warn / no bridge injected / 401 never calls the
-  bridge / 503 never calls the bridge.
+- `src/shared/login-redirect.test.ts` (6 cases): the fallback rules both success paths share — no bridge /
+  `undefined` (silent) / throw / empty string plus `//evil`, absolute URL, backslash and control characters /
+  a missing logger and a throwing logger still resolve to a redirect target.
+- `src/features/token/auth-endpoints.login-bridge.test.ts` (7 cases): hit (relative URL + Set-Cookie +
+  `referrer-policy`) / undefined fallback / throw fallback with warn / unsafe location fallback with warn / no
+  bridge injected / 401 never calls the bridge / 503 never calls the bridge.
 - `src/integration.password.test.ts` (1 new case): real stack + fake connection → sign-in 302 relative
   `/?token=launchTok123` + session cookie.
-- `src/integration.auth.test.ts` (2 new cases): real stack + fake connection → token sign-in 302 relative
-  `/?token=launchTok-it` (Location does not contain the form's shared token) + session cookie; without a
-  connection service the redirect falls back to `next`.
+- `src/integration.auth.test.ts` (2 new cases): real stack + fake connection registered _after_ the plugin
+  applies (locking the lazy lookup) → token sign-in 302 relative `/?token=launchTok-it` (does not contain the
+  form's shared token) + session cookie + a second hop to `GET /?token=` with that cookie that is no longer
+  bounced back to the login page; with a connection service that has no `authenticatedUrl`, the redirect falls
+  back to `next`.
 
 ## 6. Change Log
 
-| commit    | Content                                                                                                                                                                                                                                                            |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `19c8431` | First version: `makeLaunchTokenBridge` + `issueSession` passes host through (absolute URL)                                                                                                                                                                         |
-| `b7e48e5` | grok-4.6 review F1–F6 landed: relative redirect taking only the token, two warn latches, host dependency removed, `src/launch-token-bridge.ts` extracted (root-layer whitelist), integration test locks the assembly side, this document + reverse-proxy doc notes |
-| this PR   | issue #99: token mode uses the same bridge (D-bridge-7); both success 302s carry `referrer-policy: no-referrer` (D-bridge-8); D-bridge-9 records the rejected guard-query change and the multi-replica sticky-session assumption                                   |
+| commit    | Content                                                                                                                                                                                                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `19c8431` | First version: `makeLaunchTokenBridge` + `issueSession` passes host through (absolute URL)                                                                                                                                                                                                                                                                   |
+| `b7e48e5` | grok-4.6 review F1–F6 landed: relative redirect taking only the token, two warn latches, host dependency removed, `src/launch-token-bridge.ts` extracted (root-layer whitelist), integration test locks the assembly side, this document + reverse-proxy doc notes                                                                                           |
+| `#103`    | issue #99: token mode uses the same bridge (D-bridge-7); the success 302s and the guard's login redirect carry `referrer-policy: no-referrer` (D-bridge-8); the fallback rule is extracted into `resolvePostLoginLocation`, shared by both success paths; D-bridge-9 records the rejected guard-query change and the multi-replica sticky-session assumption |

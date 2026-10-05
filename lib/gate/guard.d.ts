@@ -78,7 +78,9 @@ export declare function guardUpgrade(gate: () => Gate, handler: UpgradeHandler):
  * - `{deny:{status}}` → 该 401/403；
  * - `{deny:{upgrade:true}}` → 401 兜底（正常不会落到 HTTP 面）；
  * - `"deny"`（旧门）→ 浏览器导航 302 登录页 + `next`，其余 401。
- * 一律 `cache-control: no-store`。
+ * 一律 `cache-control: no-store`；两条 302 另加 `referrer-policy: no-referrer`：被拒的请求
+ * URL 可能自带 dsh 的 launch token（`/?token=`），不加这条，浏览器跟随时会把带 token 的
+ * 完整 URL 作为 Referer 送进登录页请求（进而进访问日志），绕开 `token=` 脱敏。
  */
 export declare function denyHttp(req: IncomingMessage, res: ServerResponse, decision?: GateDeny): void;
 /** 拒绝一个 WS 升级：写 401 响应行后销毁 socket，不进入 ws 协商。 */

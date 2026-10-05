@@ -43,6 +43,8 @@ describe("POST /auth/login (token mode): launch-token bridge", () => {
     const res = await login(harness);
     expect(res.status).toBe(302);
     expect(res.headers["location"]).toBe("/ok");
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+    expect(res.headers["referrer-policy"]).toBe("no-referrer");
   });
 
   it("falls back to next when the bridge throws (never blocks login)", async () => {
@@ -57,11 +59,24 @@ describe("POST /auth/login (token mode): launch-token bridge", () => {
     });
   });
 
+  it("refuses a bridge location that is not a same-site relative path", async () => {
+    const harness = mount(() => Promise.resolve("//evil.com"));
+    const res = await login(harness);
+    expect(res.status).toBe(302);
+    expect(res.headers["location"]).toBe("/ok");
+    expect(harness.logs).toContainEqual({
+      level: "warn",
+      message: "launch-token bridge returned an unsafe location; falling back to plain redirect",
+    });
+  });
+
   it("keeps the plain next redirect when no bridge is injected", async () => {
     const harness = mount();
     const res = await login(harness);
     expect(res.status).toBe(302);
     expect(res.headers["location"]).toBe("/ok");
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+    expect(res.headers["referrer-policy"]).toBe("no-referrer");
     expect(harness.logs.some((entry) => entry.level === "warn")).toBe(false);
   });
 });
