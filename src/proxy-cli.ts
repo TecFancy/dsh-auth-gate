@@ -5,6 +5,7 @@
  * 用法示例：
  *   dsh-auth-proxy --listen 127.0.0.1:8443 --target https://dsh.example.com
  */
+import { realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 import {
   createProxyServer,
@@ -82,6 +83,24 @@ export function parseProxyArgs(
   };
 }
 
+/**
+ * 当前进程是否在直接运行这个入口文件。
+ *
+ * 全局安装的 bin 是符号链接：`process.argv[1]` 是链接，`import.meta.url` 是真实文件。
+ * 比较前必须解析真实路径，否则会跳过 `main()`，进程不输出就退出。
+ *
+ * `argvPath` 缺失，或者解析不到真实文件时返回 false：两种情况下它都不可能是本入口，
+ * 而 import 本模块的进程不该因此崩溃（`node -e`、测试运行器的 argv[1] 都不是本文件）。
+ */
+export function isInvokedEntry(entryUrl: string, argvPath: string | undefined): boolean {
+  if (argvPath === undefined || argvPath === "") return false;
+  try {
+    return entryUrl === pathToFileURL(realpathSync(argvPath)).href;
+  } catch {
+    return false;
+  }
+}
+
 export function main(argv: string[], io: CliIo): number {
   try {
     if (argv.includes("--help") || argv.includes("-h")) {
@@ -109,6 +128,6 @@ export function main(argv: string[], io: CliIo): number {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+if (isInvokedEntry(import.meta.url, process.argv[1])) {
   process.exitCode = main(process.argv.slice(2), defaultIo);
 }
