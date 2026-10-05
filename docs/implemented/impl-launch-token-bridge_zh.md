@@ -1,11 +1,14 @@
 # impl-launch-token-bridge — dsh launch-token 自动桥
 
 > **状态**: M3 之后的增量（**非** M3 frozen spec 的一部分；`impl-m3.md` P14 的成功路径
-> 契约仍为「302 → next」，本文档是其在 dsh ≥ 0.1.2-alpha 上的兼容层覆写）。
+> 契约仍为「302 → next」，本文档是其在 dsh ≥ 0.1.2-alpha 上的兼容层覆写）。token 模式
+> 同理覆写 `impl-m2.md` 的成功路径契约（issue #99 起）。
 > **适用**: dsh ≥ 0.1.2-alpha（存在 `dsh-client-connection` 的 `authenticatedUrl`）；
 > 更早版本零行为变化（桥自动回退）。
 > **来源**: 2026-08-31 实测（隔离实例 dsh-test.example.com）+ `19c8431` +
-> `grok-4.6 review`（`docs/reviews/grok46-launch-token-bridge-review.md`，F1–F6 全部落地）。
+> `grok-4.6 review`（`docs/reviews/grok46-launch-token-bridge-review.md`，F1–F6 全部落地）
+>
+> - `issue #99`（token 模式漏接，grok-4.7 双路复核）。
 
 ## 1. 背景
 
@@ -17,15 +20,21 @@ dsh 0.1.2-alpha 起，dsh web 新增**页面级 launch-token 门**（`dsh-client
 问题：auth-gate 登录成功后 302 到 `next`，但新浏览器没有 dsh cookie → 仍然撞 token 门，
 用户被迫手动从终端复制 `?token=` URL。
 
+issue #99 补上另一半：**token 模式**（M2 共享口令）的登录成功路径此前从未接上这座桥。
+新浏览器过完 auth-gate 拿到 `dsh_auth` cookie，却仍然没有 dsh 的 browser-session cookie，
+于是每个 `/api` 请求都是 401；当时唯一的补救是让用户再贴一次启动 URL。桥首版是 password
+流程的增量，token 模式被划在范围外，这个缺口一直没补。
+
 ## 2. 行为契约
 
 | 场景                                                           | 行为                                                                               |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | 密码登录成功（无 TOTP）                                        | 发会话 cookie → 302 **相对** `/?token=<launchToken>`                               |
 | TOTP 两段式第二段成功                                          | 同上（清挑战 cookie + 发会话 + 相对跳转）                                          |
+| 令牌登录成功（token 模式）                                     | 同上（同一座桥、同一失败语义）                                                     |
 | 桥未配置 / connection 缺失 / 旧版 dsh（无 `authenticatedUrl`） | 302 原 `next`，零行为变化（进程内 warn 一次：`launch-token bridge inactive: ...`） |
 | `authenticatedUrl` 抛错 / 返回无 token                         | 302 原 `next`（进程内 warn 一次：`launch-token bridge unavailable: ...`）          |
-| 登录失败（401/429/503）                                        | 与 M3/T4 完全一致，桥不参与任何失败路径                                            |
+| 登录失败（401/429/503）                                        | 与 M3/T4（密码）、M2（令牌）完全一致，桥不参与任何失败路径                         |
 
 **fail-open 范围**：桥只影响「登录成功后的 redirect 目标」；denial 路径、限速、TOTP
 挑战、会话签发全部不动。桥失败（返回 undefined / 抛错）绝不影响登录成功。
@@ -54,7 +63,22 @@ dsh 0.1.2-alpha 起，dsh web 新增**页面级 launch-token 门**（`dsh-client
   `log_skip` / 过滤器）作为运营缓解。
 - **D-bridge-6（测试）**: 单元测试 hand-mounted 注入 bridge 锁 fail-open 分支；集成测试
   以真 cordis 栈 + `ctx.provide("connection", ...)` 假服务锁装配边（`ctx.get` →
-  bridge → 302），断言相对 Location 与 Set-Cookie 仍签发（grok F5）。
+  bridge → 302），断言相对 Location 与 Set-Cookie 仍签发（grok F5）。装配边必须由集成
+  测试覆盖：本次 issue #99 的缺陷形态就是「端点函数正确、装配漏传」，只手注 deps 的
+  单元测试会全绿（grok-4.7 评审 A8）。
+- **D-bridge-7（token 模式对齐）**: M2 的共享口令登录与 password 登录共用同一座桥实例、
+  同一失败语义（`bridge() ?? next`），本文档对 `impl-m2.md` 成功路径契约的覆写与对
+  `impl-m3.md` P14 的覆写同性质。token 模式没有受限会话（`must_change_password` 是
+  password 专有），成功路径不需要任何跳过桥的分支（issue #99）。
+- **D-bridge-8（无 Referer）**: 两处成功 302 都带 `referrer-policy: no-referrer`，与 dsh
+  `authorizeIndex` 的 303 同形。跳转目标携带 token，就不该给下游留 Referer。
+- **D-bridge-9（否决：守卫保留 query）**: issue #99 建议把守卫导航拒绝的 `next` 从
+  `pathname` 改成 `pathname + search`，让原 URL 上的 `?token=` 活过登录往返。**不采纳**：
+  桥命中时它必然被 D-bridge-2 丢弃（收益为零）；桥失败时它会把过期的客户端 token 送回
+  `authorizeIndex`，而该门对带 token 的非 `/` 路径即使 cookie 合法也 401，用户被钉在
+  401 上；并且它把进程级 token 写进**未认证**的登录页文档 URL 与 Referer，`token%3D`
+  这种编码还会绕开 D-bridge-5 建议的 `token=` 日志脱敏。若将来要做 query 保真，应另开
+  变更，并在拼 `next` 之前剥掉凭证类参数。
 
 ## 4. 部署注意（与反代拓扑的关系）
 
@@ -67,18 +91,28 @@ dsh 0.1.2-alpha 起，dsh web 新增**页面级 launch-token 门**（`dsh-client
   本机或失败。见 `docs/deployed/reverse-proxy*.md` 附注。）
 - 多入口（LAN IP + 域名）：cookie 名绑定各自 authority，互不复用（dsh 单门模型：
   过任一入口 = 全实例权限，两张等价全权票，非提权）。
+- **多副本（Kubernetes 等）**：桥读取的是**处理这次登录的那个进程**的 connection。
+  没有粘滞会话时，紧随其后的 `GET /?token=` 若打到别的副本，`authorizeIndex` 会 401。
+  password 模式自首版起就是这个假设，token 模式继承同一约束；部署需要单进程或粘滞路由。
 
 ## 5. 测试
 
 - `src/features/password/password-endpoints.login-bridge.test.ts`（4 用例）：
   命中（相对 URL + Set-Cookie 仍含 `dsh_auth`）/ undefined 回退 / 抛错回退 /
   TOTP 第二段命中（含挑战 cookie 清理断言）。
-- `src/integration.password.test.ts`（新增 1 用例）：真栈 + 假 connection →
+- `src/features/token/auth-endpoints.login-bridge.test.ts`（6 用例）：命中（相对 URL +
+  Set-Cookie + `referrer-policy`）/ undefined 回退 / 抛错回退并 warn / 未注入桥 /
+  401 不调用桥 / 503 不调用桥。
+- `src/integration.password.test.ts`（1 用例）：真栈 + 假 connection →
   登录 302 相对 `/?token=launchTok123` + 会话 cookie。
+- `src/integration.auth.test.ts`（新增 2 用例）：真栈 + 假 connection → 令牌登录 302 相对
+  `/?token=launchTok-it`（Location 不含表单里的共享 token）+ 会话 cookie；无 connection
+  时回落 `next`。
 
 ## 6. 变更记录
 
-| commit    | 内容                                                                                                                                                            |
-| --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `19c8431` | 首版：`makeLaunchTokenBridge` + `issueSession` 透传 host（绝对 URL）                                                                                            |
-| `b7e48e5` | grok-4.6 review F1–F6 落地：相对跳转只取 token、两把闩、去 host 依赖、抽 `src/launch-token-bridge.ts`（root 层白名单）、集成测试锁装配边、本文档 + 反代文档附注 |
+| commit    | 内容                                                                                                                                                                 |
+| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `19c8431` | 首版：`makeLaunchTokenBridge` + `issueSession` 透传 host（绝对 URL）                                                                                                 |
+| `b7e48e5` | grok-4.6 review F1–F6 落地：相对跳转只取 token、两把闩、去 host 依赖、抽 `src/launch-token-bridge.ts`（root 层白名单）、集成测试锁装配边、本文档 + 反代文档附注      |
+| 本 PR     | issue #99：token 模式接上同一座桥（D-bridge-7）；两处成功 302 补 `referrer-policy: no-referrer`（D-bridge-8）；记录 D-bridge-9（否决守卫保留 query）与多副本粘滞假设 |

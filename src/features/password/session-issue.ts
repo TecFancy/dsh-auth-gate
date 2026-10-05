@@ -51,6 +51,8 @@ export async function issueSession(
   const kind = restricted ? RESTRICTED_SESSION_KIND : "full";
   const { token } = await store.create(username, ttlSeconds * 1000, kind);
   res.setHeader("cache-control", "no-store");
+  // 与 dsh authorizeIndex 的 303 同形：带 token 的跳转不给下游留 Referer。
+  res.setHeader("referrer-policy", "no-referrer");
   const cookies = [
     ...(options.extraSetCookie ?? []),
     buildSetCookie(deps.cookieName, token, ttlSeconds, deps.cookieSecure),

@@ -136,6 +136,7 @@ export function makeHarness(options?: {
       logger: {
         error: (message) => logs.push({ level: "error", message }),
         info: (message) => logs.push({ level: "info", message }),
+        warn: (message) => logs.push({ level: "warn", message }),
       },
     },
   };

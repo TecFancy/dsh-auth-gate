@@ -38,7 +38,18 @@ export interface AuthEndpointsDeps {
    * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
    */
   publicHost?: string | undefined;
-  logger: { error(message: unknown): void; info(message: unknown): void };
+  /**
+   * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
+   * 登录成功后 302 到 `launchTokenBridge()` 返回的相对 `/?token=`（浏览器自动 mint dsh
+   * cookie，沿用当前 origin）；返回 undefined / 抛错 / 未配置 → 原 302(next)。
+   * 桥失败绝不阻塞登录成功。契约与 password 模式（session-issue.ts）逐字对齐。
+   */
+  launchTokenBridge?: () => Promise<string | undefined>;
+  logger: {
+    error(message: unknown): void;
+    info(message: unknown): void;
+    warn(message: unknown): void;
+  };
 }
 
 /**
@@ -137,11 +148,21 @@ async function loginAttempt(
   }
   const { token: sessionToken } = await store.create("token", deps.sessionTtl * 1000);
   res.setHeader("cache-control", "no-store");
+  // 与 dsh authorizeIndex 的 303 同形：带 token 的跳转不给下游留 Referer（评审 B3）。
+  res.setHeader("referrer-policy", "no-referrer");
   res.setHeader(
     "set-cookie",
     buildSetCookie(deps.cookieName, sessionToken, deps.sessionTtl, deps.cookieSecure),
   );
-  res.writeHead(302, { location: next });
+  let location = next;
+  if (deps.launchTokenBridge !== undefined) {
+    try {
+      location = (await deps.launchTokenBridge()) ?? location;
+    } catch {
+      deps.logger.warn("launch-token bridge failed; falling back to plain redirect");
+    }
+  }
+  res.writeHead(302, { location });
   res.end();
   deps.logger.info("session issued");
 }
