@@ -112,10 +112,7 @@ function loginBody(username: string, password: string): string {
   return `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
 }
 
-async function postLogin(
-  base: string,
-  body: string,
-): Promise<{ status: number; cookie: string | undefined; location: string | null }> {
+async function postLogin(base: string, body: string) {
   const res = await fetch(`${base}/auth/login`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -127,6 +124,7 @@ async function postLogin(
     status: res.status,
     cookie: setCookie?.split(";")[0],
     location: res.headers.get("location"),
+    referrerPolicy: res.headers.get("referrer-policy"),
   };
 }
 
@@ -248,6 +246,8 @@ describe("integration: launch-token bridge over real HTTP", () => {
       // 只保留 token，host/scheme 全部丢弃（grok-4.6 review F1/F2）
       expect(good.location).toBe("/?token=launchTok123");
       expect(good.cookie).toContain("dsh_auth=");
+      // 成功 302 抑制发往 `/?token=` 那一跳的 Referer（与 dsh 303 同形）。
+      expect(good.referrerPolicy).toBe("no-referrer");
     } finally {
       await unmountStack(fibers, root);
     }

@@ -106,6 +106,7 @@ function makeHarness(publicHost?: string): {
       logger: {
         error: () => undefined,
         info: () => undefined,
+        warn: () => undefined,
       },
     },
   };

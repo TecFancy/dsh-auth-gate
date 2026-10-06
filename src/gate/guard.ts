@@ -171,7 +171,9 @@ function endStatus(res: ServerResponse, status: number, body: string): void {
  * - `{deny:{status}}` → 该 401/403；
  * - `{deny:{upgrade:true}}` → 401 兜底（正常不会落到 HTTP 面）；
  * - `"deny"`（旧门）→ 浏览器导航 302 登录页 + `next`，其余 401。
- * 一律 `cache-control: no-store`。
+ * 一律 `cache-control: no-store`；两条 302 另加 `referrer-policy: no-referrer`：被拒的请求
+ * URL 可能自带 dsh 的 launch token（`/?token=`），不加这条，浏览器跟随时会把带 token 的
+ * 完整 URL 作为 Referer 送进登录页请求（进而进访问日志），绕开 `token=` 脱敏。
  */
 export function denyHttp(
   req: IncomingMessage,
@@ -182,6 +184,7 @@ export function denyHttp(
     const payload = decision.deny;
     if ("redirect" in payload) {
       res.setHeader("cache-control", "no-store");
+      res.setHeader("referrer-policy", "no-referrer");
       res.writeHead(302, {
         location: isSafeLocation(payload.redirect) ? payload.redirect : LOGIN_PATH,
       });
@@ -198,6 +201,7 @@ export function denyHttp(
   if (isNavigationRequest(req)) {
     const pathname = new URL(req.url ?? "/", "http://x").pathname;
     res.setHeader("cache-control", "no-store");
+    res.setHeader("referrer-policy", "no-referrer");
     res.writeHead(302, {
       location: `${LOGIN_PATH}?next=${encodeURIComponent(pathname)}`,
     });

@@ -71,6 +71,7 @@ const ROOT_FILES = new Set([
   "integration-totp-helpers.ts",
   "integration-p2-helpers.ts",
   "integration-password-change-helpers.ts",
+  "integration-auth-helpers.ts",
   "guard-proxy-deny.test.ts",
 ]);
 const errors = [];

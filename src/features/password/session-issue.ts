@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 import { buildSetCookie, type SessionStore } from "../../session/index.js";
+import { resolvePostLoginLocation, type LaunchTokenBridge } from "../../shared/index.js";
 import {
   RESTRICTED_REDIRECT_PATH,
   RESTRICTED_SESSION_KIND,
@@ -12,7 +13,7 @@ export interface IssueSessionDeps {
   cookieSecure: boolean;
   sessionTtl: number;
   /** 可选：dsh launch-token 桥（0.1.2-alpha+）。返回相对 `/?token=` 或 undefined。 */
-  launchTokenBridge?: () => Promise<string | undefined>;
+  launchTokenBridge?: LaunchTokenBridge | undefined;
   logger: {
     warn(message: unknown): void;
     info(message: unknown): void;
@@ -51,19 +52,16 @@ export async function issueSession(
   const kind = restricted ? RESTRICTED_SESSION_KIND : "full";
   const { token } = await store.create(username, ttlSeconds * 1000, kind);
   res.setHeader("cache-control", "no-store");
+  // 与 dsh authorizeIndex 的 303 同形：带 token 的跳转不给下游留 Referer。
+  res.setHeader("referrer-policy", "no-referrer");
   const cookies = [
     ...(options.extraSetCookie ?? []),
     buildSetCookie(deps.cookieName, token, ttlSeconds, deps.cookieSecure),
   ];
   res.setHeader("set-cookie", cookies);
-  let location = restricted ? RESTRICTED_REDIRECT_PATH : options.next;
-  if (!restricted && deps.launchTokenBridge !== undefined) {
-    try {
-      location = (await deps.launchTokenBridge()) ?? location;
-    } catch {
-      deps.logger.warn("launch-token bridge failed; falling back to plain redirect");
-    }
-  }
+  const location = restricted
+    ? RESTRICTED_REDIRECT_PATH
+    : await resolvePostLoginLocation(deps.launchTokenBridge, options.next, deps.logger);
   res.writeHead(302, { location });
   res.end();
   deps.logger.info(restricted ? "restricted session issued" : "session issued");

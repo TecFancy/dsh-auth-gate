@@ -86,6 +86,9 @@ dsh.example.com {
   送去本机或失败；桥的实现刻意丢弃 `authenticatedUrl` 返回的 host/scheme，只保留 token。
 - launch token 会出现在 302 Location 进而进 access log；建议在反代日志侧对 `token=`
   做 redact（Caddy `log_skip` / 过滤器）作为运营卫生。
+- **桥是「每进程」的**：它读的是处理这次登录的那个进程的 launch token，所以多副本部署下
+  紧随其后的 `GET /?token=…` 必须落到同一个副本——单副本或开会话粘滞，否则登录成功也会
+  停在 dsh 的 401 上（password 流程自始就是同一约束）。
 
 ### 4.3 nginx 等价写法
 
