@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.16.0...v0.17.0) (2026-10-06)
+
+
+### Features
+
+* Plugins-page identity, symlink-safe proxy CLI, and the token-mode launch bridge ([#104](https://github.com/TecFancy/dsh-auth-gate/issues/104)) ([77fbeaa](https://github.com/TecFancy/dsh-auth-gate/commit/77fbeaa6ca11d2075c4e30fe97c6401047477ede))
+
 ## [0.16.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.15.0...v0.16.0) (2026-09-29)
 
 
