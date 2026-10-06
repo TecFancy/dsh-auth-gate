@@ -2,9 +2,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import {
   loginPageHtml,
   parseFormBody,
+  resolvePostLoginLocation,
   resolvePublicHost,
   validateNext,
 } from "../../shared/index.js";
+import type { LaunchTokenBridge } from "../../shared/index.js";
 import { AUTH_PATH_PREFIX, type HttpHandler } from "../../gate/index.js";
 import {
   authCatchAll,
@@ -38,7 +40,19 @@ export interface AuthEndpointsDeps {
    * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
    */
   publicHost?: string | undefined;
-  logger: { error(message: unknown): void; info(message: unknown): void };
+  /**
+   * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
+   * 登录成功后 302 到 `launchTokenBridge()` 给出的相对 `/?token=`（浏览器自动 mint dsh
+   * cookie，沿用当前 origin）；未配置 / 返回 undefined / 抛错 / 返回非站内安全地址 →
+   * 原 302(next)。回落规则由 `shared` 的 `resolvePostLoginLocation` 实现，与 password
+   * 模式共用同一份代码（issue #99 的根因就是两条成功路径各写一份而漂移）。
+   */
+  launchTokenBridge?: LaunchTokenBridge | undefined;
+  logger: {
+    error(message: unknown): void;
+    info(message: unknown): void;
+    warn(message: unknown): void;
+  };
 }
 
 /**
@@ -137,11 +151,14 @@ async function loginAttempt(
   }
   const { token: sessionToken } = await store.create("token", deps.sessionTtl * 1000);
   res.setHeader("cache-control", "no-store");
+  // 抑制发往 `/?token=` 那一跳的 Referer：登录页 URL 不作为下游 Referer 传播（与 dsh 303 同形）。
+  res.setHeader("referrer-policy", "no-referrer");
   res.setHeader(
     "set-cookie",
     buildSetCookie(deps.cookieName, sessionToken, deps.sessionTtl, deps.cookieSecure),
   );
-  res.writeHead(302, { location: next });
+  const location = await resolvePostLoginLocation(deps.launchTokenBridge, next, deps.logger);
+  res.writeHead(302, { location });
   res.end();
   deps.logger.info("session issued");
 }

@@ -52,6 +52,7 @@ const ROOT_FILES = new Set([
   "cli.passwd.test.ts",
   "cli.passwd.stdin.test.ts",
   "proxy-cli.ts",
+  "proxy-cli.entry.test.ts",
   "proxy-cli.test.ts",
   "integration.auth.test.ts",
   "integration.guard.test.ts",
@@ -70,6 +71,7 @@ const ROOT_FILES = new Set([
   "integration-totp-helpers.ts",
   "integration-p2-helpers.ts",
   "integration-password-change-helpers.ts",
+  "integration-auth-helpers.ts",
   "guard-proxy-deny.test.ts",
 ]);
 const errors = [];

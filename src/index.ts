@@ -200,6 +200,9 @@ function mountAuthEndpoints(
         const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
         return stored !== undefined && safeEqual(token, stored);
       },
+      // 两种模式共用同一个桥实例；token 模式此前漏接，登录成功后拿不到 dsh 的
+      // browser-session cookie（issue #99）。
+      launchTokenBridge,
       logger: log,
     });
   }

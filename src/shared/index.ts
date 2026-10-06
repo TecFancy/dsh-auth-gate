@@ -22,6 +22,8 @@ export {
   passwordLoginPageHtml,
   totpChallengePageHtml,
 } from "./login-page.js";
+export { resolvePostLoginLocation } from "./login-redirect.js";
+export type { LaunchTokenBridge } from "./login-redirect.js";
 export {
   checkPasswordPolicy,
   PASSWORD_MAX_LENGTH,

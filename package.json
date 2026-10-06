@@ -2,6 +2,7 @@
   "name": "dsh-auth-gate",
   "version": "0.16.0",
   "description": "Login gate for DeepSeek Harness (dsh) web instances: password or shared-token sign-in, optional TOTP two-factor, session cookies, rate limiting, self-service password change and a user-management CLI",
+  "icon": "./icon.svg",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -53,6 +54,7 @@
       "types": "./lib/client/index.d.ts",
       "default": "./lib/client.js"
     },
+    "./locale/*.json": "./locale/*.json",
     "./package.json": "./package.json"
   },
   "files": [
@@ -60,7 +62,9 @@
     "deploy",
     "docs/demo",
     ".agents/skills",
-    "cordis.patch.yml"
+    "cordis.patch.yml",
+    "icon.svg",
+    "locale/*.json"
   ],
   "sideEffects": false,
   "repository": {

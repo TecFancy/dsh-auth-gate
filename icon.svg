@@ -1,0 +1,16 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- dsh-auth-gate's mark for the Plugins page: the account row's shield and
+       keyhole, redrawn as a filled badge so it reads at 30px and at 36px.
+       Colours are explicit on purpose: the Host inlines this file as a data URL
+       and the manager draws it in an <img>, where currentColor and the theme
+       tokens of the page do not reach. -->
+  <defs>
+    <linearGradient id="shield" x1="7" y1="4" x2="30" y2="33" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6D8BFF"/>
+      <stop offset="1" stop-color="#2F3BC8"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 3.4 30.2 8v10.4c0 7.5-5.1 13.4-12.2 15.8-7.1-2.4-12.2-8.3-12.2-15.8V8Z" fill="url(#shield)"/>
+  <circle cx="18" cy="15.4" r="3" fill="#FFFFFF"/>
+  <path d="M18 17.4v5.4" stroke="#FFFFFF" stroke-width="3.8" stroke-linecap="round"/>
+</svg>

@@ -1,3 +1,4 @@
+import type { LaunchTokenBridge } from "../../shared/index.js";
 import { type HttpHandler } from "../../gate/index.js";
 import { type SessionStore } from "../../session/index.js";
 /**
@@ -26,9 +27,18 @@ export interface AuthEndpointsDeps {
      * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
      */
     publicHost?: string | undefined;
+    /**
+     * 可选：dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）。
+     * 登录成功后 302 到 `launchTokenBridge()` 给出的相对 `/?token=`（浏览器自动 mint dsh
+     * cookie，沿用当前 origin）；未配置 / 返回 undefined / 抛错 / 返回非站内安全地址 →
+     * 原 302(next)。回落规则由 `shared` 的 `resolvePostLoginLocation` 实现，与 password
+     * 模式共用同一份代码（issue #99 的根因就是两条成功路径各写一份而漂移）。
+     */
+    launchTokenBridge?: LaunchTokenBridge | undefined;
     logger: {
         error(message: unknown): void;
         info(message: unknown): void;
+        warn(message: unknown): void;
     };
 }
 /**

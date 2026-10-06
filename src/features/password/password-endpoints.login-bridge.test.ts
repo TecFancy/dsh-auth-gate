@@ -222,6 +222,20 @@ describe("POST /auth/login: launch-token bridge (dsh 0.1.2-alpha token gate)", (
     expect(res.headers["location"]).toBe("/ok");
   });
 
+  it("falls back to next when the bridge returns a non-relative location", async () => {
+    const harness = makeHarness();
+    harness.setBridge(() => Promise.resolve("//evil.com"));
+    registerPasswordEndpoints(harness.deps);
+    const res = makeRes();
+    await handlerOf(harness)(
+      loginReq("username=alice&password=pw&next=%2Fok", "dsh.test"),
+      res.res,
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers["location"]).toBe("/ok");
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+  });
+
   it("falls back to next when the bridge throws (never blocks login)", async () => {
     const harness = makeHarness();
     harness.setBridge(() => Promise.reject(new Error("connection gone")));

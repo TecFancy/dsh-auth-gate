@@ -12,6 +12,8 @@ export { resolvePublicHost } from "./host.js";
 export { cidrContains, normalizeIp, parseCidr } from "./ip-address.js";
 export type { CidrNetwork } from "./ip-address.js";
 export { loginPageHtml, loginPath, passwordLoginPageHtml, totpChallengePageHtml, } from "./login-page.js";
+export { resolvePostLoginLocation } from "./login-redirect.js";
+export type { LaunchTokenBridge } from "./login-redirect.js";
 export { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, } from "./password-policy.js";
 export type { PasswordPolicyOptions, PasswordPolicyResult, PasswordRule, } from "./password-policy.js";
 export { checkRequestOrigin } from "./origin.js";

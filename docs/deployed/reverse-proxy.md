@@ -97,6 +97,11 @@ dsh-auth-gate bridges this after a successful login by redirecting to a
 - The launch token appears in the 302 `Location`, hence in access logs; prefer
   redacting `token=` in proxy logs (Caddy `log_skip` / filters) as operational
   hygiene.
+- **The bridge is per process.** It reads the launch token of the process that
+  handled the sign-in, so behind more than one replica the follow-up
+  `GET /?token=…` must reach that same process: run a single replica or enable
+  sticky sessions, otherwise the browser lands on dsh's 401 even after a
+  successful login (same constraint the password flow has always had).
 
 ### 4.3 nginx equivalent
 
