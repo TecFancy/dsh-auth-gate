@@ -26,6 +26,7 @@ in first.
 
 - [What it does](#what-it-does)
 - [What it does not do](#what-it-does-not-do)
+- [The market's credentials badge](#the-markets-credentials-badge)
 - [Quick start](#quick-start)
 - [See it in action](#see-it-in-action)
 - [Configuration](#configuration)
@@ -89,6 +90,32 @@ mechanisms is in `docs/deployed/known-limitations.md`):
   over https.
 - **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
   reset; users are created and managed by an administrator through the CLI.
+
+## The market's credentials badge
+
+Plugin-market listings scan the artifact you would install and print what it touches.
+For this plugin the scan reports `credentials` ("uses your API keys"), `network`,
+`fs-read`, `fs-write` and `env`, plus one red line: _reads credentials/secrets AND has
+network access_. That is a disclosure, not a verdict, and for this plugin it is
+accurate. Here is what it corresponds to in the code.
+
+- **One credential read, in token mode only.** `apply()` builds the token resolver only
+  when `mode: "token"` (`src/index.ts`); password mode never touches the credentials
+  service. Token mode resolves the shared token with
+  `credentials.resolve(config.tokenRef)` in `src/token-resolver.ts`, and `tokenRef`
+  (default `DSH_AUTH_TOKEN`) is the only reference the plugin ever asks for. Nothing
+  lists, enumerates, or reads any other credential.
+- **The credential service belongs to the harness**, and it resolves in this order:
+  `$DSH_HOME/.credentials.yaml` (created `0600`), the process environment, then a `.env`
+  file. When the service is missing or the reference does not resolve, the gate denies
+  every request instead of letting traffic through.
+- **The network capability is the plugin's own traffic**: the browser calling the
+  plugin's endpoints (sign-in, user management, password reset) and the optional
+  authenticated local proxy. Nothing is sent anywhere else.
+- **What a static scan cannot say.** It can prove a capability is present; it cannot
+  prove that one is absent, and it does not read intent.
+
+If you would rather run an instance that never reads a credential, use password mode.
 
 ## Quick start
 
