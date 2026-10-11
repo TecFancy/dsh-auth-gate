@@ -239,8 +239,12 @@ async function scenarioResetConsumesOwnCode(stack: P2Stack): Promise<void> {
 }
 
 describe("integration P2: admin reset hardening", () => {
-  it("clears both target rate-limit buckets so the reset user can log in and change again", () =>
-    withStack(scenarioRateBucketReset));
+  // 每个场景都要跑十几次真实 scrypt（失败尝试也走完整验证），全量并行时会超过默认 10s。
+  it(
+    "clears both target rate-limit buckets so the reset user can log in and change again",
+    () => withStack(scenarioRateBucketReset),
+    30_000,
+  );
 
   it(
     "shares one TOTP replay guard between login and the admin reset",
@@ -248,8 +252,11 @@ describe("integration P2: admin reset hardening", () => {
     30_000,
   );
 
-  it("counts denied attempts in the admin bucket without locking the login bucket", () =>
-    withStack(scenarioAdminBucketCountsFailures, { adminTotpSecret: ADMIN_TOTP_SECRET }));
+  it(
+    "counts denied attempts in the admin bucket without locking the login bucket",
+    () => withStack(scenarioAdminBucketCountsFailures, { adminTotpSecret: ADMIN_TOTP_SECRET }),
+    30_000,
+  );
 
   it(
     "consumes the TOTP code of a reset exactly once",
