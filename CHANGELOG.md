@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.0...v0.17.1) (2026-10-11)
+
+
+### Bug Fixes
+
+* **gate:** roll back guarded routes per entry on unwrap ([#107](https://github.com/TecFancy/dsh-auth-gate/issues/107)) ([07e1155](https://github.com/TecFancy/dsh-auth-gate/commit/07e115519bbcab16169d3adb2064209934d92627))
+
 ## [0.17.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.16.0...v0.17.0) (2026-10-06)
 
 
