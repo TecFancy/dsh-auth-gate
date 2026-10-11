@@ -162,3 +162,89 @@ describe("integration: real webserver + guard", () => {
     }
   });
 });
+
+/** 另一个宿主插件：在自己的 effect 里注册一条 exact 路由，fiber dispose 时随 effect 注销。 */
+function routeOwner(id: string, path: string, body: string) {
+  return {
+    name: `route-owner-${id}`,
+    inject: ["webServer"] as const,
+    apply(ctx: Context): void {
+      const server = ctx.get("webServer") as unknown as RealServer;
+      ctx.effect(
+        () =>
+          server.register({
+            kind: "exact",
+            path,
+            handler: (_req, res) => {
+              res.writeHead(200);
+              res.end(body);
+            },
+          }),
+        `route-owner: ${path}`,
+      );
+    },
+  };
+}
+
+const authPlugin = { name, inject, apply, Config };
+const allowGate: Gate = { decide: () => "allow" };
+
+/** 本插件单独热重载（Plugins 页改配置 = dispose + apply），其余插件不动。 */
+async function reloadAuth(ctx: Context, fiber: { dispose(): Promise<unknown> }) {
+  await fiber.dispose();
+  const next = await ctx.plugin(authPlugin, {} as AuthConfig);
+  ctx.get("auth")!.gate = allowGate;
+  return next;
+}
+
+describe("integration: guard survives a reload of this plugin alone", () => {
+  it("keeps a route another plugin registered after the wrap", async () => {
+    const ctx = new Context();
+    const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
+    const base = `http://127.0.0.1:${(ctx.get("webServer") as unknown as RealServer).port}`;
+    let authFiber = await ctx.plugin(authPlugin, {} as AuthConfig);
+    ctx.get("auth")!.gate = allowGate;
+    const ownerFiber = await ctx.plugin(routeOwner("late", "/owned-late", "late"));
+
+    try {
+      expect(await (await fetch(`${base}/owned-late`)).text()).toBe("late");
+
+      authFiber = await reloadAuth(ctx, authFiber);
+
+      const after = await fetch(`${base}/owned-late`);
+      expect(after.status).toBe(200);
+      expect(await after.text()).toBe("late");
+    } finally {
+      await ownerFiber.dispose();
+      await authFiber.dispose();
+      await wsFiber.dispose();
+    }
+  });
+
+  it("does not resurrect a route its owner disposed while the guard was mounted", async () => {
+    const ctx = new Context();
+    const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
+    const base = `http://127.0.0.1:${(ctx.get("webServer") as unknown as RealServer).port}`;
+    const ownerV1 = await ctx.plugin(routeOwner("early-v1", "/owned-early", "v1"));
+    let authFiber = await ctx.plugin(authPlugin, {} as AuthConfig);
+    ctx.get("auth")!.gate = allowGate;
+    let ownerV2: { dispose(): Promise<unknown> } | undefined;
+
+    try {
+      await ownerV1.dispose();
+      expect((await fetch(`${base}/owned-early`)).status).toBe(404);
+
+      authFiber = await reloadAuth(ctx, authFiber);
+      // 拥有者已卸载：路由不应被 unwrap 的快照写回。
+      expect.soft((await fetch(`${base}/owned-early`)).status).toBe(404);
+
+      // 拥有者重新加载：必须拿到新 handler，而不是被复活的旧 handler 占位。
+      ownerV2 = await ctx.plugin(routeOwner("early-v2", "/owned-early", "v2"));
+      expect(await (await fetch(`${base}/owned-early`)).text()).toBe("v2");
+    } finally {
+      await ownerV2?.dispose();
+      await authFiber.dispose();
+      await wsFiber.dispose();
+    }
+  });
+});

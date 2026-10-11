@@ -12,3 +12,6 @@ CHANGELOG.md
 
 # husky internals
 .husky/
+
+# session-memory plugin buffer (gitignored, written while agents run)
+.remember/
