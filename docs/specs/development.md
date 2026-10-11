@@ -261,9 +261,13 @@ now documented so nobody re-learns them:
 - `@deepseek-ai/cordis`, `@deepseek-ai/schemastery`, `zod` are runtime deps
   (all public on npmjs).
 - `@deepseek-ai/dsh-storage-domain` is a **peer** declared with the same corridor string as
-  `engines.dsh` (`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || ^0.2.0-rc.1`, see D26);
-  the dev/test host cohort (`dsh-host-webserver`, `dsh-storage`, `dsh-storage-domain`,
-  `dsh-storage-json`) follows the corridor floor (`^0.2.0-rc.1`). `docs/implemented/impl-m1.md` §3
+  `engines.dsh` (`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`, see D27).
+  The three caret alternatives record the host lines that were verified; the trailing floor
+  keeps every later host version compatible, so a new dsh line never needs a hand-added
+  alternative. The gate evaluates peer ranges with `includePrerelease`, and a plugin it
+  rejects is skipped silently, which is why the declaration errs wide. The dev/test host
+  cohort (`dsh-host-webserver`, `dsh-storage`, `dsh-storage-domain`, `dsh-storage-json`)
+  follows the corridor floor (`^0.2.0-rc.1`). `docs/implemented/impl-m1.md` §3
   records the original `^0.1.0-rc.6` pin as frozen history, not as current policy.
 - `lint-staged` stays on `^16.1.0`: 17.x requires Node ≥ 22.22.1, dev machines
   may run earlier 22.x.

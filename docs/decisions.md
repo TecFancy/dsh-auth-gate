@@ -373,3 +373,19 @@ dev/测试宿主 cohort 上移到 `^0.2.0-rc.1`（解析 `0.2.0-rc.2`）；不�
 dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实入口覆盖都跑到新宿主上。
 → [zh](decisions/implemented/2026-09-29-dsh-020-host-corridor.zh.md) ·
 [en](decisions/implemented/2026-09-29-dsh-020-host-corridor.en.md)
+
+## D27. 宿主走廊末尾改用下界：两处声明 `>=0.2.0-rc.1`，不再随宿主换线追加
+
+`engines.dsh` 与 `@deepseek-ai/dsh-storage-domain` peer **同时**把末尾的 `^0.2.0-rc.1` 换成
+`>=0.2.0-rc.1`（两串逐字相同），前面三个 0.1.x 替代项保留为验证记录；守卫测试的期望串与
+覆盖断言同步改写；不改源码。
+**替代方案**：维持枚举、每条新宿主线追加一次（换线当天登录门静默消失）；整条只留 `>=0.1.0-rc.6`
+（丢掉验证记录，而保留枚举零成本）；写 `>` 不写 `>=`（下界版本自己被判不兼容）；每个宿主版本追加
+一项（caret 已覆盖整条线）；等 dsh 稳定版（闸门已在 `next` 的 rc 线生效）；给下界加上界
+（破坏性变更落在哪条线不可知，等于把问题挪到下个线边界）。
+**为什么**：闸门判定带 `includePrerelease`，下界一次接住以后所有宿主；而判不兼容的形态是插件包被
+**静默跳过**、登录门消失（fail-open），比加载后报错危险得多，所以走廊在下界一侧留宽；范围写宽不会
+让 pnpm 多装一份 storage-domain（peer 去重吃依赖图里那份，线上 lock 已证）。
+代价如实记档：未来宿主的破坏性变更不再由闸门拦住，兜底要靠运行时自检。
+→ [zh](decisions/implemented/2026-10-07-host-corridor-floor.zh.md) ·
+[en](decisions/implemented/2026-10-07-host-corridor-floor.en.md)
