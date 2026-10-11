@@ -373,3 +373,13 @@ dev/测试宿主 cohort 上移到 `^0.2.0-rc.1`（解析 `0.2.0-rc.2`）；不�
 dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实入口覆盖都跑到新宿主上。
 → [zh](decisions/implemented/2026-09-29-dsh-020-host-corridor.zh.md) ·
 [en](decisions/implemented/2026-09-29-dsh-020-host-corridor.en.md)
+
+## D27. 守卫 unwrap 逐条回滚，不按快照整表还原
+
+`wrapServer` 的 disposer 只把仍是本次 wrap 产出的守卫 handler 换回原 handler；wrap 期间被删的条目不写回，
+被别人替换的不动，wrap 之后注册的路由保留、只摘守卫。取代 impl-m1 D6 的「快照还原、post-wrap 注册随还原丢弃」。
+**替代方案**：保留快照还原；快照还原 + 合并后续注册；dispose 时只还原注册方法、表里守卫不动。
+**为什么**：单插件重载（改配置）时快照还原会抹掉别的插件后注册的路由、复活已卸载插件的路由，
+并让其重新加载撞上 `duplicate route`；守卫只拥有自己创建的 handler，回滚只碰这些。
+→ [zh](decisions/implemented/2026-10-11-guard-unwrap-per-entry.zh.md) ·
+[en](decisions/implemented/2026-10-11-guard-unwrap-per-entry.en.md)

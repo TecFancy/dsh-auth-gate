@@ -26,8 +26,9 @@ upstream offers no contract middleware hook at the time.
 ## Why
 
 Wrapping is the smallest invasive surface a plugin can ship: the wrapper
-returns a disposer that restores the exact pre-wrap state, and routes landing
-after apply are caught by the wrapped register path. The startup self-check
+returns a disposer that takes back only the guards it installed (per-entry
+rollback, see 2026-10-11-guard-unwrap-per-entry), and routes landing after
+apply are caught by the wrapped register path. The startup self-check
 turns "silently unguarded" into "boot fails with a clear error" - the
 fail-loud companion to the fail-closed gate.
 
