@@ -426,8 +426,12 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 ## Requirements
 
 - Node ≥ 22.19 and pnpm on the server.
-- dsh `0.1.x` / `0.2.x` (declared as `engines.dsh: ^0.1.0-rc.6 || ^0.1.5-rc.2 ||
-^0.1.7-alpha.1 || ^0.2.0-rc.1`). Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
+- dsh `0.1.x`, `0.2.x` and every later line (declared as `engines.dsh: ^0.1.0-rc.6 ||
+^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`). The three caret alternatives record the
+  host lines that were verified; the `>=0.2.0-rc.1` floor keeps every host from the current
+  `next` line onwards compatible, including future `0.3.x` and `1.x`. A declaration that lags
+  a new host line costs more than it protects, because an incompatible bundle is skipped and
+  the login gate then disappears silently. Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
   order), plus `0.1.7-alpha.1` and `0.2.0-rc.2` (isolated instances); the full test
   suite runs on the `0.2.0-rc.2` host packages. The `0.1.6-*`
   prereleases are not enumerated because no plugin version was verified against
@@ -437,8 +441,8 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
   the dsh base bundle already provides them. dsh `0.2.0-rc.2` (already on the `next` line) refuses to install, and at boot silently
   skips, plugins whose `@deepseek-ai/dsh*` peer ranges do not cover the running host
   version; that check reads peers only - `engines.dsh` is not consulted - and a plugin
-  declaring no such peer is not checked at all. The `0.2.0-rc.1` alternative is
-  therefore declared in **both** `engines.dsh` and the storage-domain peer.
+  declaring no such peer is not checked at all. The floor is therefore declared in
+  **both** `engines.dsh` and the storage-domain peer (D28).
 - The dsh `web` profile running (`dsh --profile web`).
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).
