@@ -1,4 +1,4 @@
-# D27. Corridor tail becomes a floor: declare `>=0.2.0-rc.1` in engines and in the storage-domain peer
+# D28. Corridor tail becomes a floor: declare `>=0.2.0-rc.1` in engines and in the storage-domain peer
 
 ## Decision
 
@@ -87,3 +87,6 @@ the login page.
 One **release constraint** follows: the corridor must ship in a new version. The wide floor
 only applies to plugin versions that carry it, so until such a version is installed, a dsh
 move to the `0.3.x` line still meets the old declaration and is still skipped silently.
+
+Numbering note: this record was written as D27 on 2026-10-07; merging 0.17.1 on 2026-10-11
+found that number taken by the guard-unwrap record, so it is renumbered D28.

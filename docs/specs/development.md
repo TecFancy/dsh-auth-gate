@@ -261,7 +261,7 @@ now documented so nobody re-learns them:
 - `@deepseek-ai/cordis`, `@deepseek-ai/schemastery`, `zod` are runtime deps
   (all public on npmjs).
 - `@deepseek-ai/dsh-storage-domain` is a **peer** declared with the same corridor string as
-  `engines.dsh` (`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`, see D27).
+  `engines.dsh` (`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`, see D28).
   The three caret alternatives record the host lines that were verified; the trailing floor
   keeps every later host version compatible, so a new dsh line never needs a hand-added
   alternative. The gate evaluates peer ranges with `includePrerelease`, and a plugin it

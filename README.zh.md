@@ -369,7 +369,7 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
   所以只要 profile 由 dsh 基础包启动，依赖就是齐的。dsh `0.2.0-rc.2`（已在 `next` 线上）会拒绝安装、并在启动时**静默跳过**那些
   `@deepseek-ai/dsh*` peer 范围不覆盖当前宿主版本的插件；这条判定**只读 peer**，不读
   `engines.dsh`，而完全没有这类 peer 的插件根本不会被检查。所以这一条下界在
-  `engines.dsh` 和 storage-domain peer **两处**都声明（D27）。
+  `engines.dsh` 和 storage-domain peer **两处**都声明（D28）。
 - dsh 的 `web` profile 处于运行状态（`dsh --profile web`）。
 - 如果 `cookieSecure` 为 `true`，站点必须通过 https 提供服务（浏览器会拒绝在纯 http 下使用安全
   cookie）。

@@ -90,7 +90,12 @@ export declare function denyForbidden(res: ServerResponse): void;
 /**
  * 包装一个 WrappableServer：存量表 + fallback 原地换守卫，三个注册方法替换为
  * 守卫版本（增量保险，apply 顺序无关）。幂等：同一 server 第二次调用返回同一
- * unwrap。返回的 unwrap 整体回滚（快照 + 原方法）。
+ * unwrap。
+ *
+ * 返回的 unwrap 逐条回滚，不整表还原：只把 handler 仍是本次 wrap 产出的守卫版本的
+ * 条目换回未守卫的原 handler（wrap 之后经包装后的 register 系方法注册的路由同样
+ * 保留在表中，只摘掉守卫）；wrap 期间被拥有者卸载的条目不写回，被第三方换成别的
+ * handler 的条目不碰。最后还原三个注册方法。
  */
 export declare function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog): () => void;
 //# sourceMappingURL=guard.d.ts.map

@@ -5,7 +5,7 @@ import { satisfies, validRange } from "semver";
 import { describe, expect, it } from "vitest";
 
 /**
- * 宿主走廊声明（D12 + D26 + D27）。
+ * 宿主走廊声明（D12 + D26 + D28）。
  *
  * 锁三件事，缺一不可：
  * 1. `engines.dsh` 与 storage-domain peer **逐字相同**（市场徽章去重，且两处不可能漂移）；
@@ -17,7 +17,7 @@ import { describe, expect, it } from "vitest";
  * `engines.dsh` **不参与**判定；只改一处或改错一处，失败形态都是静默的
  * （bundle 被跳过 = 登录门 fail-open），不会在测试或启动时报错。
  *
- * 为什么末尾是下界而不是继续追加替代项（D27）：判不兼容的代价是登录门**静默消失**，而人肉
+ * 为什么末尾是下界而不是继续追加替代项（D28）：判不兼容的代价是登录门**静默消失**，而人肉
  * 追加替代项总滞后于宿主发版。下界一次接住以后所有宿主；代价是放弃"未验证就不放行"这层
  * 保护，未来宿主的破坏性变更不再由闸门替我们拦住。
  */

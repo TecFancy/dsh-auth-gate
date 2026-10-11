@@ -234,7 +234,7 @@ gh release edit v<版本> --notes-file notes.md
   `npm install --registry=https://registry.npmjs.org/`。
 - `@deepseek-ai/cordis`、`@deepseek-ai/schemastery`、`zod` 是运行时依赖（npmjs 上均公开）。
 - `@deepseek-ai/dsh-storage-domain` 是 **peer**，与 `engines.dsh` 用同一条走廊串
-  （`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`，见 D27）。
+  （`^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`，见 D28）。
   前面三个 caret 替代项记录验过的宿主线；末尾的下界接住之后的所有宿主版本，所以 dsh 换新线时
   不需要人来追加替代项。闸门判定 peer 范围时带 `includePrerelease`，而被它拒绝的插件会被静默
   跳过，所以声明宁可偏宽。dev/测试宿主

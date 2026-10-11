@@ -442,7 +442,7 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
   skips, plugins whose `@deepseek-ai/dsh*` peer ranges do not cover the running host
   version; that check reads peers only - `engines.dsh` is not consulted - and a plugin
   declaring no such peer is not checked at all. The floor is therefore declared in
-  **both** `engines.dsh` and the storage-domain peer (D27).
+  **both** `engines.dsh` and the storage-domain peer (D28).
 - The dsh `web` profile running (`dsh --profile web`).
 - If `cookieSecure` is `true`, your site must be served over https (browsers
   refuse secure cookies on plain http).
