@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.1...v0.17.2) (2026-10-11)
+
+
+### Bug Fixes
+
+* **compat:** floor the host corridor instead of appending alternatives ([#109](https://github.com/TecFancy/dsh-auth-gate/issues/109)) ([36e07a0](https://github.com/TecFancy/dsh-auth-gate/commit/36e07a0e8816d4935af93997dbf5b4a4316a5f1c))
+
 ## [0.17.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.0...v0.17.1) (2026-10-11)
 
 
