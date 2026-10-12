@@ -2,8 +2,8 @@ import { Context } from "@deepseek-ai/cordis";
 import { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { request } from "node:http";
 import { describe, expect, it } from "vitest";
-import type { Gate, WrappableServer } from "./gate/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "./index.js";
+import type { Gate, WrappableServer } from "../../src/gate/index.js";
+import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
 
 type RealServer = WrappableServer & { readonly port: number };
 

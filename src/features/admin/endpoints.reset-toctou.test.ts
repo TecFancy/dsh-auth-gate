@@ -18,7 +18,7 @@ import {
   makeRes,
   type FakeRes,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 /**
  * grok #5（TOCTOU）：授权读在锁外（`adminActor`），写盘在锁内。

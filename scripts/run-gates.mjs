@@ -67,6 +67,7 @@ for (const gate of GATES) SCENARIOS[SCENE_OF[gate]].push(gate);
 // answer for shapes the map does not know (dependency changes, unknown files).
 const RULES = [
   { re: /^src\//, scenes: ["hygiene", "types", "tests", "build"] },
+  { re: /^test\//, scenes: ["hygiene", "types", "tests"] }, // tests and harnesses outside src/
   { re: /^lib\//, scenes: ["hygiene", "build"] }, // build artifacts
   {
     re: /^(scripts\/|.*\.config\.(js|mjs|ts)$|aliases\.json|tsconfig.*\.json$)/,

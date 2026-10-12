@@ -27,8 +27,8 @@ only checks invalidated by it.
 - **Coverage for the affected source:**
   `npm run test -- src/<module>.test.ts --coverage --coverage.include='src/<module>.ts'`.
   Never lower thresholds or narrow the include to hide an uncovered affected file.
-- **Mount-point behavior:** both integration files (`src/integration.guard.test.ts`,
-  `src/integration.session.test.ts`) — the regression net for the non-contractual seam
+- **Mount-point behavior:** both integration files (`test/integration/integration.guard.test.ts`,
+  `test/integration/integration.session.test.ts`) - the regression net for the non-contractual seam
   (plan §7).
 - **Dependencies or lockfile:** `npm run lock:check`; the install must have used
   `--registry=https://registry.npmjs.org/`.

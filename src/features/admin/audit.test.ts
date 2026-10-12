@@ -10,7 +10,7 @@ import {
   makeRes,
   type Harness,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 const NEW_PASSWORD = "NewPassw0rd!XY";
 /** 通过策略的哨兵口令（拒绝路径里必须一次都不出现在日志）。 */

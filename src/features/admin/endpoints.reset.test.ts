@@ -7,7 +7,7 @@ import {
   makeRes,
   type Harness,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 const NEW_PASSWORD = "NewPassw0rd!XY";
 const SAME_ORIGIN = { secFetchSite: "same-origin" };

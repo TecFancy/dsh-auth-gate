@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { hashPassword } from "./features/password/index.js";
-import { writeUsersFile } from "./shared/index.js";
+import { hashPassword } from "../../src/features/password/index.js";
+import { writeUsersFile } from "../../src/shared/index.js";
 import {
   cookiePair,
   currentCode,

@@ -13,7 +13,7 @@ import {
   makeRes,
   type FakeRes,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 const TARGET = "alice";
 const SAME_ORIGIN = { secFetchSite: "same-origin" };

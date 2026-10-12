@@ -6,10 +6,10 @@
  */
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { HttpHandler } from "../../gate/index.js";
-import type { PasswordEndpointsDeps } from "./password-endpoints.js";
-import { LoginRateLimiter } from "../../shared/index.js";
-import { SessionStore, type Session } from "../../session/index.js";
+import type { HttpHandler } from "../src/gate/index.js";
+import type { PasswordEndpointsDeps } from "../src/features/password/password-endpoints.js";
+import { LoginRateLimiter } from "../src/shared/index.js";
+import { SessionStore, type Session } from "../src/session/index.js";
 
 class MemTable implements KvTable<string, Session> {
   private readonly map = new Map<string, Session>();

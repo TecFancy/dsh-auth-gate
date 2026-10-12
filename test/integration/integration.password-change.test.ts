@@ -3,7 +3,7 @@ import {
   PASSWORD_CHANGED_NOTICE,
   PASSWORD_CHANGED_TEXT,
   verifyPassword,
-} from "./features/password/index.js";
+} from "../../src/features/password/index.js";
 import {
   changeBody,
   changePassword,

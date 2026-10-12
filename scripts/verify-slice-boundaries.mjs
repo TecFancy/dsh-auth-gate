@@ -6,8 +6,7 @@
  *
  * Layers:
  *   root      src/index.ts, src/launch-token-bridge.ts, src/cli.ts, src/proxy-cli.ts
- *             + their tests + src/integration.*.test.ts and
- *             src/guard-proxy-deny.test.ts
+ *             + their tests and src/guard-proxy-deny.test.ts
  *   gate      src/gate/**        (one slice)
  *   shared    src/shared/**      (one slice, leaf - no upward deps)
  *   session   src/session/**      (core mechanism layer like gate/)
@@ -19,8 +18,8 @@
  *
  * Rules:
  *   1. A cross-slice import may only land on the target slice's index.ts
- *      barrel (src/index.ts and the integration tests are assembly roots and
- *      must enter every slice through its barrel).
+ *      barrel (src/index.ts is the assembly root and must enter every slice
+ *      through its barrel).
  *   2. Slices inside features/ may never import each other, even through
  *      barrels (token/password/proxy are independent feature surfaces).
  *   3. shared/ is a leaf: nothing may import it without going through its
@@ -54,24 +53,6 @@ const ROOT_FILES = new Set([
   "proxy-cli.ts",
   "proxy-cli.entry.test.ts",
   "proxy-cli.test.ts",
-  "integration.auth.test.ts",
-  "integration.guard.test.ts",
-  "integration.password.test.ts",
-  "integration.password-change.test.ts",
-  "integration.password-change.totp.test.ts",
-  "integration.p11-pins.test.ts",
-  "integration.p2-admin.test.ts",
-  "integration.p2-admin-hardening.test.ts",
-  "integration.p2-restricted.test.ts",
-  "integration.password.rate.test.ts",
-  "integration.revoke.test.ts",
-  "integration.session.test.ts",
-  "integration.totp.test.ts",
-  "integration.totp-hardening.test.ts",
-  "integration-totp-helpers.ts",
-  "integration-p2-helpers.ts",
-  "integration-password-change-helpers.ts",
-  "integration-auth-helpers.ts",
   "guard-proxy-deny.test.ts",
 ]);
 const errors = [];

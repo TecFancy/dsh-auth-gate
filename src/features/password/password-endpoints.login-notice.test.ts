@@ -6,14 +6,14 @@
  * `integration.password-change.test.ts` 覆盖。
  */
 import { describe, expect, it } from "vitest";
-import type { FakeRes } from "./password-endpoints-login-harness.js";
+import type { FakeRes } from "../../../test/password-login-harness.js";
 import {
   handlerOf,
   loginGetReq,
   loginReq,
   makeHarness,
   makeRes,
-} from "./password-endpoints-login-harness.js";
+} from "../../../test/password-login-harness.js";
 import { registerPasswordEndpoints } from "./password-endpoints.js";
 
 const NOTICE = "Your password was changed. Sign in with your new password.";

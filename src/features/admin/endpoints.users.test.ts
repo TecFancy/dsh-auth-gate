@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { compareNames } from "../../shared/index.js";
 import type { UserRecord } from "../../shared/index.js";
 import { handleUsers } from "./endpoints.js";
-import { jsonBody, makeHarness, makeReq, makeRes, type Harness } from "./test-harness.js";
+import {
+  jsonBody,
+  makeHarness,
+  makeReq,
+  makeRes,
+  type Harness,
+} from "../../../test/admin-harness.js";
 
 async function get(
   harness: Harness,

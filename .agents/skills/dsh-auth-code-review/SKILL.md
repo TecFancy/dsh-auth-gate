@@ -30,7 +30,7 @@ required behavior over style; one substantiated blocker beats a list of nits.
    what this wrap installed: it never restores a snapshot over route tables other plugins own
    (post-wrap routes must survive, disposed routes must not come back; decisions D27).
 4. **Real entry path.** Integration tests mount the real cordis/webserver/storage stack
-   (`src/integration.*.test.ts`). Hand-mounted fakes cannot catch a silent mount-point failure —
+   (`test/integration/integration.*.test.ts`). Hand-mounted fakes cannot catch a silent mount-point failure -
    and silent failure means an unguarded deployment (plan §7).
 5. **Enforcement.** Follow every denial path to the operation that enforces it: 302 vs 401
    selection, upgrade rejection before ws negotiation, no-store headers. Exercise alternate

@@ -7,7 +7,7 @@ import {
   makeRes,
   type Harness,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 const NEW_PASSWORD = "NewPassw0rd!XY";
 const BODY = form({ target: "alice", password: NEW_PASSWORD });

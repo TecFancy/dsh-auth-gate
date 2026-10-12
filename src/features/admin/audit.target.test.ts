@@ -9,7 +9,7 @@ import {
   type FakeRes,
   type Harness,
   type ReqOptions,
-} from "./test-harness.js";
+} from "../../../test/admin-harness.js";
 
 /**
  * grok #4 子项：审计 `target` 的控制符剥离。

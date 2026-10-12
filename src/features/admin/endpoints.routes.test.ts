@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { makeAdminRoutes } from "./endpoints.js";
-import { form, makeHarness, makeReq, makeRes, type Harness } from "./test-harness.js";
+import { form, makeHarness, makeReq, makeRes, type Harness } from "../../../test/admin-harness.js";
 
 const NEW_PASSWORD = "NewPassw0rd!XY";
 const SAME_ORIGIN = { secFetchSite: "same-origin" };

@@ -14,7 +14,7 @@ Vitest。所有环节都收敛到一条命令。
 | Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                          |
 | Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                           |
 | Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                                          |
-| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                                       |
+| Build（构建）              | `npm run build` (先清空 `lib/`，再 tsc 输出 + client bundle；LF 换行，declarations + source maps)                                                                                                                              |
 | Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                                              |
 | Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
 | Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                                   |
@@ -86,10 +86,12 @@ src/
 │   ├── skill-install.ts # dsh-auth skill install（M3 新增）
 │   └── users-file.ts   # users.yaml 加载/校验/原子写 + 独立锁内 RMW/CAS/.bak（D23 加固）
 ├── client/            # client 半边（与 host 互不 import）
-├── *.test.ts          # 单元测试（与源码同居；integration 测试留在根）
-└── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试
+└── *.test.ts          # 单元测试（与源码同居）
 
-test/               # src 外共享测试 harness（vitest 不自动收集、不编译进 lib、不进 coverage）
+test/               # src 外的测试代码（不编译进 lib、不进 coverage）
+├── integration/    #   integration.*.test.ts：真实 cordis/webserver/storage 栈集成测试
+│                   #   + integration-*-helpers.ts 其专用 helper（只经各 slice barrel 引 src）
+└── *-harness.ts    #   单元测试共享 harness（非 .test.ts，vitest 不自动收集）
 lib/                # build output — COMMITTED (see below), never hand-edited
 ```
 
@@ -98,7 +100,8 @@ client/host 隔离、无法解析即失败）；增删切片请同步本结构�
 
 ## 已提交的构建产物
 
-`lib/` 由 `tsc -p tsconfig.build.json` 生成，且**提交入库**、绝不手工编辑：
+`lib/` 由 `npm run build` 生成（`scripts/clean-lib.mjs` 先清空，再依次 `tsc -p tsconfig.build.json`、
+`tsdown`、`tsc -p tsconfig.client.build.json`），且**提交入库**、绝不手工编辑，所以它恰好等于构建产物、没有孤儿文件：
 
 - 从 git 安装本包的消费者（`dsh plugin add <git-url>`）拿到的是开箱即用的包，
   服务器上无需任何构建工具链；

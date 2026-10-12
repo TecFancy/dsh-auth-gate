@@ -120,7 +120,7 @@ describe("P2 route table", () => {
     const { deps, routes } = makeDeps();
     registerPasswordEndpoints(deps);
     // 两条管理路由的 405/allow 由 `src/features/admin` 的 handler 决定，这里注入的是桩；
-    // 它们的真值断言在 `src/integration.p2-admin.test.ts`（真 handler、真 HTTP 栈）。
+    // 它们的真值断言在 `test/integration/integration.p2-admin.test.ts`（真 handler、真 HTTP 栈）。
     const cases: [string, string, string][] = [
       ["/auth/login", "PUT", "GET, POST"],
       ["/auth/logout", "GET", "POST"],

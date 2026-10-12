@@ -1,6 +1,6 @@
 import { DUMMY_HASH } from "./password.js";
 import { registerPasswordEndpoints } from "./password-endpoints.js";
-import { handlerOf, loginReq, makeHarness, makeRes } from "./password-endpoints-login-harness.js";
+import { handlerOf, loginReq, makeHarness, makeRes } from "../../../test/password-login-harness.js";
 import { describe, expect, it } from "vitest";
 
 describe("POST /auth/login: success", () => {

@@ -7,7 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PASSWORD_CHANGED_NOTICE } from "./features/password/index.js";
+import { PASSWORD_CHANGED_NOTICE } from "../../src/features/password/index.js";
 
 /** 读仓库内的文件（相对本测试文件）。 */
 function readSource(relative: string): string {
@@ -16,15 +16,15 @@ function readSource(relative: string): string {
 
 describe("integration: P1.1 cross-half pins", () => {
   it("pins the client redirect literal to the server notice key", () => {
-    const clientSource = readSource("./client/account-redirect.ts");
+    const clientSource = readSource("../../src/client/account-redirect.ts");
     expect(clientSource).toContain(`notice=${PASSWORD_CHANGED_NOTICE}`);
     expect(clientSource).toContain("next=%2F");
     expect(clientSource).toContain('LOGIN_REDIRECT_URL = "/auth/login?');
   });
 
   it("keeps the inline icon paths identical to docs/demo/account-security.svg", () => {
-    const iconSource = readSource("./client/account-icon.ts");
-    const svg = readSource("../docs/demo/account-security.svg");
+    const iconSource = readSource("../../src/client/account-icon.ts");
+    const svg = readSource("../../docs/demo/account-security.svg");
     const paths = [...svg.matchAll(/d="([^"]+)"/g)].map((match) => match[1] ?? "");
     expect(paths).toHaveLength(2);
     for (const d of paths) expect(iconSource).toContain(d);

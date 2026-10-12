@@ -76,7 +76,7 @@
     "url": "https://github.com/TecFancy/dsh-auth-gate/issues"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
+    "build": "node scripts/clean-lib.mjs && tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
     "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
