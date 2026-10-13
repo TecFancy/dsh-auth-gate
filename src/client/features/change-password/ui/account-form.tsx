@@ -7,14 +7,17 @@ import {
   type MutableRefObject,
 } from "react";
 import { ACCOUNT_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
-import { ACCOUNT_ICON_PATHS, ACCOUNT_ICON_VIEW_BOX,
+import {
+  ACCOUNT_ICON_PATHS,
+  ACCOUNT_ICON_VIEW_BOX,
   BUTTON_BUSY_STYLE,
   BUTTON_STYLE,
   FORM_STYLE,
   HINT_STYLE,
   PANEL_STYLE,
   SUCCESS_TEXT_STYLE,
-  TITLE_ROW_STYLE } from "../../../shared/ui/index.ts";
+  TITLE_ROW_STYLE,
+} from "../../../shared/ui/index.ts";
 import { redirectToLogin } from "../lib/account-redirect.ts";
 import { ACCOUNT_STATUS_ID, PasswordFields, StatusLine } from "./account-fields.tsx";
 import {

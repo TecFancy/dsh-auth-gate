@@ -1,5 +1,9 @@
 import { useEffect, useState } from "react";
-import { fetchAdminUsers, AdminResetForm , ADMIN_STATUS_ID  } from "../../../features/admin-users/index.ts";
+import {
+  fetchAdminUsers,
+  AdminResetForm,
+  ADMIN_STATUS_ID,
+} from "../../../features/admin-users/index.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "../../../features/admin-users/index.ts";
 import type { AdminUserRow } from "../../../entities/account/index.ts";
 import {

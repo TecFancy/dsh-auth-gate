@@ -4,7 +4,7 @@ import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_DICT_ZH, formatCopy } from "../../../shared/i18n/index.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
-import { ADMIN_DICT_ZH, ADMIN_KEYS, AdminResetForm  } from "../../../features/admin-users/index.ts";
+import { ADMIN_DICT_ZH, ADMIN_KEYS, AdminResetForm } from "../../../features/admin-users/index.ts";
 import type { AdminUserRow } from "../../../entities/account/index.ts";
 
 /**
