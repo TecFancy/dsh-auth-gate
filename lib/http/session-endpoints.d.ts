@@ -1,0 +1,43 @@
+import type { IncomingMessage, ServerResponse } from "node:http";
+import { type UsersLoadResult } from "../shared/index.js";
+import { type SessionStore } from "../session/index.js";
+/**
+ * token 与 password 两个认证面共用的端点件的会话半边（核心机制层 http/，与 gate、session 并列）。
+ *
+ * D29 拆分：logout / status 依赖 `SessionStore`、`buildSetCookie`、`Session` 与 `UsersLoadResult`，
+ * D29 落地后归入 `entities/session`；与会话无关的纯 HTTP 小件在 `endpoints.ts`（归 `shared/http`）。
+ *
+ * 两个认证面的 deps 结构上都满足 `AuthHttpDeps`：这里只声明本模块真实需要的字段，
+ * 不依赖任何一方的完整 deps 形状，也不 import 任何 features/ slice。
+ */
+export interface AuthHttpDeps {
+    /** 会话访问器（M16：domain 异步就绪，端点内每次现取；undefined = 会话通道不可用）。 */
+    readonly sessions: () => SessionStore | undefined;
+    readonly cookieName: string;
+    readonly cookieSecure: boolean;
+    /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
+    readonly logoutOrder: number;
+    /**
+     * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
+     * 缺省 = 保持两字段形状（加法兼容，token 模式的响应形状一字不变）。
+     */
+    readonly loadUsers?: (() => Promise<UsersLoadResult>) | undefined;
+    readonly logger: {
+        info(message: unknown): void;
+        error?(message: unknown): void;
+    };
+}
+/** POST /auth/logout 路由入口：非 POST 405，其余交给 logout。 */
+export declare function handleLogout(deps: AuthHttpDeps, req: IncomingMessage, res: ServerResponse): void | Promise<void>;
+/**
+ * GET /auth/status：只认 cookie（M5，Bearer 不参与）。
+ *
+ * P2 起在 password 模式追加「关于我」字段（§1）：`name`/`role`/`disabled`/`totpEnabled`/
+ * `mustChangePassword`/`sessionKind`。三条硬边界：
+ * 1. **只含关于我**：绝不出现他人的任何记录（面板身份判断只依赖这些字段）。
+ * 2. **键集合相等**：未认证 / subject 已不在 users.yaml / users 不可读 -> 只有既有两字段，
+ *    不出现 `role: null` 之类的占位（不泄漏用户是否存在）。
+ * 3. 授权判定不读这里：管理端点每请求现读 users.yaml，禁止信 status 或会话快照。
+ */
+export declare function handleStatus(deps: AuthHttpDeps, req: IncomingMessage, res: ServerResponse): void | Promise<void>;
+//# sourceMappingURL=session-endpoints.d.ts.map

@@ -250,7 +250,7 @@ async function scenarioPathShapes(stack: P2Stack): Promise<void> {
 
 /**
  * 第二个 Location 出口（grok 实现期复审 G3）：`POST /auth/logout?next=` 把 `next`
- * 直接写进 Location（`src/http/endpoints.ts` 的 logout），同一消毒判定必须同时覆盖它。
+ * 直接写进 Location（`src/http/session-endpoints.ts` 的 logout），同一消毒判定必须同时覆盖它。
  */
 async function scenarioLogoutLocation(stack: P2Stack): Promise<void> {
   const cookie = await restrictedVictim(stack);

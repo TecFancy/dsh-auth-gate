@@ -50,7 +50,8 @@ src/
 │   └── session-store.ts  # storage-domain 会话持久化
 ├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
 │   ├── index.ts       #   barrel：跨 slice 唯一入口
-│   └── endpoints.ts   #   404 兜底 / logout / status / methodNotAllowed / queryOf（token+password 共用）
+│   ├── endpoints.ts   #   纯 HTTP 半边：404 兜底 / methodNotAllowed / queryOf（D29 后归 shared/http）
+│   └── session-endpoints.ts #   会话半边：logout / status + AuthHttpDeps（token+password 共用，D29 后归 entities/session）
 ├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
 │   ├── token/
 │   │   ├── index.ts
@@ -79,6 +80,7 @@ src/
 │   ├── index.ts
 │   ├── auth-common.ts  # 端点共享纯函数（validateNext，M3 提取）
 │   ├── cookie.ts       # Cookie 头解析
+│   ├── dsh-home.ts     # DSH_HOME 解析（dshHomeDir，users-file 与 skill-install 共用，D29 前置拆分）
 │   ├── form-body.ts    # urlencoded body 读取
 │   ├── login-page.ts   # 自包含登录页（token + password + TOTP 挑战三版）
 │   ├── password-policy.ts # 新口令策略：≥14 位 + 四类字符 + ≠旧口令 + maxLength（D23 新增）

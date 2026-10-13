@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { parse as parseYaml, stringify } from "yaml";
 import { z } from "zod";
+import { dshHomeDir } from "./dsh-home.js";
 
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
@@ -51,11 +52,6 @@ const usersFileSchema = z
     users: z.record(z.string(), userRecordSchema),
   })
   .strict();
-
-/** P6：DSH_HOME env → `~/.dsh` 兜底。CLI 与插件共享。 */
-export function dshHomeDir(): string {
-  return process.env["DSH_HOME"] ?? path.join(os.homedir(), ".dsh");
-}
 
 /** P6：DSH_HOME env → `~/.dsh` 兜底，拼 `auth/users.yaml`。CLI 与插件共享。 */
 export function defaultUsersFilePath(): string {

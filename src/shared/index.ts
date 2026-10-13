@@ -34,6 +34,7 @@ export type {
   PasswordPolicyResult,
   PasswordRule,
 } from "./password-policy.js";
+export { dshHomeDir } from "./dsh-home.js";
 export { checkRequestOrigin } from "./origin.js";
 export type { OriginCheckRequest, OriginFailure, OriginVerdict } from "./origin.js";
 export { LoginRateLimiter } from "./rate-limit.js";
@@ -43,7 +44,6 @@ export type { InstallSkillOptions, InstallSkillResult } from "./skill-install.js
 export {
   compareNames,
   defaultUsersFilePath,
-  dshHomeDir,
   loadUsersFile,
   mutateUsersFile,
   USERNAME_RE,
