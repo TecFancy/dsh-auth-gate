@@ -55,6 +55,7 @@ const ROOT_FILES = new Set([
   "proxy-cli.entry.test.ts",
   "proxy-cli.test.ts",
   "integration.auth.test.ts",
+  "integration.cross-site.test.ts",
   "integration.guard.test.ts",
   "integration.password.test.ts",
   "integration.password-change.test.ts",
