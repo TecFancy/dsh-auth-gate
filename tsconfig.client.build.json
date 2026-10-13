@@ -10,5 +10,5 @@
     "outDir": "lib"
   },
   "include": ["src/client"],
-  "exclude": ["src/client/**/*.test.tsx"]
+  "exclude": ["src/client/**/*.test.ts", "src/client/**/*.test.tsx"]
 }
