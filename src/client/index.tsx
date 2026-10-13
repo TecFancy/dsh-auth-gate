@@ -1,9 +1,9 @@
-import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
-import { installAccountNavIcon } from "./account-nav-icon.ts";
-import { SettingsAccountSection } from "./account-section.tsx";
-import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./admin-copy.ts";
-import type { AuthContext } from "./context.ts";
-import { SettingsLogoutAction } from "./logout-action.tsx";
+import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./shared/i18n/index.ts";
+import { installAccountNavIcon } from "./features/nav-icon/index.ts";
+import { SettingsAccountSection } from "./widgets/account-section/index.ts";
+import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./features/admin-users/index.ts";
+import type { AuthContext } from "./shared/api/index.ts";
+import { SettingsLogoutAction } from "./features/logout/index.ts";
 
 /** 本插件文案的词典命名域（locale 服务按 (ns, locale) 分开注册）。 */
 const AUTH_NS = "auth";

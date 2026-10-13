@@ -3,7 +3,8 @@
  * Verifies the few source-tree boundaries that Steiger cannot see (D29). Everything
  * Feature-Sliced Design itself prescribes (layer order, same-layer isolation, public API
  * entry through `index.ts`, `@x` cross-imports, naming) is Steiger's job: `npm run lint:fsd`
- * runs it over `src/host`. This script only keeps what lies outside the analysed trees:
+ * runs it over `src/host` and over `src/client`. This script only keeps what lies outside the
+ * analysed trees:
  *
  *   1. Half isolation. `src/client/**` and the host half (`src/host/**` plus the root files
  *      directly under `src/`) never import each other, in either direction.
@@ -14,8 +15,10 @@
  *      unknown shape must never pass the gate silently. Imports that resolve outside `src/`
  *      (the shared `test/` harness) are leaves and are allowed.
  *   4. No stray files. Every `.ts`/`.tsx` file under `src/` is a root file, lies under
- *      `src/host/{shared,entities,features}/`, or lies under `src/client/`; anything else
- *      (for example a leftover `src/gate/` or a file directly in `src/host/`) fails.
+ *      `src/host/{shared,entities,features}/`, is `src/client/index.tsx` or
+ *      `src/client/index.test.tsx` (the only direct children of `src/client/`), or lies under
+ *      `src/client/{shared,entities,features,widgets,pages}/`; anything else (for example a
+ *      leftover `src/gate/`, a file directly in `src/host/`, or a flat `src/client/foo.ts`) fails.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
 import { join, dirname, relative, sep } from "node:path";
@@ -25,6 +28,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_DIR = join(ROOT, "src");
 const CODE_EXT = /\.(ts|tsx)$/;
 const HOST_LAYERS = /^host\/(shared|entities|features)\//;
+/** Client layout: the entry and its test directly, everything else under an FSD layer. */
+const CLIENT_ENTRY = /^client\/index(?:\.test)?\.tsx$/;
+const CLIENT_LAYERS = /^client\/(shared|entities|features|widgets|pages)\//;
 /** The only host files a root file may import: a slice or a shared-segment barrel. */
 const HOST_BARREL = /^host\/(?:(?:entities|features)\/[^/]+|shared\/[^/]+)\/index\.ts$/;
 /** `from "./x"`, bare `import "./x"`, `import("./x")` and `vi.mock("./x")` specifiers. */
@@ -48,7 +54,7 @@ function collectFiles(dir, out = []) {
 /** Which tree a src-relative path belongs to, or null for a stray file. */
 function zoneOf(rel) {
   if (!rel.includes("/")) return "root";
-  if (rel.startsWith("client/")) return "client";
+  if (CLIENT_ENTRY.test(rel) || CLIENT_LAYERS.test(rel)) return "client";
   if (HOST_LAYERS.test(rel)) return "host";
   return null;
 }
@@ -75,7 +81,7 @@ for (const file of collectFiles(SRC_DIR)) {
   const fromZone = zoneOf(rel);
   if (fromZone === null) {
     errors.push(
-      `${rel}: 不在允许的位置（只能是 src/ 根文件、src/host/{shared,entities,features}/ 或 src/client/）`,
+      `${rel}: 不在允许的位置（只能是 src/ 根文件、src/host/{shared,entities,features}/、src/client/index(.test).tsx 或 src/client/{shared,entities,features,widgets,pages}/）`,
     );
     continue;
   }

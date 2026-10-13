@@ -10,7 +10,7 @@ Vitest。所有环节都收敛到一条命令。
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                                   |
 | Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                                               |
-| FSD layering（FSD 分层）   | `npm run lint:fsd` (Steiger 分析 `src/host`；层级顺序、同层隔离、公共 API、命名)                                                                                                                                                         |
+| FSD layering（FSD 分层）   | `npm run lint:fsd` (Steiger 分析 `src/host` 与 `src/client`；层级顺序、同层隔离、公共 API、命名)                                                                                                                                         |
 | Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                                                |
 | Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                    |
 | Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                                     |
@@ -35,7 +35,8 @@ Vitest。所有环节都收敛到一条命令。
 
 Feature-Sliced Design 分层布局（D29，见 [`docs/decisions.md`](./decisions.md)）。host 半边在
 `src/host/` 下只用 FSD 六层中的下三层；入口与装配留在 `src/` 根，位于被分析的目录树之外。
-client 半边在自己的重构步骤完成前仍是平铺结构（此前遵循 D5）。
+client 半边在 `src/client/` 下按需使用五层中的若干层（没有 `app`：插件不拥有应用外壳），`index.tsx`
+留在它的树根。
 
 ```
 src/
@@ -68,7 +69,21 @@ src/
 │       ├── totp/          #       lib/ RFC 6238；model/ 防重放；cli/ enable、disable 子命令
 │       ├── admin/         #       api/ 端点与响应；model/ 审计、重置步骤、用户列表、deps
 │       └── proxy/         #       model/ 本地反向代理与头过滤
-└── client/                # client 半边：暂时平铺，不 import host 半边
+└── client/                # client 半边：FSD 五层，由 Steiger 分析，不 import host 半边
+    ├── index.tsx                 # bundle 入口（tsdown）与宿主槽位接线；分析树的根
+    ├── shared/                   # 只有 segment，各带自己的 index.ts
+    │   ├── api/                  # `AuthContext`：宿主槽位上下文的本地镜像（仅类型）
+    │   ├── i18n/                 # 账号文案：键、中英词典、translate 辅助
+    │   └── ui/                   # 共用内联样式与账号图标路径
+    ├── entities/
+    │   └── account/              # model/ 账号与管理视图类型；api/ `useAccountStatus`
+    ├── features/                 # slice 之间互不 import；跨 slice 只走 index.ts
+    │   ├── change-password/      # ui/ 表单与字段；model/ 校验与提交；lib/ 改密后跳转
+    │   ├── admin-users/          # api/ 列表与重置请求；lib/ 文案与失败映射；ui/ 表单
+    │   ├── logout/               # ui/ 退出设置动作
+    │   └── nav-icon/             # ui/ 设置导航图标垫片（DOM）
+    └── widgets/
+        └── account-section/      # ui/「账号安全」设置段；组合改密与用户管理
 ```
 
 单元测试与源文件同居，放在同一个 segment 里。
@@ -81,11 +96,12 @@ test/               # src 外的测试代码（不编译进 lib、不进 coverag
 lib/                # build output（host 在 lib/host/ 下）- 已提交入库（见下），绝不手工编辑
 ```
 
-分层由两道门禁强制。`npm run lint:fsd` 用 Steiger 分析 `src/host`（层级顺序、同层隔离、经
+分层由两道门禁强制。`npm run lint:fsd` 对两个半边各跑一遍 Steiger，分别分析 `src/host` 与 `src/client`（层级顺序、同层隔离、经
 `index.ts` 的公共 API、`@x` 跨引、命名）。`npm run slice:check` 只保留 Steiger 看不到的部分：
 client 与 host 两个半边互不 import，根文件进入 `src/host` 只能经 slice 或 segment 的
 `index.ts`，无法解析的相对 import 即失败，`src/` 下每个文件都必须是根文件、位于
-`src/host/{shared,entities,features}/` 或位于 `src/client/`。增删 slice 请同步本结构图。
+`src/host/{shared,entities,features}/`、是 `src/client/index.tsx` 或 `src/client/index.test.tsx`，
+或位于 `src/client/{shared,entities,features,widgets,pages}/`。增删 slice 请同步本结构图。
 
 ## 已提交的构建产物
 

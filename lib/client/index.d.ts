@@ -1,4 +1,4 @@
-import type { AuthContext } from "./context.ts";
+import type { AuthContext } from "./shared/api/index.ts";
 /**
  * dsh-auth-gate client 半边：认证后在**设置面板**（设置 → 通用设置 页底部）挂一
  * 个醒目的「退出登录 / Sign out」按钮：`settings.general.item`（root 作用域、

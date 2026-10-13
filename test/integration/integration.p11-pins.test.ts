@@ -16,14 +16,16 @@ function readSource(relative: string): string {
 
 describe("integration: P1.1 cross-half pins", () => {
   it("pins the client redirect literal to the server notice key", () => {
-    const clientSource = readSource("../../src/client/account-redirect.ts");
+    const clientSource = readSource(
+      "../../src/client/features/change-password/lib/account-redirect.ts",
+    );
     expect(clientSource).toContain(`notice=${PASSWORD_CHANGED_NOTICE}`);
     expect(clientSource).toContain("next=%2F");
     expect(clientSource).toContain('LOGIN_REDIRECT_URL = "/auth/login?');
   });
 
   it("keeps the inline icon paths identical to docs/demo/account-security.svg", () => {
-    const iconSource = readSource("../../src/client/account-icon.ts");
+    const iconSource = readSource("../../src/client/shared/ui/account-icon.ts");
     const svg = readSource("../../docs/demo/account-security.svg");
     const paths = [...svg.matchAll(/d="([^"]+)"/g)].map((match) => match[1] ?? "");
     expect(paths).toHaveLength(2);

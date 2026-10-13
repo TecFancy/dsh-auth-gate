@@ -11,7 +11,7 @@ through one command.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                               |
 | Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                           |
-| FSD layering   | `npm run lint:fsd` (Steiger over `src/host`; layer order, same-layer isolation, public API, naming)                                                                                                                                  |
+| FSD layering   | `npm run lint:fsd` (Steiger over `src/host` and `src/client`; layer order, same-layer isolation, public API, naming)                                                                                                                 |
 | Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                            |
 | Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                |
 | Watch tests    | `npm run test:watch`                                                                                                                                                                                                                 |
@@ -37,8 +37,9 @@ Run tests by name: `npm run test -- -t "guard"`
 
 Feature-Sliced Design layout (D29, see [`docs/decisions.md`](./decisions.md)). The host half
 uses the lower three of FSD's six layers under `src/host/`; the entry points and wiring sit
-at the `src/` root, beside the analysed tree. The client half is still flat until its own
-restructuring step (it follows D5 until then).
+at the `src/` root, beside the analysed tree. The client half uses the layers it needs of the
+five under `src/client/` (no `app`: a plugin owns no application shell), with `index.tsx` at
+the root of its tree.
 
 ```
 src/
@@ -71,7 +72,21 @@ src/
 │       ├── totp/          #       lib/ RFC 6238; model/ replay guard; cli/ enable and disable subcommands
 │       ├── admin/         #       api/ endpoints and responses; model/ audit, reset steps, user list, deps
 │       └── proxy/         #       model/ local reverse proxy and header filtering
-└── client/                # client half: flat for now, never imports the host half
+└── client/                # client half: five FSD layers, analysed by Steiger, never imports the host half
+    ├── index.tsx                 # bundle entry (tsdown) and host slot wiring; root of the analysed tree
+    ├── shared/                   # segments only, each with its own index.ts
+    │   ├── api/                  # `AuthContext`: local mirror of the host slot context (types only)
+    │   ├── i18n/                 # account copy: keys, zh/en dictionaries, translate helpers
+    │   └── ui/                   # shared inline styles and the account icon paths
+    ├── entities/
+    │   └── account/              # model/ account and admin view types; api/ `useAccountStatus`
+    ├── features/                 # slices never import each other; cross-slice goes through index.ts
+    │   ├── change-password/      # ui/ form and fields; model/ validation and submit; lib/ redirect
+    │   ├── admin-users/          # api/ list and reset requests; lib/ copy and failure mapping; ui/ form
+    │   ├── logout/               # ui/ logout settings action
+    │   └── nav-icon/             # ui/ settings-nav icon shim (DOM)
+    └── widgets/
+        └── account-section/      # ui/ the "Account security" section; composes password change and user management
 ```
 
 Unit tests live next to their source file, inside the same segment.
@@ -84,12 +99,13 @@ test/               # test code outside src (not compiled into lib, not in cover
 lib/                # build output (host under lib/host/) - COMMITTED (see below), never hand-edited
 ```
 
-Layering is enforced by two gates. `npm run lint:fsd` runs Steiger over `src/host` (layer
+Layering is enforced by two gates. `npm run lint:fsd` runs Steiger once per half, over `src/host` and over `src/client` (layer
 order, same-layer isolation, public API through `index.ts`, `@x` cross-imports, naming).
 `npm run slice:check` keeps only what Steiger cannot see: the client and host halves never
 import each other, root files enter `src/host` only through a slice or segment `index.ts`,
 unresolvable relative imports fail, and every file under `src/` is a root file, under
-`src/host/{shared,entities,features}/`, or under `src/client/`. Adding or removing a slice
+`src/host/{shared,entities,features}/`, `src/client/index.tsx` or `src/client/index.test.tsx`,
+or under `src/client/{shared,entities,features,widgets,pages}/`. Adding or removing a slice
 means updating this tree.
 
 ## Committed build artifact
