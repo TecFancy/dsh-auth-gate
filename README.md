@@ -378,6 +378,14 @@ Whichever way you call it, the CLI manages the same shared user list
 (`$DSH_HOME/auth/users.yaml`, fallback `~/.dsh/auth/users.yaml`) that the plugin
 reads — the global copy is just a launcher.
 
+### Opening dsh from another site
+
+Cross-site top-level navigations (a link on another site, or `127.0.0.1` to `localhost`) carry the
+`SameSite=Lax` session cookie but not dsh web's own `SameSite=Strict` cookie. For a
+request the gate allows, it answers with a tiny same-origin page that re-navigates to the
+same URL, so the second request carries both cookies. You may see a brief blank flash; no action is
+needed. Without JavaScript, click the `Continue` link.
+
 ## Deployment
 
 - [Reverse-proxy deployment guide](docs/deployed/reverse-proxy.md) — Caddy/nginx

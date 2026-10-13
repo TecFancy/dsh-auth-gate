@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { isSafeRelativeTarget } from "../shared/index.js";
+import { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
 import type { Gate, GateDeny, GuardKind } from "./gate.js";
 
 /** 挂在被包装 handler/方法上的守卫标记（幂等重包装 + 自检共用）。 */
@@ -119,6 +120,7 @@ export function isGuarded(target: (...args: never[]) => unknown): boolean {
 /**
  * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫按 gate 给出的
  * 决策写 302/401/403，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
+ * allow 但属跨站顶层文档导航时不进原 handler，改回同源弹回页（见 `serveCrossSiteBounce`）。
  */
 export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler): HttpHandler {
   if (isGuarded(handler)) return handler;
@@ -128,6 +130,10 @@ export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandle
     if (decision === "allow") {
       if (isProxyDeniedRequest(req, pathname)) {
         denyForbidden(res);
+        return;
+      }
+      if (isCrossSiteDocumentNavigation(req)) {
+        serveCrossSiteBounce(res);
         return;
       }
       await handler(req, res);

@@ -400,3 +400,15 @@ dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实�
 本记录 2026-10-07 落笔时编号为 D27；2026-10-11 合并 0.17.1 时与守卫回滚那条撞号，顺延为 D28。
 → [zh](decisions/implemented/2026-10-07-host-corridor-floor.zh.md) ·
 [en](decisions/implemented/2026-10-07-host-corridor-floor.en.md)
+
+## D29. 跨站顶层导航先回一张同源弹回页
+
+gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site: cross-site` + `Sec-Fetch-Dest: document`）时，
+`guardHttp` 不进原 handler，回一张静态页（唯一脚本 `location.replace(location.href)`，CSP 钉脚本 sha256，
+`no-store` + `no-referrer`），由同源文档重新导航，让 dsh 的 `SameSite=Strict` cookie 随第二次请求送出。
+**替代方案**：外层 cookie 也改 Strict（每次跨站进入都被踢去登录）；插件改写内层 cookie（耦合宿主内部）；302/303 回同一 URL
+（跨站发起者不变）；把 URL 插值进页面（多一个反射面）。
+**为什么**：外层 Lax、内层 Strict，跨站导航只带前者，dsh 回 401，F5 沿用跨站上下文修不好；
+同源文档发起的导航才算同站，且重试的 `Sec-Fetch-Site` 是 `same-origin`，构造上不循环。
+→ [zh](decisions/implemented/2026-10-13-cross-site-navigation-bounce.zh.md) ·
+[en](decisions/implemented/2026-10-13-cross-site-navigation-bounce.en.md)
