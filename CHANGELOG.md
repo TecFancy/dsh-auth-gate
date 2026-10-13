@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.3](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.2...v0.17.3) (2026-10-13)
+
+
+### Bug Fixes
+
+* **gate:** bounce cross-site navigations so dsh's Strict cookie is sent ([#111](https://github.com/TecFancy/dsh-auth-gate/issues/111)) ([ea84e6b](https://github.com/TecFancy/dsh-auth-gate/commit/ea84e6bcfbef8d1eeeebf3f761b7690a0e299045))
+
 ## [0.17.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.1...v0.17.2) (2026-10-11)
 
 
