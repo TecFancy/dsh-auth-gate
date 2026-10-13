@@ -8,14 +8,15 @@
 - **host 半边收进 `src/host/`，只用下面三层**：`shared`、`entities`、`features`。没有 `widgets`、
   `pages`、`app`：host 不组合界面，插件也不拥有自己的外壳。现在的 `gate/`、`session/`、`http/`、
   `features/*`、`shared/` 按下表重新落位。
-- **client 半边在 `src/client/` 里用五层**：`shared`、`entities`、`features`、`widgets`、`pages` 中
-  用得上的几层，没有 `app` 层，`index.tsx` 留在分析树的根上。
+- **client 半边在 `src/client/` 里最多用五层**：`shared`、`entities`、`features`、`widgets`、`pages` 中
+  用得上的几层，没有 `app` 层，`index.tsx` 留在分析树的根上。实际用了 `shared`、`entities`、`features`、
+  `widgets`，没有 `pages`。
 - **入口与装配留在 `src/` 根，在分析树之外**：`index.ts`、`cli.ts`、`proxy-cli.ts`（`package.json`
   的 `main`、`bin` 指向它们的产物，位置不动），以及 `admin-wiring.ts`、`token-resolver.ts`、
   `launch-token-bridge.ts`、`cli-skill.ts`。D9 定下的「TOTP 能力经根装配注入 password」照旧在这里发生。
 - **integration 测试与 helper 搬出 `src/`**，进 `test/integration/`。
 
-本记录落地后取代 D5（src 分层 + 跨 slice 只走 barrel）与 D11（http 层）的目录部分；
+本记录取代 D5（src 分层 + 跨 slice 只走 barrel）与 D11（http 层）的目录部分，二者已归档；
 「跨切片只走 `index.ts`」「feature 同层互禁」「client 与 host 互不导入」三条纪律保留，改由 Steiger
 与缩小后的 `slice:check` 执行。
 
@@ -42,19 +43,34 @@
 
 ### client 落位
 
-| 层         | 切片                       | 来自                                                                     |
-| ---------- | -------------------------- | ------------------------------------------------------------------------ |
-| `shared`   | `api`、`i18n`、`ui` 等分段 | `context.ts`、`account-copy.ts`、`account-styles.ts`、`account-icon.ts`  |
-| `entities` | `account`                  | `admin-types.ts`、`account-status.ts`                                    |
-| `features` | `change-password`          | `account-form`、`account-fields`、`account-submit`、`account-redirect`   |
-|            | `admin-users`              | `admin-api`、`admin-failure`、`admin-copy`、`admin-form`、`admin-fields` |
-|            | `logout`                   | `logout-action`                                                          |
-|            | `nav-icon`                 | `account-nav-icon`                                                       |
-| `widgets`  | `account-section`          | `account-section`、`admin-block`（组合改密与用户管理）                   |
+| 层         | 切片或分段        | 文件                                                                                                  |
+| ---------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
+| `shared`   | `api`             | `context.ts`，宿主槽位上下文的本地镜像（仅类型）                                                      |
+|            | `i18n`            | `account-copy.ts`                                                                                     |
+|            | `ui`              | `account-styles.ts`、`account-icon.ts`                                                                |
+| `entities` | `account`         | `model/` 放 `admin-types.ts`；`api/` 放 `account-status.ts`（它请求 `/auth/status`）                  |
+| `features` | `change-password` | `ui/` 放 `account-form`、`account-fields`；`model/` 放 `account-submit`；`lib/` 放 `account-redirect` |
+|            | `admin-users`     | `api/` 放 `admin-api`；`lib/` 放 `admin-failure`、`admin-copy`；`ui/` 放 `admin-form`、`admin-fields` |
+|            | `logout`          | `ui/logout-action`                                                                                    |
+|            | `nav-icon`        | `ui/account-nav-icon`（一个 DOM 垫片）                                                                |
+| `widgets`  | `account-section` | `ui/` 放 `account-section`、`admin-block`（组合改密与用户管理）以及挂载整个设置段的测试               |
+
+`shared` 只有分段（`api`、`i18n`、`ui`），各带自己的 `index.ts`，层级本身没有 barrel。`context.ts` 放在
+`api`，因为它是 client 与宿主运行时服务（槽位、locale、effect 作用域）之间的边界，这正是 FSD `api`
+分段的含义；放 `lib` 会让人以为是通用工具。没有 `pages` 层（插件只有一个设置段，它是 widget），也没有
+`app` 层。没有任何文件被改名：Steiger 没有强迫任何一处。
+
+单元测试跟着被测模块走。少数测试放在 widget 里，而不是名字暗示的模块旁边，因为分层不允许另一种放法：
+`account-status.test.tsx` 挂载 `SettingsAccountSection` 来测 `useAccountStatus`，而实体不能导入 widget；
+`admin-integration.test.tsx` 与 `admin-review-fixes.test.tsx` 同理，测的是真实的设置段。
+`logout-action.test.tsx` 与 `admin-integration.test.tsx` 从根 `index.tsx` 导入 `apply`，Steiger 不拦。
+用 `vi.mock` 替换模块的测试写的是模块的真实文件而不是 barrel，因为 mock 必须命中生产代码实际解析的
+那个说明符。
 
 现有的两处「横向」依赖（`admin-copy` 读 `account-copy`，`admin-fields` 读 `account-styles`）都指向
 下沉到 `shared` 的文件，不构成 feature 互引。`src/client/index.tsx` 的位置不变，`exports["./client"]`
-的类型路径 `lib/client/index.d.ts` 因此不受影响。
+的类型路径 `lib/client/index.d.ts` 因此不受影响。唯一按路径读 client 源文件的跨半边钉子测试
+（`test/integration/integration.p11-pins.test.ts`）随新路径更新。
 
 ## 背景
 
@@ -107,7 +123,7 @@ host 半边的依赖图本身是干净的：feature 之间零互引，`slice:che
 
 ## 实施顺序
 
-参照 lingualab 的三步法，每一步都让 `npm run verify` 保持通过，`git diff -M` 只见 rename 与导入行：
+参照 lingualab 的三步法（实际分四步，均已落地），每一步都让 `npm run verify` 保持通过，`git diff -M` 只见 rename 与导入行：
 
 1. **清理**：`build` 前清空 `lib/`（全部产物都由构建生成），删掉已跟踪的孤儿；integration 测试与
    helper 搬进 `test/integration/`，vitest 的 `include` 加上这一项。
@@ -118,19 +134,23 @@ host 半边的依赖图本身是干净的：feature 之间零互引，`slice:che
    `src/host/`，写 barrel 与 `@x`，`lint:fsd` 接入，`slice:check` 缩成 Steiger 看不到的部分：
    两个半边互不导入、根文件进入 `src/host` 只能经 barrel、导入无法解析即失败、不许有游离文件；更新
    `docs/specs/development.md` 结构图、`AGENTS.md`、随包技能和凡是画了 `src/` 结构的现行文档；重建 `lib/`。
-   本步不动 client 半边。
-4. **client 搬家**：五层落位，`lint:fsd` 跑第二遍 `src/client`。
+   本步没有动 client 半边。
+4. **client 搬家**：按上面的落位表放好，`lint:fsd` 跑第二遍 `src/client`（`steiger src/host && steiger
+src/client`）。`slice:check` 的「不许有游离文件」现在也要求每个 client 文件要么是 `src/client/index.tsx`、
+   `src/client/index.test.tsx`，要么位于 `src/client/{shared,entities,features,widgets,pages}/` 之下。
 
-第 4 步完成时：本记录移进 `implemented/` 并在 `docs/decisions.md` 登记为 D29；D5 与 D11
-移进 `archived/` 并登记哈希。这些收尾放在第 4 步而不是第 3 步，是因为在那之前 client 半边仍遵循 D5，
-D5 与 D11 对它依然有效。已实施记录与 `docs/implemented/`、`docs/handoff/` 里引用的旧路径不改：
-它们记录的是写下时的代码。
+第 4 步完成后，本记录已实施，并在 `docs/decisions.md` 登记为 D29；D5 与 D11 已归档（哈希已登记）。
+这些收尾放在第 4 步而不是第 3 步，是因为在那之前 client 半边仍遵循 D5，D5 与 D11 对它依然有效。已实施
+记录与 `docs/implemented/`、`docs/handoff/` 里引用的旧路径不改：它们记录的是写下时的代码。
+`docs/specs/src-refactor-plan*`（D5 的执行方案）加了一条「历史文档」说明。
 
 ## 待定
 
 - host 命名（第 3 步已定）：Steiger 的 `ambiguous-slice-names`、`inconsistent-naming` 对 host 目录树
-  没有触发，所以没有任何文件夹或文件被迫改名（无）。client 命名仍待定：lingualab 被逼改了两个名字，
-  client 搬家时也可能遇到，第 4 步定，定了写回本记录。
+  没有触发，所以没有任何文件夹或文件被迫改名（无）。client 命名（第 4 步已定）：lingualab 被逼改了两个名字，但这里 Steiger 对 client
+  目录树同样没有报任何问题，所以没有文件夹或文件被改名（无）。注意 `steiger.config.js` 里
+  `fsd/repetitive-naming` 本就是有意关掉的（`account-`、`admin-` 前缀刻意保留），这条规则也就不可能逼出改名。
+- `context.ts` 的去向（第 4 步）：`shared/api`，不是 `shared/lib`；理由见「client 落位」。
 - `login-notice.ts` 的去向（第 3 步）：它只有一组提示白名单常量加一个纯解析函数，不渲染任何标记，
   所以放进 `features/password/model/`；`api` 段与 `ui` 段（改密页）都从那里引用。
 - `features/password` 是否再拆成 `login`、`password-change`、`restricted` 几个 feature：它们共用会话签发，

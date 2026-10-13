@@ -1,6 +1,7 @@
 # dsh-auth-gate src directory refactor plan (following the framework layering convention)
 
 > Status: **implemented (2026-08-30)** — `verify` self-check fully green, cross-validation with the framework passed; pending review, then commit / open PR
+> Historical (2026-10-13): superseded by D29 (Feature-Sliced Design, see [`docs/decisions.md`](../decisions.md)). The paths in this plan reflect the pre-D29 tree (`gate/`, `session/`, `http/`, a flat `client/`) and no longer exist; the current layout is in [`development.md`](./development.md) "Structure".
 > Note (2026-09-13): the inventory in §1 is the **pre-refactor snapshot** (52 files / 8202 lines, 3 client files; `src/` is now 86 files / 11070 lines with 4 client files). Read those numbers as the record of that change, not as a current baseline.
 > Branch: `development`
 > Nature: **pure structural refactor** — file moves only + mechanical import updates, zero behavior change

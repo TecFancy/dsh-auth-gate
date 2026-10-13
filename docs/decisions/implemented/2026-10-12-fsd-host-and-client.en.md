@@ -9,9 +9,10 @@ aligned to dsh-lingualab (its v0.9.0 host refactor and the earlier client refact
   `features`. There is no `widgets`, `pages` or `app`: the host composes no UI, and the plugin owns
   no shell of its own. Today's `gate/`, `session/`, `http/`, `features/*` and `shared/` are re-homed
   according to the table below.
-- **The client half uses five layers inside `src/client/`**: whichever of `shared`, `entities`,
-  `features`, `widgets`, `pages` are needed, with no `app` layer; `index.tsx` stays at the root of
-  the analyzed tree.
+- **The client half uses up to five layers inside `src/client/`**: whichever of `shared`,
+  `entities`, `features`, `widgets`, `pages` are needed, with no `app` layer; `index.tsx` stays at
+  the root of the analyzed tree. It uses `shared`, `entities`, `features` and `widgets`; no
+  `pages`.
 - **Entry points and assembly stay at the `src/` root, outside the analyzed tree**: `index.ts`,
   `cli.ts`, `proxy-cli.ts` (the `main` and `bin` fields of `package.json` point at their build
   output, so their location does not move), plus `admin-wiring.ts`, `token-resolver.ts`,
@@ -19,8 +20,8 @@ aligned to dsh-lingualab (its v0.9.0 host refactor and the earlier client refact
   injected into password through the root assembly, keeps happening here.
 - **Integration tests and their helpers move out of `src/`** into `test/integration/`.
 
-Once this record lands it supersedes the directory part of D5 (src layering with cross-slice
-imports only through barrels) and of D11 (the http layer). The three disciplines "cross-slice only
+This record supersedes the directory part of D5 (src layering with cross-slice imports only through
+barrels) and of D11 (the http layer); both are archived. The three disciplines "cross-slice only
 through `index.ts`", "no imports between feature slices at the same level" and "client and host
 never import each other" stay, and are now enforced by Steiger and the slimmed-down `slice:check`.
 
@@ -48,20 +49,37 @@ manifest rather than a module (`host-corridor`, `manifest-icon`, `manifest-local
 
 ### Client placement
 
-| Layer      | Slice                                | From                                                                            |
-| ---------- | ------------------------------------ | ------------------------------------------------------------------------------- |
-| `shared`   | segments such as `api`, `i18n`, `ui` | `context.ts`, `account-copy.ts`, `account-styles.ts`, `account-icon.ts`         |
-| `entities` | `account`                            | `admin-types.ts`, `account-status.ts`                                           |
-| `features` | `change-password`                    | `account-form`, `account-fields`, `account-submit`, `account-redirect`          |
-|            | `admin-users`                        | `admin-api`, `admin-failure`, `admin-copy`, `admin-form`, `admin-fields`        |
-|            | `logout`                             | `logout-action`                                                                 |
-|            | `nav-icon`                           | `account-nav-icon`                                                              |
-| `widgets`  | `account-section`                    | `account-section`, `admin-block` (composes password change and user management) |
+| Layer      | Slice or segment  | Files                                                                                                                                  |
+| ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared`   | `api`             | `context.ts`, the local mirror of the host slot context (types only)                                                                   |
+|            | `i18n`            | `account-copy.ts`                                                                                                                      |
+|            | `ui`              | `account-styles.ts`, `account-icon.ts`                                                                                                 |
+| `entities` | `account`         | `model/` holds `admin-types.ts`; `api/` holds `account-status.ts` (it fetches `/auth/status`)                                          |
+| `features` | `change-password` | `ui/` holds `account-form`, `account-fields`; `model/` holds `account-submit`; `lib/` holds `account-redirect`                         |
+|            | `admin-users`     | `api/` holds `admin-api`; `lib/` holds `admin-failure`, `admin-copy`; `ui/` holds `admin-form`, `admin-fields`                         |
+|            | `logout`          | `ui/logout-action`                                                                                                                     |
+|            | `nav-icon`        | `ui/account-nav-icon` (a DOM shim)                                                                                                     |
+| `widgets`  | `account-section` | `ui/` holds `account-section`, `admin-block` (composes password change and user management) and the tests that mount the whole section |
+
+`shared` is segments only (`api`, `i18n`, `ui`), each with its own `index.ts` and no layer-level
+barrel. `context.ts` sits in `api` because it is the boundary to the host's runtime services (slots,
+locale, the effect scope), which is what FSD's `api` segment stands for; `lib` would suggest generic
+helpers. There is no `pages` layer (the plugin has a single settings section, which is a widget) and
+no `app` layer. No file was renamed: Steiger forced none.
+
+Unit tests moved with their subject. A few sit in the widget rather than next to the module their
+name suggests, because the layering forbids the alternative: `account-status.test.tsx` mounts
+`SettingsAccountSection` to exercise `useAccountStatus`, and an entity may not import a widget;
+`admin-integration.test.tsx` and `admin-review-fixes.test.tsx` likewise exercise the real section.
+`logout-action.test.tsx` and `admin-integration.test.tsx` import `apply` from the root `index.tsx`,
+which Steiger does not flag. A test that mocks a module (`vi.mock`) names the module's real file, not
+the barrel, because the mock has to hit the specifier the production code resolves.
 
 The two existing "sideways" dependencies (`admin-copy` reads `account-copy`, `admin-fields` reads
-`account-styles`) both point at files that sink into `shared`, so they are not feature-to-feature
+`account-styles`) both point at files that sank into `shared`, so they are not feature-to-feature
 imports. `src/client/index.tsx` stays where it is, so the type path `lib/client/index.d.ts` behind
-`exports["./client"]` is unaffected.
+`exports["./client"]` is unaffected. The one cross-half pin that reads a client source file by path
+(`test/integration/integration.p11-pins.test.ts`) follows the new paths.
 
 ## Context
 
@@ -134,7 +152,7 @@ Two further holes get fixed along the way:
 
 ## Order of Work
 
-Following lingualab's three-step method, each step keeps `npm run verify` passing, and `git diff -M`
+Following lingualab's three-step method (the work went in four steps, all landed), each step kept `npm run verify` passing, and `git diff -M`
 shows only renames and import lines:
 
 1. **Clean up**: empty `lib/` before `build` (every artifact is produced by the build), and delete
@@ -149,23 +167,29 @@ shows only renames and import lines:
    `slice:check` to what Steiger cannot see: half isolation, barrel-only entry from root files
    into `src/host`, fail-closed import resolution, and the "no stray files" rule; update the
    `docs/specs/development.md` structure diagram, `AGENTS.md`, the bundled skills and every
-   living document that draws the `src/` structure; rebuild `lib/`. The client half is not
+   living document that draws the `src/` structure; rebuild `lib/`. The client half was not
    touched in this step.
-4. **Move the client**: settle it into five layers, and `lint:fsd` runs a second pass over
-   `src/client`.
+4. **Move the client**: settle it into the layers above, and `lint:fsd` runs a second pass over
+   `src/client` (`steiger src/host && steiger src/client`). `slice:check`'s "no stray files" rule
+   now also requires every client file to be `src/client/index.tsx`, `src/client/index.test.tsx`,
+   or under `src/client/{shared,entities,features,widgets,pages}/`.
 
-When step 4 is done: this record moves into `implemented/` and is registered in `docs/decisions.md`
-as D29; D5 and D11 move into `archived/` and their hashes are registered. This bookkeeping waits for
-step 4 rather than step 3 because until then the client half still follows D5, so D5 and D11 remain
-in force for it. Old paths cited by implemented records, `docs/implemented/` and `docs/handoff/` are
-left alone: they record the code as it was when they were written.
+With step 4 done, this record is implemented and registered in `docs/decisions.md` as D29; D5 and
+D11 are archived (their hashes registered). This bookkeeping waited for step 4 rather than step 3
+because until then the client half still followed D5, so D5 and D11 remained in force for it. Old
+paths cited by implemented records, `docs/implemented/` and `docs/handoff/` are left alone: they
+record the code as it was when they were written. `docs/specs/src-refactor-plan*` (the D5
+execution plan) carries a note that it is historical.
 
 ## Open Questions
 
 - Host naming (settled in step 3): Steiger's `ambiguous-slice-names` and `inconsistent-naming`
-  did not fire on the host tree, so no folder or file had to be renamed (none). Client naming is
-  still open: lingualab was forced to rename two names, and the client move may be as well; decide
-  in step 4 and write the outcome back into this record.
+  did not fire on the host tree, so no folder or file had to be renamed (none). Client naming
+  (settled in step 4): lingualab was forced to rename two names, but here Steiger raised nothing
+  on the client tree either, so no folder or file was renamed (none). Note that
+  `fsd/repetitive-naming` is off in `steiger.config.js` by design (the `account-` and `admin-`
+  prefixes stay on purpose), so that rule could not have forced one.
+- Where `context.ts` went (step 4): `shared/api`, not `shared/lib`; see "Client placement".
 - Where `login-notice.ts` went (step 3): it holds the notice whitelist as constants plus a pure
   parser and renders no markup, so it sits in `features/password/model/`; both the `api` segment
   and the `ui` segment (the password-change page) import it from there.

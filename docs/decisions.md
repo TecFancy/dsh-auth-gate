@@ -40,14 +40,17 @@
 → [zh](decisions/implemented/2026-08-30-configurable-logout-order.zh.md) ·
 [en](decisions/implemented/2026-08-30-configurable-logout-order.en.md)（回填自 v0.10.0）
 
-## D5. src 分层 + 跨 slice 只走 barrel
+## D5. src 分层 + 跨 slice 只走 barrel（已归档，被 D29 取代）
 
 `gate/`/`session/` 核心机制层 + `features/{token,password,proxy}` + `shared/` 叶子层，
 跨 slice 唯一 barrel 入口，feature 同层互禁；verify 链新增 slice/bundle/no-emdash/build 门禁。
 **替代方案**：完整 FSD；保持平铺；session 作 feature slice（执行中被边界检查否决，降层）；
 轻量 ADR 制度（被官方实践否决）。**为什么**：层匹配依赖图，机器约束防回潮。
-→ [zh](decisions/implemented/2026-08-30-layered-src-with-barrels.zh.md) ·
-[en](decisions/implemented/2026-08-30-layered-src-with-barrels.en.md)（2026-08-30 实施）
+目录部分已被 D29 取代（`gate/`/`session/`/`http/` 核心机制层改为 FSD 的 `src/host/` 下三层，client 半边也分层）；
+「跨 slice 只走 index.ts」「feature 同层互禁」「client 与 host 互不引用」三条纪律保留，改由 Steiger 与
+`slice:check` 执行。
+→ [zh](decisions/archived/2026-08-30-layered-src-with-barrels.zh.md) ·
+[en](decisions/archived/2026-08-30-layered-src-with-barrels.en.md)（2026-08-30 实施，2026-10-13 归档）
 
 ## D6. TOTP 两段式登录采用无状态挑战 cookie
 
@@ -93,15 +96,17 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 → [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
 
-## D11. 认证 HTTP 端点公共件独立成 http 层
+## D11. 认证 HTTP 端点公共件独立成 http 层（已归档，被 D29 取代）
 
 token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进新核心机制层
 `src/http/`（与 gate、session 并列，经 barrel 引用），`shared` 保持叶子层不变。
 **替代方案**：下沉 `shared`（破坏叶子约束，或得把 cookie 构造当参数注入）；
 塞进 `session`（methodNotAllowed 与会话无关）；保持重复（改一处得记得另一处）。
 **为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
-→ [zh](decisions/implemented/2026-09-13-http-endpoint-layer.zh.md) ·
-[en](decisions/implemented/2026-09-13-http-endpoint-layer.en.md)
+`src/http/` 层已被 D29 取代：与会话无关的件进 `src/host/shared/http`，`handleLogout`/`handleStatus`
+进 `src/host/entities/session/api`。
+→ [zh](decisions/archived/2026-09-13-http-endpoint-layer.zh.md) ·
+[en](decisions/archived/2026-09-13-http-endpoint-layer.en.md)（2026-10-13 归档）
 
 ## D12. 宿主要求声明 + storage-domain 转 peer
 
@@ -400,3 +405,18 @@ dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实�
 本记录 2026-10-07 落笔时编号为 D27；2026-10-11 合并 0.17.1 时与守卫回滚那条撞号，顺延为 D28。
 → [zh](decisions/implemented/2026-10-07-host-corridor-floor.zh.md) ·
 [en](decisions/implemented/2026-10-07-host-corridor-floor.en.md)
+
+## D29. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 分层
+
+两个半边都改用 Feature-Sliced Design 分层并由 Steiger 守护（`npm run lint:fsd` 先后跑 `src/host` 与
+`src/client`）：host 收进 `src/host/{shared,entities,features}`（无 widgets/pages/app，入口与装配留在
+`src/` 根），client 在 `src/client/` 下用 `shared`/`entities`/`features`/`widgets`（`index.tsx` 留在树根，
+无 `pages`、无 `app`），integration 测试搬进 `test/integration/`。`slice:check` 缩成 Steiger 看不到的部分
+（两半边互不导入、根文件只经 index.ts 进 host、导入无法解析即失败、不许有游离文件）。取代 D5 与 D11 的目录部分，
+二者归档。`context.ts` 落在 `shared/api`；client 没有强迫任何改名。
+**替代方案**：保持 D5 只整理测试；只改 client；host 不加 `src/host/` 外壳；host 照搬五层；ESLint
+`no-restricted-paths` 分区代替 Steiger；`handleLogout`/`handleStatus` 留 `shared/http` 靠注入；integration
+测试留在 `src/` 根。**为什么**：与 dsh-lingualab、dsh-plugin-framework 同一套结构，检查换成现成工具，层与依赖图
+重新对齐，并顺带堵住 helper 进包、`lib/` 积累孤儿两个发布漏洞。
+→ [zh](decisions/implemented/2026-10-12-fsd-host-and-client.zh.md) ·
+[en](decisions/implemented/2026-10-12-fsd-host-and-client.en.md)（2026-10-13 实施）
