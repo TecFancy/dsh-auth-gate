@@ -146,22 +146,29 @@ shows only renames and import lines:
    (lingualab uses `.ts` suffixes, so this is a risk unique to this repository; if it does not work,
    fall back to extending the hand-written script, and rewrite this record accordingly). Then
    `git mv` into `src/host/`, write the barrels and `@x`, wire in `lint:fsd`, and shrink
-   `slice:check` to a half-isolation check; update the `docs/specs/development.md` structure
-   diagram, `AGENTS.md`, the bundled skills and every living document that draws the `src/`
-   structure; rebuild `lib/`.
+   `slice:check` to what Steiger cannot see: half isolation, barrel-only entry from root files
+   into `src/host`, fail-closed import resolution, and the "no stray files" rule; update the
+   `docs/specs/development.md` structure diagram, `AGENTS.md`, the bundled skills and every
+   living document that draws the `src/` structure; rebuild `lib/`. The client half is not
+   touched in this step.
 4. **Move the client**: settle it into five layers, and `lint:fsd` runs a second pass over
    `src/client`.
 
-When step 3 is done: this record moves into `implemented/` and is registered in `docs/decisions.md`
-as D29; D5 and D11 move into `archived/` and their hashes are registered. Old paths cited by
-implemented records, `docs/implemented/` and `docs/handoff/` are left alone: they record the code as
-it was when they were written.
+When step 4 is done: this record moves into `implemented/` and is registered in `docs/decisions.md`
+as D29; D5 and D11 move into `archived/` and their hashes are registered. This bookkeeping waits for
+step 4 rather than step 3 because until then the client half still follows D5, so D5 and D11 remain
+in force for it. Old paths cited by implemented records, `docs/implemented/` and `docs/handoff/` are
+left alone: they record the code as it was when they were written.
 
 ## Open Questions
 
-- Steiger's `ambiguous-slice-names` and `inconsistent-naming` may force a name change or two
-  (lingualab was forced to rename two); decide during the move and write the outcome back into this
-  record.
+- Host naming (settled in step 3): Steiger's `ambiguous-slice-names` and `inconsistent-naming`
+  did not fire on the host tree, so no folder or file had to be renamed (none). Client naming is
+  still open: lingualab was forced to rename two names, and the client move may be as well; decide
+  in step 4 and write the outcome back into this record.
+- Where `login-notice.ts` went (step 3): it holds the notice whitelist as constants plus a pure
+  parser and renders no markup, so it sits in `features/password/model/`; both the `api` segment
+  and the `ui` segment (the password-change page) import it from there.
 - Whether to split `features/password` further into `login`, `password-change` and `restricted`
   features: they share session issuance, and splitting would introduce feature-to-feature imports,
   so for now it stays one slice with segments.

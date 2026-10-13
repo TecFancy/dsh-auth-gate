@@ -115,17 +115,23 @@ host 半边的依赖图本身是干净的：feature 之间零互引，`slice:che
    与 logout/status 两份。
 3. **host 搬家**：先用一个分支验证 Steiger 能解析 NodeNext 的 `.js` 导入（lingualab 用的是 `.ts`
    后缀，这是本仓库独有的风险；不行就退回扩写自写脚本，并在本记录里改写）；然后 `git mv` 进
-   `src/host/`，写 barrel 与 `@x`，`lint:fsd` 接入，`slice:check` 缩成半边隔离检查；更新
+   `src/host/`，写 barrel 与 `@x`，`lint:fsd` 接入，`slice:check` 缩成 Steiger 看不到的部分：
+   两个半边互不导入、根文件进入 `src/host` 只能经 barrel、导入无法解析即失败、不许有游离文件；更新
    `docs/specs/development.md` 结构图、`AGENTS.md`、随包技能和凡是画了 `src/` 结构的现行文档；重建 `lib/`。
+   本步不动 client 半边。
 4. **client 搬家**：五层落位，`lint:fsd` 跑第二遍 `src/client`。
 
-第 3 步完成时：本记录移进 `implemented/` 并在 `docs/decisions.md` 登记为 D29；D5 与 D11
-移进 `archived/` 并登记哈希。已实施记录与 `docs/implemented/`、`docs/handoff/` 里引用的旧路径不改：
+第 4 步完成时：本记录移进 `implemented/` 并在 `docs/decisions.md` 登记为 D29；D5 与 D11
+移进 `archived/` 并登记哈希。这些收尾放在第 4 步而不是第 3 步，是因为在那之前 client 半边仍遵循 D5，
+D5 与 D11 对它依然有效。已实施记录与 `docs/implemented/`、`docs/handoff/` 里引用的旧路径不改：
 它们记录的是写下时的代码。
 
 ## 待定
 
-- Steiger 的 `ambiguous-slice-names`、`inconsistent-naming` 可能逼一两个名字改动（lingualab 就被逼改了
-  两个），搬家时定，定了写回本记录。
+- host 命名（第 3 步已定）：Steiger 的 `ambiguous-slice-names`、`inconsistent-naming` 对 host 目录树
+  没有触发，所以没有任何文件夹或文件被迫改名（无）。client 命名仍待定：lingualab 被逼改了两个名字，
+  client 搬家时也可能遇到，第 4 步定，定了写回本记录。
+- `login-notice.ts` 的去向（第 3 步）：它只有一组提示白名单常量加一个纯解析函数，不渲染任何标记，
+  所以放进 `features/password/model/`；`api` 段与 `ui` 段（改密页）都从那里引用。
 - `features/password` 是否再拆成 `login`、`password-change`、`restricted` 几个 feature：它们共用会话签发，
   拆开会出现 feature 互引，暂按一个切片加分段处理。

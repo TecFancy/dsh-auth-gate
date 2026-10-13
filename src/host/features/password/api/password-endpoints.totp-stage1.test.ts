@@ -1,0 +1,69 @@
+import { describe, expect, it } from "vitest";
+import { CHALLENGE_TTL_SECONDS, CHALLENGE_COOKIE } from "../model/challenge-cookie.js";
+import { makeHarness, post } from "../../../../../test/password-totp-harness.js";
+
+describe("TOTP: password stage issues challenge cookie", () => {
+  it("optional + secret user: 302 to /auth/login with challenge cookie, no session cookie", async () => {
+    const h = makeHarness();
+    const res = await post(h, "POST", "username=alice&password=pw&next=/models");
+    expect(res.status).toBe(302);
+    expect(res.headers["location"]).toBe("/auth/login?next=%2Fmodels");
+    const sc = res.headers["set-cookie"];
+    expect(sc).toContain(`${CHALLENGE_COOKIE}=alice.`);
+    expect(sc).toContain(`Max-Age=${CHALLENGE_TTL_SECONDS}`);
+    expect(sc).not.toContain("dsh_auth="); // 未发会话
+  });
+
+  it("optional + no-secret user: straight session (M3 behavior)", async () => {
+    const h = makeHarness();
+    const res = await post(h, "POST", "username=bob&password=pw");
+    expect(res.status).toBe(302);
+    expect(res.headers["location"]).toBe("/");
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+    expect(res.headers["set-cookie"]).not.toContain(CHALLENGE_COOKIE);
+  });
+
+  it("off mode ignores secrets entirely (straight session)", async () => {
+    const h = makeHarness();
+    h.setTotpMode("off");
+    const res = await post(h, "POST", "username=alice&password=pw");
+    expect(res.status).toBe(302);
+    expect(res.headers["set-cookie"]).toContain("dsh_auth=");
+  });
+
+  it("required + no-secret user: 401 (uniform, counted as failure)", async () => {
+    const h = makeHarness();
+    h.setTotpMode("required");
+    const res = await post(h, "POST", "username=bob&password=pw");
+    expect(res.status).toBe(401);
+    // D20：required + 无 secret 也走同一张失败卡（三态正文同一，防枚举）
+    expect(res.headers["content-type"]).toContain("text/html");
+    expect(res.body).toContain('class="error"');
+    expect(res.body).toContain("Invalid username or password.");
+    expect(res.body).toContain('value="bob"');
+  });
+
+  it("required mode: correct password for a no-secret user does not reset prior failures", async () => {
+    const h = makeHarness();
+    for (let i = 0; i < 4; i++) {
+      const res = await post(h, "POST", "username=bob&password=wrong");
+      expect(res.status).toBe(401);
+    }
+    // 正确密码 + required + 无 secret → 401（第 5 次失败；不得先 success 洗桶）
+    h.setTotpMode("required");
+    const res = await post(h, "POST", "username=bob&password=pw");
+    expect(res.status).toBe(401);
+    // 再试 → 429（若被错误 success 清桶则不会 429）
+    const locked = await post(h, "POST", "username=bob&password=pw");
+    expect(locked.status).toBe(429);
+    expect(locked.headers["retry-after"]).toBe("30");
+  });
+
+  it("disabled user with secret is blocked at the password stage", async () => {
+    const h = makeHarness();
+    const alice = h.users.get("alice")!;
+    h.users.set("alice", { ...alice, disabled: true });
+    const res = await post(h, "POST", "username=alice&password=pw");
+    expect(res.status).toBe(401);
+  });
+});

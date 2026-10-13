@@ -1,4 +1,9 @@
-import { bundledSkillDir, installSkill, SKILL_NAME, userSkillDir } from "./shared/index.js";
+import {
+  bundledSkillDir,
+  installSkill,
+  SKILL_NAME,
+  userSkillDir,
+} from "./host/shared/skill/index.js";
 
 /** `dsh-auth skill install [--force]` 需要的注入面（结构兼容 `CliCtx`）。 */
 interface SkillCommandCtx {

@@ -476,8 +476,8 @@ is in `docs/deployed/known-limitations.md`.
 
 Built on the engineering conventions of
 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework): barrel-only
-cross-slice imports, the `npm run verify` gate chain, and decision records. `verify`
-runs format / lint / no-emdash / slice / lock / decisions / docs / readme-parity /
+cross-slice imports (Feature-Sliced Design layers, checked by Steiger), the `npm run verify` gate chain, and decision records. `verify`
+runs format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity /
 type-check / coverage 80% / build / bundle; tests, build and the release flow are
 documented in `docs/specs/development.md`.
 

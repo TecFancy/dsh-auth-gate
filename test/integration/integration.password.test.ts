@@ -7,10 +7,10 @@ import { promises as fs, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import type { WrappableServer } from "../../src/gate/index.js";
+import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
-import { hashPassword } from "../../src/features/password/index.js";
-import { writeUsersFile } from "../../src/shared/index.js";
+import { hashPassword } from "../../src/host/features/password/index.js";
+import { writeUsersFile } from "../../src/host/entities/user/index.js";
 
 type RealServer = WrappableServer & { readonly port: number };
 

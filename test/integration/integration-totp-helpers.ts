@@ -6,11 +6,11 @@ import * as storageJson from "@deepseek-ai/dsh-storage-json";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { WrappableServer } from "../../src/gate/index.js";
+import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
-import { hashPassword } from "../../src/features/password/index.js";
-import { generateTotpSecret, totpCodeAt } from "../../src/features/totp/index.js";
-import { writeUsersFile } from "../../src/shared/index.js";
+import { hashPassword } from "../../src/host/features/password/index.js";
+import { generateTotpSecret, totpCodeAt } from "../../src/host/features/totp/index.js";
+import { writeUsersFile } from "../../src/host/entities/user/index.js";
 
 /** 集成测试共享 helpers（mountTotpStack 等）。测试文件从本模块 import，避免跨 .test.ts import 丢失类型。 */
 type RealServer = WrappableServer & { readonly port: number };

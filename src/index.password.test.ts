@@ -1,17 +1,21 @@
 import type { Context } from "@deepseek-ai/cordis";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WrappableServer, WrappableRoute, WrappableUpgradeRoute } from "./gate/index.js";
+import type {
+  WrappableServer,
+  WrappableRoute,
+  WrappableUpgradeRoute,
+} from "./host/shared/guard/index.js";
 import { apply, type AuthConfig, type AuthService } from "./index.js";
-import { PasswordGate } from "./features/password/index.js";
-import { TokenGate } from "./features/token/index.js";
+import { PasswordGate } from "./host/features/password/index.js";
+import { TokenGate } from "./host/features/token/index.js";
 
 const { capturedDeps } = vi.hoisted<{ capturedDeps: { current: unknown } }>(() => ({
   capturedDeps: { current: undefined },
 }));
 
-vi.mock("./features/password/index.js", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("./features/password/index.js")>();
+vi.mock("./host/features/password/index.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./host/features/password/index.js")>();
   return {
     ...actual,
     registerPasswordEndpoints: (deps: unknown) => {

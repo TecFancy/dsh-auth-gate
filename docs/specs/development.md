@@ -7,20 +7,21 @@ through one command.
 
 ## Commands
 
-| Task           | Command                                                                                                                                                                                                                   |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                    |
-| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                |
-| Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                 |
-| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                     |
-| Watch tests    | `npm run test:watch`                                                                                                                                                                                                      |
-| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                                     |
-| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations + source maps)                                                                                                            |
-| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                                     |
-| Full gate      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check; full set - CI, not every local run) |
-| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` and of CI `hygiene` — see `docs/README.md` "文档规范")                                 |
+| Task           | Command                                                                                                                                                                                                                              |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                               |
+| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                           |
+| FSD layering   | `npm run lint:fsd` (Steiger over `src/host`; layer order, same-layer isolation, public API, naming)                                                                                                                                  |
+| Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                            |
+| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                |
+| Watch tests    | `npm run test:watch`                                                                                                                                                                                                                 |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                                                |
+| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations + source maps)                                                                                                                       |
+| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                                                |
+| Full gate      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lint:fsd + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check; full set - CI, not every local run) |
+| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` and of CI `hygiene` - see `docs/README.md` "文档规范")                                            |
 
-Run a single test file: `npm run test -- src/gate/guard.test.ts`
+Run a single test file: `npm run test -- src/host/shared/guard/guard.test.ts`
 Run tests by name: `npm run test -- -t "guard"`
 
 ## Git hooks
@@ -34,73 +35,62 @@ Run tests by name: `npm run test -- -t "guard"`
 
 ## Structure
 
-分层布局（2026-08-30 重构，见 [`docs/decisions.md`](./decisions.md) D5）：
+Feature-Sliced Design layout (D29, see [`docs/decisions.md`](./decisions.md)). The host half
+uses the lower three of FSD's six layers under `src/host/`; the entry points and wiring sit
+at the `src/` root, beside the analysed tree. The client half is still flat until its own
+restructuring step (it follows D5 until then).
 
 ```
 src/
-├── index.ts           # plugin entry + auth 服务接线（M3：mode 二选一装配 password 流）
-├── cli.ts             # dsh-auth 用户管理 CLI（bin 入口，M3 新增）
-├── proxy-cli.ts       # dsh-auth-proxy（bin 入口）
-├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
-├── gate/              # 守卫核心机制层（跨模式）
-│   ├── index.ts       #   barrel：跨 slice 唯一入口
-│   ├── gate.ts        #   Gate 词表 + noopGate
-│   ├── guard.ts       #   webServer 路由/升级/fallback 包装与拒绝管线 + AUTH_PATH_PREFIX
-│   └── self-check.ts  #   包装覆盖自检（fail loud）
-├── session/           # 会话层（核心机制层，token/password 共同消费）
-│   ├── index.ts
-│   └── session-store.ts  # storage-domain 会话持久化
-├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
-│   ├── index.ts       #   barrel：跨 slice 唯一入口
-│   ├── endpoints.ts   #   纯 HTTP 半边：404 兜底 / methodNotAllowed / queryOf（D29 后归 shared/http）
-│   └── session-endpoints.ts #   会话半边：logout / status + AuthHttpDeps（token+password 共用，D29 后归 entities/session）
-├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
-│   ├── token/
-│   │   ├── index.ts
-│   │   ├── token-gate.ts      # TokenGate：白名单/cookie/Bearer 共享 token + safeEqual
-│   │   └── auth-endpoints.ts  # token 模式 /auth 兜底 + 三个 exact 端点
-│   ├── password/
-│   │   ├── index.ts
-│   │   ├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
-│   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
-│   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
-│   │   ├── challenge-cookie.ts # TOTP 挑战 cookie 签发/校验（HMAC 签名，D10）
-│   │   ├── session-issue.ts   # 会话签发 + launch-token 桥（password 侧）
-│   │   ├── disabled-sweeper.ts # 定期撤销已禁用用户的会话（`revokeSweepMs`）
-│   │   ├── password-endpoints.ts # password 模式 /auth 兜底 + exact 端点（D22 后 4 条，含 /auth/password）
-│   │   └── password-change.ts  # POST /auth/password 逻辑：策略/TOTP 确认/写盘/全踢会话（D22 新增）
-│   ├── totp/
-│   │   ├── index.ts
-│   │   ├── totp.ts            # RFC 6238：自写 base32 + HOTP/TOTP + 恒时验证（M4 新增）
-│   │   ├── replay-guard.ts    # 防重放：内存记录已验 (counter, code)（M4 新增）
-│   │   └── cli.ts             # dsh-auth user totp enable/disable（M4 新增）
-│   └── proxy/
-│       ├── index.ts
-│       ├── proxy.ts           # 本地反向代理（HTTP/WS 透传，dsh-auth-proxy）
-│       └── proxy-headers.ts   # 请求/响应头过滤 + Set-Cookie 重写
-├── shared/            # 叶子通用层
-│   ├── index.ts
-│   ├── auth-common.ts  # 端点共享纯函数（validateNext，M3 提取）
-│   ├── cookie.ts       # Cookie 头解析
-│   ├── dsh-home.ts     # DSH_HOME 解析（dshHomeDir，users-file 与 skill-install 共用，D29 前置拆分）
-│   ├── form-body.ts    # urlencoded body 读取
-│   ├── login-page.ts   # 自包含登录页（token + password + TOTP 挑战三版）
-│   ├── password-policy.ts # 新口令策略：≥14 位 + 四类字符 + ≠旧口令 + maxLength（D23 新增）
-│   ├── rate-limit.ts   # 双桶登录限速器（M3 新增）
-│   ├── skill-install.ts # dsh-auth skill install（M3 新增）
-│   └── users-file.ts   # users.yaml 加载/校验/原子写 + 独立锁内 RMW/CAS/.bak（D23 加固）
-├── client/            # client 半边（与 host 互不 import）
-└── *.test.ts          # 单元测试（与源码同居）
-
-test/               # src 外的测试代码（不编译进 lib、不进 coverage）
-├── integration/    #   integration.*.test.ts：真实 cordis/webserver/storage 栈集成测试
-│                   #   + integration-*-helpers.ts 其专用 helper（只经各 slice barrel 引 src）
-└── *-harness.ts    #   单元测试共享 harness（非 .test.ts，vitest 不自动收集）
-lib/                # build output — COMMITTED (see below), never hand-edited
+├── index.ts               # plugin entry + auth service wiring (mode picks the password or token flow)
+├── cli.ts                 # dsh-auth user-management CLI (bin entry)
+├── proxy-cli.ts           # dsh-auth-proxy (bin entry)
+├── admin-wiring.ts        # root-side assembly of the admin routes (P2)
+├── token-resolver.ts      # shared-token credential resolver (token mode)
+├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
+├── cli-skill.ts           # `dsh-auth skill install`
+├── *.test.ts              # root tests: entry points, CLI, manifest checks (host-corridor, manifest-*)
+├── host/                  # host half: three FSD layers, analysed by Steiger (`npm run lint:fsd`)
+│   ├── shared/            #   layer without slices: segments only, each with its own index.ts
+│   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, startup self-check
+│   │   ├── http/          #     cookie / form body / Origin / Host / client IP / `next` / login redirect,
+│   │   │                  #     plus the session-independent authCatchAll, queryOf, methodNotAllowed
+│   │   ├── login-page/    #     self-contained login page (token, password and TOTP challenge variants)
+│   │   ├── rate-limit/    #     two-bucket login rate limiter
+│   │   ├── skill/         #     `dsh-auth skill install`
+│   │   └── lib/           #     leaf helpers (`dshHomeDir`)
+│   ├── entities/
+│   │   ├── session/       #     model/ session-store; api/ logout and /auth/status (AuthHttpDeps)
+│   │   └── user/          #     model/ users-file (users.yaml), password-policy;
+│   │                      #     @x/session.ts exposes only `UsersLoadResult` to the session entity
+│   └── features/          #     slices never import each other; cross-slice goes through index.ts
+│       ├── token/         #       api/ /auth endpoints; model/ TokenGate
+│       ├── password/      #       api/ endpoints + password change; model/ gate, login, session issue,
+│       │                  #       restricted session, challenge cookie, disabled-user sweeper, login notice;
+│       │                  #       lib/ scrypt; ui/ server-rendered failure and password-change pages
+│       ├── totp/          #       lib/ RFC 6238; model/ replay guard; cli/ enable and disable subcommands
+│       ├── admin/         #       api/ endpoints and responses; model/ audit, reset steps, user list, deps
+│       └── proxy/         #       model/ local reverse proxy and header filtering
+└── client/                # client half: flat for now, never imports the host half
 ```
 
-分层纪律由 `npm run slice:check` 强制（跨 slice import 只落 barrel、features 同层互禁、
-client/host 隔离、无法解析即失败）；增删切片请同步本结构图与门禁脚本。
+Unit tests live next to their source file, inside the same segment.
+
+```
+test/               # test code outside src (not compiled into lib, not in coverage)
+├── integration/    #   integration.*.test.ts: real cordis/webserver/storage stack
+│                   #   + integration-*-helpers.ts (enter src through slice or segment index.ts)
+└── *-harness.ts    #   shared unit-test harnesses (not .test.ts, so vitest does not collect them)
+lib/                # build output (host under lib/host/) - COMMITTED (see below), never hand-edited
+```
+
+Layering is enforced by two gates. `npm run lint:fsd` runs Steiger over `src/host` (layer
+order, same-layer isolation, public API through `index.ts`, `@x` cross-imports, naming).
+`npm run slice:check` keeps only what Steiger cannot see: the client and host halves never
+import each other, root files enter `src/host` only through a slice or segment `index.ts`,
+unresolvable relative imports fail, and every file under `src/` is a root file, under
+`src/host/{shared,entities,features}/`, or under `src/client/`. Adding or removing a slice
+means updating this tree.
 
 ## Committed build artifact
 
@@ -180,7 +170,7 @@ byte-stable across Windows/Linux builders.
 
 `.github/workflows/ci.yml` runs on every push to `main` and every PR, on
 **both ubuntu-latest and windows-latest** (fail-fast disabled): `npm ci`,
-format check, lint, no-emdash, slice boundaries, decision records, type-check,
+format check, lint, no-emdash, slice boundaries, FSD layering (Steiger), decision records, type-check,
 coverage tests, build, bundle check, then two parity gates:
 
 1. **Committed artifact parity**: `git diff --exit-code -- lib` after the fresh

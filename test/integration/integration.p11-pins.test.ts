@@ -7,7 +7,7 @@
  */
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PASSWORD_CHANGED_NOTICE } from "../../src/features/password/index.js";
+import { PASSWORD_CHANGED_NOTICE } from "../../src/host/features/password/index.js";
 
 /** 读仓库内的文件（相对本测试文件）。 */
 function readSource(relative: string): string {

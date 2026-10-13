@@ -1,8 +1,8 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { HttpHandler } from "../src/gate/index.js";
-import type { AuthEndpointsDeps } from "../src/features/token/auth-endpoints.js";
-import { SessionStore, type Session } from "../src/session/index.js";
+import type { HttpHandler } from "../src/host/shared/guard/index.js";
+import type { AuthEndpointsDeps } from "../src/host/features/token/api/auth-endpoints.js";
+import { SessionStore, type Session } from "../src/host/entities/session/index.js";
 
 export class MemTable implements KvTable<string, Session> {
   private readonly map = new Map<string, Session>();

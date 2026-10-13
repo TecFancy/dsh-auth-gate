@@ -1,0 +1,1 @@
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../../src/host/features/totp/index.ts"],"names":[],"mappings":"AAAA;;;;GAIG;AACH,OAAO,EACL,YAAY,EACZ,YAAY,EACZ,kBAAkB,EAClB,UAAU,EACV,cAAc,GACf,MAAM,eAAe,CAAC;AACvB,OAAO,EAAE,eAAe,EAAE,MAAM,yBAAyB,CAAC;AAC1D,OAAO,EAAE,cAAc,EAAE,OAAO,EAAE,MAAM,cAAc,CAAC;AACvD,YAAY,EAAE,SAAS,EAAE,MAAM,cAAc,CAAC"}

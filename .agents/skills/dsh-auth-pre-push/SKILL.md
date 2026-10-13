@@ -22,10 +22,10 @@ only checks invalidated by it.
 
 ## Select relevant evidence
 
-- **Guard/gate/session-store behavior:** `npm run test -- src/<module>.test.ts`, or a focused
+- **Guard/gate/session-store behavior:** `npm run test -- src/host/<layer>/<slice>/<segment>/<module>.test.ts`, or a focused
   test name via `-t`.
 - **Coverage for the affected source:**
-  `npm run test -- src/<module>.test.ts --coverage --coverage.include='src/<module>.ts'`.
+  `npm run test -- <path>/<module>.test.ts --coverage --coverage.include='<path>/<module>.ts'`.
   Never lower thresholds or narrow the include to hide an uncovered affected file.
 - **Mount-point behavior:** both integration files (`test/integration/integration.guard.test.ts`,
   `test/integration/integration.session.test.ts`) - the regression net for the non-contractual seam

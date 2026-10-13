@@ -6,10 +6,10 @@ import {
   type WrappableRoute,
   type WrappableServer,
   type WrappableUpgradeRoute,
-} from "./gate/index.js";
+} from "./host/shared/guard/index.js";
 import { apply, Config, inject, name, type AuthConfig, type AuthService } from "./index.js";
-import { SessionStore, type Session } from "./session/index.js";
-import { TokenGate } from "./features/token/index.js";
+import { SessionStore, type Session } from "./host/entities/session/index.js";
+import { TokenGate } from "./host/features/token/index.js";
 const cfg = (): AuthConfig => ({
   mode: "token",
   sessionTtl: 604800,

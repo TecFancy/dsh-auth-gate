@@ -3,12 +3,11 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main, type CliIo } from "./cli.js";
-import { loadUsersFile } from "./shared/index.js";
+import { loadUsersFile } from "./host/entities/user/index.js";
 
 /**
  * P2：`dsh-auth user enable <name>`（契约 §8-B 第 19 条）。
- * 拆出独立文件是为了守住 `src/cli.test.ts` 的 max-lines 250（root 文件在
- * `scripts/verify-slice-boundaries.mjs` 的 ROOT_FILES 已登记）。
+ * 拆出独立文件是为了守住 `src/cli.test.ts` 的 max-lines 250。
  */
 function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];

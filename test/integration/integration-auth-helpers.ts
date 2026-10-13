@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { WrappableServer } from "../../src/gate/index.js";
+import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
 
 /**

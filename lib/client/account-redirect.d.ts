@@ -9,7 +9,7 @@
  * 从"会话已死"到"对方发现"之间的每一毫秒都是竞态窗口，我们先走才稳拿 notice。成功文案与
  * 「重新登录」按钮仍留在面板上，作为导航被环境拒绝时的兜底（见 `account-form.tsx`）。
  *
- * 常量镜像：服务端 `src/features/password/login-notice.ts` 的 `PASSWORD_CHANGED_NOTICE`。
+ * 常量镜像：服务端 `src/host/features/password/model/login-notice.ts` 的 `PASSWORD_CHANGED_NOTICE`。
  * 客户端半边刻意不 import 服务端 `shared`（保持解耦、不打大 bundle）；两侧字面量由集成测试
  * 以源码文本比对钉住（`integration.p11-pins.test.ts`）。
  */

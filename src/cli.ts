@@ -2,8 +2,8 @@
 import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
-import { hashPassword, verifyPassword } from "./features/password/index.js";
-import { handleUserTotp } from "./features/totp/index.js";
+import { hashPassword, verifyPassword } from "./host/features/password/index.js";
+import { handleUserTotp } from "./host/features/totp/index.js";
 import { installSkillCommand } from "./cli-skill.js";
 import {
   checkPasswordPolicy,
@@ -15,7 +15,7 @@ import {
   UsersFileError,
   type UserRecord,
   type UsersSnapshot,
-} from "./shared/index.js";
+} from "./host/entities/user/index.js";
 
 export interface CliIo {
   out(line: string): void;

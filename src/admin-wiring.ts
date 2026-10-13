@@ -1,13 +1,14 @@
 import type { IncomingMessage } from "node:http";
-import { makeAdminRoutes, type AdminRoutes } from "./features/admin/index.js";
-import { hashPassword, verifyPassword } from "./features/password/index.js";
-import { verifyTotpCode } from "./features/totp/index.js";
-import { LoginRateLimiter, loadUsersFile, mutateUsersFile } from "./shared/index.js";
-import type { SessionStore } from "./session/index.js";
+import { makeAdminRoutes, type AdminRoutes } from "./host/features/admin/index.js";
+import { hashPassword, verifyPassword } from "./host/features/password/index.js";
+import { verifyTotpCode } from "./host/features/totp/index.js";
+import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
+import { loadUsersFile, mutateUsersFile } from "./host/entities/user/index.js";
+import type { SessionStore } from "./host/entities/session/index.js";
 
 /**
  * P2 管理面的 root 侧装配（从 `src/index.ts` 拆出，守住 250 行文件上限）：
- * 新独立限流桶 + 锁内写盘 + 吊销探针 + 双桶清理，全部在这里注入 `features/admin`。
+ * 新独立限流桶 + 锁内写盘 + 吊销探针 + 双桶清理，全部在这里注入 `host/features/admin`。
  *
  * 三条口径：
  * - **现读**：权限判定与目标判定都走 `loadUsersFile`（每请求现读，绝不信会话缓存）；

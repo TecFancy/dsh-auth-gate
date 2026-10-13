@@ -6,10 +6,10 @@ import * as storageJson from "@deepseek-ai/dsh-storage-json";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { WrappableServer } from "../../src/gate/index.js";
+import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
-import { hashPassword } from "../../src/features/password/index.js";
-import { writeUsersFile } from "../../src/shared/index.js";
+import { hashPassword } from "../../src/host/features/password/index.js";
+import { writeUsersFile } from "../../src/host/entities/user/index.js";
 
 /**
  * P2 集成测试夹具：真 `apply()` + 真 HTTP 栈（与 `integration.password.test.ts` 同构）。

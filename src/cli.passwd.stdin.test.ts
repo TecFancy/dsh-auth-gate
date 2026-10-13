@@ -5,8 +5,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main, type CliIo } from "./cli.js";
-import { verifyPassword } from "./features/password/index.js";
-import { loadUsersFile } from "./shared/index.js";
+import { verifyPassword } from "./host/features/password/index.js";
+import { loadUsersFile } from "./host/entities/user/index.js";
 
 /** 满足策略（≥14 位 + 四类字符）的口令。 */
 const OLD_PASSWORD = "Old-Password-Ok!23";

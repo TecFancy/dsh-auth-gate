@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { totpCodeAt } from "../../src/features/totp/index.js";
+import { totpCodeAt } from "../../src/host/features/totp/index.js";
 import { currentCode } from "./integration-totp-helpers.js";
 import {
   ADMIN_PASSWORD,

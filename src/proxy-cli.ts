@@ -11,7 +11,7 @@ import {
   createProxyServer,
   validateProxyOptions,
   type ProxyOptions,
-} from "./features/proxy/index.js";
+} from "./host/features/proxy/index.js";
 
 export interface CliIo {
   out(line: string): void;

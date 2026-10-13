@@ -24,6 +24,7 @@ const SCENE_OF = {
   lint: "hygiene",
   "lint:no-emdash": "hygiene",
   "slice:check": "hygiene",
+  "lint:fsd": "hygiene",
   "aliases:check": "hygiene",
   "lock:check": "hygiene",
   "decisions:check": "hygiene",

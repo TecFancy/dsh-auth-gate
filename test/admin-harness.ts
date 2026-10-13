@@ -1,10 +1,10 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { LoginRateLimiter } from "../src/shared/index.js";
-import type { UserRecord } from "../src/shared/index.js";
-import { digestToken, SessionStore, type Session } from "../src/session/index.js";
-import type { AdminAuditEvent } from "../src/features/admin/audit.js";
-import type { AdminDeps } from "../src/features/admin/deps.js";
+import { LoginRateLimiter } from "../src/host/shared/rate-limit/index.js";
+import type { UserRecord } from "../src/host/entities/user/index.js";
+import { digestToken, SessionStore, type Session } from "../src/host/entities/session/index.js";
+import type { AdminAuditEvent } from "../src/host/features/admin/model/audit.js";
+import type { AdminDeps } from "../src/host/features/admin/model/deps.js";
 
 /**
  * admin 切片测试夹具（切片内，非 *.test.ts）。依赖全部可注入 + 真实 `SessionStore`（内存表），
