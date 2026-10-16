@@ -89,7 +89,7 @@ export default defineConfig([
   },
   // Tests: identical rules, explicit vitest imports (no ambient globals needed).
   {
-    files: ["src/**/*.test.{ts,tsx}"],
+    files: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-non-null-assertion": "off",

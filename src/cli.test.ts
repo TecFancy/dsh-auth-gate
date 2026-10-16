@@ -3,9 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { main, type CliIo } from "./cli.js";
-import { verifyPassword } from "./features/password/index.js";
+import { verifyPassword } from "./host/features/password/index.js";
 import { Config } from "./index.js";
-import { bundledSkillDir, loadUsersFile } from "./shared/index.js";
+import { bundledSkillDir } from "./host/shared/skill/index.js";
+import { loadUsersFile } from "./host/entities/user/index.js";
 
 function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];

@@ -3,8 +3,8 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { main, type CliIo } from "./cli.js";
-import { base32Decode } from "./features/totp/index.js";
-import { loadUsersFile } from "./shared/index.js";
+import { base32Decode } from "./host/features/totp/index.js";
+import { loadUsersFile } from "./host/entities/user/index.js";
 
 function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];

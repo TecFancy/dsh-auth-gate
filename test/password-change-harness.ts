@@ -1,11 +1,11 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { LoginRateLimiter } from "../src/shared/index.js";
-import type { UserRecord } from "../src/shared/index.js";
-import type { Session, SessionStore } from "../src/session/index.js";
+import { LoginRateLimiter } from "../src/host/shared/rate-limit/index.js";
+import type { UserRecord } from "../src/host/entities/user/index.js";
+import type { Session, SessionStore } from "../src/host/entities/session/index.js";
 import {
   handlePasswordChange,
   type PasswordChangeDeps,
-} from "../src/features/password/password-change.js";
+} from "../src/host/features/password/api/password-change.js";
 
 /**
  * 改密端点的共享测试夹具（test/ 叶子，契约 §0 允许任何 slice 经相对路径引用）。
@@ -61,7 +61,7 @@ export interface ReqOptions {
   /**
    * P2 §6：`/auth/password` 的 POST 有 Origin/Sec-Fetch-Site 门，缺省模拟浏览器同源请求。
    * `null` = 两个头都不带（用于断言 fail-closed 403；正例矩阵在
-   * `src/features/password/password-change.origin.test.ts`）。
+   * `src/host/features/password/api/password-change.origin.test.ts`）。
    */
   secFetchSite?: string | null;
 }

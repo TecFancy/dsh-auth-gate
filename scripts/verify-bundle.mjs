@@ -8,7 +8,9 @@
  * 3. the module loader load call appears exactly once at the top level;
  * 4. the bundle is a non-trivial size (rules out empty builds);
  * 5. no stylesheet asset survived (CSS is inlined at build time) and the
- *    bundle does not reference the removed `styles` runner builtin.
+ *    bundle does not reference the removed `styles` runner builtin;
+ * 6. no test artifact (`*.test.*` / `*.spec.*`, including declaration files
+ *    and maps) exists anywhere under lib/, since lib/ ships in the package.
  *
  * Ported from dsh-plugin-framework (scripts/verify-bundle.mjs) and trimmed:
  * the Typert /remote contribution check and the data-plugin-css check are
@@ -18,7 +20,7 @@
  * of its externals is not practical here. The important invariants are the
  * loader contract and the single-file shape.
  */
-import { readFileSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -76,6 +78,12 @@ if (exists(bundlePath)) {
   );
 }
 
+const leakedTests = findTestArtifacts(resolve(repoRoot, "lib"));
+check(
+  leakedTests.length === 0,
+  `test artifacts must not ship in lib/ (fix the exclude in tsconfig.build.json / tsconfig.client.build.json): ${leakedTests.join(", ")}`,
+);
+
 if (failures.length > 0) {
   console.error("bundle:check FAILED");
   for (const failure of failures) console.error("  - " + failure);
@@ -93,4 +101,19 @@ function exists(path) {
   } catch {
     return false;
   }
+}
+
+function findTestArtifacts(dir, found = []) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return found;
+  }
+  for (const entry of entries) {
+    const full = resolve(dir, entry.name);
+    if (entry.isDirectory()) findTestArtifacts(full, found);
+    else if (/\.(test|spec)\./.test(entry.name)) found.push(full.slice(repoRoot.length + 1));
+  }
+  return found;
 }

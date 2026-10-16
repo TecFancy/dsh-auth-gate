@@ -2,7 +2,7 @@
 /**
  * check-live-entries.mjs — 「升级后必跑」的入口覆盖回归（只读、无第三方依赖）。
  *
- * 背景：`src/gate/self-check.ts` 的 `assertGuarded()` 只检查"包装标记在不在"，
+ * 背景：`src/host/shared/guard/self-check.ts` 的 `assertGuarded()` 只检查"包装标记在不在"，
  * 不发真实请求。宿主 webServer 的路由表有四类入口（exact / prefix / upgrade /
  * fallback），标记在 ≠ 真的拦得住。本脚本用**未认证的真实请求**逐一验证。
  *
@@ -53,7 +53,7 @@ const USAGE = `用法: node scripts/check-live-entries.mjs [选项]
 /** 门自己的包名：它注册的 /auth/* 是**设计上公开**的入口，单独归类。 */
 const GATE_PACKAGE = "dsh-auth-gate";
 
-/** 门的登录页路径：未认证的**浏览器导航**必须 302 到这里（`src/gate/guard.ts`）。 */
+/** 门的登录页路径：未认证的**浏览器导航**必须 302 到这里（`src/host/shared/guard/guard.ts`）。 */
 const LOGIN_PATH = "/auth/login";
 
 /**
@@ -91,7 +91,7 @@ const SUPPLEMENTS = [
     kind: "public",
     path: "/auth",
     source:
-      "dsh-auth-gate lib/features/password/password-endpoints.js:14 / token/auth-endpoints.js:15",
+      "dsh-auth-gate lib/host/features/password/api/password-endpoints.js / lib/host/features/token/api/auth-endpoints.js",
     expect: "404（/auth/* 兜底，不落 SPA）",
     note: "prefix 兜底：未注册的 /auth/* 一律 404",
   },
@@ -99,7 +99,7 @@ const SUPPLEMENTS = [
     group: "public",
     kind: "public",
     path: "/auth/login",
-    source: "dsh-auth-gate lib/features/password/password-endpoints.js:15（token 模式同名）",
+    source: "dsh-auth-gate lib/host/features/password/api/password-endpoints.js（token 模式同名）",
     expect: "200（登录页）",
     note: "必须可达，否则无法登录",
   },
@@ -107,7 +107,7 @@ const SUPPLEMENTS = [
     group: "public",
     kind: "public",
     path: "/auth/logout",
-    source: "dsh-auth-gate lib/features/password/password-endpoints.js:17（token 模式同名）",
+    source: "dsh-auth-gate lib/host/features/password/api/password-endpoints.js（token 模式同名）",
     expect: "405（仅 POST）",
     note: "GET 未认证不得 2xx",
   },
@@ -115,7 +115,7 @@ const SUPPLEMENTS = [
     group: "public",
     kind: "public",
     path: "/auth/status",
-    source: "dsh-auth-gate lib/features/password/password-endpoints.js:22（token 模式同名）",
+    source: "dsh-auth-gate lib/host/features/password/api/password-endpoints.js（token 模式同名）",
     expect: "200（未认证态 JSON）",
     note: "只返回认证态，不含凭证",
   },
@@ -886,7 +886,7 @@ async function main() {
   }
 
   // 浏览器导航分支：真实浏览器导航带 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`
-  // （门的导航判定只认这两个头，见 src/gate/guard.ts；缺头一律按 API 处理 → 401）。
+  // （门的导航判定只认这两个头，见 src/host/shared/guard/guard.ts；缺头一律按 API 处理 → 401）。
   // 这一行**断言 302 → /auth/login**，而不是"非 2xx 即通过"：这是唯一能证明"未认证的
   // 浏览器会被送去登录页"的探针，脱门（SPA 直接 200）必须失败。
   const navProbe = await probeHttp(opts.base, "/", opts.timeoutMs, "text/html", {

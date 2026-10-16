@@ -6,20 +6,22 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 命令
 
-| Task                       | Command                                                                                                                                                                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                         |
-| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                                     |
-| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                                      |
-| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                          |
-| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                           |
-| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                                          |
-| Build（构建）              | `npm run build` (tsc 输出到 `lib/`，LF 换行，declarations + source maps)                                                                                                                                                       |
-| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                                              |
-| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check；完整组合 —— CI 跑全套，并非每次本地运行) |
-| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene —— 规则见 `docs/README.md`「文档规范」)                                                                   |
+| Task                       | Command                                                                                                                                                                                                                                               |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type-check（类型检查）     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                                                |
+| Lint（代码检查）           | `npm run lint` (flat ESLint，启用类型检查)                                                                                                                                                                                                            |
+| FSD layering（FSD 分层）   | `npm run lint:fsd` (Steiger 分析 `src/host` 与 `src/client`；层级顺序、同层隔离、公共 API、命名)                                                                                                                                                      |
+| Format（格式化）           | `npm run format` / `npm run format:check`                                                                                                                                                                                                             |
+| Tests（测试）              | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                                 |
+| Watch tests（监听测试）    | `npm run test:watch`                                                                                                                                                                                                                                  |
+| Coverage（覆盖率）         | `npm run test:coverage` (v8，80% branches/functions/lines/statements)                                                                                                                                                                                 |
+| Build（构建）              | `npm run build` (先清空 `lib/`，再 tsc 输出 + client bundle；LF 换行，declarations + source maps)                                                                                                                                                     |
+| Scenario gates（场景门禁） | `npm run gates` (自动探测变更面；pre-push 时运行)                                                                                                                                                                                                     |
+| Full gate（全量门禁）      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lint:fsd + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check + host:check；完整组合 - CI 跑全套，并非每次本地运行) |
+| Host contract（宿主契约）  | `npm run host:check`（先自测，再查：包名 = Loader 行 = client 注册 id = host `name`；manifest 指向的产物存在；client 的 `require` 都是宿主模块表里的模块；`src/protocol/` 之外没有路由字面量、每个契约路径都有注册、README 提到的路由都存在）         |
+| Docs gate（文档门禁）      | `npm run docs:check` (双语配对 + 50 KiB 大小红线 + 同文件 H2-H4 重复标题（含根 README）；已挂 verify 链与 CI hygiene - 规则见 `docs/README.md`「文档规范」)                                                                                           |
 
-跑单个测试文件：`npm run test -- src/gate/guard.test.ts`
+跑单个测试文件：`npm run test -- src/host/shared/guard/guard.test.ts`
 按名称跑测试：`npm run test -- -t "guard"`
 
 ## Git 钩子
@@ -32,73 +34,95 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 目录结构
 
-分层布局（2026-08-30 重构，见 [`docs/decisions.md`](./decisions.md) D5）：
+Feature-Sliced Design 分层布局（D30，见 [`docs/decisions.md`](./decisions.md)）。host 半边在
+`src/host/` 下只用 FSD 六层中的下三层；入口与装配留在 `src/` 根，位于被分析的目录树之外。
+client 半边在 `src/client/` 下按需使用五层中的若干层（没有 `app`：插件不拥有应用外壳），`index.tsx`
+留在它的树根。
 
 ```
 src/
-├── index.ts           # plugin entry + auth 服务接线（M3：mode 二选一装配 password 流）
-├── cli.ts             # dsh-auth 用户管理 CLI（bin 入口，M3 新增）
-├── proxy-cli.ts       # dsh-auth-proxy（bin 入口）
+├── index.ts               # plugin entry + auth 服务接线（mode 二选一装配 password 或 token 流）
+├── cli.ts                 # dsh-auth 用户管理 CLI（bin 入口）
+├── proxy-cli.ts           # dsh-auth-proxy（bin 入口）
+├── admin-wiring.ts        # 管理路由的 root 侧装配（P2）
+├── token-resolver.ts      # 共享 token 凭证解析器（token 模式）
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
-├── gate/              # 守卫核心机制层（跨模式）
-│   ├── index.ts       #   barrel：跨 slice 唯一入口
-│   ├── gate.ts        #   Gate 词表 + noopGate
-│   ├── guard.ts       #   webServer 路由/升级/fallback 包装与拒绝管线 + AUTH_PATH_PREFIX
-│   └── self-check.ts  #   包装覆盖自检（fail loud）
-├── session/           # 会话层（核心机制层，token/password 共同消费）
-│   ├── index.ts
-│   └── session-store.ts  # storage-domain 会话持久化
-├── http/              # 认证 HTTP 端点公共件（核心机制层，与 gate/session 并列，D11）
-│   ├── index.ts       #   barrel：跨 slice 唯一入口
-│   └── endpoints.ts   #   404 兜底 / logout / status / methodNotAllowed / queryOf（token+password 共用）
-├── features/          # 认证面（同层 slice 互不 import，跨 slice 只走 barrel）
-│   ├── token/
-│   │   ├── index.ts
-│   │   ├── token-gate.ts      # TokenGate：白名单/cookie/Bearer 共享 token + safeEqual
-│   │   └── auth-endpoints.ts  # token 模式 /auth 兜底 + 三个 exact 端点
-│   ├── password/
-│   │   ├── index.ts
-│   │   ├── password.ts        # scrypt 哈希/恒时验证 + DUMMY_HASH（M3 新增）
-│   │   ├── password-gate.ts   # PasswordGate：白名单/cookie/Bearer 会话 token
-│   │   ├── password-login.ts  # POST /auth/login 逻辑（限速/用户文件/恒时验证/发会话）
-│   │   ├── challenge-cookie.ts # TOTP 挑战 cookie 签发/校验（HMAC 签名，D10）
-│   │   ├── session-issue.ts   # 会话签发 + launch-token 桥（password 侧）
-│   │   ├── disabled-sweeper.ts # 定期撤销已禁用用户的会话（`revokeSweepMs`）
-│   │   ├── password-endpoints.ts # password 模式 /auth 兜底 + exact 端点（D22 后 4 条，含 /auth/password）
-│   │   └── password-change.ts  # POST /auth/password 逻辑：策略/TOTP 确认/写盘/全踢会话（D22 新增）
-│   ├── totp/
-│   │   ├── index.ts
-│   │   ├── totp.ts            # RFC 6238：自写 base32 + HOTP/TOTP + 恒时验证（M4 新增）
-│   │   ├── replay-guard.ts    # 防重放：内存记录已验 (counter, code)（M4 新增）
-│   │   └── cli.ts             # dsh-auth user totp enable/disable（M4 新增）
-│   └── proxy/
-│       ├── index.ts
-│       ├── proxy.ts           # 本地反向代理（HTTP/WS 透传，dsh-auth-proxy）
-│       └── proxy-headers.ts   # 请求/响应头过滤 + Set-Cookie 重写
-├── shared/            # 叶子通用层
-│   ├── index.ts
-│   ├── auth-common.ts  # 端点共享纯函数（validateNext，M3 提取）
-│   ├── cookie.ts       # Cookie 头解析
-│   ├── form-body.ts    # urlencoded body 读取
-│   ├── login-page.ts   # 自包含登录页（token + password + TOTP 挑战三版）
-│   ├── password-policy.ts # 新口令策略：≥14 位 + 四类字符 + ≠旧口令 + maxLength（D23 新增）
-│   ├── rate-limit.ts   # 双桶登录限速器（M3 新增）
-│   ├── skill-install.ts # dsh-auth skill install（M3 新增）
-│   └── users-file.ts   # users.yaml 加载/校验/原子写 + 独立锁内 RMW/CAS/.bak（D23 加固）
-├── client/            # client 半边（与 host 互不 import）
-├── *.test.ts          # 单元测试（与源码同居；integration 测试留在根）
-└── integration.*.test.ts  # 真实 cordis/webserver/storage 栈集成测试
-
-test/               # src 外共享测试 harness（vitest 不自动收集、不编译进 lib、不进 coverage）
-lib/                # build output — COMMITTED (see below), never hand-edited
+├── cli-skill.ts           # `dsh-auth skill install`
+├── *.test.ts              # 根测试：入口、CLI、包清单检查（host-corridor、manifest-*）
+├── protocol/              # 跨半边契约（D31）：/auth 路径与登录 URL 构造（index.ts）、
+│                          # 请求体/响应体/错误体类型（payloads.ts）；不 import 任何东西
+├── host/                  # host 半边：FSD 下三层，由 Steiger 分析（`npm run lint:fsd`）
+│   ├── shared/            #   无 slice 的层：只有 segment，各带自己的 index.ts
+│   │   ├── guard/         #     Gate 词表、webServer 包装与拒绝管线、启动自检
+│   │   ├── http/          #     cookie / 表单体（含按契约取字段的 `formField`）/ Origin / Host / 客户端 IP / `next` / 登录跳转，
+│   │   │                  #     以及与会话无关的 authCatchAll、queryOf、methodNotAllowed
+│   │   ├── login-page/    #     自包含登录页（token、password、TOTP 挑战三版）
+│   │   ├── protocol/      #     进入 src/protocol 的桥（host 半边唯一入口）
+│   │   ├── rate-limit/    #     双桶登录限速器
+│   │   ├── skill/         #     `dsh-auth skill install`
+│   │   └── lib/           #     叶子小件（`dshHomeDir`）
+│   ├── entities/
+│   │   ├── session/       #     model/ session-store；api/ logout 与 /auth/status（AuthHttpDeps）
+│   │   └── user/          #     model/ users-file（users.yaml）、password-policy；
+│   │                      #     @x/session.ts 只向 session 实体暴露 `UsersLoadResult`
+│   └── features/          #     slice 之间互不 import；跨 slice 只走 index.ts
+│       ├── token/         #       api/ /auth 端点；model/ TokenGate
+│       ├── password/      #       api/ 端点与改密；model/ 门、登录、会话签发、受限会话、
+│       │                  #       挑战 cookie、禁用用户清扫、登录提示；
+│       │                  #       lib/ scrypt；ui/ 服务端渲染的失败页与改密页
+│       ├── totp/          #       lib/ RFC 6238；model/ 防重放；cli/ enable、disable 子命令
+│       ├── admin/         #       api/ 端点与响应；model/ 审计、重置步骤、用户列表、deps
+│       └── proxy/         #       model/ 本地反向代理与头过滤
+└── client/                # client 半边：FSD 五层，由 Steiger 分析，不 import host 半边
+    ├── index.tsx                 # bundle 入口（tsdown）与宿主槽位接线；分析树的根
+    ├── shared/                   # 只有 segment，各带自己的 index.ts
+    │   ├── api/                  # `AuthContext`：宿主槽位上下文的本地镜像（仅类型）；
+    │   │                         # `protocol.ts`：client 半边进入 src/protocol 的桥；
+    │   │                         # `encodeForm`：把按契约标注的请求对象编码成表单体
+    │   ├── i18n/                 # 账号文案：键、中英词典、translate 辅助
+    │   └── ui/                   # 共用内联样式与账号图标路径
+    ├── entities/
+    │   └── account/              # api/ `useAccountStatus` 及其解析出的 `AccountStatusView`
+    ├── features/                 # slice 之间互不 import；跨 slice 只走 index.ts
+    │   ├── change-password/      # ui/ 表单与字段；model/ 校验与提交；lib/ 改密后跳转
+    │   ├── admin-users/          # api/ 列表与重置请求；model/ 表单与结果类型；
+    │   │                         # lib/ 文案与失败映射；ui/ 表单
+    │   ├── logout/               # ui/ 退出设置动作
+    │   └── nav-icon/             # ui/ 设置导航图标垫片（DOM）
+    └── widgets/
+        └── account-section/      # ui/「账号安全」设置段；组合改密与用户管理
 ```
 
-分层纪律由 `npm run slice:check` 强制（跨 slice import 只落 barrel、features 同层互禁、
-client/host 隔离、无法解析即失败）；增删切片请同步本结构图与门禁脚本。
+单元测试与源文件同居，放在同一个 segment 里。
+
+```
+test/               # src 外的测试代码（不编译进 lib、不进 coverage）
+├── integration/    #   integration.*.test.ts：真实 cordis/webserver/storage 栈集成测试
+│                   #   + integration-*-helpers.ts（经 slice 或 segment 的 index.ts 引 src）
+└── *-harness.ts    #   单元测试共享 harness（非 .test.ts，vitest 不自动收集）
+lib/                # build output（host 在 lib/host/ 下）- 已提交入库（见下），绝不手工编辑
+```
+
+分层由两道门禁强制。`npm run lint:fsd` 对两个半边各跑一遍 Steiger，分别分析 `src/host` 与 `src/client`（层级顺序、同层隔离、经
+`index.ts` 的公共 API、`@x` 跨引、命名）。`npm run slice:check` 只保留 Steiger 看不到的部分：
+client 与 host 两个半边互不 import，根文件进入 `src/host` 只能经 slice 或 segment 的
+`index.ts`，`src/protocol/` 不 import 自身以外的任何文件、只能经它的 `index.ts` 由两个桥
+（`src/host/shared/protocol/index.ts`、`src/client/shared/api/protocol.ts`）进入，
+无法解析的相对 import 即失败，`src/` 下每个文件都必须是根文件、位于 `src/protocol/`、位于
+`src/host/{shared,entities,features}/`、是 `src/client/index.tsx` 或 `src/client/index.test.tsx`，
+或位于 `src/client/{shared,entities,features,widgets,pages}/`。增删 slice 请同步本结构图。
+
+`/auth/*` 端点的线上形状（status、用户列表、改密与管理重置的请求体、响应体、错误体，以及 `UserRole`、
+`SessionKind`、`PasswordRule`）是 `src/protocol/payloads.ts` 里的纯类型，由 `src/protocol/index.ts` 再导出，
+经同样两个桥进入。任何一个半边都不得重新声明它们：host 用它们给写出点收窄类型、用
+`formField<Request>(params, name)` 读字段；client 给请求对象标注类型后交给 `encodeForm`，读响应体时经
+`Unchecked<T>`（键按契约，值是 `unknown`，仍逐字段校验）。`shared` 是最低层，host 与 client 的任何层都能
+直接引到它们，不需要 `@x`。
 
 ## 已提交的构建产物
 
-`lib/` 由 `tsc -p tsconfig.build.json` 生成，且**提交入库**、绝不手工编辑：
+`lib/` 由 `npm run build` 生成（`scripts/clean-lib.mjs` 先清空，再依次 `tsc -p tsconfig.build.json`、
+`tsdown`、`tsc -p tsconfig.client.build.json`），且**提交入库**、绝不手工编辑，所以它恰好等于构建产物、没有孤儿文件：
 
 - 从 git 安装本包的消费者（`dsh plugin add <git-url>`）拿到的是开箱即用的包，
   服务器上无需任何构建工具链；
@@ -158,7 +182,7 @@ client/host 隔离、无法解析即失败）；增删切片请同步本结构�
 
 `.github/workflows/ci.yml` 在每次推送到 `main` 和每个 PR 上运行，且同时跑在
 **ubuntu-latest 与 windows-latest**（关闭 fail-fast）：`npm ci`、格式检查、lint、
-no-emdash、slice 边界、决策记录、类型检查、覆盖率测试、构建、bundle 检查，
+no-emdash、slice 边界、FSD 分层（Steiger）、决策记录、类型检查、覆盖率测试、构建、bundle 检查、宿主契约检查，
 然后是两道一致性门禁：
 
 1. **已提交产物一致性（Committed artifact parity）**：全新构建后 `git diff --exit-code -- lib`

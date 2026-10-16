@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
-import { SettingsAccountSection } from "./account-section.tsx";
-import type { AuthSlotRegisterOptions, AuthContext } from "./context.ts";
+import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./shared/i18n/index.ts";
+import { SettingsAccountSection } from "./widgets/account-section/index.ts";
+import type { AuthSlotRegisterOptions, AuthContext } from "./shared/api/index.ts";
 import { apply } from "./index.tsx";
-import { SettingsLogoutAction } from "./logout-action.tsx";
+import { SettingsLogoutAction } from "./features/logout/index.ts";
 
 interface RegisterCall {
   opts: AuthSlotRegisterOptions;

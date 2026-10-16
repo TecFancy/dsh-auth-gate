@@ -1,10 +1,10 @@
 import type { IncomingMessage } from "node:http";
-import { type AdminRoutes } from "./features/admin/index.js";
-import { LoginRateLimiter } from "./shared/index.js";
-import type { SessionStore } from "./session/index.js";
+import { type AdminRoutes } from "./host/features/admin/index.js";
+import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
+import type { SessionStore } from "./host/entities/session/index.js";
 /**
  * P2 管理面的 root 侧装配（从 `src/index.ts` 拆出，守住 250 行文件上限）：
- * 新独立限流桶 + 锁内写盘 + 吊销探针 + 双桶清理，全部在这里注入 `features/admin`。
+ * 新独立限流桶 + 锁内写盘 + 吊销探针 + 双桶清理，全部在这里注入 `host/features/admin`。
  *
  * 三条口径：
  * - **现读**：权限判定与目标判定都走 `loadUsersFile`（每请求现读，绝不信会话缓存）；

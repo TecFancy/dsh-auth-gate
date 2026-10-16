@@ -1,0 +1,1 @@
+{"version":3,"file":"account-form.d.ts","sourceRoot":"","sources":["../../../../../src/client/features/change-password/ui/account-form.tsx"],"names":[],"mappings":"AAQA,OAAO,EAAgB,KAAK,gBAAgB,EAAE,MAAM,+BAA+B,CAAC;AA8IpF;;;;GAIG;AACH,MAAM,WAAW,wBAAwB;IACvC,CAAC,EAAE,gBAAgB,CAAC;CACrB;AAED,wCAAwC;AACxC,wBAAgB,mBAAmB,CAAC,EAAE,CAAC,EAAE,EAAE,wBAAwB,+BAsElE"}

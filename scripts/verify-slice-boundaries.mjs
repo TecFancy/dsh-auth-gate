@@ -1,80 +1,52 @@
 #!/usr/bin/env node
 /**
- * Verifies dsh-auth-gate's slice boundaries (adapted from dsh-plugin-framework's
- * verify-slice-boundaries.mjs; framework-specific entities layer, client path
- * aliases and css-module handling are dropped).
+ * Verifies the few source-tree boundaries that Steiger cannot see (D30, D31). Everything
+ * Feature-Sliced Design itself prescribes (layer order, same-layer isolation, public API
+ * entry through `index.ts`, `@x` cross-imports, naming) is Steiger's job: `npm run lint:fsd`
+ * runs it over `src/host` and over `src/client`. This script only keeps what lies outside the
+ * analysed trees:
  *
- * Layers:
- *   root      src/index.ts, src/launch-token-bridge.ts, src/cli.ts, src/proxy-cli.ts
- *             + their tests + src/integration.*.test.ts and
- *             src/guard-proxy-deny.test.ts
- *   gate      src/gate/**        (one slice)
- *   shared    src/shared/**      (one slice, leaf - no upward deps)
- *   session   src/session/**      (core mechanism layer like gate/)
- *   http      src/http/**        (core mechanism layer: auth endpoint pieces shared by
- *             the token and password feature slices; may import gate/session/shared,
- *             never features/)
- *   features  src/features/<f>/**  (token | password | proxy | totp)
- *   client    src/client/**      (separate half: no host<->client imports)
- *
- * Rules:
- *   1. A cross-slice import may only land on the target slice's index.ts
- *      barrel (src/index.ts and the integration tests are assembly roots and
- *      must enter every slice through its barrel).
- *   2. Slices inside features/ may never import each other, even through
- *      barrels (token/password/proxy are independent feature surfaces).
- *   3. shared/ is a leaf: nothing may import it without going through its
- *      barrel, and it imports nothing but its own files.
- *   4. client/ is isolated from the host half in both directions.
- *   5. Imports that cannot be resolved fail (fail-closed: an unknown shape
- *      must never pass the gate silently).
+ *   1. Half isolation. `src/client/**` and the host half (`src/host/**` plus the root files
+ *      directly under `src/`) never import each other, in either direction.
+ *   2. Barrel-only entry. A root file (anything directly under `src/`, entry points, wiring
+ *      and their tests) may enter `src/host/` only through a slice or segment `index.ts`:
+ *      `src/host/{entities,features}/<slice>/index.ts` or `src/host/shared/<segment>/index.ts`.
+ *   3. Fail-closed resolution. A relative import that cannot be resolved to a file fails: an
+ *      unknown shape must never pass the gate silently. Imports that resolve outside `src/`
+ *      (the shared `test/` harness) are leaves and are allowed.
+ *   4. One shared contract (D31). `src/protocol/` holds the cross-half route contract. It
+ *      imports nothing outside itself, and it is entered only through `src/protocol/index.ts`
+ *      and only by the two bridges: `src/host/shared/protocol/index.ts` (host half) and
+ *      `src/client/shared/api/protocol.ts` (client half). Every other file reaches the contract
+ *      through its own half's bridge, so Steiger keeps seeing ordinary shared imports.
+ *   5. No stray files. Every `.ts`/`.tsx` file under `src/` is a root file, lies under
+ *      `src/protocol/`, lies under `src/host/{shared,entities,features}/`, is `src/client/index.tsx` or
+ *      `src/client/index.test.tsx` (the only direct children of `src/client/`), or lies under
+ *      `src/client/{shared,entities,features,widgets,pages}/`; anything else (for example a
+ *      leftover `src/gate/`, a file directly in `src/host/`, or a flat `src/client/foo.ts`) fails.
  */
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs";
-import { join, dirname, relative, basename, sep } from "node:path";
+import { join, dirname, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC_DIR = join(ROOT, "src");
 const CODE_EXT = /\.(ts|tsx)$/;
-const FEATURE_SLICES = new Set(["token", "password", "proxy", "totp", "admin"]);
-const ROOT_FILES = new Set([
-  "index.ts",
-  "admin-wiring.ts",
-  "token-resolver.ts",
-  "cli-skill.ts",
-  "launch-token-bridge.ts",
-  "index.test.ts",
-  "index.password.test.ts",
-  "cli.ts",
-  "cli.test.ts",
-  "cli.enable.test.ts",
-  "cli.totp.test.ts",
-  "cli.passwd.test.ts",
-  "cli.passwd.stdin.test.ts",
-  "proxy-cli.ts",
-  "proxy-cli.entry.test.ts",
-  "proxy-cli.test.ts",
-  "integration.auth.test.ts",
-  "integration.cross-site.test.ts",
-  "integration.guard.test.ts",
-  "integration.password.test.ts",
-  "integration.password-change.test.ts",
-  "integration.password-change.totp.test.ts",
-  "integration.p11-pins.test.ts",
-  "integration.p2-admin.test.ts",
-  "integration.p2-admin-hardening.test.ts",
-  "integration.p2-restricted.test.ts",
-  "integration.password.rate.test.ts",
-  "integration.revoke.test.ts",
-  "integration.session.test.ts",
-  "integration.totp.test.ts",
-  "integration.totp-hardening.test.ts",
-  "integration-totp-helpers.ts",
-  "integration-p2-helpers.ts",
-  "integration-password-change-helpers.ts",
-  "integration-auth-helpers.ts",
-  "guard-proxy-deny.test.ts",
+const HOST_LAYERS = /^host\/(shared|entities|features)\//;
+/** Client layout: the entry and its test directly, everything else under an FSD layer. */
+const CLIENT_ENTRY = /^client\/index(?:\.test)?\.tsx$/;
+const CLIENT_LAYERS = /^client\/(shared|entities|features|widgets|pages)\//;
+/** The only host files a root file may import: a slice or a shared-segment barrel. */
+const HOST_BARREL = /^host\/(?:(?:entities|features)\/[^/]+|shared\/[^/]+)\/index\.ts$/;
+/** The cross-half contract (D31): its tree, its only entry, and the two files that may enter it. */
+const PROTOCOL_TREE = /^protocol\//;
+const PROTOCOL_ENTRY = "protocol/index.ts";
+const PROTOCOL_BRIDGES = new Set([
+  "host/shared/protocol/index.ts",
+  "client/shared/api/protocol.ts",
 ]);
+/** `from "./x"`, bare `import "./x"`, `import("./x")` and `vi.mock("./x")` specifiers. */
+const SPECIFIER = /(?:\bfrom\s+|\bimport\s*\(?\s*|\bvi\.mock\(\s*)"(\.[^"]+)"/g;
 const errors = [];
 
 const toPosix = (p) => p.split(sep).join("/");
@@ -91,93 +63,86 @@ function collectFiles(dir, out = []) {
   return out;
 }
 
-/** Slice identifier for a src-relative path, or null when unrecognized. */
-function sliceOf(rel) {
-  const parts = rel.split("/");
-  if (parts.length === 1) return ROOT_FILES.has(rel) ? "root" : null;
-  if (parts[0] === "client") return "client";
-  if (parts[0] === "gate" || parts[0] === "session" || parts[0] === "http") return parts[0];
-  if (parts[0] === "shared") return "shared";
-  if (parts[0] === "features" && FEATURE_SLICES.has(parts[1])) return `feature:${parts[1]}`;
+/** Which tree a src-relative path belongs to, or null for a stray file. */
+function zoneOf(rel) {
+  if (!rel.includes("/")) return "root";
+  if (PROTOCOL_TREE.test(rel)) return "protocol";
+  if (CLIENT_ENTRY.test(rel) || CLIENT_LAYERS.test(rel)) return "client";
+  if (HOST_LAYERS.test(rel)) return "host";
   return null;
 }
 
-/** The barrel a cross-slice import must land on, per target slice. */
-function barrelOf(slice) {
-  switch (slice) {
-    case "gate":
-      return "gate/index.ts";
-    case "session":
-      return "session/index.ts";
-    case "http":
-      return "http/index.ts";
-    case "shared":
-      return "shared/index.ts";
-    default:
-      return slice.startsWith("feature:")
-        ? `features/${slice.slice("feature:".length)}/index.ts`
-        : null;
-  }
-}
-
-/** Resolve a relative specifier to a src-relative file path, or null. */
+/** Resolve a relative specifier to a src-relative file path; null when it does not resolve. */
 function resolveTarget(parentRel, spec) {
-  let rel = join(dirname(parentRel), spec);
-  rel = toPosix(rel.replace(/\.(js|ts|tsx)$/, ""));
-  const withExt = ["", ".ts", ".tsx"].map((e) => rel + e).find((p) => existsSync(join(SRC_DIR, p)));
-  return withExt === undefined ? null : withExt;
+  const base = toPosix(join(dirname(parentRel), spec).replace(/\.(js|ts|tsx)$/, ""));
+  return ["", ".ts", ".tsx"].map((e) => base + e).find((p) => isFile(join(SRC_DIR, p))) ?? null;
 }
 
-/** A leaf target outside src/ that tests may import (test/ shared harness). */
-const TEST_DIR = join(ROOT, "test");
+function isFile(p) {
+  return existsSync(p) && statSync(p).isFile();
+}
+
+/** An import that lands outside `src/` on an existing file (the `test/` harness leaf). */
+function isOutsideLeaf(parentRel, spec) {
+  const abs = join(dirname(join(SRC_DIR, parentRel)), spec).replace(/\.(js|ts|tsx)$/, "");
+  if (!relative(SRC_DIR, abs).startsWith("..")) return false;
+  return [".ts", ".tsx"].some((e) => isFile(abs + e));
+}
+
+/**
+ * Rule 4 for one import edge. Returns undefined when the edge does not touch the contract (the
+ * other rules decide), null when it is an allowed contract edge, or the error message.
+ */
+function checkProtocolEdge(rel, fromZone, targetRel, toZone) {
+  if (fromZone === "protocol") {
+    return toZone === "protocol"
+      ? null
+      : `${rel}: src/protocol 只能引用自己的文件（当前指向 ${targetRel}）`;
+  }
+  if (toZone !== "protocol") return undefined;
+  if (!PROTOCOL_BRIDGES.has(rel)) {
+    return `${rel}: 只有 ${[...PROTOCOL_BRIDGES].join(" 与 ")} 可以引用 src/protocol，其余文件经本半边的桥`;
+  }
+  return targetRel === PROTOCOL_ENTRY
+    ? null
+    : `${rel}: 引用 src/protocol 必须落在 ${PROTOCOL_ENTRY}（当前指向 ${targetRel}）`;
+}
 
 for (const file of collectFiles(SRC_DIR)) {
   const rel = toPosix(relative(SRC_DIR, file));
-  const Fslice = sliceOf(rel);
-  if (Fslice === null) {
-    errors.push(`${rel}: 不认识的路径（未列入 root 白名单或未被识别的层）`);
+  const fromZone = zoneOf(rel);
+  if (fromZone === null) {
+    errors.push(
+      `${rel}: 不在允许的位置（只能是 src/ 根文件、src/protocol/、src/host/{shared,entities,features}/、src/client/index(.test).tsx 或 src/client/{shared,entities,features,widgets,pages}/）`,
+    );
     continue;
   }
   const text = readFileSync(file, "utf8");
-  const specifiers = [...text.matchAll(/from\s+"(\.[^"]+)"/g)].map((m) => m[1]);
-  for (const spec of specifiers) {
-    // 测试共享 harness（src/ 外叶子）：任何 slice 可引，仅经相对路径解析到 test/ 时允许
-    const testTarget = toPosix(join(dirname(join(SRC_DIR, rel)), spec)).replace(
-      /\.(js|ts|tsx)$/,
-      "",
-    );
-    if (testTarget.startsWith(toPosix(TEST_DIR)) && existsSync(testTarget + ".ts")) {
-      continue;
-    }
+  for (const [, spec] of text.matchAll(SPECIFIER)) {
+    if (isOutsideLeaf(rel, spec)) continue;
     const targetRel = resolveTarget(rel, spec);
     if (targetRel === null) {
       errors.push(`${rel}: import "${spec}" 无法解析到 src 下的文件（fail-closed）`);
       continue;
     }
-    const Ts = sliceOf(targetRel);
-    if (Ts === null) {
-      errors.push(`${rel}: import "${spec}" 落入不认识的路径 ${targetRel}`);
+    const toZone = zoneOf(targetRel);
+    if (toZone === null) {
+      errors.push(`${rel}: import "${spec}" 落入不允许的位置 ${targetRel}`);
       continue;
     }
-    if (Ts === Fslice) continue; // same-slice deep imports are fine
-
-    // client half and host half are isolated both ways.
-    if (Ts === "client" || Fslice === "client") {
-      if (Ts !== Fslice) errors.push(`${rel}: client 半区与 host 半区禁止互引（${targetRel}）`);
+    const protocolError = checkProtocolEdge(rel, fromZone, targetRel, toZone);
+    if (protocolError !== undefined) {
+      if (protocolError !== null) errors.push(protocolError);
       continue;
     }
-    // Slices inside features/ never import each other, even via barrels.
-    if (Fslice.startsWith("feature:") && Ts.startsWith("feature:")) {
-      errors.push(`${rel}: features 同层 slice 禁止互引（${Fslice} -> ${Ts}）`);
+    if ((fromZone === "client") !== (toZone === "client")) {
+      errors.push(`${rel}: client 半区与 host 半区禁止互引（${targetRel}）`);
       continue;
     }
-    const barrel = barrelOf(Ts);
-    if (barrel === null) {
-      errors.push(`${rel}: 跨 slice import 目标 ${targetRel} 没有可用的 barrel`);
-      continue;
-    }
-    if (targetRel !== barrel) {
-      errors.push(`${rel}: 跨 slice import 必须落在 ${barrel}（当前指向 ${targetRel}）`);
+    if (fromZone === "root" && toZone === "host" && !HOST_BARREL.test(targetRel)) {
+      errors.push(
+        `${rel}: 根文件进入 src/host 必须经 slice 或 shared 段的 index.ts（当前指向 ${targetRel}）`,
+      );
     }
   }
 }
@@ -187,4 +152,6 @@ if (errors.length > 0) {
   for (const error of errors) console.error("  - " + error);
   process.exit(1);
 }
-console.log("OK: slice boundaries hold (barrel-only cross-slice imports, no feature cross-talk)");
+console.log(
+  "OK: client/host halves isolated, src/protocol entered only through its two bridges, root files enter src/host only through index.ts, no stray files",
+);

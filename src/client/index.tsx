@@ -1,9 +1,14 @@
-import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./account-copy.ts";
-import { installAccountNavIcon } from "./account-nav-icon.ts";
-import { SettingsAccountSection } from "./account-section.tsx";
-import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./admin-copy.ts";
-import type { AuthContext } from "./context.ts";
-import { SettingsLogoutAction } from "./logout-action.tsx";
+import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./shared/i18n/index.ts";
+import { installAccountNavIcon } from "./features/nav-icon/index.ts";
+import { SettingsAccountSection } from "./widgets/account-section/index.ts";
+import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./features/admin-users/index.ts";
+import {
+  STATUS_PATH,
+  type AuthContext,
+  type StatusResponse,
+  type Unchecked,
+} from "./shared/api/index.ts";
+import { SettingsLogoutAction } from "./features/logout/index.ts";
 
 /** 本插件文案的词典命名域（locale 服务按 (ns, locale) 分开注册）。 */
 const AUTH_NS = "auth";
@@ -95,9 +100,9 @@ export function apply(ctx: AuthContext): void {
     // 与 SettingsLogoutAction 相同的 status 探针：读 host 的 logoutOrder 配置并在
     // 不同时重注册。探针抛错（如测试环境无 fetch）保持默认，绝不吞掉注册。
     try {
-      void fetch("/auth/status")
-        .then((res) => res.json() as Promise<{ logoutOrder?: unknown }>)
-        .then((body: { logoutOrder?: unknown }) => {
+      void fetch(STATUS_PATH)
+        .then((res) => res.json() as Promise<Unchecked<StatusResponse>>)
+        .then((body: Unchecked<StatusResponse>) => {
           const order = body.logoutOrder;
           if (
             typeof order !== "number" ||

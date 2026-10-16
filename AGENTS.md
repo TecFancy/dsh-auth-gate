@@ -66,8 +66,8 @@ tables).
 
 ## Verifying a change actually works
 
-1. **`npm run verify`** — format check + lint + type-check + coverage tests
-   (80% red line) + `lock:check`. Must pass before committing.
+1. **`npm run verify`** - format check + lint + layering (`slice:check`, `lint:fsd`) +
+   type-check + coverage tests (80% red line) + `lock:check`. Must pass before committing.
 2. **`src/` edits require rebuilding `lib/`** (`npm run build`) and committing
    the regenerated artifact in the same change. `lib/` is generated, never
    hand-edited, and CI fails on drift (`git diff --exit-code -- lib`).
@@ -99,3 +99,14 @@ Versioning is owned by release-please (`.github/workflows/release.yml`):
 
 See `README.md`. Docs live under `docs/` (plan + development conventions);
 build output under `lib/`; CI parity checks under `.github/workflows/`.
+
+Source layout follows Feature-Sliced Design (decision D30, in `docs/decisions/implemented/`):
+the host half lives in `src/host/` with the lower three layers (`shared`, `entities`,
+`features`) and the client half in `src/client/` with `shared`, `entities`, `features` and
+`widgets` (no `app`, `index.tsx` stays at its root); both are checked by Steiger
+(`npm run lint:fsd`). Entry points and wiring sit at the `src/` root. Cross-slice and
+cross-segment imports go through `index.ts`, features never import each other, and the client
+and host halves never import each other (`slice:check`). The `/auth/*` paths both halves share
+live only in `src/protocol/` (D31), reached through `src/host/shared/protocol/` and
+`src/client/shared/api/protocol.ts`; never write a route literal anywhere else. The tree is in
+`docs/specs/development.md` "Structure".

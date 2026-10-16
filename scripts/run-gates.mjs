@@ -24,6 +24,7 @@ const SCENE_OF = {
   lint: "hygiene",
   "lint:no-emdash": "hygiene",
   "slice:check": "hygiene",
+  "lint:fsd": "hygiene",
   "aliases:check": "hygiene",
   "lock:check": "hygiene",
   "decisions:check": "hygiene",
@@ -35,6 +36,7 @@ const SCENE_OF = {
   test: "tests",
   build: "build",
   "bundle:check": "build",
+  "host:check": "build",
 };
 
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
@@ -67,6 +69,7 @@ for (const gate of GATES) SCENARIOS[SCENE_OF[gate]].push(gate);
 // answer for shapes the map does not know (dependency changes, unknown files).
 const RULES = [
   { re: /^src\//, scenes: ["hygiene", "types", "tests", "build"] },
+  { re: /^test\//, scenes: ["hygiene", "types", "tests"] }, // tests and harnesses outside src/
   { re: /^lib\//, scenes: ["hygiene", "build"] }, // build artifacts
   {
     re: /^(scripts\/|.*\.config\.(js|mjs|ts)$|aliases\.json|tsconfig.*\.json$)/,
