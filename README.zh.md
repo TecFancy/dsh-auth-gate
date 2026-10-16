@@ -318,6 +318,13 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 无论用哪种方式调用，CLI 读写的都是同一份共享用户列表（`$DSH_HOME/auth/users.yaml`，找不到时
 回退到 `~/.dsh/auth/users.yaml`），也就是插件读取的那份；全局安装的副本只是一个启动器。
 
+### 从其他站点打开 dsh
+
+跨站顶层导航（别的站点点链接、`127.0.0.1` 跳 `localhost`）只会带上 `SameSite=Lax` 的会话 cookie，
+不带 dsh web 自带的 `SameSite=Strict` cookie。对 gate 放行的请求，会先回一张很小的同源页面，
+让浏览器重新导航到同一 URL，第二次请求就同时带上两个 cookie。可能看到一次短暂的空白闪烁，无需操作；
+没有 JavaScript 时点 `Continue` 链接即可。
+
 ## 部署
 
 - [反向代理部署指南](docs/deployed/reverse-proxy_zh.md)：Caddy/nginx 配置、浏览器信任栅栏的坑

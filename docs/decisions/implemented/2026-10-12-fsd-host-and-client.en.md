@@ -1,4 +1,4 @@
-# D29. The host half moves into `src/host/` with the lower three FSD layers; the client half uses five FSD layers
+# D30. The host half moves into `src/host/` with the lower three FSD layers; the client half uses five FSD layers
 
 ## Decision
 
@@ -174,7 +174,7 @@ shows only renames and import lines:
    now also requires every client file to be `src/client/index.tsx`, `src/client/index.test.tsx`,
    or under `src/client/{shared,entities,features,widgets,pages}/`.
 
-With step 4 done, this record is implemented and registered in `docs/decisions.md` as D29; D5 and
+With step 4 done, this record is implemented and registered in `docs/decisions.md` as D30; D5 and
 D11 are archived (their hashes registered). This bookkeeping waited for step 4 rather than step 3
 because until then the client half still followed D5, so D5 and D11 remained in force for it. Old
 paths cited by implemented records, `docs/implemented/` and `docs/handoff/` are left alone: they

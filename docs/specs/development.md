@@ -35,7 +35,7 @@ Run tests by name: `npm run test -- -t "guard"`
 
 ## Structure
 
-Feature-Sliced Design layout (D29, see [`docs/decisions.md`](./decisions.md)). The host half
+Feature-Sliced Design layout (D30, see [`docs/decisions.md`](./decisions.md)). The host half
 uses the lower three of FSD's six layers under `src/host/`; the entry points and wiring sit
 at the `src/` root, beside the analysed tree. The client half uses the layers it needs of the
 five under `src/client/` (no `app`: a plugin owns no application shell), with `index.tsx` at

@@ -3,6 +3,7 @@
  * 守卫核心机制：Gate 决策词汇 + webServer 包装 + 启动自检。
  * 2026-09-13：由 `export *` 改为显式清单；新增导出必须在此登记。
  */
+export { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
 export { noopGate } from "./gate.js";
 export type {
   Gate,

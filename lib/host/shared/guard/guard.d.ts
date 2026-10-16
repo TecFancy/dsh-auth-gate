@@ -65,6 +65,7 @@ export declare function isGuarded(target: (...args: never[]) => unknown): boolea
 /**
  * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫按 gate 给出的
  * 决策写 302/401/403，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
+ * allow 但属跨站顶层文档导航时不进原 handler，改回同源弹回页（见 `serveCrossSiteBounce`）。
  */
 export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler): HttpHandler;
 /**

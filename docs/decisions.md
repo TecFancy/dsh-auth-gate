@@ -40,13 +40,13 @@
 → [zh](decisions/implemented/2026-08-30-configurable-logout-order.zh.md) ·
 [en](decisions/implemented/2026-08-30-configurable-logout-order.en.md)（回填自 v0.10.0）
 
-## D5. src 分层 + 跨 slice 只走 barrel（已归档，被 D29 取代）
+## D5. src 分层 + 跨 slice 只走 barrel（已归档，被 D30 取代）
 
 `gate/`/`session/` 核心机制层 + `features/{token,password,proxy}` + `shared/` 叶子层，
 跨 slice 唯一 barrel 入口，feature 同层互禁；verify 链新增 slice/bundle/no-emdash/build 门禁。
 **替代方案**：完整 FSD；保持平铺；session 作 feature slice（执行中被边界检查否决，降层）；
 轻量 ADR 制度（被官方实践否决）。**为什么**：层匹配依赖图，机器约束防回潮。
-目录部分已被 D29 取代（`gate/`/`session/`/`http/` 核心机制层改为 FSD 的 `src/host/` 下三层，client 半边也分层）；
+目录部分已被 D30 取代（`gate/`/`session/`/`http/` 核心机制层改为 FSD 的 `src/host/` 下三层，client 半边也分层）；
 「跨 slice 只走 index.ts」「feature 同层互禁」「client 与 host 互不引用」三条纪律保留，改由 Steiger 与
 `slice:check` 执行。
 → [zh](decisions/archived/2026-08-30-layered-src-with-barrels.zh.md) ·
@@ -96,14 +96,14 @@ revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估
 → [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
 [en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
 
-## D11. 认证 HTTP 端点公共件独立成 http 层（已归档，被 D29 取代）
+## D11. 认证 HTTP 端点公共件独立成 http 层（已归档，被 D30 取代）
 
 token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进新核心机制层
 `src/http/`（与 gate、session 并列，经 barrel 引用），`shared` 保持叶子层不变。
 **替代方案**：下沉 `shared`（破坏叶子约束，或得把 cookie 构造当参数注入）；
 塞进 `session`（methodNotAllowed 与会话无关）；保持重复（改一处得记得另一处）。
 **为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
-`src/http/` 层已被 D29 取代：与会话无关的件进 `src/host/shared/http`，`handleLogout`/`handleStatus`
+`src/http/` 层已被 D30 取代：与会话无关的件进 `src/host/shared/http`，`handleLogout`/`handleStatus`
 进 `src/host/entities/session/api`。
 → [zh](decisions/archived/2026-09-13-http-endpoint-layer.zh.md) ·
 [en](decisions/archived/2026-09-13-http-endpoint-layer.en.md)（2026-10-13 归档）
@@ -406,7 +406,19 @@ dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实�
 → [zh](decisions/implemented/2026-10-07-host-corridor-floor.zh.md) ·
 [en](decisions/implemented/2026-10-07-host-corridor-floor.en.md)
 
-## D29. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 分层
+## D29. 跨站顶层导航先回一张同源弹回页
+
+gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site: cross-site` + `Sec-Fetch-Dest: document`）时，
+`guardHttp` 不进原 handler，回一张静态页（唯一脚本 `location.replace(location.href)`，CSP 钉脚本 sha256，
+`no-store` + `no-referrer`），由同源文档重新导航，让 dsh 的 `SameSite=Strict` cookie 随第二次请求送出。
+**替代方案**：外层 cookie 也改 Strict（每次跨站进入都被踢去登录）；插件改写内层 cookie（耦合宿主内部）；302/303 回同一 URL
+（跨站发起者不变）；把 URL 插值进页面（多一个反射面）。
+**为什么**：外层 Lax、内层 Strict，跨站导航只带前者，dsh 回 401，F5 沿用跨站上下文修不好；
+同源文档发起的导航才算同站，且重试的 `Sec-Fetch-Site` 是 `same-origin`，构造上不循环。
+→ [zh](decisions/implemented/2026-10-13-cross-site-navigation-bounce.zh.md) ·
+[en](decisions/implemented/2026-10-13-cross-site-navigation-bounce.en.md)
+
+## D30. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 分层
 
 两个半边都改用 Feature-Sliced Design 分层并由 Steiger 守护（`npm run lint:fsd` 先后跑 `src/host` 与
 `src/client`）：host 收进 `src/host/{shared,entities,features}`（无 widgets/pages/app，入口与装配留在

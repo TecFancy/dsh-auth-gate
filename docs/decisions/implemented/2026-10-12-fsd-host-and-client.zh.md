@@ -1,4 +1,4 @@
-# D29. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 五层
+# D30. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 五层
 
 ## 决定了什么
 
@@ -139,7 +139,7 @@ host 半边的依赖图本身是干净的：feature 之间零互引，`slice:che
 src/client`）。`slice:check` 的「不许有游离文件」现在也要求每个 client 文件要么是 `src/client/index.tsx`、
    `src/client/index.test.tsx`，要么位于 `src/client/{shared,entities,features,widgets,pages}/` 之下。
 
-第 4 步完成后，本记录已实施，并在 `docs/decisions.md` 登记为 D29；D5 与 D11 已归档（哈希已登记）。
+第 4 步完成后，本记录已实施，并在 `docs/decisions.md` 登记为 D30；D5 与 D11 已归档（哈希已登记）。
 这些收尾放在第 4 步而不是第 3 步，是因为在那之前 client 半边仍遵循 D5，D5 与 D11 对它依然有效。已实施
 记录与 `docs/implemented/`、`docs/handoff/` 里引用的旧路径不改：它们记录的是写下时的代码。
 `docs/specs/src-refactor-plan*`（D5 的执行方案）加了一条「历史文档」说明。

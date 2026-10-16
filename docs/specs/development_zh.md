@@ -33,7 +33,7 @@ Vitest。所有环节都收敛到一条命令。
 
 ## 目录结构
 
-Feature-Sliced Design 分层布局（D29，见 [`docs/decisions.md`](./decisions.md)）。host 半边在
+Feature-Sliced Design 分层布局（D30，见 [`docs/decisions.md`](./decisions.md)）。host 半边在
 `src/host/` 下只用 FSD 六层中的下三层；入口与装配留在 `src/` 根，位于被分析的目录树之外。
 client 半边在 `src/client/` 下按需使用五层中的若干层（没有 `app`：插件不拥有应用外壳），`index.tsx`
 留在它的树根。
