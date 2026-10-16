@@ -1,3 +1,4 @@
+import { USERS_PASSWORD_PATH, USERS_PATH } from "../../../shared/api/index.ts";
 import { describeAdminFailure } from "../lib/admin-failure.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "../lib/admin-copy.ts";
 import type {
@@ -18,8 +19,8 @@ import type {
 
 export { describeAdminFailure };
 
-const USERS_TARGET = "/auth/users";
-const RESET_TARGET = "/auth/users/password";
+const USERS_TARGET = USERS_PATH;
+const RESET_TARGET = USERS_PASSWORD_PATH;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

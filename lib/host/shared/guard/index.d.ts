@@ -6,7 +6,7 @@
 export { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
 export { noopGate } from "./gate.js";
 export type { Gate, GateDecision, GateDeny, GateRedirectDeny, GateStatusDeny, GateUpgradeDeny, GuardKind, } from "./gate.js";
-export { AUTH_PATH_PREFIX, denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, LOGIN_PATH, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, wrapServer, } from "./guard.js";
+export { denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, wrapServer, } from "./guard.js";
 export type { GuardLog, HttpHandler, UpgradeHandler, WrappableRoute, WrappableServer, WrappableUpgradeRoute, } from "./guard.js";
 export { assertGuarded } from "./self-check.js";
 //# sourceMappingURL=index.d.ts.map

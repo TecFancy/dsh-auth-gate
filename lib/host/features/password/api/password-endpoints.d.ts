@@ -1,6 +1,6 @@
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type UsersSnapshot } from "../../../entities/user/index.js";
-import { type HttpHandler } from "../../../shared/guard/index.js";
+import type { HttpHandler } from "../../../shared/guard/index.js";
 import { type PasswordLoginDeps } from "../model/password-login.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 /** 改密端点的接线（§5）：写盘 / 哈希 / 独立限速桶 / 防重放 / 撤销会话，由 index.ts 注入。 */

@@ -51,12 +51,14 @@ src/
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
 ├── cli-skill.ts           # `dsh-auth skill install`
 ├── *.test.ts              # root tests: entry points, CLI, manifest checks (host-corridor, manifest-*)
+├── protocol/              # cross-half contract (D31): /auth paths and login URL builders; imports nothing
 ├── host/                  # host half: three FSD layers, analysed by Steiger (`npm run lint:fsd`)
 │   ├── shared/            #   layer without slices: segments only, each with its own index.ts
 │   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, startup self-check
 │   │   ├── http/          #     cookie / form body / Origin / Host / client IP / `next` / login redirect,
 │   │   │                  #     plus the session-independent authCatchAll, queryOf, methodNotAllowed
 │   │   ├── login-page/    #     self-contained login page (token, password and TOTP challenge variants)
+│   │   ├── protocol/      #     bridge to src/protocol: the host half's only way in
 │   │   ├── rate-limit/    #     two-bucket login rate limiter
 │   │   ├── skill/         #     `dsh-auth skill install`
 │   │   └── lib/           #     leaf helpers (`dshHomeDir`)
@@ -75,7 +77,8 @@ src/
 └── client/                # client half: five FSD layers, analysed by Steiger, never imports the host half
     ├── index.tsx                 # bundle entry (tsdown) and host slot wiring; root of the analysed tree
     ├── shared/                   # segments only, each with its own index.ts
-    │   ├── api/                  # `AuthContext`: local mirror of the host slot context (types only)
+    │   ├── api/                  # `AuthContext` (local mirror of the host slot context, types only) and
+    │   │                         # `protocol.ts`, the client half's bridge to src/protocol
     │   ├── i18n/                 # account copy: keys, zh/en dictionaries, translate helpers
     │   └── ui/                   # shared inline styles and the account icon paths
     ├── entities/
@@ -103,8 +106,10 @@ Layering is enforced by two gates. `npm run lint:fsd` runs Steiger once per half
 order, same-layer isolation, public API through `index.ts`, `@x` cross-imports, naming).
 `npm run slice:check` keeps only what Steiger cannot see: the client and host halves never
 import each other, root files enter `src/host` only through a slice or segment `index.ts`,
+`src/protocol/` imports nothing outside itself and is entered only through its `index.ts` by
+the two bridges (`src/host/shared/protocol/index.ts`, `src/client/shared/api/protocol.ts`),
 unresolvable relative imports fail, and every file under `src/` is a root file, under
-`src/host/{shared,entities,features}/`, `src/client/index.tsx` or `src/client/index.test.tsx`,
+`src/protocol/`, under `src/host/{shared,entities,features}/`, `src/client/index.tsx` or `src/client/index.test.tsx`,
 or under `src/client/{shared,entities,features,widgets,pages}/`. Adding or removing a slice
 means updating this tree.
 

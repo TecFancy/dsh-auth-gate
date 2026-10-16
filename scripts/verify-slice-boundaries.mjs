@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verifies the few source-tree boundaries that Steiger cannot see (D29). Everything
+ * Verifies the few source-tree boundaries that Steiger cannot see (D30, D31). Everything
  * Feature-Sliced Design itself prescribes (layer order, same-layer isolation, public API
  * entry through `index.ts`, `@x` cross-imports, naming) is Steiger's job: `npm run lint:fsd`
  * runs it over `src/host` and over `src/client`. This script only keeps what lies outside the
@@ -14,8 +14,13 @@
  *   3. Fail-closed resolution. A relative import that cannot be resolved to a file fails: an
  *      unknown shape must never pass the gate silently. Imports that resolve outside `src/`
  *      (the shared `test/` harness) are leaves and are allowed.
- *   4. No stray files. Every `.ts`/`.tsx` file under `src/` is a root file, lies under
- *      `src/host/{shared,entities,features}/`, is `src/client/index.tsx` or
+ *   4. One shared contract (D31). `src/protocol/` holds the cross-half route contract. It
+ *      imports nothing outside itself, and it is entered only through `src/protocol/index.ts`
+ *      and only by the two bridges: `src/host/shared/protocol/index.ts` (host half) and
+ *      `src/client/shared/api/protocol.ts` (client half). Every other file reaches the contract
+ *      through its own half's bridge, so Steiger keeps seeing ordinary shared imports.
+ *   5. No stray files. Every `.ts`/`.tsx` file under `src/` is a root file, lies under
+ *      `src/protocol/`, lies under `src/host/{shared,entities,features}/`, is `src/client/index.tsx` or
  *      `src/client/index.test.tsx` (the only direct children of `src/client/`), or lies under
  *      `src/client/{shared,entities,features,widgets,pages}/`; anything else (for example a
  *      leftover `src/gate/`, a file directly in `src/host/`, or a flat `src/client/foo.ts`) fails.
@@ -33,6 +38,13 @@ const CLIENT_ENTRY = /^client\/index(?:\.test)?\.tsx$/;
 const CLIENT_LAYERS = /^client\/(shared|entities|features|widgets|pages)\//;
 /** The only host files a root file may import: a slice or a shared-segment barrel. */
 const HOST_BARREL = /^host\/(?:(?:entities|features)\/[^/]+|shared\/[^/]+)\/index\.ts$/;
+/** The cross-half contract (D31): its tree, its only entry, and the two files that may enter it. */
+const PROTOCOL_TREE = /^protocol\//;
+const PROTOCOL_ENTRY = "protocol/index.ts";
+const PROTOCOL_BRIDGES = new Set([
+  "host/shared/protocol/index.ts",
+  "client/shared/api/protocol.ts",
+]);
 /** `from "./x"`, bare `import "./x"`, `import("./x")` and `vi.mock("./x")` specifiers. */
 const SPECIFIER = /(?:\bfrom\s+|\bimport\s*\(?\s*|\bvi\.mock\(\s*)"(\.[^"]+)"/g;
 const errors = [];
@@ -54,6 +66,7 @@ function collectFiles(dir, out = []) {
 /** Which tree a src-relative path belongs to, or null for a stray file. */
 function zoneOf(rel) {
   if (!rel.includes("/")) return "root";
+  if (PROTOCOL_TREE.test(rel)) return "protocol";
   if (CLIENT_ENTRY.test(rel) || CLIENT_LAYERS.test(rel)) return "client";
   if (HOST_LAYERS.test(rel)) return "host";
   return null;
@@ -76,12 +89,31 @@ function isOutsideLeaf(parentRel, spec) {
   return [".ts", ".tsx"].some((e) => isFile(abs + e));
 }
 
+/**
+ * Rule 4 for one import edge. Returns undefined when the edge does not touch the contract (the
+ * other rules decide), null when it is an allowed contract edge, or the error message.
+ */
+function checkProtocolEdge(rel, fromZone, targetRel, toZone) {
+  if (fromZone === "protocol") {
+    return toZone === "protocol"
+      ? null
+      : `${rel}: src/protocol 只能引用自己的文件（当前指向 ${targetRel}）`;
+  }
+  if (toZone !== "protocol") return undefined;
+  if (!PROTOCOL_BRIDGES.has(rel)) {
+    return `${rel}: 只有 ${[...PROTOCOL_BRIDGES].join(" 与 ")} 可以引用 src/protocol，其余文件经本半边的桥`;
+  }
+  return targetRel === PROTOCOL_ENTRY
+    ? null
+    : `${rel}: 引用 src/protocol 必须落在 ${PROTOCOL_ENTRY}（当前指向 ${targetRel}）`;
+}
+
 for (const file of collectFiles(SRC_DIR)) {
   const rel = toPosix(relative(SRC_DIR, file));
   const fromZone = zoneOf(rel);
   if (fromZone === null) {
     errors.push(
-      `${rel}: 不在允许的位置（只能是 src/ 根文件、src/host/{shared,entities,features}/、src/client/index(.test).tsx 或 src/client/{shared,entities,features,widgets,pages}/）`,
+      `${rel}: 不在允许的位置（只能是 src/ 根文件、src/protocol/、src/host/{shared,entities,features}/、src/client/index(.test).tsx 或 src/client/{shared,entities,features,widgets,pages}/）`,
     );
     continue;
   }
@@ -96,6 +128,11 @@ for (const file of collectFiles(SRC_DIR)) {
     const toZone = zoneOf(targetRel);
     if (toZone === null) {
       errors.push(`${rel}: import "${spec}" 落入不允许的位置 ${targetRel}`);
+      continue;
+    }
+    const protocolError = checkProtocolEdge(rel, fromZone, targetRel, toZone);
+    if (protocolError !== undefined) {
+      if (protocolError !== null) errors.push(protocolError);
       continue;
     }
     if ((fromZone === "client") !== (toZone === "client")) {
@@ -116,5 +153,5 @@ if (errors.length > 0) {
   process.exit(1);
 }
 console.log(
-  "OK: client/host halves isolated, root files enter src/host only through index.ts, no stray files",
+  "OK: client/host halves isolated, src/protocol entered only through its two bridges, root files enter src/host only through index.ts, no stray files",
 );

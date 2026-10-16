@@ -1,12 +1,8 @@
 import type { IncomingMessage } from "node:http";
-import { loginPath } from "../../../shared/login-page/index.js";
 import { parseCookieHeader } from "../../../shared/http/index.js";
 import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
-import {
-  AUTH_PATH_PREFIX,
-  isNavigationRequest,
-  isPublicStaticPath,
-} from "../../../shared/guard/index.js";
+import { isNavigationRequest, isPublicStaticPath } from "../../../shared/guard/index.js";
+import { isAuthPath, LOGIN_PATH, loginPath } from "../../../shared/protocol/index.js";
 import type { Session, SessionStore } from "../../../entities/session/index.js";
 import { isRestrictedSession, RESTRICTED_REDIRECT_PATH } from "./restricted-session.js";
 
@@ -36,7 +32,7 @@ export class PasswordGate implements Gate {
   }
 
   decide(req: IncomingMessage, kind: GuardKind, pathname: string): GateDecision {
-    if (pathname === AUTH_PATH_PREFIX || pathname.startsWith(AUTH_PATH_PREFIX + "/")) {
+    if (isAuthPath(pathname)) {
       return this.decideAuthPath(req, kind, pathname);
     }
     const session = this.sessionOf(req);
@@ -50,7 +46,7 @@ export class PasswordGate implements Gate {
   private decideAuthPath(req: IncomingMessage, kind: GuardKind, pathname: string): GateDecision {
     if (!isRestrictedSession(this.sessionOf(req))) return "allow";
     if (kind === "upgrade") return { deny: { upgrade: true } };
-    if (pathname !== "/auth/login") {
+    if (pathname !== LOGIN_PATH) {
       // `/auth/password`、`/auth/status`、`/auth/logout`、`/auth/users*`：放行进 handler。
       // `/auth/users*` 由管理面 handler 回 403（**不是** gate 302，否则导航会跳走）。
       return "allow";

@@ -1,7 +1,8 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { LOGOUT_URL, STATUS_PATH } from "../../../shared/api/index.ts";
 
 /** 登出目标：POST-only（M22：next 仅从 query 取，校验回落 /）。 */
-const LOGOUT_TARGET = "/auth/logout?next=/";
+const LOGOUT_TARGET = LOGOUT_URL;
 
 /**
  * 登出图标：16px 按钮图标（viewBox 24 不变，只设 width/height 16）。
@@ -69,7 +70,7 @@ function useAuthenticated(): boolean | null {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetch("/auth/status")
+    fetch(STATUS_PATH)
       .then((res) => res.json())
       .then((body: { authenticated?: unknown }) => {
         if (!cancelled) setAuthenticated(body.authenticated === true);

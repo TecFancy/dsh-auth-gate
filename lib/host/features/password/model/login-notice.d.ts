@@ -10,7 +10,9 @@
  *  - 文案只能是本文件里的常量，绝不拼接请求文本 → 无反射型 XSS、无开放重定向文案；
  *  - 未知键不报错也不记日志（登录页可被爬，别把噪声写进日志）。
  */
-export declare const PASSWORD_CHANGED_NOTICE = "password-changed";
+import { PASSWORD_CHANGED_NOTICE } from "../../../shared/protocol/index.js";
+/** 原因键定义在跨半边契约 `src/protocol/`（D31，client 的改密后跳转用同一个常量），这里转出给 host 用。 */
+export { PASSWORD_CHANGED_NOTICE };
 /** 改密后的登录卡提示（英文：登录卡片整体是服务端渲染英文，与 D20 失败文案同语言）。 */
 export declare const PASSWORD_CHANGED_TEXT = "Your password was changed. Sign in with your new password.";
 /** 白名单解析：命中返回常量文案，否则 undefined（缺省时卡片不渲染 notice 槽）。 */

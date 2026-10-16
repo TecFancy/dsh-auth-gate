@@ -4,6 +4,7 @@
  *
  * 零第三方资源、无外部字体；脚本只做增强，无 JS 时表单照常提交。
  */
+import { LOGIN_PATH } from "../protocol/index.js";
 
 /**
  * 三变体共享样式：单栏「门禁检查点」卡（2026-09-22 grok-4.6 设计定稿）。
@@ -135,7 +136,7 @@ export const SUBMIT_SCRIPT = `
     form.removeAttribute("aria-busy");
   }
   var next = form.querySelector('input[name="next"]');
-  var target = "/auth/login" + (next && next.value ? "?next=" + encodeURIComponent(next.value) : "");
+  var target = "${LOGIN_PATH}" + (next && next.value ? "?next=" + encodeURIComponent(next.value) : "");
   var failed = document.getElementById("err");
   if (failed) {
     try {

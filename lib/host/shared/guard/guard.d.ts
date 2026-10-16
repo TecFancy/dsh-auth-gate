@@ -3,8 +3,6 @@ import type { Duplex } from "node:stream";
 import type { Gate, GateDeny, GuardKind } from "./gate.js";
 /** 挂在被包装 handler/方法上的守卫标记（幂等重包装 + 自检共用）。 */
 export declare const GUARDED: unique symbol;
-/** 登录页路径：`"deny"` 字符串分支（既有 token 门）的默认 302 目标。 */
-export declare const LOGIN_PATH = "/auth/login";
 /**
  * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
  * **禁止**用 `Accept` 子串匹配（面板 fetch 的 Accept 很杂，会假绿）；两个头都缺 →
@@ -17,8 +15,6 @@ export declare function isNavigationRequest(req: IncomingMessage): boolean;
  * 控制符会让浏览器把 `"/\t/evil.com"` 解析成协议相对的站外地址（见该文件注释）。
  */
 export declare function isSafeLocation(location: string): boolean;
-/** auth 公共路径前缀（两种 gate 的白名单：登录/登出/状态端点免守卫）。 */
-export declare const AUTH_PATH_PREFIX = "/auth";
 /**
  * 免守卫的公开只读静态路径（精确匹配）。浏览器抓取 Web App Manifest 时按规范
  * 不带凭证（Chromium `manifest_fetcher.cc`：只有 link 带 `crossorigin="use-credentials"`

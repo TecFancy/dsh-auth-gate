@@ -1,3 +1,5 @@
+import { PASSWORD_CHANGED_LOGIN_URL } from "../../../shared/api/index.ts";
+
 /**
  * 改密成功后的去向（P1.1 / D24；D24.1 起改为**立即**跳转）。
  *
@@ -9,11 +11,10 @@
  * 从"会话已死"到"对方发现"之间的每一毫秒都是竞态窗口，我们先走才稳拿 notice。成功文案与
  * 「重新登录」按钮仍留在面板上，作为导航被环境拒绝时的兜底（见 `account-form.tsx`）。
  *
- * 常量镜像：服务端 `src/host/features/password/model/login-notice.ts` 的 `PASSWORD_CHANGED_NOTICE`。
- * 客户端半边刻意不 import 服务端 `shared`（保持解耦、不打大 bundle）；两侧字面量由集成测试
- * 以源码文本比对钉住（`integration.p11-pins.test.ts`）。
+ * URL 与原因键都来自跨半边契约 `src/protocol/`（D31），与服务端 `PASSWORD_CHANGED_NOTICE`
+ * 是同一个常量，不再靠两侧各写字面量再用源码文本比对钉住。
  */
-export const LOGIN_REDIRECT_URL = "/auth/login?next=%2F&notice=password-changed";
+export const LOGIN_REDIRECT_URL = PASSWORD_CHANGED_LOGIN_URL;
 
 /** 跳到登录页；`nav` 只为测试注入（缺省走真实 `window.location.replace`）。 */
 export function redirectToLogin(nav: (url: string) => void = defaultReplace): void {

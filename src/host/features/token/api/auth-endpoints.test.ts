@@ -1,7 +1,8 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
-import { AUTH_PATH_PREFIX, type HttpHandler } from "../../../shared/guard/index.js";
+import type { HttpHandler } from "../../../shared/guard/index.js";
+import { AUTH_PATH_PREFIX } from "../../../shared/protocol/index.js";
 import { registerAuthEndpoints, type AuthEndpointsDeps } from "./auth-endpoints.js";
 import { SessionStore, type Session } from "../../../entities/session/index.js";
 

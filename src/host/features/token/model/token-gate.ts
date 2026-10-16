@@ -1,7 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import type { Gate, GuardKind } from "../../../shared/guard/index.js";
-import { AUTH_PATH_PREFIX, isPublicStaticPath } from "../../../shared/guard/index.js";
+import { isPublicStaticPath } from "../../../shared/guard/index.js";
+import { isAuthPath } from "../../../shared/protocol/index.js";
 import type { SessionStore } from "../../../entities/session/index.js";
 import { parseCookieHeader } from "../../../shared/http/index.js";
 
@@ -36,9 +37,7 @@ export class TokenGate implements Gate {
   }
 
   async decide(req: IncomingMessage, kind: GuardKind, pathname: string): Promise<"allow" | "deny"> {
-    if (pathname === AUTH_PATH_PREFIX || pathname.startsWith(AUTH_PATH_PREFIX + "/")) {
-      return "allow";
-    }
+    if (isAuthPath(pathname)) return "allow";
     if (isPublicStaticPath(kind, pathname)) return "allow";
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
     if (cookie !== undefined && cookie !== "") {

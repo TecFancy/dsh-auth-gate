@@ -15,7 +15,6 @@ export type {
   GuardKind,
 } from "./gate.js";
 export {
-  AUTH_PATH_PREFIX,
   denyForbidden,
   denyHttp,
   denyUpgrade,
@@ -27,7 +26,6 @@ export {
   isProxyDeniedRequest,
   isPublicStaticPath,
   isSafeLocation,
-  LOGIN_PATH,
   PROXY_MARKER_HEADER,
   PUBLIC_STATIC_PATHS,
   wrapServer,

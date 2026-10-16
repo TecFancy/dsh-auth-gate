@@ -1,3 +1,5 @@
+import { isAuthPath } from "../protocol/index.js";
+
 /**
  * 控制符（C0 + DEL）在 `Location` 里不是洁癖，而是两个真实缺陷（2026-09-24 复审）：
  * - **开放重定向**：WHATWG URL 在解析前会剥掉全部 ASCII TAB/LF/CR，
@@ -42,7 +44,7 @@ export function isSafeRelativeTarget(target: string): boolean {
 }
 
 export function validateNext(next: string): string {
-  if (isSafeRelativeTarget(next) && next !== "/auth" && !next.startsWith("/auth/")) {
+  if (isSafeRelativeTarget(next) && !isAuthPath(next)) {
     return next;
   }
   return "/";

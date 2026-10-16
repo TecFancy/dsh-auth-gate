@@ -1,7 +1,8 @@
+import { PASSWORD_PATH } from "../../../shared/api/index.ts";
 import { ACCOUNT_KEYS, ruleText, type AccountTranslate } from "../../../shared/i18n/index.ts";
 
 /** 自助改密端点（契约 §1：POST + application/x-www-form-urlencoded）。 */
-const PASSWORD_TARGET = "/auth/password";
+const PASSWORD_TARGET = PASSWORD_PATH;
 
 /** 四个字段：契约 §1 只收 current/password/code，confirm 只在客户端比对。 */
 export type FieldName = "current" | "password" | "confirm" | "code";

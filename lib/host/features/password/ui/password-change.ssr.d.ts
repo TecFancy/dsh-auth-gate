@@ -13,9 +13,6 @@ import { type SessionStore } from "../../../entities/session/index.js";
  * 零外链（CSS 全内联、无字体/无 url()）、无 `<script>`、不回填任何口令 value。
  * 页面文案与 Location 全部是服务端常量，绝不拼接请求文本（无反射面/无开放重定向面）。
  */
-/** 改密页与登录页的固定路径：Location 只用这两个常量。 */
-export declare const PASSWORD_CHANGE_PATH = "/auth/password";
-export declare const LOGIN_PATH = "/auth/login";
 /** GET /auth/password 的 deps 子集：只读会话，不参与任何写路径。 */
 export interface PasswordChangePageDeps {
     sessions: () => SessionStore | undefined;

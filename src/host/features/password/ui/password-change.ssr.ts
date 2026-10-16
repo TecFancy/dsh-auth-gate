@@ -2,6 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { parseCookieHeader, queryOf } from "../../../shared/http/index.js";
 import { buildSetCookie, type SessionStore } from "../../../entities/session/index.js";
 import { PASSWORD_CHANGED_NOTICE, resolveLoginNotice } from "../model/login-notice.js";
+import { LOGIN_PATH, PASSWORD_PATH } from "../../../shared/protocol/index.js";
 
 /**
  * 改密端点（`/auth/password`）的 SSR 页面与响应整形（P2 §1/§3/§6）。
@@ -16,10 +17,6 @@ import { PASSWORD_CHANGED_NOTICE, resolveLoginNotice } from "../model/login-noti
  * 零外链（CSS 全内联、无字体/无 url()）、无 `<script>`、不回填任何口令 value。
  * 页面文案与 Location 全部是服务端常量，绝不拼接请求文本（无反射面/无开放重定向面）。
  */
-
-/** 改密页与登录页的固定路径：Location 只用这两个常量。 */
-export const PASSWORD_CHANGE_PATH = "/auth/password";
-export const LOGIN_PATH = "/auth/login";
 
 /** GET /auth/password 的 deps 子集：只读会话，不参与任何写路径。 */
 export interface PasswordChangePageDeps {
@@ -79,7 +76,7 @@ export function passwordChangePageHtml(notice: string | undefined): string {
 <p class="hint">Set a new password to continue. This device is signed in with a temporary session.</p>
 </header>
 ${noticeHtml}
-<form method="post" action="${PASSWORD_CHANGE_PATH}">
+<form method="post" action="${PASSWORD_PATH}">
 <input type="hidden" name="nav" value="1">
 <div class="field">
 <label for="current">Current password</label>
@@ -133,7 +130,7 @@ export function handlePasswordChangePage(
   res: ServerResponse,
 ): void {
   if (!hasSession(deps, req)) {
-    redirect(res, `${LOGIN_PATH}?next=${PASSWORD_CHANGE_PATH}`);
+    redirect(res, `${LOGIN_PATH}?next=${PASSWORD_PATH}`);
     return;
   }
   res.setHeader("cache-control", "no-store");

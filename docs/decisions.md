@@ -432,3 +432,14 @@ gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site:
 重新对齐，并顺带堵住 helper 进包、`lib/` 积累孤儿两个发布漏洞。
 → [zh](decisions/implemented/2026-10-12-fsd-host-and-client.zh.md) ·
 [en](decisions/implemented/2026-10-12-fsd-host-and-client.en.md)（2026-10-13 实施）
+
+## D31. `/auth/*` 路径收进跨半边契约 `src/protocol/`
+
+路由路径、登录页原因键与由它们拼出的 URL 只在 `src/protocol/index.ts` 定义一次（纯常量与纯函数，不 import
+任何东西），host 经 `src/host/shared/protocol/`、client 经 `src/client/shared/api/protocol.ts` 两个桥进入，
+其余文件不再写路径字面量；`slice:check` 强制只有两个桥能引用它。
+**替代方案**：放进 `host/shared`（client 要开直引例外，误引 barrel 会把 Node 代码打进 bundle）；推广源码文本钉子
+（只能发现、不能消除重复）；两半边直引不设桥（Steiger 看到越树深层 import）；契约里再放路由表（与按接线注册的实际集合不符）。
+**为什么**：一份定义直接消除漂移的来源，契约零依赖所以两种构建都能安全包含，桥让 D30 的分层检查不受影响。
+→ [zh](decisions/implemented/2026-10-16-cross-half-protocol.zh.md) ·
+[en](decisions/implemented/2026-10-16-cross-half-protocol.en.md)

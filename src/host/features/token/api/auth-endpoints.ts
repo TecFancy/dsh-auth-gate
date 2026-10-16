@@ -10,7 +10,13 @@ import {
   validateNext,
   type LaunchTokenBridge,
 } from "../../../shared/http/index.js";
-import { AUTH_PATH_PREFIX, type HttpHandler } from "../../../shared/guard/index.js";
+import type { HttpHandler } from "../../../shared/guard/index.js";
+import {
+  AUTH_PATH_PREFIX,
+  LOGIN_PATH,
+  LOGOUT_PATH,
+  STATUS_PATH,
+} from "../../../shared/protocol/index.js";
 import {
   buildSetCookie,
   handleLogout,
@@ -68,15 +74,15 @@ export function registerAuthEndpoints(deps: AuthEndpointsDeps): () => void {
     disposers.push(deps.register(route));
   };
   track({ kind: "prefix", path: AUTH_PATH_PREFIX, handler: authCatchAll });
-  track({ kind: "exact", path: "/auth/login", handler: (req, res) => handleLogin(deps, req, res) });
+  track({ kind: "exact", path: LOGIN_PATH, handler: (req, res) => handleLogin(deps, req, res) });
   track({
     kind: "exact",
-    path: "/auth/logout",
+    path: LOGOUT_PATH,
     handler: (req, res) => handleLogout(deps, req, res),
   });
   track({
     kind: "exact",
-    path: "/auth/status",
+    path: STATUS_PATH,
     handler: (req, res) => handleStatus(deps, req, res),
   });
   return () => {

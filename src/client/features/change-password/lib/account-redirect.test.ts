@@ -1,9 +1,9 @@
 /**
  * 改密成功后的跳转（P1.1 / D24；D24.1 起立即走）。
  *
- * 客户端半边刻意不 import 服务端 `shared`，所以 `notice=password-changed` 这个键在两侧各写
- * 一份字面量：这里钉住客户端这一侧（URL + 白名单键 + 注入点 + replace 语义），服务端由
- * `login-notice.test.ts` 钉住，跨侧一致性由 `integration.p11-pins.test.ts` 的 source-pin 钉住。
+ * URL 与 `notice=password-changed` 键来自跨半边契约 `src/protocol/`（D31，值由
+ * `src/protocol/index.test.ts` 钉住）；这里钉住客户端这一侧的用法（URL + 白名单键 + 注入点 +
+ * replace 语义）。
  */
 import { describe, expect, it, vi } from "vitest";
 import { LOGIN_REDIRECT_URL, redirectToLogin } from "./account-redirect.ts";

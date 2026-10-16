@@ -1,5 +1,5 @@
 import { type LaunchTokenBridge } from "../../../shared/http/index.js";
-import { type HttpHandler } from "../../../shared/guard/index.js";
+import type { HttpHandler } from "../../../shared/guard/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 /**
  * 错 token 的唯一常量文案（D21）：所有拒绝共用同一响应形态，且绝不读 query、绝不反射

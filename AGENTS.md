@@ -106,5 +106,7 @@ the host half lives in `src/host/` with the lower three layers (`shared`, `entit
 `widgets` (no `app`, `index.tsx` stays at its root); both are checked by Steiger
 (`npm run lint:fsd`). Entry points and wiring sit at the `src/` root. Cross-slice and
 cross-segment imports go through `index.ts`, features never import each other, and the client
-and host halves never import each other (`slice:check`). The tree is in
+and host halves never import each other (`slice:check`). The `/auth/*` paths both halves share
+live only in `src/protocol/` (D31), reached through `src/host/shared/protocol/` and
+`src/client/shared/api/protocol.ts`; never write a route literal anywhere else. The tree is in
 `docs/specs/development.md` "Structure".

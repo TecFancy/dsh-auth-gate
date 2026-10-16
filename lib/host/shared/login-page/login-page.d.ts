@@ -22,6 +22,4 @@ export declare function loginPageHtml(next: string, error?: string, options?: Lo
 export declare function passwordLoginPageHtml(next: string, error?: string, options?: LoginPageOptions): string;
 /** TOTP 挑战页（M4 T6）：单验证码字段，两段式登录第二段。 */
 export declare function totpChallengePageHtml(next: string, error?: string, options?: LoginPageOptions): string;
-/** 登录页 URL：带 next；`stage=password` 供 TOTP 段「换一个账号」回退（服务端清挑战 cookie）。 */
-export declare function loginPath(next: string, stage?: "password"): string;
 //# sourceMappingURL=login-page.d.ts.map

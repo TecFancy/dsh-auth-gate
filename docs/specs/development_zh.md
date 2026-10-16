@@ -48,12 +48,14 @@ src/
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
 ├── cli-skill.ts           # `dsh-auth skill install`
 ├── *.test.ts              # 根测试：入口、CLI、包清单检查（host-corridor、manifest-*）
+├── protocol/              # 跨半边契约（D31）：/auth 路径与登录 URL 构造；不 import 任何东西
 ├── host/                  # host 半边：FSD 下三层，由 Steiger 分析（`npm run lint:fsd`）
 │   ├── shared/            #   无 slice 的层：只有 segment，各带自己的 index.ts
 │   │   ├── guard/         #     Gate 词表、webServer 包装与拒绝管线、启动自检
 │   │   ├── http/          #     cookie / 表单体 / Origin / Host / 客户端 IP / `next` / 登录跳转，
 │   │   │                  #     以及与会话无关的 authCatchAll、queryOf、methodNotAllowed
 │   │   ├── login-page/    #     自包含登录页（token、password、TOTP 挑战三版）
+│   │   ├── protocol/      #     进入 src/protocol 的桥（host 半边唯一入口）
 │   │   ├── rate-limit/    #     双桶登录限速器
 │   │   ├── skill/         #     `dsh-auth skill install`
 │   │   └── lib/           #     叶子小件（`dshHomeDir`）
@@ -72,7 +74,8 @@ src/
 └── client/                # client 半边：FSD 五层，由 Steiger 分析，不 import host 半边
     ├── index.tsx                 # bundle 入口（tsdown）与宿主槽位接线；分析树的根
     ├── shared/                   # 只有 segment，各带自己的 index.ts
-    │   ├── api/                  # `AuthContext`：宿主槽位上下文的本地镜像（仅类型）
+    │   ├── api/                  # `AuthContext`：宿主槽位上下文的本地镜像（仅类型）；
+    │   │                         # `protocol.ts`：client 半边进入 src/protocol 的桥
     │   ├── i18n/                 # 账号文案：键、中英词典、translate 辅助
     │   └── ui/                   # 共用内联样式与账号图标路径
     ├── entities/
@@ -99,7 +102,9 @@ lib/                # build output（host 在 lib/host/ 下）- 已提交入库�
 分层由两道门禁强制。`npm run lint:fsd` 对两个半边各跑一遍 Steiger，分别分析 `src/host` 与 `src/client`（层级顺序、同层隔离、经
 `index.ts` 的公共 API、`@x` 跨引、命名）。`npm run slice:check` 只保留 Steiger 看不到的部分：
 client 与 host 两个半边互不 import，根文件进入 `src/host` 只能经 slice 或 segment 的
-`index.ts`，无法解析的相对 import 即失败，`src/` 下每个文件都必须是根文件、位于
+`index.ts`，`src/protocol/` 不 import 自身以外的任何文件、只能经它的 `index.ts` 由两个桥
+（`src/host/shared/protocol/index.ts`、`src/client/shared/api/protocol.ts`）进入，
+无法解析的相对 import 即失败，`src/` 下每个文件都必须是根文件、位于 `src/protocol/`、位于
 `src/host/{shared,entities,features}/`、是 `src/client/index.tsx` 或 `src/client/index.test.tsx`，
 或位于 `src/client/{shared,entities,features,widgets,pages}/`。增删 slice 请同步本结构图。
 

@@ -6,6 +6,7 @@ import {
   SUBMIT_SCRIPT,
   TOTP_SCRIPT,
 } from "./login-page-assets.js";
+import { LOGIN_PATH } from "../protocol/index.js";
 
 const HTML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
@@ -141,7 +142,7 @@ function renderLoginCard(spec: LoginCardOptions): string {
 <div class="head">
 <h1 class="kicker">${escapeHtml(spec.kicker)}</h1>${hostHtml}${whoHtml}
 </div>
-<form method="post" action="/auth/login">
+<form method="post" action="${LOGIN_PATH}">
 <input type="hidden" name="next" value="${escapeHtml(spec.next)}">
 ${noticeHtml}${errorHtml}${hintHtml}${fieldsHtml}
 <button type="submit">${escapeHtml(spec.submitLabel)}</button>
@@ -258,10 +259,4 @@ export function totpChallengePageHtml(
     options,
     script: TOTP_SCRIPT,
   });
-}
-
-/** 登录页 URL：带 next；`stage=password` 供 TOTP 段「换一个账号」回退（服务端清挑战 cookie）。 */
-export function loginPath(next: string, stage?: "password"): string {
-  const base = `/auth/login?next=${encodeURIComponent(next)}`;
-  return stage === undefined ? base : `${base}&stage=${stage}`;
 }

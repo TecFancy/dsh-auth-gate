@@ -5,7 +5,8 @@ import {
   parseCookieHeader,
   resolvePublicHost,
 } from "../../../shared/http/index.js";
-import { loginPath, totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import { totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import { loginPath } from "../../../shared/protocol/index.js";
 import { DUMMY_HASH } from "../lib/password.js";
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type UsersLoadResult } from "../../../entities/user/index.js";

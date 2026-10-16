@@ -1,4 +1,5 @@
 import type { Session } from "../../../entities/session/index.js";
+import { PASSWORD_PATH } from "../../../shared/protocol/index.js";
 
 /**
  * 受限会话（P2 ④）的字面量常量。**只此一处**写 `"password-change-only"`，
@@ -16,7 +17,7 @@ export const RESTRICTED_SESSION_TTL_SECONDS = 15 * 60;
  * 受限会话被拒的导航目标（§3）：改密页，**不是** `/auth/login`
  * （回登录页会渲染第二个登录表单，受限闭环会断）。
  */
-export const RESTRICTED_REDIRECT_PATH = "/auth/password";
+export const RESTRICTED_REDIRECT_PATH = PASSWORD_PATH;
 
 /**
  * 受限判定：**只信 `session.kind`**（§0 不变量）。

@@ -1,14 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { isSafeRelativeTarget } from "../http/index.js";
+import { LOGIN_PATH } from "../protocol/index.js";
 import { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
 import type { Gate, GateDeny, GuardKind } from "./gate.js";
 
 /** 挂在被包装 handler/方法上的守卫标记（幂等重包装 + 自检共用）。 */
 export const GUARDED: unique symbol = Symbol.for("dsh-auth.guarded");
-
-/** 登录页路径：`"deny"` 字符串分支（既有 token 门）的默认 302 目标。 */
-export const LOGIN_PATH = "/auth/login";
 
 /**
  * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
@@ -30,9 +28,6 @@ export function isNavigationRequest(req: IncomingMessage): boolean {
 export function isSafeLocation(location: string): boolean {
   return isSafeRelativeTarget(location);
 }
-
-/** auth 公共路径前缀（两种 gate 的白名单：登录/登出/状态端点免守卫）。 */
-export const AUTH_PATH_PREFIX = "/auth";
 
 /**
  * 免守卫的公开只读静态路径（精确匹配）。浏览器抓取 Web App Manifest 时按规范

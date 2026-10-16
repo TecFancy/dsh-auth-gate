@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { STATUS_PATH } from "../../../shared/api/index.ts";
 import type { AccountStatusView, SessionKind, UserRole } from "../model/admin-types.ts";
 
 /** 会话探针（只认 cookie，语义同 `/auth/status`，契约 §1.1）。 */
-const STATUS_TARGET = "/auth/status";
+const STATUS_TARGET = STATUS_PATH;
 
 /** 字符串字段守卫：非字符串一律 `undefined`（旧服务端/异常形状都不渲染管理块）。 */
 function optionalString(value: unknown): string | undefined {

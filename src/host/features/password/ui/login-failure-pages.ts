@@ -5,11 +5,8 @@
  * 请求文本（防开放重定向式任意文案）。
  */
 import type { ServerResponse } from "node:http";
-import {
-  loginPath,
-  passwordLoginPageHtml,
-  totpChallengePageHtml,
-} from "../../../shared/login-page/index.js";
+import { passwordLoginPageHtml, totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import { loginPath } from "../../../shared/protocol/index.js";
 
 /** 未知用户 / 错口令 / 禁用三态共用的唯一常量（P9 反枚举）。 */
 export const INVALID_CREDENTIALS = "Invalid username or password.";
