@@ -1,5 +1,5 @@
 import { type AdminTranslate } from "./admin-copy.ts";
-import type { AdminFailureView } from "../../../entities/account/index.ts";
+import type { AdminFailureView } from "../model/admin-reset.ts";
 /**
  * 状态码矩阵 → 文案键：
  * 400 bad_target / policy+rules、401 invalid_totp / unauthorized、403 forbidden、

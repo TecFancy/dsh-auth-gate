@@ -6,6 +6,7 @@
  * 策略文案里的 14/256 字符镜像契约 §2（`PASSWORD_MIN_LENGTH` / `PASSWORD_MAX_LENGTH`）：
  * client bundle 不 import 服务端 shared 模块，半边保持解耦。
  */
+import type { PasswordRule } from "../api/index.ts";
 
 /** 槽位注入的标准 `t` seat（host locale translate 的形）。 */
 export type AccountTranslate = (key: string, params?: Record<string, unknown>) => string;
@@ -52,7 +53,7 @@ export const ACCOUNT_KEYS = {
   ruleSameAsOld: "account.rule.sameAsOld",
 } as const;
 
-/** 契约 §2 策略规则名 → 词典键。 */
+/** 契约 §2 策略规则名 → 词典键（`satisfies` 保证与契约的 `PasswordRule` 一一对应）。 */
 const RULE_KEYS: Record<string, string> = {
   minLength: ACCOUNT_KEYS.ruleMinLength,
   maxLength: ACCOUNT_KEYS.ruleMaxLength,
@@ -61,7 +62,7 @@ const RULE_KEYS: Record<string, string> = {
   digit: ACCOUNT_KEYS.ruleDigit,
   special: ACCOUNT_KEYS.ruleSpecial,
   sameAsOld: ACCOUNT_KEYS.ruleSameAsOld,
-};
+} satisfies Record<PasswordRule, string>;
 
 /** 规则名翻译；未知规则原样回显（不发明契约之外的文案）。 */
 export function ruleText(rule: string, t: AccountTranslate): string {

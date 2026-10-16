@@ -1,4 +1,5 @@
 import { type KvTable } from "@deepseek-ai/dsh-storage-domain";
+import type { SessionKind } from "../../../shared/protocol/index.js";
 /** 会话 cookie 属性（M2 起使用；M1 冻结并测试）。 */
 export declare const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
 /**
@@ -8,12 +9,6 @@ export declare const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
 export declare function buildSetCookie(cookieName: string, token: string, maxAgeSeconds: number, secure?: boolean): string;
 /** 会话 token 的落盘键：sha256 hex 小写（64 字符）；介质上永不出现原始 token。 */
 export declare function digestToken(token: string): string;
-/**
- * 会话类别（P2 ④）：`full` = 常规会话；`password-change-only` = 受限会话，
- * 仅由「登录时用户带 `must_change_password`」签发，TTL 短且入口受限。
- * 缺省/缺字段一律按 `full` 解释（既有行兼容）。
- */
-export type SessionKind = "full" | "password-change-only";
 export interface Session {
     /** 审计用：产生该会话的凭证身份（M1 恒 "token"，M2 为用户名）。 */
     subject: string;
@@ -22,7 +17,11 @@ export interface Session {
     /** epoch ms。 */
     expiresAt: number;
     revoked: boolean;
-    /** P2 ④：缺省 = `full`（旧行无此字段仍解析）。 */
+    /**
+     * 会话类别（P2 ④，类型在跨半边契约 D31）：`full` = 常规会话；`password-change-only` =
+     * 受限会话，仅由「登录时用户带 `must_change_password`」签发，TTL 短且入口受限。
+     * 缺省 = `full`（旧行无此字段仍解析）。
+     */
     kind?: SessionKind | undefined;
 }
 export interface IssuedSession {

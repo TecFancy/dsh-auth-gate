@@ -1,6 +1,20 @@
 import { useEffect, useState } from "react";
-import { STATUS_PATH } from "../../../shared/api/index.ts";
-import type { AccountStatusView, SessionKind, UserRole } from "../model/admin-types.ts";
+import {
+  STATUS_PATH,
+  type SessionKind,
+  type StatusResponse,
+  type Unchecked,
+  type UserRole,
+} from "../../../shared/api/index.ts";
+
+/**
+ * `GET /auth/status` 的「关于我」视图：线上形状 `StatusResponse`（跨半边契约 D31）去掉本视图
+ * 不用的 `logoutOrder`（由 client 入口单独读）与 `mustChangePassword`。
+ *
+ * **加法兼容**：身份字段是 PR1 才有的（旧服务端只回 `authenticated`/`logoutOrder`），
+ * 任一身份字段缺失即视为「不渲染管理块」，其余行为一字不变（契约 §1.1 / §3.3）。
+ */
+export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword">;
 
 /** 会话探针（只认 cookie，语义同 `/auth/status`，契约 §1.1）。 */
 const STATUS_TARGET = STATUS_PATH;
@@ -31,14 +45,16 @@ function optionalSessionKind(value: unknown): SessionKind | undefined {
  * `authenticated === true` 才可能让调用方继续渲染登录后的 UI。
  */
 function parseAccountStatus(body: unknown): AccountStatusView {
-  const source = (typeof body === "object" && body !== null ? body : {}) as Record<string, unknown>;
+  const source = (
+    typeof body === "object" && body !== null ? body : {}
+  ) as Unchecked<StatusResponse>;
   return {
-    authenticated: source["authenticated"] === true,
-    name: optionalString(source["name"]),
-    role: optionalRole(source["role"]),
-    disabled: optionalBoolean(source["disabled"]),
-    totpEnabled: optionalBoolean(source["totpEnabled"]),
-    sessionKind: optionalSessionKind(source["sessionKind"]),
+    authenticated: source.authenticated === true,
+    name: optionalString(source.name),
+    role: optionalRole(source.role),
+    disabled: optionalBoolean(source.disabled),
+    totpEnabled: optionalBoolean(source.totpEnabled),
+    sessionKind: optionalSessionKind(source.sessionKind),
   };
 }
 

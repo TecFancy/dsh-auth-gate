@@ -1,4 +1,10 @@
-import { PASSWORD_PATH } from "../../../shared/api/index.ts";
+import {
+  encodeForm,
+  PASSWORD_PATH,
+  type PasswordChangeErrorBody,
+  type PasswordChangeRequest,
+  type Unchecked,
+} from "../../../shared/api/index.ts";
 import { ACCOUNT_KEYS, ruleText, type AccountTranslate } from "../../../shared/i18n/index.ts";
 
 /** 自助改密端点（契约 §1：POST + application/x-www-form-urlencoded）。 */
@@ -18,11 +24,12 @@ export interface FailureView {
   fields: FieldName[];
 }
 
-/** 契约 §1 的 JSON 失败体（503 是 text/plain，走空体 + 状态码兜底）。 */
-interface FailureBody {
-  error?: unknown;
-  rules?: unknown;
-  retryAfter?: unknown;
+/** 契约 §1 的 JSON 失败体（形状在跨半边契约 D31；503 是 text/plain，走空体 + 状态码兜底）。 */
+type FailureBody = Unchecked<PasswordChangeErrorBody>;
+
+/** 错误码比较：码的字面量受契约约束，写错码编译不过；值本身仍是未校验的 `unknown`。 */
+function isError(value: unknown, code: PasswordChangeErrorBody["error"]): boolean {
+  return value === code;
 }
 
 /** 客户端校验：两次新密码一致只在这里判（契约 §1：不进请求体）。值不 trim。 */
@@ -52,11 +59,11 @@ async function readFailureBody(res: Response): Promise<FailureBody> {
 /** 严格按契约 §1 响应矩阵映射，不自造错误码。 */
 function describeFailure(status: number, body: FailureBody, t: AccountTranslate): FailureView {
   if (status === 401) {
-    return body.error === "invalid_totp"
+    return isError(body.error, "invalid_totp")
       ? { message: t(ACCOUNT_KEYS.invalidTotp), rules: [], fields: ["code"] }
       : { message: t(ACCOUNT_KEYS.invalidCredentials), rules: [], fields: ["current"] };
   }
-  if (status === 400 && body.error === "policy") {
+  if (status === 400 && isError(body.error, "policy")) {
     const rules = Array.isArray(body.rules)
       ? body.rules.filter((rule): rule is string => typeof rule === "string")
       : [];
@@ -79,14 +86,15 @@ function describeFailure(status: number, body: FailureBody, t: AccountTranslate)
 
 /** 提交请求：URLSearchParams 原样编码；code 恒带上（TOTP 未开启时为空串）。 */
 function postPassword(values: FormValues, signal: AbortSignal): Promise<Response> {
-  const body = new URLSearchParams();
-  body.set("current", values.current);
-  body.set("password", values.password);
-  body.set("code", values.code);
+  const request: PasswordChangeRequest = {
+    current: values.current,
+    password: values.password,
+    code: values.code,
+  };
   return fetch(PASSWORD_TARGET, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
+    body: encodeForm(request),
     signal,
     credentials: "same-origin",
   });

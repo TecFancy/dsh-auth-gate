@@ -49,11 +49,12 @@ src/
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
 ├── cli-skill.ts           # `dsh-auth skill install`
 ├── *.test.ts              # 根测试：入口、CLI、包清单检查（host-corridor、manifest-*）
-├── protocol/              # 跨半边契约（D31）：/auth 路径与登录 URL 构造；不 import 任何东西
+├── protocol/              # 跨半边契约（D31）：/auth 路径与登录 URL 构造（index.ts）、
+│                          # 请求体/响应体/错误体类型（payloads.ts）；不 import 任何东西
 ├── host/                  # host 半边：FSD 下三层，由 Steiger 分析（`npm run lint:fsd`）
 │   ├── shared/            #   无 slice 的层：只有 segment，各带自己的 index.ts
 │   │   ├── guard/         #     Gate 词表、webServer 包装与拒绝管线、启动自检
-│   │   ├── http/          #     cookie / 表单体 / Origin / Host / 客户端 IP / `next` / 登录跳转，
+│   │   ├── http/          #     cookie / 表单体（含按契约取字段的 `formField`）/ Origin / Host / 客户端 IP / `next` / 登录跳转，
 │   │   │                  #     以及与会话无关的 authCatchAll、queryOf、methodNotAllowed
 │   │   ├── login-page/    #     自包含登录页（token、password、TOTP 挑战三版）
 │   │   ├── protocol/      #     进入 src/protocol 的桥（host 半边唯一入口）
@@ -76,14 +77,16 @@ src/
     ├── index.tsx                 # bundle 入口（tsdown）与宿主槽位接线；分析树的根
     ├── shared/                   # 只有 segment，各带自己的 index.ts
     │   ├── api/                  # `AuthContext`：宿主槽位上下文的本地镜像（仅类型）；
-    │   │                         # `protocol.ts`：client 半边进入 src/protocol 的桥
+    │   │                         # `protocol.ts`：client 半边进入 src/protocol 的桥；
+    │   │                         # `encodeForm`：把按契约标注的请求对象编码成表单体
     │   ├── i18n/                 # 账号文案：键、中英词典、translate 辅助
     │   └── ui/                   # 共用内联样式与账号图标路径
     ├── entities/
-    │   └── account/              # model/ 账号与管理视图类型；api/ `useAccountStatus`
+    │   └── account/              # api/ `useAccountStatus` 及其解析出的 `AccountStatusView`
     ├── features/                 # slice 之间互不 import；跨 slice 只走 index.ts
     │   ├── change-password/      # ui/ 表单与字段；model/ 校验与提交；lib/ 改密后跳转
-    │   ├── admin-users/          # api/ 列表与重置请求；lib/ 文案与失败映射；ui/ 表单
+    │   ├── admin-users/          # api/ 列表与重置请求；model/ 表单与结果类型；
+    │   │                         # lib/ 文案与失败映射；ui/ 表单
     │   ├── logout/               # ui/ 退出设置动作
     │   └── nav-icon/             # ui/ 设置导航图标垫片（DOM）
     └── widgets/
@@ -108,6 +111,13 @@ client 与 host 两个半边互不 import，根文件进入 `src/host` 只能经
 无法解析的相对 import 即失败，`src/` 下每个文件都必须是根文件、位于 `src/protocol/`、位于
 `src/host/{shared,entities,features}/`、是 `src/client/index.tsx` 或 `src/client/index.test.tsx`，
 或位于 `src/client/{shared,entities,features,widgets,pages}/`。增删 slice 请同步本结构图。
+
+`/auth/*` 端点的线上形状（status、用户列表、改密与管理重置的请求体、响应体、错误体，以及 `UserRole`、
+`SessionKind`、`PasswordRule`）是 `src/protocol/payloads.ts` 里的纯类型，由 `src/protocol/index.ts` 再导出，
+经同样两个桥进入。任何一个半边都不得重新声明它们：host 用它们给写出点收窄类型、用
+`formField<Request>(params, name)` 读字段；client 给请求对象标注类型后交给 `encodeForm`，读响应体时经
+`Unchecked<T>`（键按契约，值是 `unknown`，仍逐字段校验）。`shared` 是最低层，host 与 client 的任何层都能
+直接引到它们，不需要 `@x`。
 
 ## 已提交的构建产物
 

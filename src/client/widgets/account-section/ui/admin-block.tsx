@@ -5,7 +5,7 @@ import {
   ADMIN_STATUS_ID,
 } from "../../../features/admin-users/index.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "../../../features/admin-users/index.ts";
-import type { AdminUserRow } from "../../../entities/account/index.ts";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 import {
   ADMIN_BADGE_STYLE,
   ADMIN_BLOCK_STYLE,

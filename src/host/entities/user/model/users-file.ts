@@ -5,12 +5,13 @@ import path from "node:path";
 import { parse as parseYaml, stringify } from "yaml";
 import { z } from "zod";
 import { dshHomeDir } from "../../../shared/lib/index.js";
+import type { UserRole } from "../../../shared/protocol/index.js";
 
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
 
-/** 用户角色（契约 §3.1）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
-export type UserRole = "user" | "admin";
+/** 用户角色（契约 §3.1，定义在跨半边契约 D31）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
+export type { UserRole };
 
 export interface UserRecord {
   passwordHash: string;

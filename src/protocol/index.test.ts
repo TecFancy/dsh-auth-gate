@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   AUTH_PATH_PREFIX,
   isAuthPath,
@@ -12,6 +12,9 @@ import {
   STATUS_PATH,
   USERS_PASSWORD_PATH,
   USERS_PATH,
+  type AdminResetErrorBody,
+  type StatusResponse,
+  type Unchecked,
 } from "./index.js";
 
 /**
@@ -60,5 +63,14 @@ describe("protocol: /auth contract", () => {
     ["/api/auth", false],
   ])("isAuthPath(%s) is %s", (pathname, expected) => {
     expect(isAuthPath(pathname)).toBe(expected);
+  });
+});
+
+describe("protocol: payload helpers", () => {
+  it("Unchecked keeps every key of every union member, with unknown values", () => {
+    expectTypeOf<keyof Unchecked<AdminResetErrorBody>>().toEqualTypeOf<
+      "error" | "rules" | "retryAfter"
+    >();
+    expectTypeOf<Unchecked<StatusResponse>["logoutOrder"]>().toEqualTypeOf<unknown>();
   });
 });

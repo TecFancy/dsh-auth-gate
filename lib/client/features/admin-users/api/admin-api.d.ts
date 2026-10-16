@@ -1,10 +1,10 @@
 import { describeAdminFailure } from "../lib/admin-failure.ts";
 import { type AdminTranslate } from "../lib/admin-copy.ts";
-import type { AdminFailureView, AdminResetResult, AdminResetValues, AdminUsersResult } from "../../../entities/account/index.ts";
+import type { AdminFailureView, AdminResetResult, AdminResetValues, AdminUsersResult } from "../model/admin-reset.ts";
 /**
  * 管理面客户端 API（CONTRACT-pr2 §1.2 / §1.3 + §9）：列表读取 + 重置提交。
  *
- * 类型全部来自 `admin-types.ts`（冻结面）；失败映射在 `admin-failure.ts`（A12 预拆，此处按
+ * 线上形状来自跨半边契约（D31，经 `shared/api`），表单与结果类型在 `model/admin-reset.ts`；失败映射在 `admin-failure.ts`（A12 预拆，此处按
  * 冻结面原样再导出）。不手写 `Origin`（同源 POST 由浏览器自动携带）、不做 `Accept` 子串匹配、
  * 不重排服务端已排好的顺序。
  */

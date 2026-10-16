@@ -3,7 +3,7 @@ import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH } from "../../../shared/i18n/index.ts"
 import { validateAdminReset } from "../api/admin-api.ts";
 import { describeAdminFailure } from "./admin-failure.ts";
 import { ADMIN_DICT_EN, ADMIN_DICT_ZH, ADMIN_KEYS, translateAdminFrom } from "./admin-copy.ts";
-import type { AdminResetValues } from "../../../entities/account/index.ts";
+import type { AdminResetValues } from "../model/admin-reset.ts";
 
 /** 宿主把 account / admin 分片合并成一个 `auth` 命名域（见 index.tsx），测试按同一合并构造 `t`。 */
 const zh = translateAdminFrom({ ...ACCOUNT_DICT_ZH, ...ADMIN_DICT_ZH });

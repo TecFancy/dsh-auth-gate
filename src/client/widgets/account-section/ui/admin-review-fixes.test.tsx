@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_DICT_ZH, formatCopy } from "../../../shared/i18n/index.ts";
 import { SettingsAccountSection } from "./account-section.tsx";
 import { ADMIN_DICT_ZH, ADMIN_KEYS, AdminResetForm } from "../../../features/admin-users/index.ts";
-import type { AdminUserRow } from "../../../entities/account/index.ts";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 
 /**
  * grok **实现期评审必修项**的回归测试（lead 所有）。这里只放"修完必须不再犯"的键位/键序行为，

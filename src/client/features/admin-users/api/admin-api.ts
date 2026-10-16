@@ -1,18 +1,27 @@
-import { USERS_PASSWORD_PATH, USERS_PATH } from "../../../shared/api/index.ts";
+import {
+  encodeForm,
+  USERS_PASSWORD_PATH,
+  USERS_PATH,
+  type AdminResetErrorBody,
+  type AdminResetRequest,
+  type AdminResetResponse,
+  type AdminUserRow,
+  type Unchecked,
+  type UsersResponse,
+} from "../../../shared/api/index.ts";
 import { describeAdminFailure } from "../lib/admin-failure.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "../lib/admin-copy.ts";
 import type {
   AdminFailureView,
   AdminResetResult,
   AdminResetValues,
-  AdminUserRow,
   AdminUsersResult,
-} from "../../../entities/account/index.ts";
+} from "../model/admin-reset.ts";
 
 /**
  * 管理面客户端 API（CONTRACT-pr2 §1.2 / §1.3 + §9）：列表读取 + 重置提交。
  *
- * 类型全部来自 `admin-types.ts`（冻结面）；失败映射在 `admin-failure.ts`（A12 预拆，此处按
+ * 线上形状来自跨半边契约（D31，经 `shared/api`），表单与结果类型在 `model/admin-reset.ts`；失败映射在 `admin-failure.ts`（A12 预拆，此处按
  * 冻结面原样再导出）。不手写 `Origin`（同源 POST 由浏览器自动携带）、不做 `Accept` 子串匹配、
  * 不重排服务端已排好的顺序。
  */
@@ -22,18 +31,15 @@ export { describeAdminFailure };
 const USERS_TARGET = USERS_PATH;
 const RESET_TARGET = USERS_PASSWORD_PATH;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+/** 对象守卫：键按契约形状 `T` 读（读错键编译不过），值仍是未校验的 `unknown`。 */
+function isRecord<T>(value: unknown): value is Unchecked<T> {
   return typeof value === "object" && value !== null;
 }
 
 /** 单行形状校验：任一必需字段类型不符即丢弃该行（不整表失败，契约 §1.2）。 */
 function asRow(value: unknown): AdminUserRow | undefined {
-  if (!isRecord(value)) return undefined;
-  const name = value["name"];
-  const role = value["role"];
-  const disabled = value["disabled"];
-  const totpEnabled = value["totpEnabled"];
-  const mustChangePassword = value["mustChangePassword"];
+  if (!isRecord<AdminUserRow>(value)) return undefined;
+  const { name, role, disabled, totpEnabled, mustChangePassword } = value;
   if (typeof name !== "string" || name === "") return undefined;
   if (role !== "admin" && role !== "user") return undefined;
   if (typeof disabled !== "boolean" || typeof totpEnabled !== "boolean") return undefined;
@@ -43,18 +49,21 @@ function asRow(value: unknown): AdminUserRow | undefined {
 
 /** 解析 200 body；`users` 不是数组视为形状非法（整表 failure）。 */
 function parseUsers(body: unknown): AdminUserRow[] | undefined {
-  if (!isRecord(body)) return undefined;
-  const raw = body["users"];
+  if (!isRecord<UsersResponse>(body)) return undefined;
+  const raw = body.users;
   if (!Array.isArray(raw)) return undefined;
   // 保持服务端顺序：只过滤，不排序。
   return raw.map(asRow).filter((row): row is AdminUserRow => row !== undefined);
 }
 
+/** 重置端点的全部 JSON 形状（成功体 + 错误体），按契约读键。 */
+type ResetBody = AdminResetResponse | AdminResetErrorBody;
+
 /** 读 JSON；非对象或解析失败统一回空体（映射只看状态码）。 */
-async function readJsonSafe(res: Response): Promise<Record<string, unknown>> {
+async function readJsonSafe(res: Response): Promise<Unchecked<ResetBody>> {
   try {
     const body: unknown = await res.json();
-    return isRecord(body) ? body : {};
+    return isRecord<ResetBody>(body) ? body : {};
   } catch {
     return {};
   }
@@ -114,14 +123,15 @@ function postAdminReset(
   values: AdminResetValues,
   options: { signal: AbortSignal; actorTotpEnabled: boolean },
 ): Promise<Response> {
-  const body = new URLSearchParams();
-  body.set("target", values.target);
-  body.set("password", values.password);
-  if (options.actorTotpEnabled) body.set("code", values.code);
+  const request: AdminResetRequest = {
+    target: values.target,
+    password: values.password,
+    ...(options.actorTotpEnabled ? { code: values.code } : {}),
+  };
   return fetch(RESET_TARGET, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body,
+    body: encodeForm(request),
     signal: options.signal,
     credentials: "same-origin",
   });
@@ -144,8 +154,8 @@ export async function submitAdminReset(
     if (options.signal.aborted) return { kind: "aborted" };
     const body = await readJsonSafe(res);
     if (options.signal.aborted) return { kind: "aborted" };
-    if (res.status === 200 && body["ok"] === true) {
-      return { kind: "ok", sessionsRevoked: body["sessionsRevoked"] === true };
+    if (res.status === 200 && body.ok === true) {
+      return { kind: "ok", sessionsRevoked: body.sessionsRevoked === true };
     }
     return { kind: "failure", failure: describeAdminFailure(res.status, body, t) };
   } catch {

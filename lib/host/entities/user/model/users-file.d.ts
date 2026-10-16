@@ -1,7 +1,8 @@
+import type { UserRole } from "../../../shared/protocol/index.js";
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export declare const USERNAME_RE: RegExp;
-/** 用户角色（契约 §3.1）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
-export type UserRole = "user" | "admin";
+/** 用户角色（契约 §3.1，定义在跨半边契约 D31）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
+export type { UserRole };
 export interface UserRecord {
     passwordHash: string;
     /** M3 只解析不使用（M4 TOTP）。 */
@@ -48,5 +49,4 @@ type RenameFn = (from: string, to: string) => Promise<void>;
  * 重试耗尽后抛最后一次错误，调用方看到的失败语义不变。
  */
 export declare function renameWithRetry(from: string, to: string, rename?: RenameFn): Promise<void>;
-export {};
 //# sourceMappingURL=users-file.d.ts.map

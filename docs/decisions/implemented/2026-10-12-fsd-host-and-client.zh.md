@@ -43,17 +43,17 @@
 
 ### client 落位
 
-| 层         | 切片或分段        | 文件                                                                                                  |
-| ---------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
-| `shared`   | `api`             | `context.ts`，宿主槽位上下文的本地镜像（仅类型）                                                      |
-|            | `i18n`            | `account-copy.ts`                                                                                     |
-|            | `ui`              | `account-styles.ts`、`account-icon.ts`                                                                |
-| `entities` | `account`         | `model/` 放 `admin-types.ts`；`api/` 放 `account-status.ts`（它请求 `/auth/status`）                  |
-| `features` | `change-password` | `ui/` 放 `account-form`、`account-fields`；`model/` 放 `account-submit`；`lib/` 放 `account-redirect` |
-|            | `admin-users`     | `api/` 放 `admin-api`；`lib/` 放 `admin-failure`、`admin-copy`；`ui/` 放 `admin-form`、`admin-fields` |
-|            | `logout`          | `ui/logout-action`                                                                                    |
-|            | `nav-icon`        | `ui/account-nav-icon`（一个 DOM 垫片）                                                                |
-| `widgets`  | `account-section` | `ui/` 放 `account-section`、`admin-block`（组合改密与用户管理）以及挂载整个设置段的测试               |
+| 层         | 切片或分段        | 文件                                                                                                                             |
+| ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `shared`   | `api`             | `context.ts`，宿主槽位上下文的本地镜像（仅类型）                                                                                 |
+|            | `i18n`            | `account-copy.ts`                                                                                                                |
+|            | `ui`              | `account-styles.ts`、`account-icon.ts`                                                                                           |
+| `entities` | `account`         | `api/` 放 `account-status.ts`（它请求 `/auth/status`）；原 `model/admin-types.ts` 镜像已由 `src/protocol/` 取代（D31）           |
+| `features` | `change-password` | `ui/` 放 `account-form`、`account-fields`；`model/` 放 `account-submit`；`lib/` 放 `account-redirect`                            |
+|            | `admin-users`     | `api/` 放 `admin-api`；`model/` 放 `admin-reset`；`lib/` 放 `admin-failure`、`admin-copy`；`ui/` 放 `admin-form`、`admin-fields` |
+|            | `logout`          | `ui/logout-action`                                                                                                               |
+|            | `nav-icon`        | `ui/account-nav-icon`（一个 DOM 垫片）                                                                                           |
+| `widgets`  | `account-section` | `ui/` 放 `account-section`、`admin-block`（组合改密与用户管理）以及挂载整个设置段的测试                                          |
 
 `shared` 只有分段（`api`、`i18n`、`ui`），各带自己的 `index.ts`，层级本身没有 barrel。`context.ts` 放在
 `api`，因为它是 client 与宿主运行时服务（槽位、locale、effect 作用域）之间的边界，这正是 FSD `api`

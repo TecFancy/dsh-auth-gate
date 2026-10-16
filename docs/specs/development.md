@@ -52,11 +52,12 @@ src/
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
 ├── cli-skill.ts           # `dsh-auth skill install`
 ├── *.test.ts              # root tests: entry points, CLI, manifest checks (host-corridor, manifest-*)
-├── protocol/              # cross-half contract (D31): /auth paths and login URL builders; imports nothing
+├── protocol/              # cross-half contract (D31): /auth paths, login URL builders (index.ts) and
+│                          # request/response/error payload types (payloads.ts); imports nothing
 ├── host/                  # host half: three FSD layers, analysed by Steiger (`npm run lint:fsd`)
 │   ├── shared/            #   layer without slices: segments only, each with its own index.ts
 │   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, startup self-check
-│   │   ├── http/          #     cookie / form body / Origin / Host / client IP / `next` / login redirect,
+│   │   ├── http/          #     cookie / form body (+ typed `formField`) / Origin / Host / client IP / `next` / login redirect,
 │   │   │                  #     plus the session-independent authCatchAll, queryOf, methodNotAllowed
 │   │   ├── login-page/    #     self-contained login page (token, password and TOTP challenge variants)
 │   │   ├── protocol/      #     bridge to src/protocol: the host half's only way in
@@ -78,15 +79,17 @@ src/
 └── client/                # client half: five FSD layers, analysed by Steiger, never imports the host half
     ├── index.tsx                 # bundle entry (tsdown) and host slot wiring; root of the analysed tree
     ├── shared/                   # segments only, each with its own index.ts
-    │   ├── api/                  # `AuthContext` (local mirror of the host slot context, types only) and
-    │   │                         # `protocol.ts`, the client half's bridge to src/protocol
+    │   ├── api/                  # `AuthContext` (local mirror of the host slot context, types only),
+    │   │                         # `protocol.ts` (the client half's bridge to src/protocol) and
+    │   │                         # `encodeForm` (form body from a contract-typed request object)
     │   ├── i18n/                 # account copy: keys, zh/en dictionaries, translate helpers
     │   └── ui/                   # shared inline styles and the account icon paths
     ├── entities/
-    │   └── account/              # model/ account and admin view types; api/ `useAccountStatus`
+    │   └── account/              # api/ `useAccountStatus` and the `AccountStatusView` it parses into
     ├── features/                 # slices never import each other; cross-slice goes through index.ts
     │   ├── change-password/      # ui/ form and fields; model/ validation and submit; lib/ redirect
-    │   ├── admin-users/          # api/ list and reset requests; lib/ copy and failure mapping; ui/ form
+    │   ├── admin-users/          # api/ list and reset requests; model/ form and result types;
+    │   │                         # lib/ copy and failure mapping; ui/ form
     │   ├── logout/               # ui/ logout settings action
     │   └── nav-icon/             # ui/ settings-nav icon shim (DOM)
     └── widgets/
@@ -113,6 +116,15 @@ unresolvable relative imports fail, and every file under `src/` is a root file, 
 `src/protocol/`, under `src/host/{shared,entities,features}/`, `src/client/index.tsx` or `src/client/index.test.tsx`,
 or under `src/client/{shared,entities,features,widgets,pages}/`. Adding or removing a slice
 means updating this tree.
+
+The wire shapes of the `/auth/*` endpoints (status, user list, password change and admin reset
+request, response and error bodies, plus `UserRole`, `SessionKind` and `PasswordRule`) are pure
+types in `src/protocol/payloads.ts`, re-exported by `src/protocol/index.ts` and reached through the
+same two bridges. Never redeclare one of them in either half: the host types its writers and
+`formField<Request>(params, name)` reads with them, the client annotates its request objects for
+`encodeForm` and reads response bodies through `Unchecked<T>` (contract keys, `unknown` values,
+still validated field by field). `shared` is the lowest layer, so every host or client layer reaches
+them without an `@x` import.
 
 ## Committed build artifact
 

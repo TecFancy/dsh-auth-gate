@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { methodNotAllowed, parseFormBody } from "../../../shared/http/index.js";
+import { formField, methodNotAllowed, parseFormBody } from "../../../shared/http/index.js";
+import type { AdminResetRequest } from "../../../shared/protocol/index.js";
 import type { Session } from "../../../entities/session/index.js";
 import type { AdminAuditContext } from "../model/audit.js";
 import { auditSuccess } from "../model/audit.js";
@@ -87,14 +88,14 @@ export async function handleResetPassword(
   const ctx: AdminAuditContext = {
     ts: deps.now(),
     actor: session?.subject ?? "",
-    target: params.get("target") ?? "",
+    target: formField<AdminResetRequest>(params, "target"),
     clientIp: deps.clientIp(req),
     reauth: "none",
     targetDisabled: false,
   };
 
-  const password = params.get("password") ?? "";
-  const code = params.get("code") ?? "";
+  const password = formField<AdminResetRequest>(params, "password");
+  const code = formField<AdminResetRequest>(params, "code");
   // 打码白名单：日志里出现这两个明文即替换（§5），贯穿到 hash/写盘/吊销的错误出口。
   const secrets = [password, code];
   const actor = await authorizeReset(deps, req, res, ctx, session, secrets);

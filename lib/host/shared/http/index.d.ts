@@ -11,7 +11,7 @@ export { DEFAULT_TRUSTED_PROXIES, makeClientIpResolver, parseClientIpPolicy, res
 export type { ClientIpLogger, ClientIpPolicy, ClientIpResolver } from "./client-ip.js";
 export { parseCookieHeader } from "./cookie.js";
 export { authCatchAll, methodNotAllowed, queryOf } from "./endpoints.js";
-export { FORM_BODY_LIMIT, parseFormBody } from "./form-body.js";
+export { FORM_BODY_LIMIT, formField, parseFormBody } from "./form-body.js";
 export { resolvePublicHost } from "./host.js";
 export { cidrContains, normalizeIp, parseCidr } from "./ip-address.js";
 export type { CidrNetwork } from "./ip-address.js";

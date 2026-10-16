@@ -49,17 +49,17 @@ manifest rather than a module (`host-corridor`, `manifest-icon`, `manifest-local
 
 ### Client placement
 
-| Layer      | Slice or segment  | Files                                                                                                                                  |
-| ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared`   | `api`             | `context.ts`, the local mirror of the host slot context (types only)                                                                   |
-|            | `i18n`            | `account-copy.ts`                                                                                                                      |
-|            | `ui`              | `account-styles.ts`, `account-icon.ts`                                                                                                 |
-| `entities` | `account`         | `model/` holds `admin-types.ts`; `api/` holds `account-status.ts` (it fetches `/auth/status`)                                          |
-| `features` | `change-password` | `ui/` holds `account-form`, `account-fields`; `model/` holds `account-submit`; `lib/` holds `account-redirect`                         |
-|            | `admin-users`     | `api/` holds `admin-api`; `lib/` holds `admin-failure`, `admin-copy`; `ui/` holds `admin-form`, `admin-fields`                         |
-|            | `logout`          | `ui/logout-action`                                                                                                                     |
-|            | `nav-icon`        | `ui/account-nav-icon` (a DOM shim)                                                                                                     |
-| `widgets`  | `account-section` | `ui/` holds `account-section`, `admin-block` (composes password change and user management) and the tests that mount the whole section |
+| Layer      | Slice or segment  | Files                                                                                                                                        |
+| ---------- | ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared`   | `api`             | `context.ts`, the local mirror of the host slot context (types only)                                                                         |
+|            | `i18n`            | `account-copy.ts`                                                                                                                            |
+|            | `ui`              | `account-styles.ts`, `account-icon.ts`                                                                                                       |
+| `entities` | `account`         | `api/` holds `account-status.ts` (it fetches `/auth/status`); the former `model/admin-types.ts` mirror gave way to `src/protocol/` (D31)     |
+| `features` | `change-password` | `ui/` holds `account-form`, `account-fields`; `model/` holds `account-submit`; `lib/` holds `account-redirect`                               |
+|            | `admin-users`     | `api/` holds `admin-api`; `model/` holds `admin-reset`; `lib/` holds `admin-failure`, `admin-copy`; `ui/` holds `admin-form`, `admin-fields` |
+|            | `logout`          | `ui/logout-action`                                                                                                                           |
+|            | `nav-icon`        | `ui/account-nav-icon` (a DOM shim)                                                                                                           |
+| `widgets`  | `account-section` | `ui/` holds `account-section`, `admin-block` (composes password change and user management) and the tests that mount the whole section       |
 
 `shared` is segments only (`api`, `i18n`, `ui`), each with its own `index.ts` and no layer-level
 barrel. `context.ts` sits in `api` because it is the boundary to the host's runtime services (slots,

@@ -1,1 +1,1 @@
-{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../../src/client/entities/account/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,gBAAgB,EAAE,MAAM,yBAAyB,CAAC;AAC3D,OAAO,EACL,iBAAiB,EACjB,KAAK,iBAAiB,EACtB,KAAK,gBAAgB,EACrB,KAAK,UAAU,EACf,KAAK,gBAAgB,EACrB,KAAK,gBAAgB,EACrB,KAAK,YAAY,EACjB,KAAK,gBAAgB,GACtB,MAAM,wBAAwB,CAAC"}
+{"version":3,"file":"index.d.ts","sourceRoot":"","sources":["../../../../src/client/entities/account/index.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,gBAAgB,EAAE,KAAK,iBAAiB,EAAE,MAAM,yBAAyB,CAAC"}

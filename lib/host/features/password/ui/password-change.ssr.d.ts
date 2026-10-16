@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { type SessionStore } from "../../../entities/session/index.js";
+import { type PasswordChangeErrorBody } from "../../../shared/protocol/index.js";
 /**
  * 改密端点（`/auth/password`）的 SSR 页面与响应整形（P2 §1/§3/§6）。
  *
@@ -42,7 +43,7 @@ export declare function handlePasswordChangePage(deps: PasswordChangePageDeps, r
  */
 export declare function respondChanged(deps: ChangeResponseDeps, res: ServerResponse, navigation: boolean): void;
 /** JSON 写出：no-store 必须早于 writeHead（headers sent 之后 setHeader 会抛）。 */
-export declare function sendJson(res: ServerResponse, status: number, body: unknown): void;
+export declare function sendJson(res: ServerResponse, status: number, body: PasswordChangeErrorBody): void;
 /** 503 统一写出（users 文件读/写失败语义）。 */
 export declare function sendUnavailable(res: ServerResponse): void;
 /** 415/413 响应（M19 复刻：413 先写 `connection: close`，不调 req.destroy）；无 status 的异常向上抛。 */

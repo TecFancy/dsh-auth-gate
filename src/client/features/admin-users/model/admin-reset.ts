@@ -1,42 +1,11 @@
-/**
- * PR2 客户端管理块的**冻结类型面**（契约 §2，lead 所有）。
- *
- * 只放类型与常量，不放逻辑。客户端半区禁止 import host 半区（`slice:check` 铁律），
- * 所以这里的形状是对服务端 `AdminUserView` / `/auth/status` 的**手写镜像**；
- * 漂移由 jsdom 集成测试与真机 E2E 兜住，不靠 import 共享。
- */
-
-/** 与 `users.yaml` 的 role 同集合（镜像，不 import 服务端）。 */
-export type UserRole = "admin" | "user";
-
-/** 会话类别（PR1 / D25）：受限会话只能改密，不进管理面。 */
-export type SessionKind = "full" | "password-change-only";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 
 /**
- * `GET /auth/status` 的「关于我」投影。
+ * 管理重置表单与结果的 client 侧类型（契约 §2）。只放类型与常量，不放逻辑。
  *
- * **加法兼容**：追加字段是 PR1 才有的（旧服务端只回 `authenticated`/`logoutOrder`），
- * 任一身份字段缺失即视为「不渲染管理块」，其余行为一字不变（契约 §1.1 / §3.3）。
- * 可选字段显式带 `| undefined`（`exactOptionalPropertyTypes`）。
+ * 线上形状（列表行、请求体、响应体、错误体）在跨半边契约 `src/protocol/`（D31），经
+ * `shared/api` 进来；这里只剩表单状态和解析后的结果，它们不上线，host 不认识。
  */
-export interface AccountStatusView {
-  authenticated: boolean;
-  name?: string | undefined;
-  role?: UserRole | undefined;
-  /** 账号是否被禁用：§9-A1 渲染门要求 `=== false`（禁用 admin 不挂管理块）。 */
-  disabled?: boolean | undefined;
-  totpEnabled?: boolean | undefined;
-  sessionKind?: SessionKind | undefined;
-}
-
-/** `GET /auth/users` 的单行投影，与服务端 `AdminUserView` 同形同键集。 */
-export interface AdminUserRow {
-  name: string;
-  role: UserRole;
-  disabled: boolean;
-  totpEnabled: boolean;
-  mustChangePassword: boolean;
-}
 
 /** 管理重置表单字段（`confirm` 只在客户端比对，不进请求体，契约 §1.3）。 */
 export type AdminField = "target" | "password" | "confirm" | "code";

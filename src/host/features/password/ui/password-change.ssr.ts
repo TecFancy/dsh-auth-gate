@@ -2,7 +2,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { parseCookieHeader, queryOf } from "../../../shared/http/index.js";
 import { buildSetCookie, type SessionStore } from "../../../entities/session/index.js";
 import { PASSWORD_CHANGED_NOTICE, resolveLoginNotice } from "../model/login-notice.js";
-import { LOGIN_PATH, PASSWORD_PATH } from "../../../shared/protocol/index.js";
+import {
+  LOGIN_PATH,
+  PASSWORD_PATH,
+  type PasswordChangeErrorBody,
+  type PasswordChangeResponse,
+} from "../../../shared/protocol/index.js";
 
 /**
  * 改密端点（`/auth/password`）的 SSR 页面与响应整形（P2 §1/§3/§6）。
@@ -159,11 +164,11 @@ export function respondChanged(
     return;
   }
   res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ ok: true }));
+  res.end(JSON.stringify({ ok: true } satisfies PasswordChangeResponse));
 }
 
 /** JSON 写出：no-store 必须早于 writeHead（headers sent 之后 setHeader 会抛）。 */
-export function sendJson(res: ServerResponse, status: number, body: unknown): void {
+export function sendJson(res: ServerResponse, status: number, body: PasswordChangeErrorBody): void {
   res.setHeader("cache-control", "no-store");
   res.writeHead(status, { "content-type": "application/json" });
   res.end(JSON.stringify(body));

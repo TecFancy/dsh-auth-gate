@@ -1,13 +1,16 @@
 /**
- * 跨半边契约（D31）：`/auth/*` 路由路径与登录页查询键，host 与 client 两个半边的唯一来源。
+ * 跨半边契约（D31）：`/auth/*` 路由路径、登录页查询键与端点载荷形状，host 与 client 两个半边的
+ * 唯一来源。载荷类型在同目录的 `payloads.ts`，经本文件再导出（两个桥只认本文件）。
  *
- * 这里只放纯常量与纯函数，不 import 任何东西（`slice:check` 强制），所以它能同时进 Node 的
- * host 构建与浏览器的 client bundle，而不会把任何一侧的依赖带给另一侧。两个半边各经一个桥进来：
+ * 这里只放纯常量、纯函数与纯类型，不 import 自身以外的任何东西（`slice:check` 强制），所以它能
+ * 同时进 Node 的 host 构建与浏览器的 client bundle，而不会把任何一侧的依赖带给另一侧。两个半边
+ * 各经一个桥进来：
  * host 走 `src/host/shared/protocol/index.ts`，client 走 `src/client/shared/api/protocol.ts`。
  *
  * 改这里的值就是改对外契约（书签、反代规则、dsh 前端的跳转都认这些路径）：先改
  * `index.test.ts` 里钉住的值，再改这里。
  */
+export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
 /** 本插件全部端点的前缀；`prefix` 兜底路由挂在这里，gate 白名单也按它放行。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
 /** 登录页（GET 渲染、POST 提交）。 */

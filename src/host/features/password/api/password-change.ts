@@ -7,10 +7,12 @@ import {
 } from "../../../entities/user/index.js";
 import {
   checkRequestOrigin,
+  formField,
   methodNotAllowed,
   parseCookieHeader,
   parseFormBody,
 } from "../../../shared/http/index.js";
+import type { PasswordChangeRequest } from "../../../shared/protocol/index.js";
 import { type LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type Session, type SessionStore } from "../../../entities/session/index.js";
 import { DUMMY_HASH } from "../lib/password.js";
@@ -105,7 +107,7 @@ export async function handlePasswordChange(
   }
   if (!originAccepted(deps, req, res)) return;
 
-  const { current, newPassword, code } = requestOf(params);
+  const { current, password: newPassword, code } = requestOf(params);
   const subject = locateSession(deps, req)?.subject;
   if (subject === undefined) {
     sendJson(res, 401, { error: "unauthorized" });
@@ -160,20 +162,16 @@ export async function handlePasswordChange(
   // TODO(auth-p2): 撤销失败不重试 ⇒「新口令已生效但旧 cookie 仍可用」窗口由会话 TTL 兜底。
   await deps.revoke(subject);
   // P2 §1 响应整形：SSR 无 JS 表单的隐藏字段，精确匹配 nav=1（绝不用 Accept 子串判定）。
-  respondChanged(deps, res, params.get("nav") === "1");
+  respondChanged(deps, res, formField<PasswordChangeRequest>(params, "nav") === "1");
   deps.logger.info("password changed");
 }
 
 /** 请求字段（**不 trim 不截断**：口令按原始码点判定）。 */
-function requestOf(params: URLSearchParams): {
-  current: string;
-  newPassword: string;
-  code: string;
-} {
+function requestOf(params: URLSearchParams): Omit<PasswordChangeRequest, "nav"> {
   return {
-    current: params.get("current") ?? "",
-    newPassword: params.get("password") ?? "",
-    code: params.get("code") ?? "",
+    current: formField<PasswordChangeRequest>(params, "current"),
+    password: formField<PasswordChangeRequest>(params, "password"),
+    code: formField<PasswordChangeRequest>(params, "code"),
   };
 }
 
@@ -232,13 +230,16 @@ function totpAccepted(
   return counter !== undefined && deps.replayCheck(ctx.subject, counter, code);
 }
 
-/** 4xx 拒绝统一口径：计失败 + 常量日志 + JSON body（明文永不入日志）。 */
+/**
+ * 4xx 拒绝统一口径：计失败 + 常量日志 + JSON body（明文永不入日志）。
+ * body 形状同 `sendJson`，即跨半边契约的 `PasswordChangeErrorBody`（D31）。
+ */
 function reject(
   deps: PasswordChangeDeps,
   res: ServerResponse,
   ctx: ChangeContext,
   status: number,
-  body: unknown,
+  body: Parameters<typeof sendJson>[2],
 ): void {
   deps.limiter.recordFailure(ctx.ip, ctx.subject);
   deps.logger.info(REJECTED);

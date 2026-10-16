@@ -21,8 +21,8 @@ import {
   type AdminFailureView,
   type AdminField,
   type AdminResetValues,
-  type AdminUserRow,
-} from "../../../entities/account/index.ts";
+} from "../model/admin-reset.ts";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 import {
   BUTTON_BUSY_STYLE,
   BUTTON_STYLE,

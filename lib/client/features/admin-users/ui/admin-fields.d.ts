@@ -1,4 +1,4 @@
-import type { AdminFailureView, AdminField } from "../../../entities/account/index.ts";
+import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
 /** 状态播报位：aria-live 落点，也是错误字段 aria-describedby 的目标。 */
 export declare const ADMIN_STATUS_ID = "dsh-auth-gate-admin-status";
 export declare const ADMIN_CODE_HINT_ID = "dsh-auth-gate-admin-code-hint";

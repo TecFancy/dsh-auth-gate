@@ -5,6 +5,7 @@ import {
   queryOf,
   validateNext,
 } from "../../../shared/http/index.js";
+import type { StatusResponse } from "../../../shared/protocol/index.js";
 import type { UsersLoadResult } from "../../user/@x/session.js";
 import { buildSetCookie, type Session, type SessionStore } from "../model/session-store.js";
 
@@ -127,8 +128,14 @@ async function writeStatusWithIdentity(
   });
 }
 
-function writeStatus(res: ServerResponse, deps: AuthHttpDeps, body: Record<string, unknown>): void {
+/** 写出 `StatusResponse`（跨半边契约 D31）；`logoutOrder` 恒由 deps 补在最后。 */
+function writeStatus(
+  res: ServerResponse,
+  deps: AuthHttpDeps,
+  body: Omit<StatusResponse, "logoutOrder">,
+): void {
+  const payload: StatusResponse = { ...body, logoutOrder: deps.logoutOrder };
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "application/json" });
-  res.end(JSON.stringify({ ...body, logoutOrder: deps.logoutOrder }));
+  res.end(JSON.stringify(payload));
 }

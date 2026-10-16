@@ -1,4 +1,4 @@
-import type { AdminFailureView, AdminField } from "../../../entities/account/index.ts";
+import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
 import {
   ERROR_TEXT_STYLE,
   HINT_STYLE,

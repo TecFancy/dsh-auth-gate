@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ACCOUNT_DICT_ZH, formatCopy } from "../../../shared/i18n/index.ts";
 import { ADMIN_DICT_ZH, ADMIN_KEYS } from "../lib/admin-copy.ts";
 import { AdminResetForm } from "./admin-form.tsx";
-import type { AdminUserRow } from "../../../entities/account/index.ts";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 
 // React 18 的 act() 需要显式声明测试环境（否则只警告不生效）。
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

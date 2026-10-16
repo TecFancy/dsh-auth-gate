@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
-import { FORM_BODY_LIMIT, parseFormBody } from "./form-body.js";
+import { FORM_BODY_LIMIT, formField, parseFormBody } from "./form-body.js";
 
 function fakeReq(options: {
   contentType?: string;
@@ -69,5 +69,22 @@ describe("parseFormBody", () => {
     });
     await expect(parseFormBody(req)).rejects.toSatisfy((error) => statusOf(error) === 413);
     expect(destroyed).toBe(0);
+  });
+});
+
+describe("formField", () => {
+  interface SampleRequest {
+    target: string;
+    code?: string;
+  }
+
+  it("returns the raw value, untrimmed", () => {
+    const params = new URLSearchParams("target=%20alice%20&code=123456");
+    expect(formField<SampleRequest>(params, "target")).toBe(" alice ");
+    expect(formField<SampleRequest>(params, "code")).toBe("123456");
+  });
+
+  it("returns an empty string for an absent field", () => {
+    expect(formField<SampleRequest>(new URLSearchParams(""), "code")).toBe("");
   });
 });

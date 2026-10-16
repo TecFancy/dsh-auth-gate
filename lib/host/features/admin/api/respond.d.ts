@@ -1,4 +1,5 @@
 import type { ServerResponse } from "node:http";
+import type { AdminResetErrorBody, AdminResetResponse, UsersErrorBody, UsersResponse } from "../../../shared/protocol/index.js";
 import { type AdminAuditContext, type AdminAuditLogger, type AdminDenyReason } from "../model/audit.js";
 /**
  * 响应与拒绝出口。只依赖 logger + limiter 两样（AdminDeps 天然满足），
@@ -10,13 +11,15 @@ export interface DenyDeps {
         recordFailure(ip: string, account: string | undefined): void;
     };
 }
+/** 两条管理路由能写出的全部 JSON 形状（跨半边契约 D31）；写错键或错误码编译不过。 */
+export type AdminJsonBody = UsersResponse | UsersErrorBody | AdminResetResponse | AdminResetErrorBody;
 /** JSON 写出（`no-store` + `pragma: no-cache` 冻结，§1）。 */
-export declare function sendJson(res: ServerResponse, status: number, body: unknown): void;
+export declare function sendJson(res: ServerResponse, status: number, body: AdminJsonBody): void;
 export declare function sendText(res: ServerResponse, status: number, body: string): void;
 /** 拒绝：审计 + JSON 响应（不碰限速桶）。 */
-export declare function deny(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: unknown): void;
+export declare function deny(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: AdminResetErrorBody): void;
 /** 限流门**之后**的拒绝：额外计失败（§6「失败也计入本桶」，沿用 P1 口径）。 */
-export declare function fail(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: unknown): void;
+export declare function fail(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: AdminResetErrorBody): void;
 /** 415/413（复用既有 form-body 语义；413 先写 `connection: close`）；无 status 的异常向上抛。 */
 export declare function respondFormError(res: ServerResponse, error: unknown): void;
 export declare function errorMessage(error: unknown): string;

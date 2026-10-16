@@ -1,4 +1,10 @@
 import type { ServerResponse } from "node:http";
+import type {
+  AdminResetErrorBody,
+  AdminResetResponse,
+  UsersErrorBody,
+  UsersResponse,
+} from "../../../shared/protocol/index.js";
 import {
   auditDenied,
   type AdminAuditContext,
@@ -15,8 +21,12 @@ export interface DenyDeps {
   limiter: { recordFailure(ip: string, account: string | undefined): void };
 }
 
+/** 两条管理路由能写出的全部 JSON 形状（跨半边契约 D31）；写错键或错误码编译不过。 */
+export type AdminJsonBody =
+  UsersResponse | UsersErrorBody | AdminResetResponse | AdminResetErrorBody;
+
 /** JSON 写出（`no-store` + `pragma: no-cache` 冻结，§1）。 */
-export function sendJson(res: ServerResponse, status: number, body: unknown): void {
+export function sendJson(res: ServerResponse, status: number, body: AdminJsonBody): void {
   res.setHeader("cache-control", "no-store");
   res.setHeader("pragma", "no-cache");
   res.writeHead(status, { "content-type": "application/json" });
@@ -36,7 +46,7 @@ export function deny(
   ctx: AdminAuditContext,
   reason: AdminDenyReason,
   status: number,
-  body: unknown,
+  body: AdminResetErrorBody,
 ): void {
   auditDenied(deps.logger, ctx, reason);
   sendJson(res, status, body);
@@ -49,7 +59,7 @@ export function fail(
   ctx: AdminAuditContext,
   reason: AdminDenyReason,
   status: number,
-  body: unknown,
+  body: AdminResetErrorBody,
 ): void {
   deps.limiter.recordFailure(ctx.clientIp, ctx.actor);
   deny(deps, res, ctx, reason, status, body);

@@ -1,5 +1,5 @@
 import { type AdminTranslate } from "../lib/admin-copy.ts";
-import { type AdminUserRow } from "../../../entities/account/index.ts";
+import type { AdminUserRow } from "../../../shared/api/index.ts";
 export interface AdminResetFormProps {
     t: AdminTranslate;
     users: AdminUserRow[];
