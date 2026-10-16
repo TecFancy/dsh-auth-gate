@@ -7,19 +7,20 @@ through one command.
 
 ## Commands
 
-| Task           | Command                                                                                                                                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                               |
-| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                           |
-| FSD layering   | `npm run lint:fsd` (Steiger over `src/host` and `src/client`; layer order, same-layer isolation, public API, naming)                                                                                                                 |
-| Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                            |
-| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                |
-| Watch tests    | `npm run test:watch`                                                                                                                                                                                                                 |
-| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                                                |
-| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations + source maps)                                                                                                                       |
-| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                                                |
-| Full gate      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lint:fsd + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check; full set - CI, not every local run) |
-| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` and of CI `hygiene` - see `docs/README.md` "文档规范")                                            |
+| Task           | Command                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                                                                     |
+| Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                                                                 |
+| FSD layering   | `npm run lint:fsd` (Steiger over `src/host` and `src/client`; layer order, same-layer isolation, public API, naming)                                                                                                                                                       |
+| Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                                                                  |
+| Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                                                      |
+| Watch tests    | `npm run test:watch`                                                                                                                                                                                                                                                       |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                                                                                      |
+| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations + source maps)                                                                                                                                                             |
+| Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                                                                                      |
+| Full gate      | `npm run verify` (format:check + lint + lint:no-emdash + slice:check + lint:fsd + lock:check + decisions:check + docs:check + readme:parity + type-check + test:coverage + build + bundle:check + host:check; full set - CI, not every local run)                          |
+| Host contract  | `npm run host:check` (self-test, then: package name = Loader row = client registration id = host `name`; manifest targets exist; client `require`s are seeded host modules; no route literal outside `src/protocol/`, every protocol path registered, README routes exist) |
+| Docs gate      | `npm run docs:check` (bilingual pairing + 50 KiB size red line + duplicate H2-H4 headings, root READMEs included; part of `verify` and of CI `hygiene` - see `docs/README.md` "文档规范")                                                                                  |
 
 Run a single test file: `npm run test -- src/host/shared/guard/guard.test.ts`
 Run tests by name: `npm run test -- -t "guard"`
@@ -192,7 +193,7 @@ byte-stable across Windows/Linux builders.
 `.github/workflows/ci.yml` runs on every push to `main` and every PR, on
 **both ubuntu-latest and windows-latest** (fail-fast disabled): `npm ci`,
 format check, lint, no-emdash, slice boundaries, FSD layering (Steiger), decision records, type-check,
-coverage tests, build, bundle check, then two parity gates:
+coverage tests, build, bundle check, host contract check, then two parity gates:
 
 1. **Committed artifact parity**: `git diff --exit-code -- lib` after the fresh
    build — the committed `lib/` must equal a clean build.

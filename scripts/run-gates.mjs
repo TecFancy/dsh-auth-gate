@@ -36,6 +36,7 @@ const SCENE_OF = {
   test: "tests",
   build: "build",
   "bundle:check": "build",
+  "host:check": "build",
 };
 
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));

@@ -406,7 +406,7 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 本仓库遵循 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework) 的工程约定：
 跨 slice 只通过 barrel 引用（Feature-Sliced Design 分层，由 Steiger 检查），以 `npm run verify` 作为门禁链，并保留决策记录（ADR）。`verify`
 依次运行 format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity / type-check /
-覆盖率 80% / build / bundle；测试、构建和发版流程见 `docs/specs/development_zh.md`。
+覆盖率 80% / build / bundle / 宿主契约；测试、构建和发版流程见 `docs/specs/development_zh.md`。
 
 ## 许可证
 

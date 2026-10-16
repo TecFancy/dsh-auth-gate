@@ -66,6 +66,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run bundle:check
+      - run: npm run host:check
       - name: Verify committed lib/ matches a fresh build
         run: git diff --exit-code -- lib
       # dsh installs this package into a profile with `npm install` (devDeps
