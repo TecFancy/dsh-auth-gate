@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.4](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.3...v0.17.4) (2026-10-16)
+
+
+### Code Refactoring
+
+* lay out both halves in FSD and share the /auth contract across them ([#113](https://github.com/TecFancy/dsh-auth-gate/issues/113)) ([dbc9b04](https://github.com/TecFancy/dsh-auth-gate/commit/dbc9b046e4649f74d395d933834807c106579741))
+
 ## [0.17.3](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.2...v0.17.3) (2026-10-13)
 
 
