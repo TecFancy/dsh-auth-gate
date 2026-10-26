@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.4...v0.18.0) (2026-10-26)
+
+
+### Features
+
+* first-run launch-token onboarding for unconfigured instances ([#117](https://github.com/TecFancy/dsh-auth-gate/issues/117)) ([f73a13e](https://github.com/TecFancy/dsh-auth-gate/commit/f73a13e5388b007a5a3ed132b652506cc981e0a5))
+
 ## [0.17.4](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.3...v0.17.4) (2026-10-16)
 
 
