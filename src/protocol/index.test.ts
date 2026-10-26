@@ -1,6 +1,9 @@
 import { describe, expect, expectTypeOf, it } from "vitest";
 import {
   AUTH_PATH_PREFIX,
+  BOOTSTRAP_PATH,
+  BOOTSTRAP_SESSION_KIND,
+  CONTINUE_PATH,
   isAuthPath,
   LOGIN_PATH,
   loginPath,
@@ -9,6 +12,7 @@ import {
   PASSWORD_CHANGED_LOGIN_URL,
   PASSWORD_CHANGED_NOTICE,
   PASSWORD_PATH,
+  SETUP_PATH,
   STATUS_PATH,
   USERS_PASSWORD_PATH,
   USERS_PATH,
@@ -31,6 +35,9 @@ describe("protocol: /auth contract", () => {
       PASSWORD_PATH,
       USERS_PATH,
       USERS_PASSWORD_PATH,
+      BOOTSTRAP_PATH,
+      SETUP_PATH,
+      CONTINUE_PATH,
     }).toEqual({
       AUTH_PATH_PREFIX: "/auth",
       LOGIN_PATH: "/auth/login",
@@ -39,7 +46,14 @@ describe("protocol: /auth contract", () => {
       PASSWORD_PATH: "/auth/password",
       USERS_PATH: "/auth/users",
       USERS_PASSWORD_PATH: "/auth/users/password",
+      BOOTSTRAP_PATH: "/auth/bootstrap",
+      SETUP_PATH: "/auth/setup",
+      CONTINUE_PATH: "/auth/continue",
     });
+  });
+
+  it("pins the bootstrap session kind", () => {
+    expect(BOOTSTRAP_SESSION_KIND).toBe("bootstrap");
   });
 
   it("pins the composed URLs and the notice key", () => {

@@ -4,8 +4,9 @@ import { resolvePublicHost } from "./host.js";
 /**
  * 已认证状态变更请求的同源校验（P2 §6 的 CSRF 纵深）。
  *
- * 只服务两条**已认证**的写路径：`POST /auth/users/password` 与 `POST /auth/password`。
- * 登录路径（未认证）**不覆盖**：那边失败会让全员锁死，风险与收益不成比例（契约 §10 残留）。
+ * 只服务三条**已认证**的写路径：`POST /auth/users/password`、`POST /auth/password` 与首次
+ * 配置向导的 `POST /auth/setup`（只有 bootstrap 会话能进，校验后不写盘）。登录路径
+ * （未认证）**不覆盖**：那边失败会让全员锁死，风险与收益不成比例（契约 §10 残留）。
  *
  * 判定顺序（任一通过即放行，两者都缺则 fail-closed）：
  * 1. `Sec-Fetch-Site: same-origin`：浏览器强制设置、页面脚本无法伪造，是最可靠的来源证明。

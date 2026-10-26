@@ -1,5 +1,5 @@
 import { type KvTable } from "@deepseek-ai/dsh-storage-domain";
-import type { SessionKind } from "../../../shared/protocol/index.js";
+import { type SessionKind } from "../../../shared/protocol/index.js";
 /** 会话 cookie 属性（M2 起使用；M1 冻结并测试）。 */
 export declare const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
 /**
@@ -28,6 +28,11 @@ export interface IssuedSession {
     token: string;
     session: Session;
 }
+/**
+ * 是否 bootstrap 会话（只读 `kind`；缺省 / 其它类别一律 false）。
+ * 门用它把「只放行 `/auth/*`」的临时会话与正式会话分开，不做任何 IO。
+ */
+export declare function isBootstrapSession(session: Session | undefined): boolean;
 /** 键 = digest（sha256 hex），不进 row；row 只存以上四字段。 */
 export declare const sessionDomainSpec: {
     name: string;
@@ -38,7 +43,7 @@ export declare const sessionDomainSpec: {
             createdAt: number;
             expiresAt: number;
             revoked: boolean;
-            kind?: "full" | "password-change-only" | undefined;
+            kind?: "full" | "password-change-only" | "bootstrap" | undefined;
         }>;
     };
 };
@@ -57,6 +62,12 @@ export declare class SessionStore {
      * 行内没有主体索引，故按 row.subject 全表扫描（会话量级为单机用户数，成本可忽略）。
      */
     revokeBySubject(subject: string): Promise<number>;
+    /**
+     * 吊销某个类别的**全部**会话行，返回吊销条数（写盘）。
+     * 用途：首次配置向导成功后关掉引导窗口（`bootstrap` 会话一律失效）。
+     * 行内没有类别索引，故按 row.kind 全表扫描（与 `revokeBySubject` 同款理由）。
+     */
+    revokeByKind(kind: SessionKind): Promise<number>;
     /** 全表扫描删除过期行，返回删除数。 */
     pruneExpired(now?: number): Promise<number>;
 }

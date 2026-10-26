@@ -54,7 +54,8 @@ export async function waitFor(condition: () => boolean, timeoutMs = 5_000): Prom
   }
 }
 
-export async function mountStack(options: {
+/** 首次引导的测试要能读回「向导写进去的那枚 token」，所以可写凭据服务单独一档。 */
+export interface MountStackOptions {
   withCredentials: boolean;
   /**
    * 假 dsh connection 的形状：`authenticatedUrl` = dsh ≥ 0.1.2-alpha；`bare` = 服务在但没有
@@ -62,17 +63,48 @@ export async function mountStack(options: {
    * 用来锁住桥「登录时才 `ctx.get("connection")`」的惰性查找（晚注册的 connection 同样有效）。
    */
   connection?: "authenticatedUrl" | "bare";
-}): Promise<{
+  /** 认证流（默认 token）；password 模式需要 `usersFile`（默认落在临时目录里）。 */
+  mode?: "token" | "password";
+  /** password 模式的 users.yaml 路径；缺省用临时目录下的一份（绝不碰真实 DSH_HOME）。 */
+  usersFile?: string;
+  /** 提供带 `set` 的可写凭据服务（`resolve` 读同一份内存表），用于首次配置写 token。 */
+  writableCredentials?: boolean;
+  /** 反钓鱼 host / CSRF 的公开来源（默认空串，即只用 Sec-Fetch-Site 通道）。 */
+  publicHost?: string;
+}
+
+export interface MountedStack {
   ctx: Context;
   port: number;
   fibers: Fiber[];
   root: string;
   token: string | undefined;
-}> {
+  usersFile: string;
+  /** 可写凭据服务的落点（`writableCredentials` 时存在）；token 写到这里。 */
+  credentialsStore: Map<string, string> | undefined;
+}
+
+export async function mountStack(options: MountStackOptions): Promise<MountedStack> {
   const root = mkdtempSync(join(tmpdir(), "dsh-auth-it-"));
   const ctx = new Context();
+  const mode = options.mode ?? "token";
+  const usersFile = options.usersFile ?? join(root, "auth", "users.yaml");
   const token = options.withCredentials ? randomBytes(24).toString("base64url") : undefined;
-  if (options.withCredentials) {
+  let credentialsStore: Map<string, string> | undefined;
+  if (options.writableCredentials === true) {
+    credentialsStore = new Map();
+    const store = credentialsStore;
+    ctx.provide("credentials", {
+      resolve: (ref: string) => {
+        const value = store.get(ref);
+        return Promise.resolve(value === undefined ? undefined : { value, source: "test" });
+      },
+      set: (ref: string, value: string) => {
+        store.set(ref, value);
+        return Promise.resolve();
+      },
+    });
+  } else if (options.withCredentials) {
     ctx.provide("credentials", {
       resolve: (ref: string) =>
         ref === "DSH_AUTH_TOKEN"
@@ -106,7 +138,12 @@ export async function mountStack(options: {
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
   fibers.push(
-    await ctx.plugin({ name, inject, apply, Config }, { cookieSecure: false } as AuthConfig),
+    await ctx.plugin({ name, inject, apply, Config }, {
+      cookieSecure: false,
+      mode,
+      usersFile: mode === "password" ? usersFile : "",
+      publicHost: options.publicHost ?? "",
+    } as AuthConfig),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
   registerProbes(server);
@@ -127,7 +164,7 @@ export async function mountStack(options: {
     });
   }
   if (options.connection === "bare") ctx.provide("connection", {});
-  return { ctx, port: server.port, fibers, root, token };
+  return { ctx, port: server.port, fibers, root, token, usersFile, credentialsStore };
 }
 
 /**

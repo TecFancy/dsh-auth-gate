@@ -1,9 +1,13 @@
 import type { IncomingMessage } from "node:http";
-import { parseCookieHeader } from "../../../shared/http/index.js";
+import { bootstrapRedirectPath, parseCookieHeader } from "../../../shared/http/index.js";
 import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
 import { isNavigationRequest, isPublicStaticPath } from "../../../shared/guard/index.js";
-import { isAuthPath, LOGIN_PATH, loginPath } from "../../../shared/protocol/index.js";
-import type { Session, SessionStore } from "../../../entities/session/index.js";
+import { isAuthPath, LOGIN_PATH, loginPath, SETUP_PATH } from "../../../shared/protocol/index.js";
+import {
+  isBootstrapSession,
+  type Session,
+  type SessionStore,
+} from "../../../entities/session/index.js";
 import { isRestrictedSession, RESTRICTED_REDIRECT_PATH } from "./restricted-session.js";
 
 export interface PasswordGateOptions {
@@ -21,6 +25,9 @@ export interface PasswordGateOptions {
  * `GET /auth/login` → 302 改密页、`POST /auth/login` → 403；其余（含 `/auth/users*`）
  * 放行进 handler，由 handler 按 kind 细分（管理面回 403）。宿主 `/api`、静态、`/plugins`
  * 与 WS 一律 deny（导航 302 `/auth/password`，API 401，WS 拒握手）。
+ *
+ * `session.kind === "bootstrap"` 的首次引导会话只放行 `/auth` 前缀；其余一律 deny（导航
+ * 302 向导页，API 401，WS 拒握手）。未认证的 `GET /?token=` 按请求形状 302 到引导端点。
  */
 export class PasswordGate implements Gate {
   private readonly sessions: () => SessionStore | undefined;
@@ -37,8 +44,11 @@ export class PasswordGate implements Gate {
     }
     const session = this.sessionOf(req);
     if (isRestrictedSession(session)) return denyRestricted(req, kind);
+    if (isBootstrapSession(session)) return denyBootstrap(req);
     if (isPublicStaticPath(kind, pathname)) return "allow";
     if (session !== undefined) return "allow";
+    const hint = bootstrapRedirectPath(req);
+    if (hint !== undefined) return { deny: { redirect: hint } };
     return denyAnonymous(req, pathname);
   }
 
@@ -77,6 +87,11 @@ function denyRestricted(req: IncomingMessage, kind: GuardKind): GateDecision {
   return isNavigationRequest(req)
     ? { deny: { redirect: RESTRICTED_REDIRECT_PATH } }
     : { deny: { status: 401 } };
+}
+
+/** 首次引导会话被拒的宿主路径：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。 */
+function denyBootstrap(req: IncomingMessage): GateDecision {
+  return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }
 
 /** 未认证（无会话/会话失效）：导航 → 302 登录页 + next；其余 → 字符串 deny（401）。 */

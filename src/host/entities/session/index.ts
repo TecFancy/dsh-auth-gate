@@ -7,6 +7,7 @@ export {
   buildSetCookie,
   COOKIE_FLAGS,
   digestToken,
+  isBootstrapSession,
   sessionDomainSpec,
   SessionStore,
 } from "./model/session-store.js";
