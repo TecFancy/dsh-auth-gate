@@ -24,6 +24,7 @@
 - [它不做什么](#它不做什么)
 - [市场的「会用你的密钥」徽章](#市场的会用你的密钥徽章)
 - [快速开始](#快速开始)
+- [首次运行](#首次运行)
 - [效果预览](#效果预览)
 - [配置](#配置)
 - [命令行工具](#命令行工具)
@@ -96,25 +97,43 @@ _读凭据的同时还能联网_。这是披露，不是判决；对本插件来
 
 ## 快速开始
 
+装上插件、重启 dsh，然后打开 dsh 启动时打印的那条链接。全新安装的实例还没有任何配置，所以这条链接
+会直接进入首次配置向导：整个过程不需要开 shell，也不需要改配置文件。
+
 ```sh
 # 1. 从 npm 装进你的 dsh profile。
 #    自 0.4.1 起，包里声明了 dsh.bundle manifest，`dsh plugin add` 会顺带自动注册挂载
 #    （dsh.profile.bundles），不需要再手动添加挂载行：
 dsh plugin --profile web add dsh-auth-gate
 
-# 2. 创建管理员账号。
-#    `dsh plugin add` 把插件装进 profile 的 node_modules
-#    （$DSH_HOME/profiles/web，默认 ~/.dsh/...）；CLI 不会被加入你的 PATH，
-#    所以要通过 profile 调用。`dsh plugin` 本身就依赖 pnpm：
-printf '%s\n' '选一个强密码' | \
-  pnpm --dir "$DSH_HOME/profiles/web" exec dsh-auth user add admin --password-stdin
-
-# 3. 启用密码登录：在 $DSH_HOME/cordis.patch.yml 里覆盖插件配置
-#    （仓库自带可直接使用的覆盖模板 deploy/cordis.patch.yml，见下文"配置"；
-#    挂载这一步本身不需要手动写 patch 行）
-
-# 4. 重启 dsh，打开站点，就会先要求登录。
+# 2. 重启 dsh，然后打开它启动时打印的链接
+#    （http://<host>:<port>/?token=<launch token>）。
+dsh --profile web
 ```
+
+向导给出的选项跟随当前模式：token 模式（出厂默认）生成并保存共享访问令牌，password 模式创建第一个
+管理员。新令牌只在结果页显示一次，点一下就能继续进入 dsh。从下次访问起，那条启动链接又只是一条普通 URL：
+在登录页用刚设好的令牌或密码登录即可。其余的事（加用户、开 TOTP、改 `mode`）仍然在 shell 里做：
+见 [首次运行](#首次运行)、[配置](#配置) 和 [命令行工具](#命令行工具)。
+
+## 首次运行
+
+启动链接会不会打开向导，每次请求都会重新判一次，判据只有一个：这个实例配置好了没有？
+
+- **默认模式是 `mode: "token"`。** 没有 `DSH_AUTH_TOKEN` 时，未配置的 token 模式实例会拒绝所有人，
+  所以启动链接是唯一的入口。只有读取成功且值为空才算未配置；credentials 服务缺失或读取抛错，一律按
+  已配置处理，不会打开向导。`password` 模式在 `users.yaml` 缺失或零用户时同理。
+- **`?token=` 是什么。** 它是 dsh 自己的启动令牌，dsh 每次启动打印一次，只在这个进程活着的时候有效。
+  插件把它当成「你能读服务器控制台」的凭证，随后签一张 bootstrap 会话：最长 1 小时，除了插件自己的
+  `/auth/*` 页面什么都打不开。
+- **向导能改什么。** 它生成并保存共享令牌（token 模式）或创建第一个管理员（password 模式），两者一旦
+  存在，窗口立刻关闭。它改不了 `mode`、`totp`、`cookieSecure`、`sessionTtl` 和 `proxy`：这些要改
+  `$DSH_HOME/cordis.patch.yml` 再重启 dsh。
+- **之后启动链接会怎样。** 它不再放你进来，而且要走两跳：门先把请求转到
+  `/auth/bootstrap?token=...`，端点判定实例已配置，再回 `302 /auth/login?next=%2F`。两跳都不下发
+  cookie、都不放行，所以启动令牌不是第二把钥匙。
+- **怎么再打开向导。** 删掉已保存的令牌（或者让 `users.yaml` 没有用户），然后重启 dsh。如果 credentials
+  服务返回的是缓存值，正是这次重启让它看到变化。
 
 ## 效果预览
 
@@ -325,6 +344,27 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill inst
 让浏览器重新导航到同一 URL，第二次请求就同时带上两个 cookie。可能看到一次短暂的空白闪烁，无需操作；
 没有 JavaScript 时点 `Continue` 链接即可。
 
+### 纯 HTTP 下会话 cookie 存不住
+
+`cookieSecure` 默认是 `true`，浏览器被告知只在 HTTPS 下保存会话 cookie。纯 `http://` 站点上登录会正常
+提交、服务端也正常应答，随后浏览器把 cookie 丢掉，于是你又回到登录页，等于没有会话。纯 http 的测试实例
+把 `cookieSecure` 设成 `false`；TLS 在 dsh 前面终结的部署则保持 `true`。同一个坑还会踩两次：
+`$DSH_HOME/cordis.patch.yml` 是所有 profile 共享的一层，它写 `true`、测试 profile 写 `false` 时以共享层
+为准，启动测试 profile 时加 `--patch` 覆盖。
+
+### 配好之后启动链接进不来了
+
+这是预期行为。启动令牌只用来打开首次配置向导，而向导在令牌或用户出现的那一刻就关掉了这个窗口；之后
+请求先到 `/auth/bootstrap?token=...`，端点判定实例已配置，再回 `302 /auth/login?next=%2F`，全程不下发
+cookie，与向导出现之前完全一样。改用登录页登录即可。什么都没丢：要再打开向导，删掉已保存的令牌（或让
+`users.yaml` 没有用户）再重启 dsh。
+
+### 刚重启时启动链接停在登录页
+
+dsh 打开启动链接时，credentials 服务可能还没就绪。在它应答之前，插件分不清「没有配置」和
+「读不到配置」，于是按 fail-closed 停在登录页。等实例启动完成后刷新一次：真未配置就会进向导，
+已配置则登录页本来就是正确去处。
+
 ## 部署
 
 - [反向代理部署指南](docs/deployed/reverse-proxy_zh.md)：Caddy/nginx 配置、浏览器信任栅栏的坑
@@ -399,6 +439,11 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 - 重置不会改动目标的 TOTP 密钥；重置一个仍被禁用的账号也不会让它登得进来（登录路径恒拒禁用
   用户），需要先执行 `dsh-auth user enable <name>`。
 - 管理员自己没启用 TOTP 时，管理端点是单因素认证；生产环境应给管理员启用 TOTP。
+- 首次配置向导是一次性窗口：它的 bootstrap 会话最长 1 小时、只能访问 `/auth/*`，令牌或用户一出现窗口
+  就关闭。删掉那枚令牌（或最后一个用户）再重启 dsh，可以重新打开。
+- 向导假设只有单个 dsh 进程，因为每个进程各自生成自己的启动令牌；多副本没有粘滞路由时，请求可能落到
+  不认识这枚令牌的进程，回落到登录页。credentials 服务若缓存值，可能要在重启之后才认向导里保存的令牌；
+  没有 `connection.authenticatedUrl` 的 dsh 版本则完全没有向导。
 - 本插件只保护 dsh 的 Web 入口；操作系统账号和配置文件需要你自己保持私密。
 
 ## 开发

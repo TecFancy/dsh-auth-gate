@@ -52,5 +52,19 @@ README 里只留了短清单；这里是完整版：每条已知局限、它背�
 - 审计事件走结构化 logger，而 dsh 0.1.5-rc.2 **不会**把 `ctx.logger` 的 info/error 落盘，因此在该
   版本上，验证只能靠运行侧可观察结果 + 仓内的 in-process 真栈审计测试（32 例，分布在两个审计单测
   套件与三个 P2 集成套件里）。这是日志可见性限制，不是「没有审计」。
+- 首次配置向导（`/auth/setup`，从启动链接经 `/auth/bootstrap` 进入）只在实例**未配置**时存在：token
+  模式只有在凭据读取成功、且读到空值时才判为未配置；password 模式要求 `users.yaml` 缺失或零用户。令牌
+  非空、已有一个用户、credentials 服务缺失、`resolve` 抛错，或者文件不可读，都按「不是未配置」处理，
+  维持原来的拒绝。探针每次请求实时判定，另外向导写盘成功后进程内会置 `markedConfigured` 标志，窗口
+  立即关闭。
+- bootstrap 会话最长 `min(sessionTtl, 3600)` 秒（默认配置下就是 1 小时），`subject = "bootstrap"`，
+  只放行 `/auth/*`：其它导航回 `302 /auth/setup`，API 请求回 `401`，WebSocket 升级握手直接拒绝。向导
+  完成时先吊销全部 bootstrap 会话再签发正式会话，所以这张票不能重放。
+- 引导通道假设单进程。launch token 每个进程启动时各自生成，多副本没有粘滞路由时，`/auth/bootstrap`
+  可能落到不认识这枚 token 的进程，按 fail-closed 回落到登录页。
+- credentials 服务若缓存已解析的值，向导保存新令牌之后可能仍然返回旧的（空）值。结果页会提示需要重启，
+  新令牌在 dsh 重启后成为唯一凭据；窗口本身不受影响，仍然立刻关闭。
+- 低于 0.1.2-alpha 的 dsh 没有 `connection.authenticatedUrl`，读不到 launch token，也就没有引导：这类
+  实例维持 0.17.4 的行为，只能通过 CLI 配置。
 - 本插件只保护 dsh 的网页入口，不能替代服务器层面的安全：请保持服务器系统用户最小权限、
   配置文件私密（`.credentials.yaml` 和 `auth/users.yaml` 创建时即为 `0600` 权限）。
