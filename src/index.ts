@@ -11,6 +11,7 @@ import {
   verifyPassword,
 } from "./host/features/password/index.js";
 import { makeAdminWiring } from "./admin-wiring.js";
+import { makeBootstrapWiring } from "./bootstrap-wiring.js";
 import { TotpReplayGuard, verifyTotpCode } from "./host/features/totp/index.js";
 import {
   DEFAULT_TRUSTED_PROXIES,
@@ -119,12 +120,14 @@ declare module "@deepseek-ai/cordis" {
 
 /**
  * 会话层软接（M1 逻辑不变）：storageDomain 缺失 → error 日志后守卫照常挂载；
- * 存在 → effect 内 open domain，就绪后把 SessionStore 挂到 auth.sessions。
+ * 存在 → effect 内 open domain，就绪后把 SessionStore 挂到 auth.sessions，再通知 `onReady`
+ * （首次引导的启动清扫要等这一刻）。
  */
 function mountSessionDomain(
   ctx: Context,
   auth: AuthService,
   log: { error(message: unknown): void; info(message: unknown): void },
+  onReady?: (store: SessionStore) => void,
 ): (() => () => Promise<void>) | undefined {
   const storageDomain = ctx.get("storageDomain");
   if (storageDomain === undefined) {
@@ -142,7 +145,9 @@ function mountSessionDomain(
           void domain.close();
           return;
         }
-        auth.sessions = new SessionStore(domain.table("sessions"));
+        const store = new SessionStore(domain.table("sessions"));
+        auth.sessions = store;
+        onReady?.(store);
         log.info("session domain opened: dsh_auth_sessions");
       },
       (error: unknown) => {
@@ -280,10 +285,17 @@ export function apply(ctx: Context, config: AuthConfig): void {
   };
   ctx.provide("auth", auth);
 
-  const sessionDisposer = mountSessionDomain(ctx, auth, log);
-  if (sessionDisposer !== undefined) {
-    ctx.effect(sessionDisposer, "dsh-auth-gate: session domain");
-  }
+  const bootstrap = makeBootstrapWiring({
+    ctx,
+    server,
+    config,
+    auth,
+    usersPath,
+    launchTokenBridge,
+    log,
+  });
+  const sessionDisposer = mountSessionDomain(ctx, auth, log, bootstrap.onSessionsReady);
+  if (sessionDisposer !== undefined) ctx.effect(sessionDisposer, "dsh-auth-gate: session domain");
 
   // 禁用用户 → 已发会话即时失效（D8）：插件侧周期扫描 users.yaml，把变更落到会话表；
   // 门保持 P12 的同步零 IO 语义，CLI 也不需要访问会话存储。
@@ -299,6 +311,10 @@ export function apply(ctx: Context, config: AuthConfig): void {
 
   const unwrap = wrapServer(server, () => auth.gate, log);
   ctx.effect(() => unwrap, "dsh-auth-gate: guard unwrap");
+
+  // 首次引导通道（`/auth/bootstrap` → `/auth/setup` → `/auth/continue`）：只在实例未配置时签发
+  // 一次性 bootstrap 会话，向导完成后关窗。三条路径在 `/auth` 前缀内，门直接放行。
+  ctx.effect(() => bootstrap.mount(), "dsh-auth-gate: bootstrap routes");
 
   ctx.effect(
     () =>

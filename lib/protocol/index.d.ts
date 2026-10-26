@@ -25,6 +25,17 @@ export declare const PASSWORD_PATH = "/auth/password";
 export declare const USERS_PATH = "/auth/users";
 /** 管理面：管理员重置他人口令。 */
 export declare const USERS_PASSWORD_PATH = "/auth/users/password";
+/** 首次引导：校验 dsh launch token 并签发一次性的 bootstrap 会话（GET）。 */
+export declare const BOOTSTRAP_PATH = "/auth/bootstrap";
+/** 首次配置向导页（GET 渲染、POST 提交）；也是 bootstrap 会话被拒时的导航目标。 */
+export declare const SETUP_PATH = "/auth/setup";
+/** 向导完成后回首页：只认会话 cookie，302 到 dsh 的 `/?token=`。 */
+export declare const CONTINUE_PATH = "/auth/continue";
+/**
+ * bootstrap 会话的 `kind` 值：只在首次引导通道签发，TTL 有上限，只能访问本插件的
+ * `/auth/*`。向导完成后被整体吊销，不是第二种长期登录方式。
+ */
+export declare const BOOTSTRAP_SESSION_KIND = "bootstrap";
 /** 登录页 `notice` 白名单键：改密成功后被登出。 */
 export declare const PASSWORD_CHANGED_NOTICE = "password-changed";
 /** 改密成功后 client 把当前设备送去的登录页（回首页，并带上被登出的原因键）。 */

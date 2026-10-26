@@ -1,6 +1,7 @@
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { SessionStore } from "../../../entities/session/index.js";
+import type { SessionKind } from "../../../shared/protocol/index.js";
 import { safeEqual, TokenGate } from "./token-gate.js";
 
 function fakeReq(headers: Record<string, string | undefined>): IncomingMessage {
@@ -117,5 +118,68 @@ describe("safeEqual", () => {
     expect(safeEqual("abc", "abc")).toBe(true);
     expect(safeEqual("abc", "abd")).toBe(false);
     expect(safeEqual("", "x")).toBe(false);
+  });
+});
+
+describe("TokenGate: first-run bootstrap channel", () => {
+  function fakeSessionsWithKind(kind: SessionKind): SessionStore {
+    const session = {
+      subject: "bootstrap",
+      createdAt: 0,
+      expiresAt: Date.now() + 60_000,
+      revoked: false,
+      kind,
+    };
+    return { getByToken: () => session } as unknown as SessionStore;
+  }
+
+  it("redirects a bare token launch URL to the bootstrap endpoint", async () => {
+    const gate = makeGate();
+    expect(
+      await gate.decide(
+        { method: "GET", url: "/?token=launch-token", headers: {} } as IncomingMessage,
+        "exact",
+        "/",
+      ),
+    ).toEqual({ deny: { redirect: "/auth/bootstrap?token=launch-token" } });
+  });
+
+  it("leaves every other anonymous request on the plain deny", async () => {
+    const gate = makeGate();
+    expect(await gate.decide(fakeReq({}), "exact", "/api/x")).toBe("deny");
+    expect(await gate.decide(fakeReq({}), "exact", "/")).toBe("deny");
+    expect(
+      await gate.decide(
+        { method: "POST", url: "/?token=x", headers: {} } as IncomingMessage,
+        "exact",
+        "/",
+      ),
+    ).toBe("deny");
+  });
+
+  it("keeps a bootstrap session inside /auth", async () => {
+    const gate = makeGate({ sessions: () => fakeSessionsWithKind("bootstrap") });
+    expect(await gate.decide(fakeReq({ cookie: "dsh_auth=boot" }), "exact", "/auth/setup")).toBe(
+      "allow",
+    );
+    expect(
+      await gate.decide(
+        fakeReq({ cookie: "dsh_auth=boot", "sec-fetch-dest": "document" }),
+        "exact",
+        "/",
+      ),
+    ).toEqual({ deny: { redirect: "/auth/setup" } });
+    expect(await gate.decide(fakeReq({ cookie: "dsh_auth=boot" }), "exact", "/api/x")).toBe("deny");
+    // 公开静态路径也不例外：bootstrap 会话只能碰本插件的 /auth/*。
+    expect(
+      await gate.decide(fakeReq({ cookie: "dsh_auth=boot" }), "fallback", "/manifest.webmanifest"),
+    ).toBe("deny");
+  });
+
+  it("still lets a full session through", async () => {
+    const gate = makeGate({ sessions: () => fakeSessionsWithKind("full") });
+    expect(await gate.decide(fakeReq({ cookie: "dsh_auth=full" }), "exact", "/api/x")).toBe(
+      "allow",
+    );
   });
 });

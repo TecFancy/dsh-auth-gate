@@ -9,8 +9,11 @@
  */
 /** 用户角色（`users.yaml` 的 `role`，也是 `/auth/status` 与 `/auth/users` 里的 `role`）。 */
 export type UserRole = "user" | "admin";
-/** 会话类别（D25）：受限会话只能改密，不进管理面。 */
-export type SessionKind = "full" | "password-change-only";
+/**
+ * 会话类别（D25）：受限会话只能改密，不进管理面；bootstrap 会话只能访问本插件的
+ * `/auth/*`，只在首次引导通道签发，向导完成后整体吊销。
+ */
+export type SessionKind = "full" | "password-change-only" | "bootstrap";
 /** 口令策略未通过项（值即 400 `policy` 错误体里 `rules` 数组的元素，顺序同 host 判定顺序）。 */
 export type PasswordRule = "minLength" | "maxLength" | "uppercase" | "lowercase" | "digit" | "special" | "sameAsOld";
 /**

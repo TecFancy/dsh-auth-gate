@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { defineDomain, domainTable, type KvTable } from "@deepseek-ai/dsh-storage-domain";
 import { z } from "zod";
-import type { SessionKind } from "../../../shared/protocol/index.js";
+import { BOOTSTRAP_SESSION_KIND, type SessionKind } from "../../../shared/protocol/index.js";
 
 /** 会话 cookie 属性（M2 起使用；M1 冻结并测试）。 */
 export const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
@@ -45,6 +45,14 @@ export interface IssuedSession {
   session: Session;
 }
 
+/**
+ * 是否 bootstrap 会话（只读 `kind`；缺省 / 其它类别一律 false）。
+ * 门用它把「只放行 `/auth/*`」的临时会话与正式会话分开，不做任何 IO。
+ */
+export function isBootstrapSession(session: Session | undefined): boolean {
+  return session?.kind === BOOTSTRAP_SESSION_KIND;
+}
+
 const sessionRowSchema = z.object({
   subject: z.string(),
   createdAt: z.number().int().nonnegative(),
@@ -53,7 +61,7 @@ const sessionRowSchema = z.object({
   // 可选：P2 之前写入的行没有该字段，必须继续可解析（缺省按 full 处理）。
   // 注意：本仓库的 zod 是 v4（`z.enum`/`z.literal`），没有 `z.const`
   // （后者是 @deepseek-ai/schemastery 的 API，见 src/index.ts 的 Config）。
-  kind: z.enum(["full", "password-change-only"]).optional(),
+  kind: z.enum(["full", "password-change-only", "bootstrap"]).optional(),
 });
 
 /** 键 = digest（sha256 hex），不进 row；row 只存以上四字段。 */
@@ -110,6 +118,21 @@ export class SessionStore {
     let count = 0;
     for (const [key, row] of this.table.entries()) {
       if (row.subject !== subject) continue;
+      await this.table.delete(key);
+      count += 1;
+    }
+    return count;
+  }
+
+  /**
+   * 吊销某个类别的**全部**会话行，返回吊销条数（写盘）。
+   * 用途：首次配置向导成功后关掉引导窗口（`bootstrap` 会话一律失效）。
+   * 行内没有类别索引，故按 row.kind 全表扫描（与 `revokeBySubject` 同款理由）。
+   */
+  async revokeByKind(kind: SessionKind): Promise<number> {
+    let count = 0;
+    for (const [key, row] of this.table.entries()) {
+      if (row.kind !== kind) continue;
       await this.table.delete(key);
       count += 1;
     }
