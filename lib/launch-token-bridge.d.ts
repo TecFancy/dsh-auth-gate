@@ -1,5 +1,12 @@
 import type { Context } from "@deepseek-ai/cordis";
 /**
+ * 当前进程的 launch token（只从 `connection.authenticatedUrl` 取）。
+ *
+ * 服务缺失 / 旧版 dsh（无 `authenticatedUrl`）/ 返回里没有 token / 抛错 → `undefined`。
+ * 首次引导通道拿它做常量时间比较，桥拿它拼登录后的 `/?token=`，两处读的是同一枚 token。
+ */
+export declare function readLaunchToken(ctx: Context): string | undefined;
+/**
  * dsh launch-token 桥（0.1.2-alpha 起 client-connection 的页面 token 门）：登录成功后
  * 302 到相对 `/?token=<launchToken>`，浏览器自动 mint dsh cookie，免去手动复制
  * `?token=`。只从 authenticatedUrl 取 token，host/scheme 一概丢弃 - 相对 Location

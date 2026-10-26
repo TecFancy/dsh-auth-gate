@@ -7,6 +7,7 @@
  * grow by accident.
  */
 export { isSafeRelativeTarget, validateNext } from "./auth-common.js";
+export { bootstrapRedirectPath, singleTokenParam } from "./bootstrap-hint.js";
 export { DEFAULT_TRUSTED_PROXIES, makeClientIpResolver, parseClientIpPolicy, resolveClientIp, } from "./client-ip.js";
 export type { ClientIpLogger, ClientIpPolicy, ClientIpResolver } from "./client-ip.js";
 export { parseCookieHeader } from "./cookie.js";

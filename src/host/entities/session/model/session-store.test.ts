@@ -1,6 +1,12 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import { describe, expect, it } from "vitest";
-import { buildSetCookie, digestToken, SessionStore, type Session } from "./session-store.js";
+import {
+  buildSetCookie,
+  digestToken,
+  isBootstrapSession,
+  SessionStore,
+  type Session,
+} from "./session-store.js";
 
 class MemTable implements KvTable<string, Session> {
   private readonly map = new Map<string, Session>();
@@ -113,6 +119,46 @@ describe("SessionStore", () => {
     expect(store.getByToken(second.token)).toBeUndefined();
     expect(store.getByToken(other.token)?.subject).toBe("bob");
     expect(await store.revokeBySubject("alice")).toBe(0);
+  });
+
+  it("revokes every session of one kind and leaves the other kinds alone", async () => {
+    const table = new MemTable();
+    const store = new SessionStore(table);
+    const bootstrap1 = await store.create("bootstrap", 60_000, "bootstrap");
+    const bootstrap2 = await store.create("bootstrap", 60_000, "bootstrap");
+    const full = await store.create("token", 60_000);
+    const restricted = await store.create("alice", 60_000, "password-change-only");
+
+    expect(await store.revokeByKind("bootstrap")).toBe(2);
+    expect(store.getByToken(bootstrap1.token)).toBeUndefined();
+    expect(store.getByToken(bootstrap2.token)).toBeUndefined();
+    expect(store.getByToken(full.token)?.subject).toBe("token");
+    expect(store.getByToken(restricted.token)?.kind).toBe("password-change-only");
+    // 再删一遍：已没有同类行，条数为 0（幂等）。
+    expect(await store.revokeByKind("bootstrap")).toBe(0);
+  });
+
+  it("keeps the session kind on the stored row", async () => {
+    const table = new MemTable();
+    const store = new SessionStore(table);
+    const issued = await store.create("bootstrap", 60_000, "bootstrap");
+    expect(table.get(digestToken(issued.token))?.kind).toBe("bootstrap");
+    expect(issued.session.kind).toBe("bootstrap");
+  });
+});
+
+describe("isBootstrapSession", () => {
+  const base: Session = { subject: "token", createdAt: 0, expiresAt: 1, revoked: false };
+
+  it("recognises only the bootstrap kind", () => {
+    expect(isBootstrapSession({ ...base, kind: "bootstrap" })).toBe(true);
+    expect(isBootstrapSession({ ...base, kind: "full" })).toBe(false);
+    expect(isBootstrapSession({ ...base, kind: "password-change-only" })).toBe(false);
+  });
+
+  it("treats a missing kind and a missing session as not bootstrap", () => {
+    expect(isBootstrapSession(base)).toBe(false);
+    expect(isBootstrapSession(undefined)).toBe(false);
   });
 });
 

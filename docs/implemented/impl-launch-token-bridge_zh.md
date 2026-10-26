@@ -124,10 +124,29 @@ issue #99 补上另一半：**token 模式**（M2 共享口令）的登录成功
   - 会话 cookie + 带 cookie 跟随第二跳 `GET /?token=` 不再被打回登录页；connection 服务
     在但没有 `authenticatedUrl` 时回落 `next`。
 
-## 6. 变更记录
+## 6. 引导通道复用桥，但判定不在桥里
+
+首次配置向导没有再开一条 token 通道。它在出口复用这座桥，把「要不要放这个人进向导」交给
+bootstrap feature 决定。
+
+- **向导的出口就是登录的出口。** `/auth/continue` 调 `resolvePostLoginLocation(bridge, "/")`，与两条
+  登录成功路径同一个函数，所以浏览器从 `/auth/setup` 走到 `/?token=<launchToken>`，dsh 照常铸自己的
+  cookie。D-bridge-1 与 D-bridge-2 原样适用：Location 仍然相对，`next` 仍然丢弃。
+- **「实例配置好没有」不在这里判。** 探针在 bootstrap feature 里，每次请求实时判（token 模式看
+  `credentials.resolve(tokenRef)`，password 模式看 `users.yaml`）。桥不读配置，它只负责把「登录成功」
+  映射成一个跳转目标。
+- **launch token 只读一份。** `/auth/bootstrap` 拿请求里的 token 与 `readLaunchToken(ctx)` 比对，用的
+  就是桥也走的那个提取函数，所以向导和桥比的永远是同一枚进程级 token，不会出现两份读法各自漂移。
+- **窗口在桥前面。** 向导一旦写入了令牌或用户，探针就答「已配置」，`/auth/bootstrap` 不管桥会返回什么
+  都拒绝，旧 launch URL 再也换不到 bootstrap 会话。
+- **失败语义不变。** 桥保持 fail-open，connection 服务缺失或抛错时回落到 `/`，所以桥坏掉不会把人困在
+  向导里，只是省掉了自动交接 launch token 这一步（D-bridge-3）。
+
+## 7. 变更记录
 
 | commit    | 内容                                                                                                                                                                                                                                                                                  |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `19c8431` | 首版：`makeLaunchTokenBridge` + `issueSession` 透传 host（绝对 URL）                                                                                                                                                                                                                  |
 | `b7e48e5` | grok-4.6 review F1–F6 落地：相对跳转只取 token、两把闩、去 host 依赖、抽 `src/launch-token-bridge.ts`（root 层白名单）、集成测试锁装配边、本文档 + 反代文档附注                                                                                                                       |
 | `#103`    | issue #99：token 模式接上同一座桥（D-bridge-7）；成功 302 与守卫登录跳转补 `referrer-policy: no-referrer`（D-bridge-8）；回落规则抽成两条成功路径共用的 `resolvePostLoginLocation`；记录 D-bridge-9（否决守卫保留 query）；多副本粘滞约束记在 §4 与 `docs/deployed/reverse-proxy*.md` |
+| `#115`    | issue #115：未配置实例把 launch URL 换成一次性 bootstrap 会话与 `/auth/setup` 向导，出口复用本桥（D32）；桥自身的契约不变，「配置好没有」的探针在 bootstrap feature 里                                                                                                                |

@@ -28,6 +28,7 @@ in first.
 - [What it does not do](#what-it-does-not-do)
 - [The market's credentials badge](#the-markets-credentials-badge)
 - [Quick start](#quick-start)
+- [First run](#first-run)
 - [See it in action](#see-it-in-action)
 - [Configuration](#configuration)
 - [Command-line tool](#command-line-tool)
@@ -119,25 +120,54 @@ If you would rather run an instance that never reads a credential, use password 
 
 ## Quick start
 
+Install the plugin, restart dsh, and open the link dsh prints on startup. A fresh
+install has nothing configured yet, so that link goes straight into the first-run
+wizard: getting in needs no shell command and no configuration edit.
+
 ```sh
 # 1. Install the plugin from npm into your dsh profile.
 #    Since 0.4.1 the package declares a `dsh.bundle` manifest, so `dsh plugin add`
 #    also registers the mount (dsh.profile.bundles) automatically:
 dsh plugin --profile web add dsh-auth-gate
 
-# 2. Create an admin account.
-#    `dsh plugin add` installs the plugin into the profile's node_modules
-#    ($DSH_HOME/profiles/web, default ~/.dsh/...) — the CLI is NOT added to your
-#    PATH, so call it through the profile. `dsh plugin` already requires pnpm:
-printf '%s\n' 'choose-a-strong-password' | \
-  pnpm --dir "$DSH_HOME/profiles/web" exec dsh-auth user add admin --password-stdin
-
-# 3. Turn on password login: override the plugin config in $DSH_HOME/cordis.patch.yml
-#    (a ready-to-use config-override template ships in deploy/cordis.patch.yml;
-#    see Configuration below — the mount itself needs no manual patch row)
-
-# 4. Restart dsh. Open your site — you will be asked to sign in.
+# 2. Restart dsh, then open the URL it prints at startup
+#    (http://<host>:<port>/?token=<launch token>).
+dsh --profile web
 ```
+
+The wizard offers what the current mode allows: `token` mode, the shipped default,
+generates and saves the shared access token, and `password` mode creates the first
+administrator. The new token is shown once on the result page, and one click continues
+into dsh. From the next visit on that launch link is just a URL again: sign in on the
+login page with the token or the password you just set. Everything else (more users,
+TOTP, changing `mode`) still happens in the shell: see [First run](#first-run),
+[Configuration](#configuration) and [Command-line tool](#command-line-tool).
+
+## First run
+
+Whether the launch link opens the wizard is decided on every request, from one
+question: is this instance configured?
+
+- **The default is `mode: "token"`.** With no `DSH_AUTH_TOKEN`, an unconfigured
+  token-mode instance rejects everyone, so the launch link is the only way in. Only a
+  successful read that returns nothing counts as unconfigured; a missing credentials
+  service or a throwing read is treated like a configured instance and opens no wizard.
+  `password` mode follows the same rule while `users.yaml` is missing or holds no users.
+- **What `?token=` means.** It is dsh's own launch token, printed at startup and valid
+  only for the lifetime of that dsh process. The plugin takes it as proof that you can
+  read the server console, then issues a bootstrap session: at most one hour, and it
+  can open nothing but the plugin's own `/auth/*` pages.
+- **What the wizard can change.** It generates and saves the shared token (token mode)
+  or creates the first administrator (password mode), and the window closes as soon as
+  one of the two exists. It cannot change `mode`, `totp`, `cookieSecure`, `sessionTtl`
+  or `proxy`: edit `$DSH_HOME/cordis.patch.yml` and restart dsh for those.
+- **What happens to the launch URL afterwards.** It stops admitting you, in two hops: the
+  gate first bounces the request to `/auth/bootstrap?token=...`, that endpoint finds the
+  instance configured, and it answers `302 /auth/login?next=%2F`. Neither hop sets a
+  cookie and nothing is let through, so the launch token is not a second key.
+- **How to open the wizard again.** Remove the saved token (or leave `users.yaml` with
+  no users) and restart dsh. If a credentials service hands back a cached value, that
+  restart is what makes it see the change.
 
 ## See it in action
 
@@ -386,6 +416,34 @@ request the gate allows, it answers with a tiny same-origin page that re-navigat
 same URL, so the second request carries both cookies. You may see a brief blank flash; no action is
 needed. Without JavaScript, click the `Continue` link.
 
+### The session cookie does not stick on plain HTTP
+
+With `cookieSecure: true`, the default, the browser is told to store the session cookie
+for HTTPS only. On a plain `http://` site the login submits, the server answers normally,
+and the browser then drops the cookie, so you land back on the login page with no
+session. Set `cookieSecure: false` for a plain-http test instance and keep it `true`
+wherever TLS terminates in front of dsh. The same trap bites twice when
+`$DSH_HOME/cordis.patch.yml`, a layer every profile shares, sets `true` while a test
+profile sets `false`: boot the test profile with `--patch` to override it.
+
+### The launch URL no longer signs me in
+
+That is expected once the instance is configured. The launch token only opens the
+first-run wizard, and the wizard closes that window the moment a token or a user exists;
+afterwards the request goes to `/auth/bootstrap?token=...`, that endpoint finds the
+instance configured, and it answers `302 /auth/login?next=%2F` without setting a cookie,
+exactly as before the wizard existed. Sign in on the login page instead. Nothing is lost:
+to open the wizard again, remove the saved token (or leave `users.yaml` with no users) and
+restart dsh.
+
+### The launch link lands on the login page right after a restart
+
+dsh opens the launch URL while the credentials service may still be starting up. Until
+that service answers, the plugin cannot tell "not configured" from "cannot read the
+configuration", so it fails closed and shows the login page. Reload the link once the
+instance has finished booting: on a truly unconfigured instance the wizard opens, and on a
+configured one the login page is the correct destination.
+
 ## Deployment
 
 - [Reverse-proxy deployment guide](docs/deployed/reverse-proxy.md) — Caddy/nginx
@@ -477,6 +535,14 @@ is in `docs/deployed/known-limitations.md`.
   it sign in (the login path rejects disabled users), so run `dsh-auth user enable <name>` first.
 - An administrator without TOTP makes the admin endpoints single-factor; enable TOTP for
   administrators in production.
+- The first-run wizard is a one-time window: its bootstrap session lasts at most one hour,
+  can only reach `/auth/*`, and closes as soon as a token or a user exists. Removing that
+  token (or the last user) and restarting dsh opens it again.
+- The wizard assumes a single dsh process, because each process mints its own launch token;
+  behind several replicas without sticky routing the request can land on a process that does
+  not know the token and falls back to the login page. A credentials service that caches
+  values may need a restart before the token saved in the wizard becomes the only credential,
+  and dsh versions without `connection.authenticatedUrl` have no wizard at all.
 - The plugin protects dsh's web surface only. Keep the OS user and the config files
   private.
 

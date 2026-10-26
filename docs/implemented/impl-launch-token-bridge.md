@@ -137,10 +137,35 @@ throwing) never affects sign-in success.
   bounced back to the login page; with a connection service that has no `authenticatedUrl`, the redirect falls
   back to `next`.
 
-## 6. Change Log
+## 6. Bootstrap channel: the bridge is reused, not consulted
+
+The first-run wizard adds no second token path. It reuses this bridge at its exit and
+leaves the "should this visitor see the wizard?" decision to the bootstrap feature.
+
+- **The wizard ends where a sign-in ends.** `/auth/continue` calls
+  `resolvePostLoginLocation(bridge, "/")`, the same helper both sign-in success paths use,
+  so the browser leaves `/auth/setup` for `/?token=<launchToken>` and dsh mints its own
+  cookie exactly as after a normal login. D-bridge-1 and D-bridge-2 apply unchanged: the
+  Location stays relative and `next` is dropped.
+- **"Is this instance configured?" is not answered here.** The probe lives in the
+  bootstrap feature and runs per request (`credentials.resolve(tokenRef)` in token mode,
+  `users.yaml` in password mode). The bridge never reads configuration; it only maps a
+  successful sign-in to a redirect target.
+- **The launch token is read once.** `/auth/bootstrap` compares the presented token with
+  `readLaunchToken(ctx)`, the same extraction the bridge uses, so the wizard and the bridge
+  always compare the same per-process token instead of two readers that could drift.
+- **The window sits in front of the bridge.** Once the wizard has written a token or a
+  user, the probe answers "configured" and `/auth/bootstrap` denies, whatever the bridge
+  would return; an old launch URL cannot mint a bootstrap session again.
+- **Failure semantics are unchanged.** The bridge stays fail-open and falls back to `/`
+  when the connection service is missing or throws, so a broken bridge cannot trap a user
+  inside the wizard; it only costs the automatic launch-token handoff (D-bridge-3).
+
+## 7. Change Log
 
 | commit    | Content                                                                                                                                                                                                                                                                                                                                                                                                           |
 | --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `19c8431` | First version: `makeLaunchTokenBridge` + `issueSession` passes host through (absolute URL)                                                                                                                                                                                                                                                                                                                        |
 | `b7e48e5` | grok-4.6 review F1–F6 landed: relative redirect taking only the token, two warn latches, host dependency removed, `src/launch-token-bridge.ts` extracted (root-layer whitelist), integration test locks the assembly side, this document + reverse-proxy doc notes                                                                                                                                                |
 | `#103`    | issue #99: token mode uses the same bridge (D-bridge-7); the success 302s and the guard's login redirect carry `referrer-policy: no-referrer` (D-bridge-8); the fallback rule is extracted into `resolvePostLoginLocation`, shared by both success paths; D-bridge-9 records the rejected guard-query change, while the multi-replica sticky-session constraint lives in §4 and `docs/deployed/reverse-proxy*.md` |
+| `#115`    | issue #115: an unconfigured instance turns the launch URL into a one-time bootstrap session plus the `/auth/setup` wizard, and `/auth/continue` reuses this bridge on the way out (D32); the bridge contract itself is unchanged, the "is it configured?" probe lives in the bootstrap feature                                                                                                                    |

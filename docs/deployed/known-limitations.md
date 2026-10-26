@@ -90,6 +90,29 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   runtime behaviour plus the in-process full-stack audit tests in this repository (32 cases across
   the two audit unit suites and the three P2 integration suites). That is a logging-visibility
   limitation, not a missing audit trail.
+- The first-run wizard (`/auth/setup`, reached from the launch URL through
+  `/auth/bootstrap`) exists only while the instance is **unconfigured**: token mode counts
+  as unconfigured only when the credential read succeeds and comes back empty, password
+  mode when `users.yaml` is missing or holds zero users. A non-empty token, a single user,
+  a missing credentials service, a throwing `resolve` or an unreadable file all count as
+  "not unconfigured" and keep today's denial. The probe runs on every request, and the
+  process also sets a `markedConfigured` flag once the wizard writes, so the window closes
+  immediately.
+- A bootstrap session lasts at most `min(sessionTtl, 3600)` seconds (one hour with the
+  defaults), carries `subject = "bootstrap"`, and reaches `/auth/*` only: any other
+  navigation answers `302 /auth/setup`, an API call answers `401` and a WebSocket upgrade
+  is refused. Completing the wizard revokes every bootstrap session before it issues the
+  full one, so that ticket cannot be replayed.
+- The channel assumes a single dsh process. The launch token is minted per process start,
+  so behind several replicas without sticky routing `/auth/bootstrap` can land on a
+  process that does not know that token; it fails closed to the login page.
+- A credentials service that caches resolved values may keep returning the old (empty)
+  token after the wizard saves a new one. The result page says a restart is needed, and
+  the new token becomes the only credential after dsh restarts; the window itself still
+  closes right away.
+- dsh versions without `connection.authenticatedUrl` (older than 0.1.2-alpha) expose no
+  launch token, so there is no wizard at all: those instances keep the 0.17.4 behavior
+  and are configured through the CLI.
 - The plugin only protects dsh's web surface. It is not a replacement for
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with

@@ -445,3 +445,18 @@ gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site:
 **为什么**：一份定义直接消除漂移的来源，契约零依赖所以两种构建都能安全包含，桥让 D30 的分层检查不受影响。
 → [zh](decisions/implemented/2026-10-16-cross-half-protocol.zh.md) ·
 [en](decisions/implemented/2026-10-16-cross-half-protocol.en.md)
+
+## D32. 未配置实例认 launch token 进首次配置向导，配置成立即关窗
+
+全新安装后，`GET /?token=<launchToken>` 在实例未配置时不再 302 到登录页，而是签一个最长 1 小时、只放行
+`/auth/*` 的 bootstrap 会话并 302 到 `/auth/setup` 向导；在向导里生成共享令牌或创建第一个管理员后窗口立即
+关闭，旧 launch URL 再访问按原样拒绝。校验、未配置探针与会话签发全在新端点 `/auth/bootstrap`，两个门只在
+本来就要 deny 的位置多做一次形态重定向，`guard.ts`/`wrapServer`/`Gate` 词表一行不改。
+**替代方案**：launch token 永久放行（等于一把绕过 TOTP 与密码的第二把钥匙）；守卫 `next` 保留 search
+（D-bridge-9 已否决）；给 guard 加引导钩子（动冻结契约，收益不足）；探针把读盘失败算作未配置（一次故障即
+开门）；只在 client 面板做入口（bundle 挂了再次锁死）。
+**为什么**：未配置可以每次请求实时判定，配置成立后判据自然为假，不需要额外状态；门保持零 IO，冻结契约不动；
+引导会话有 1 小时与 `/auth/*` 两重边界，临时放人进来仍然进不到 dsh。代价如实记档：launch token 会出现在
+`Location: /auth/bootstrap?token=` 上，与原始请求 URL 同级暴露。
+→ [zh](decisions/implemented/2026-10-26-first-run-launch-bootstrap.zh.md) ·
+[en](decisions/implemented/2026-10-26-first-run-launch-bootstrap.en.md)

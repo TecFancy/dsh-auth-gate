@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
-import type { SessionStore } from "../../../entities/session/index.js";
+import { type SessionStore } from "../../../entities/session/index.js";
 export interface PasswordGateOptions {
     /** 会话访问器（M16 同形）：每次 decide 现取；undefined = 会话通道不可用。 */
     sessions: () => SessionStore | undefined;
@@ -15,6 +15,9 @@ export interface PasswordGateOptions {
  * `GET /auth/login` → 302 改密页、`POST /auth/login` → 403；其余（含 `/auth/users*`）
  * 放行进 handler，由 handler 按 kind 细分（管理面回 403）。宿主 `/api`、静态、`/plugins`
  * 与 WS 一律 deny（导航 302 `/auth/password`，API 401，WS 拒握手）。
+ *
+ * `session.kind === "bootstrap"` 的首次引导会话只放行 `/auth` 前缀；其余一律 deny（导航
+ * 302 向导页，API 401，WS 拒握手）。未认证的 `GET /?token=` 按请求形状 302 到引导端点。
  */
 export declare class PasswordGate implements Gate {
     private readonly sessions;
