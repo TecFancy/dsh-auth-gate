@@ -7,9 +7,10 @@
  * `src/host` holds the lower three of FSD's six layers: `shared`, `entities` and
  * `features`. The host composes no UI, so there is nothing for `widgets` or
  * `pages` to hold, and there is no `app` layer: the entry points and the wiring
- * (`index.ts`, `cli.ts`, `proxy-cli.ts`, `admin-wiring.ts`, `token-resolver.ts`,
- * `launch-token-bridge.ts`, `cli-skill.ts`) sit at the `src/` root, beside the
- * analysed tree rather than in it.
+ * (`index.ts`, `cli.ts`, `proxy-cli.ts`, `admin-wiring.ts`, `bootstrap-wiring.ts`,
+ * `endpoints-wiring.ts`, `token-resolver.ts`, `launch-token-bridge.ts`,
+ * `cli-skill.ts`) sit at the `src/` root, beside the analysed tree rather than in
+ * it.
  *
  * `src/client` holds five layers: `shared`, `entities`, `features`, `widgets`
  * and `pages`. There is no `app` layer on purpose: a plugin does not own its

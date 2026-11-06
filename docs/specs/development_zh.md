@@ -45,6 +45,8 @@ src/
 ├── cli.ts                 # dsh-auth 用户管理 CLI（bin 入口）
 ├── proxy-cli.ts           # dsh-auth-proxy（bin 入口）
 ├── admin-wiring.ts        # 管理路由的 root 侧装配（P2）
+├── bootstrap-wiring.ts    # 首次引导通道的 root 侧装配（M2）
+├── endpoints-wiring.ts    # /auth 端点注册的 root 侧装配（P26）
 ├── token-resolver.ts      # 共享 token 凭证解析器（token 模式）
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token 兼容层（M2）
 ├── cli-skill.ts           # `dsh-auth skill install`
