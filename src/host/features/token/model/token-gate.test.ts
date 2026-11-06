@@ -136,11 +136,7 @@ describe("TokenGate: first-run bootstrap channel", () => {
   it("redirects a bare token launch URL to the bootstrap endpoint", async () => {
     const gate = makeGate();
     expect(
-      await gate.decide(
-        { method: "GET", url: "/?token=launch-token", headers: {} } as IncomingMessage,
-        "exact",
-        "/",
-      ),
+      await gate.decide({ method: "GET", url: "/?token=launch-token", headers: {} }, "exact", "/"),
     ).toEqual({ deny: { redirect: "/auth/bootstrap?token=launch-token" } });
   });
 
@@ -148,13 +144,9 @@ describe("TokenGate: first-run bootstrap channel", () => {
     const gate = makeGate();
     expect(await gate.decide(fakeReq({}), "exact", "/api/x")).toBe("deny");
     expect(await gate.decide(fakeReq({}), "exact", "/")).toBe("deny");
-    expect(
-      await gate.decide(
-        { method: "POST", url: "/?token=x", headers: {} } as IncomingMessage,
-        "exact",
-        "/",
-      ),
-    ).toBe("deny");
+    expect(await gate.decide({ method: "POST", url: "/?token=x", headers: {} }, "exact", "/")).toBe(
+      "deny",
+    );
   });
 
   it("keeps a bootstrap session inside /auth", async () => {

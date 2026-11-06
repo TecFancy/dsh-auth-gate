@@ -295,8 +295,11 @@ now documented so nobody re-learns them:
   keeps every later host version compatible, so a new dsh line never needs a hand-added
   alternative. The gate evaluates peer ranges with `includePrerelease`, and a plugin it
   rejects is skipped silently, which is why the declaration errs wide. The dev/test host
-  cohort (`dsh-host-webserver`, `dsh-storage`, `dsh-storage-domain`, `dsh-storage-json`)
-  follows the corridor floor (`^0.2.0-rc.1`). `docs/implemented/impl-m1.md` §3
-  records the original `^0.1.0-rc.6` pin as frozen history, not as current policy.
+  cohort (`dsh-host-webserver`, `dsh-storage`, `dsh-storage-domain`, `dsh-storage-json`) is
+  pinned at `0.2.2-rc.1`, the first line whose routes may be `{ resource }`; that pin is what
+  lets the integration suite mount the real `/plugins` resource prefix and the SPA resource
+  fallback (`@deepseek-ai/cordis` follows at `4.1.0`). The peer declaration above keeps the
+  wide corridor regardless. `docs/implemented/impl-m1.md` §3 records the original `^0.1.0-rc.6`
+  pin as frozen history, not as current policy.
 - `lint-staged` stays on `^16.1.0`: 17.x requires Node ≥ 22.22.1, dev machines
   may run earlier 22.x.

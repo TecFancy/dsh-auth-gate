@@ -1,5 +1,4 @@
-import type { IncomingMessage } from "node:http";
-import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
+import { type Gate, type GateDecision, type GuardKind, type GuardRequest } from "../../../shared/guard/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 export interface PasswordGateOptions {
     /** 会话访问器（M16 同形）：每次 decide 现取；undefined = 会话通道不可用。 */
@@ -23,7 +22,7 @@ export declare class PasswordGate implements Gate {
     private readonly sessions;
     private readonly cookieName;
     constructor(options: PasswordGateOptions);
-    decide(req: IncomingMessage, kind: GuardKind, pathname: string): GateDecision;
+    decide(req: GuardRequest, kind: GuardKind, pathname: string): GateDecision;
     /** `/auth` 前缀内：只有受限会话需要细分；其余一律交 handler（method 矩阵在 handler）。 */
     private decideAuthPath;
     /** 会话解析：cookie → Bearer；store 不可用 / 无凭证 / 已吊销 / 已过期 → undefined。 */

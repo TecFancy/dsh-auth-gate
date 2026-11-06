@@ -460,3 +460,19 @@ gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site:
 `Location: /auth/bootstrap?token=` 上，与原始请求 URL 同级暴露。
 → [zh](decisions/implemented/2026-10-26-first-run-launch-bootstrap.zh.md) ·
 [en](decisions/implemented/2026-10-26-first-run-launch-bootstrap.en.md)
+
+## D33. 守卫同时支持 handler 与 DSH 0.2.2 的 resource 路由
+
+0.2.2 起 `webServer` 的路由可以是 `{ resource }`（Fetch `Request` 进、`Response` 出），官方 `/plugins`
+前缀与 SPA 兜底已经换成这种形态。`wrapServer` 改成同时包装两种路由（联合类型加运行期探测），
+fallback 既认函数也认 `{ resource }`；`Gate.decide()` 的入参收窄成只含 `url`、`method`、`headers` 的
+`GuardRequest`，resource 入口由 `toGuardRequest()` 复制三项后传入；拒绝语义抽成传输无关的
+`GuardReply`，handler 与 resource 各用一种方式写回；放行路径零拷贝。`peerDependencies` 与
+`engines.dsh` 保持原范围，同一份包同时服务 0.2.0、0.2.1 与 0.2.2。
+**替代方案**：peer 下限提到 `>=0.2.2`（放弃两代旧宿主）；把 `Response` 转成假 `ServerResponse`
+（破坏流式、gzip、Range）；放行时缓冲再包装（白增延迟与内存）；只改 `lib/` 编译产物（不可发布）；
+缺 handler 就跳过（`/plugins` 与 SPA 兜底裸奔，正是本次要修的缺陷）。
+**为什么**：拒绝语义只写一份，两种传输行为不漂移；运行期探测让一份包服务三代宿主，消费者不用迁移；
+结构镜像不 import 0.2.2 独有类型，旧宿主加载不受影响；自检继续 fail loud，任何入口没守卫就抛错。
+→ [zh](decisions/implemented/2026-11-06-guard-resource-routes.zh.md) ·
+[en](decisions/implemented/2026-11-06-guard-resource-routes.en.md)

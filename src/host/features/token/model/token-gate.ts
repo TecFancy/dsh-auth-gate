@@ -1,5 +1,4 @@
-import type { IncomingMessage } from "node:http";
-import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
+import type { Gate, GateDecision, GuardKind, GuardRequest } from "../../../shared/guard/index.js";
 import { isNavigationRequest, isPublicStaticPath } from "../../../shared/guard/index.js";
 import { isAuthPath, SETUP_PATH } from "../../../shared/protocol/index.js";
 import { safeEqual } from "../../../shared/crypto/index.js";
@@ -40,7 +39,7 @@ export class TokenGate implements Gate {
     this.cookieName = options.cookieName;
   }
 
-  async decide(req: IncomingMessage, kind: GuardKind, pathname: string): Promise<GateDecision> {
+  async decide(req: GuardRequest, kind: GuardKind, pathname: string): Promise<GateDecision> {
     if (isAuthPath(pathname)) return "allow";
     const session = this.sessionOf(req);
     if (session !== undefined) return isBootstrapSession(session) ? denyBootstrap(req) : "allow";
@@ -60,7 +59,7 @@ export class TokenGate implements Gate {
   }
 
   /** 会话行（只认会话 cookie，与既有 token 通道一致）：无 store/无 cookie/失效 → undefined。 */
-  private sessionOf(req: IncomingMessage): Session | undefined {
+  private sessionOf(req: GuardRequest): Session | undefined {
     const store = this.sessions();
     if (store === undefined) return undefined;
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
@@ -69,6 +68,6 @@ export class TokenGate implements Gate {
 }
 
 /** bootstrap 会话被拒的宿主路径：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。 */
-function denyBootstrap(req: IncomingMessage): GateDecision {
+function denyBootstrap(req: GuardRequest): GateDecision {
   return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }

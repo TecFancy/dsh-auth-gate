@@ -124,3 +124,44 @@ describe("wrapServer: unwrap 逐条回滚", () => {
     expect(server.fallback).toBe(foreignFallback);
   });
 });
+
+describe("wrapServer: resource 路由回滚", () => {
+  const allow: Gate = { decide: () => "allow" };
+  const resource = (): Promise<Response> => Promise.resolve(new Response("x"));
+
+  it("restores only this wrap's resource routes and the original resource fallback object", () => {
+    const server = makeFakeServer();
+    const original = resource;
+    server.prefixes.set("/plugins", { kind: "prefix", path: "/plugins", resource: original });
+    const fallback = { resource: (): Promise<Response> => Promise.resolve(new Response("spa")) };
+    server.fallback = fallback;
+    const unwrap = wrapServer(server, () => allow, log);
+    expect((server.prefixes.get("/plugins") as { resource: unknown }).resource).not.toBe(original);
+    unwrap();
+    expect((server.prefixes.get("/plugins") as { resource: unknown }).resource).toBe(original);
+    expect(server.fallback).toBe(fallback);
+  });
+
+  it("keeps late resource routes registered while restoring their original resource", () => {
+    const server = makeFakeServer();
+    const unwrap = wrapServer(server, () => allow, log);
+    const late = resource;
+    server.register({ kind: "prefix", path: "/late", resource: late });
+    expect((server.prefixes.get("/late") as { resource: unknown }).resource).not.toBe(late);
+    unwrap();
+    expect((server.prefixes.get("/late") as { resource: unknown }).resource).toBe(late);
+  });
+
+  it("does not resurrect deleted resource entries or overwrite foreign replacements", () => {
+    const server = makeFakeServer();
+    const original = resource;
+    server.prefixes.set("/gone", { kind: "prefix", path: "/gone", resource: original });
+    const unwrap = wrapServer(server, () => allow, log);
+    server.prefixes.delete("/gone");
+    const foreign = (): Promise<Response> => Promise.resolve(new Response("foreign"));
+    server.prefixes.set("/foreign", { kind: "prefix", path: "/foreign", resource: foreign });
+    unwrap();
+    expect(server.prefixes.has("/gone")).toBe(false);
+    expect((server.prefixes.get("/foreign") as { resource: unknown }).resource).toBe(foreign);
+  });
+});

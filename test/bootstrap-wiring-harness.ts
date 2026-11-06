@@ -111,11 +111,12 @@ export function makeWiringHarness(
     server,
     store,
     logs,
-    handler: (path) => server.routes.get(path)!.handler,
+    handler: (path) => (server.routes.get(path) as { handler: HttpHandler }).handler,
     cookie,
     async post(body = "", session?: Promise<string>): Promise<ReturnType<typeof makeRes>> {
       const res = makeRes();
-      await server.routes.get(SETUP_PATH)!.handler(
+      const setupHandler = (server.routes.get(SETUP_PATH) as { handler: HttpHandler }).handler;
+      await setupHandler(
         fakeReq({
           method: "POST",
           url: SETUP_PATH,

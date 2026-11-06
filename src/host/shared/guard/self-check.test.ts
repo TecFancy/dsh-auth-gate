@@ -72,3 +72,38 @@ describe("assertGuarded", () => {
     expect(isGuarded(server.exact.get("/e")!.handler)).toBe(true);
   });
 });
+
+describe("assertGuarded: resource routes", () => {
+  it("accepts a fully guarded mixture of handler and resource entries", () => {
+    const server = makeFakeServer();
+    server.exact.set("/e", { kind: "exact", path: "/e", handler: () => undefined });
+    server.prefixes.set("/plugins", {
+      kind: "prefix",
+      path: "/plugins",
+      resource: () => Promise.resolve(new Response("x")),
+    });
+    server.fallback = { resource: () => Promise.resolve(new Response("spa")) };
+    wrapServer(server, () => allowGate, log);
+    expect(assertGuarded(server)).toEqual([]);
+  });
+
+  it("names unguarded resource routes and a resource fallback", () => {
+    const server = makeFakeServer();
+    server.prefixes.set("/plugins", {
+      kind: "prefix",
+      path: "/plugins",
+      resource: () => Promise.resolve(new Response("x")),
+    });
+    server.fallback = { resource: () => Promise.resolve(new Response("spa")) };
+    const failures = assertGuarded(server);
+    expect(failures).toContain("prefix /plugins");
+    expect(failures).toContain("fallback");
+  });
+
+  it("reports missing or malformed targets without throwing", () => {
+    const server = makeFakeServer();
+    server.exact.set("/broken", { kind: "exact", path: "/broken" } as unknown as WrappableRoute);
+    expect(() => assertGuarded(server)).not.toThrow();
+    expect(assertGuarded(server)).toContain("exact /broken");
+  });
+});

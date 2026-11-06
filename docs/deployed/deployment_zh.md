@@ -79,8 +79,11 @@ tail -f ~/dsh.log                                        # 期望：无 error
 `setsid` 可立即返回；启动后另开连接检查 `pgrep` 与端口。停止：
 `pkill -f "[d]sh --profile web"`——括号技巧防自杀，kill 与启动分两个连接。）
 
-启动自检（M1）：四类入口未全覆盖会 **fail loud**（进程启动失败并报
-`guard self-check failed`）——启动成功即守卫在位。日志应出现
+启动自检（M1）：四类入口未全覆盖时插件会 **fail loud** 并报 `guard self-check failed`。
+dsh 0.1.6 之后这**不会**让进程退出：启动审计只把七个必需 id 当致命错误，插件条目停在未激活，
+宿主照常服务但没有登录门。所以「进程活着」不等于「守卫在位」。要确认两件事：启动日志里没有
+`did not activate` 或 `guard self-check failed`，并且未认证的探测请求拿到 401 或 302，绝不是 2xx。
+日志应出现
 `session domain opened: dsh_auth_sessions`；无 `user store unavailable` /
 `users file not found`（首次登录前该 warn 正常——文件缺失=空用户集，fail-closed）。
 
@@ -150,17 +153,17 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 
 守卫包装依赖 `webServer` 非契约内部结构（plan §7）——**每次 dsh 升级后**：
 
-1. 启动（§3）——自检 fail loud 即失败；
+1. 启动（§3），然后确认门真的在工作：未认证探测必须拿到 401 或 302。自检 fail loud 表示条目没激活，而 dsh 可能继续无门服务；
 2. 跑验收清单 B/D/F 三组（守卫 + 会话 + WS）；
 3. **重跑未认证入口覆盖探测**（只读、不带凭证）：`node scripts/check-live-entries.mjs`
    （默认打 `http://127.0.0.1:3080`）。脚本会从已加载 profile 里发现全部已注册入口
    （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**受守卫**入口**未带会话却答 2xx** 就以非零码退出
    （门自己的公开端点单列判定——它们必须保持可达）。
-   最近两次已验证运行：[`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md) ——
-   dsh `0.1.5-rc.2`，8 个包共 56 条入口，61/61 被拒；以及
-   [`entry-coverage-0.2.0-rc.2_zh.md`](./entry-coverage-0.2.0-rc.2_zh.md) —— dsh `0.2.0-rc.2`，
-   10 个包共 62 条入口（含第三方插件路由表），67/67 被拒，且浏览器导航探针断言
-   `302 -> /auth/login`。导航探针必须带 `Sec-Fetch-Mode: navigate`
+   最近已验证运行：[`entry-coverage-0.2.2-rc.1_zh.md`](./entry-coverage-0.2.2-rc.1_zh.md) ——
+   dsh `0.2.2-rc.1`，第一条有 `{ resource }` 路由的宿主：`/plugins` 与 SPA 兜底都在门内，
+   26/26 被拒，浏览器导航探针断言 `302 -> /auth/login`；另有
+   [`entry-coverage-0.2.0-rc.2_zh.md`](./entry-coverage-0.2.0-rc.2_zh.md)（62 条入口，67/67）与
+   [`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md)。导航探针必须带 `Sec-Fetch-Mode: navigate`
    （`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`）：缺这两个头时门按设计返回
    401 而不是 302。
 4. 检查 `boot.log` 无新增 error/warn；

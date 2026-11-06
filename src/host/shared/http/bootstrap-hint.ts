@@ -1,4 +1,4 @@
-import type { IncomingMessage } from "node:http";
+import type { GuardRequest } from "../guard/index.js";
 import { BOOTSTRAP_PATH } from "../protocol/index.js";
 
 /**
@@ -19,7 +19,7 @@ export function singleTokenParam(params: URLSearchParams): string | undefined {
  * 门只做这一步形态判断，**不校验** token、不读文件、不 await：真正的校验、未配置探针与会话
  * 签发都在 `GET /auth/bootstrap` 里完成，被冻结的守卫词表因此一行不用改。
  */
-export function bootstrapRedirectPath(req: IncomingMessage): string | undefined {
+export function bootstrapRedirectPath(req: GuardRequest): string | undefined {
   if (req.method !== "GET") return undefined;
   const url = new URL(req.url ?? "/", "http://x");
   if (url.pathname !== "/") return undefined;
