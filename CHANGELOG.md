@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.18.0...v0.18.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **guard:** support DSH 0.2.2 resource routes ([#119](https://github.com/TecFancy/dsh-auth-gate/issues/119)) ([3cbaa13](https://github.com/TecFancy/dsh-auth-gate/commit/3cbaa13d8905a7bfca71a4daae33d713c4ae180a))
+
 ## [0.18.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.17.4...v0.18.0) (2026-10-26)
 
 
