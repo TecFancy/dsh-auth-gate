@@ -3,7 +3,7 @@ import { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { request } from "node:http";
 import { describe, expect, it } from "vitest";
 import type { Gate, WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 
 type RealServer = WrappableServer & { readonly port: number };
 
@@ -67,7 +67,7 @@ describe("integration: real webserver + guard", () => {
     const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
     const server = ctx.get("webServer") as unknown as RealServer;
     registerRoutes(server);
-    const authFiber = await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig);
+    const authFiber = await ctx.plugin({ name, inject, apply, Config }, { telemetry: false });
     const port = server.port;
 
     try {
@@ -133,7 +133,7 @@ describe("integration: real webserver + guard", () => {
     const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
     const server = ctx.get("webServer") as unknown as RealServer;
     registerRoutes(server);
-    const authFiber = await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig);
+    const authFiber = await ctx.plugin({ name, inject, apply, Config }, { telemetry: false });
     const port = server.port;
     const base = `http://127.0.0.1:${port}`;
 
@@ -192,7 +192,7 @@ const allowGate: Gate = { decide: () => "allow" };
 /** 本插件单独热重载（Plugins 页改配置 = dispose + apply），其余插件不动。 */
 async function reloadAuth(ctx: Context, fiber: { dispose(): Promise<unknown> }) {
   await fiber.dispose();
-  const next = await ctx.plugin(authPlugin, {} as AuthConfig);
+  const next = await ctx.plugin(authPlugin, { telemetry: false });
   ctx.get("auth")!.gate = allowGate;
   return next;
 }
@@ -202,7 +202,7 @@ describe("integration: guard survives a reload of this plugin alone", () => {
     const ctx = new Context();
     const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
     const base = `http://127.0.0.1:${(ctx.get("webServer") as unknown as RealServer).port}`;
-    let authFiber = await ctx.plugin(authPlugin, {} as AuthConfig);
+    let authFiber = await ctx.plugin(authPlugin, { telemetry: false });
     ctx.get("auth")!.gate = allowGate;
     const ownerFiber = await ctx.plugin(routeOwner("late", "/owned-late", "late"));
 
@@ -226,7 +226,7 @@ describe("integration: guard survives a reload of this plugin alone", () => {
     const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
     const base = `http://127.0.0.1:${(ctx.get("webServer") as unknown as RealServer).port}`;
     const ownerV1 = await ctx.plugin(routeOwner("early-v1", "/owned-early", "v1"));
-    let authFiber = await ctx.plugin(authPlugin, {} as AuthConfig);
+    let authFiber = await ctx.plugin(authPlugin, { telemetry: false });
     ctx.get("auth")!.gate = allowGate;
     let ownerV2: { dispose(): Promise<unknown> } | undefined;
 

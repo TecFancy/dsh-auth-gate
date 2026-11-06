@@ -31,6 +31,7 @@ in first.
 - [First run](#first-run)
 - [See it in action](#see-it-in-action)
 - [Configuration](#configuration)
+- [Anonymous usage statistics](#anonymous-usage-statistics)
 - [Command-line tool](#command-line-tool)
 - [Admin tools: list users and reset a password](#admin-tools-list-users-and-reset-a-password)
 - [Bundled configuration skill](#bundled-configuration-skill)
@@ -276,11 +277,44 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
 | `clientIpHeader`    | `""`                         | Header carrying the real client address for rate limiting (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare). Empty = read no header at all. Only read when the request's peer is inside `trustedProxyCidrs`; without it a same-host reverse proxy makes every client share one lockout bucket (issue #74)                                                                                                                                                                                                                                                                                           |
 | `trustedProxyCidrs` | `["127.0.0.0/8", "::1/128"]` | Which peers may supply `clientIpHeader` (default: loopback only; a peer without an address, i.e. a Unix socket, counts as local). Invalid entries are dropped with an error log and trust narrows to loopback, an explicit `[]` means "trust nobody", and `0.0.0.0/0` / `::/0` are always rejected                                                                                                                                                                                                                                                                                                             |
 | `logoutOrder`       | `1000`                       | Slot order of the "Sign out" button in Settings → General (higher = lower on the page). Raise it if another plugin registers a bigger order                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| `telemetry`         | `true`                       | Anonymous usage statistics: at most one ping per process per 24 hours, and only after a request passed the gate. `false` sends nothing at all. What is sent is listed in [Anonymous usage statistics](#anonymous-usage-statistics)                                                                                                                                                                                                                                                                                                                                                                             |
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
 Authenticator, 1Password, etc.). The code changes every 30 seconds; a code from
 the previous or next window is also accepted (drift tolerance).
+
+## Anonymous usage statistics
+
+This plugin sends one anonymous usage ping per process per 24 hours, and only after a request has
+already been let through the login gate. It answers one question: how many machines actually run the
+plugin, and on which version. No account, no server of ours, no third-party SDK.
+
+The `POST` goes to `https://t.hi-ruofei.com/v1/ping` and carries exactly:
+
+- the payload version, the package name and version;
+- a random install id (UUID v4), generated on first use and stored in this plugin's config entry;
+- the Node major version, the operating system and the CPU architecture;
+- three facts about this deployment: the gate mode (`token` or `password`), the TOTP mode (`off`, `optional`, `required`) and the bucketed user count (`1`, `2-5`, `6+`).
+
+It never carries a user name, a password hash, a TOTP secret, a session id, a token, a client IP, a
+request path or a host name. Failures are silent: the request has five seconds, is never retried,
+never logged and never delays the request it rode on.
+
+The ping is on by default and visible in the config table above; turn it off with one option and
+nothing is sent at all:
+
+```yaml
+- id: dsh-auth-gate
+  config:
+    telemetry: false
+```
+
+The install id lives in the hidden `installId` field of the same config entry and is written back
+through the host's settings service when there is one. A host without that service keeps the id in
+memory for this process (one new id per restart) rather than writing a private file to disk; deleting
+the field starts a new anonymous identity. The reasoning and the rejected alternatives are in
+[the decision record](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md).
 
 ## Command-line tool
 

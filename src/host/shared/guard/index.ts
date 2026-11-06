@@ -11,6 +11,7 @@ export {
 } from "./cross-site-bounce.js";
 export { noopGate } from "./gate.js";
 export type {
+  AdmitHook,
   Gate,
   GateDecision,
   GateDeny,

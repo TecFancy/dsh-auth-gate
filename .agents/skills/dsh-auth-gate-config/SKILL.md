@@ -1,6 +1,6 @@
 ---
 name: dsh-auth-gate-config
-description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
+description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/telemetry/installId), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/telemetry/installId）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
@@ -17,9 +17,9 @@ CLI 用法、常见故障时使用。
 ## Triggers / 触发词
 
 auth-gate / login door / logout button / cookieSecure / usersFile / logoutOrder /
-mode / totp / two-factor / authenticator code / dsh-auth commands / login failures / rate-limit 429 / config 403 / first run / bootstrap / setup wizard
+mode / totp / two-factor / authenticator code / dsh-auth commands / login failures / rate-limit 429 / config 403 / first run / bootstrap / setup wizard / anonymous usage statistics / telemetry
 auth-gate / 登录门 / 退出登录按钮 / cookieSecure / usersFile / logoutOrder / mode /
-totp / 两步验证 / 验证码 / dsh-auth 命令 / 登录不上 / 限速锁定 429 / 配置面 403 / 首次运行 / 配置向导 / 引导会话
+totp / 两步验证 / 验证码 / dsh-auth 命令 / 登录不上 / 限速锁定 429 / 配置面 403 / 首次运行 / 配置向导 / 引导会话 / 匿名使用统计 / telemetry
 
 ## What it is / 一句话定位
 
@@ -49,10 +49,16 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
     logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
+    telemetry: true # anonymous usage statistics: at most one ping per process per 24h, and only after a request passed the gate; false = send nothing / 匿名使用统计：每进程最多每 24 小时一次，且只在请求通过门之后；false = 完全不发
+    installId: "" # internal anonymous install id (UUID v4), hidden and generated on first use; do not set by hand / 内部匿名安装 id（UUID v4），隐藏、首次使用时生成，不要手填
 ```
 
 - Override **without** `insert` — the bundle row is already mounted; adding one
   double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
+- `telemetry: false` turns the anonymous ping off completely; `installId` is
+  hidden, generated on first use, and must not be edited by hand (delete the key
+  to start a new anonymous identity). / `telemetry: false` 完全关闭匿名上报；
+  `installId` 是隐藏字段，首次使用时生成，不要手填（删掉这个键即换一个新的匿名身份）。
 - The shipped default is token mode: with no `DSH_AUTH_TOKEN` resolvable, nobody signs in, not even you (the gate fails closed). / 出厂默认是 token 模式：解析不到 `DSH_AUTH_TOKEN` 时谁都进不去（门按 fail-closed 处理）。
 - Token mode needs no user file; put the shared secret in `.credentials.yaml`
   (`DSH_AUTH_TOKEN`). / 改为 token 模式时不用建用户文件，把共享秘密放进

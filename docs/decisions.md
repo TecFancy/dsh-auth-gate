@@ -476,3 +476,19 @@ fallback 既认函数也认 `{ resource }`；`Gate.decide()` 的入参收窄成�
 结构镜像不 import 0.2.2 独有类型，旧宿主加载不受影响；自检继续 fail loud，任何入口没守卫就抛错。
 → [zh](decisions/implemented/2026-11-06-guard-resource-routes.zh.md) ·
 [en](decisions/implemented/2026-11-06-guard-resource-routes.en.md)
+
+## D34. 匿名使用统计：放行后惰性上报，默认开、可见可关
+
+每进程每 24 小时最多一次匿名上报，只在请求通过登录门之后；报文固定 v1（包版本、随机 UUID 安装 id、
+Node 主版本、平台、架构，加门 mode / totp / 用户数分桶），发往 `https://t.hi-ruofei.com/v1/ping`。
+`telemetry` 默认 `true` 且可见可关；`installId` 为 `.volatile().hidden(true)`，经宿主 settings 服务
+写回，服务缺席时 id 只留在进程内存、照样上报，绝不写私有文件。挂载点是守卫的放行分支（经
+`AdmitHook` 接进 `wrapServer`），不在门的判定路径上、不在启动时调用、没有定时器。
+**替代方案**：机器指纹（可识别、需特权读取）；第三方统计 SDK（新增依赖与后台定时器）；账号/登录式
+统计（要服务器与个人数据）；默认关（样本太小，回答不了安装量）；把 id 写进 `$DSH_HOME` 文件（同一
+事实的第二个家）；挂进门内或会话层（把网络放到认证判定路径上）；启动即上报（没被使用的进程也算在用）。
+**为什么**：默认开让数字有意义，可见可关让同意为真；放行之后才报把信号绑在真实使用上；报文只由配置
+与进程事实组成，不含用户名/哈希/密钥/会话/token/IP/路径/主机名，威胁模型不变；失败静默且不阻塞，匿名
+上报永远不会影响一次认证判定。
+→ [zh](decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md) ·
+[en](decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md)

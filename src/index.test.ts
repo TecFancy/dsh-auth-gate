@@ -23,7 +23,11 @@ const cfg = (): AuthConfig => ({
   revokeSweepMs: 5000,
   totp: "off",
   logoutOrder: 1000,
+  telemetry: true,
+  installId: INSTALL_ID,
 });
+/** `installId` 是 volatile 盒子；同一引用让默认值断言不受函数身份影响。 */
+const INSTALL_ID = { get: () => "" };
 function makeFakeServer(): WrappableServer {
   const exact = new Map<string, WrappableRoute>();
   const prefixes = new Map<string, WrappableRoute>();
@@ -105,10 +109,10 @@ describe("dsh-auth-gate plugin shape", () => {
 });
 describe("Config", () => {
   it("fills defaults from an empty config", () => {
-    expect(Config({} as AuthConfig)).toEqual(cfg());
+    expect({ ...Config({}), installId: INSTALL_ID }).toEqual(cfg());
   });
   it("rejects a tokenRef that is not a credential reference", () => {
-    expect(() => Config({ tokenRef: "1bad-ref" } as AuthConfig)).toThrow();
+    expect(() => Config({ tokenRef: "1bad-ref" })).toThrow();
   });
 });
 describe("apply: mode 与装配", () => {
