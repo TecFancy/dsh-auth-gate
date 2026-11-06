@@ -48,6 +48,8 @@ src/
 ├── cli.ts                 # dsh-auth user-management CLI (bin entry)
 ├── proxy-cli.ts           # dsh-auth-proxy (bin entry)
 ├── admin-wiring.ts        # root-side assembly of the admin routes (P2)
+├── bootstrap-wiring.ts    # root-side assembly of the bootstrap routes (M2)
+├── endpoints-wiring.ts    # root-side assembly of the /auth endpoint registration (P26)
 ├── token-resolver.ts      # shared-token credential resolver (token mode)
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
 ├── cli-skill.ts           # `dsh-auth skill install`
