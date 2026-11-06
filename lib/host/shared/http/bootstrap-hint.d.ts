@@ -1,4 +1,4 @@
-import type { IncomingMessage } from "node:http";
+import type { GuardRequest } from "../guard/index.js";
 /**
  * `token` 查询参数：必须**恰好一项**且 trim 后非空，否则 undefined。
  * 多值一律拒绝（`?token=a&token=b` 没有"哪个才算"的正确答案），空串/纯空白同理。
@@ -11,5 +11,5 @@ export declare function singleTokenParam(params: URLSearchParams): string | unde
  * 门只做这一步形态判断，**不校验** token、不读文件、不 await：真正的校验、未配置探针与会话
  * 签发都在 `GET /auth/bootstrap` 里完成，被冻结的守卫词表因此一行不用改。
  */
-export declare function bootstrapRedirectPath(req: IncomingMessage): string | undefined;
+export declare function bootstrapRedirectPath(req: GuardRequest): string | undefined;
 //# sourceMappingURL=bootstrap-hint.d.ts.map

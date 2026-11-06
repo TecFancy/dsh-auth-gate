@@ -32,6 +32,12 @@ export class MemTable implements KvTable<string, Session> {
     return Promise.resolve(this.map.delete(key));
   }
 
+  deleteMany(keys: readonly string[]): Promise<number> {
+    let removed = 0;
+    for (const key of keys) if (this.map.delete(key)) removed += 1;
+    return Promise.resolve(removed);
+  }
+
   update(key: string, fn: (current: Session) => Session): Promise<Session> {
     const current = this.map.get(key);
     if (current === undefined) throw new Error("missing-key");

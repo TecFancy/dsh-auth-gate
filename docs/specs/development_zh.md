@@ -263,6 +263,8 @@ gh release edit v<版本> --notes-file notes.md
   不需要人来追加替代项。闸门判定 peer 范围时带 `includePrerelease`，而被它拒绝的插件会被静默
   跳过，所以声明宁可偏宽。dev/测试宿主
   cohort（`dsh-host-webserver`、`dsh-storage`、`dsh-storage-domain`、`dsh-storage-json`）
-  跟随走廊下界（`^0.2.0-rc.1`）。`docs/implemented/impl-m1.md` §3 里的 `^0.1.0-rc.6` 是冻结的
+  钉在 `0.2.2-rc.1`，这是路由可以是 `{ resource }` 的第一条线；钉住它，集成套件才能在真实
+  webserver 上挂载 `/plugins` resource 前缀与 SPA resource 兜底（`@deepseek-ai/cordis` 跟到
+  `4.1.0`）。上面的 peer 声明照旧保持宽走廊。`docs/implemented/impl-m1.md` §3 里的 `^0.1.0-rc.6` 是冻结的
   历史记录，不是现行纪律。
 - `lint-staged` 保持在 `^16.1.0`：17.x 要求 Node ≥ 22.22.1，开发机可能跑更早的 22.x。

@@ -1,5 +1,4 @@
-import type { IncomingMessage } from "node:http";
-import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
+import type { Gate, GateDecision, GuardKind, GuardRequest } from "../../../shared/guard/index.js";
 import { safeEqual } from "../../../shared/crypto/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 /** 恒时比较在 `shared/crypto`，这里转口导出：既有调用点（含 barrel）不用改 import。 */
@@ -24,7 +23,7 @@ export declare class TokenGate implements Gate {
     private readonly sessions;
     private readonly cookieName;
     constructor(options: TokenGateOptions);
-    decide(req: IncomingMessage, kind: GuardKind, pathname: string): Promise<GateDecision>;
+    decide(req: GuardRequest, kind: GuardKind, pathname: string): Promise<GateDecision>;
     /** 会话行（只认会话 cookie，与既有 token 通道一致）：无 store/无 cookie/失效 → undefined。 */
     private sessionOf;
 }

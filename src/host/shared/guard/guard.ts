@@ -1,73 +1,23 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import { isSafeRelativeTarget } from "../http/index.js";
-import { LOGIN_PATH } from "../protocol/index.js";
 import { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
-import type { Gate, GateDeny, GuardKind } from "./gate.js";
+import type { Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import { denyReply, forbiddenReply, isProxyDeniedRequest, writeGuardReply } from "./http.js";
+import { GUARDED, isGuarded } from "./mark.js";
+import { guardResource, type ResourceHandler } from "./resource.js";
 
-/** 挂在被包装 handler/方法上的守卫标记（幂等重包装 + 自检共用）。 */
-export const GUARDED: unique symbol = Symbol.for("dsh-auth.guarded");
-
-/**
- * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
- * **禁止**用 `Accept` 子串匹配（面板 fetch 的 Accept 很杂，会假绿）；两个头都缺 →
- * false（fail-closed：按 API 处理，401 而不是放行）。
- */
-export function isNavigationRequest(req: IncomingMessage): boolean {
-  const mode = req.headers["sec-fetch-mode"];
-  if (typeof mode === "string" && mode.toLowerCase() === "navigate") return true;
-  const dest = req.headers["sec-fetch-dest"];
-  return typeof dest === "string" && dest.toLowerCase() === "document";
-}
-
-/**
- * Location 消毒（§6）：只允许站内相对路径（`/` 开头、非 `//`、无反斜杠、无控制符）。
- * 判定与登录 `next` 共用 `shared` 的 `isSafeRelativeTarget`：同一条 302 出口纪律，
- * 控制符会让浏览器把 `"/\t/evil.com"` 解析成协议相对的站外地址（见该文件注释）。
- */
-export function isSafeLocation(location: string): boolean {
-  return isSafeRelativeTarget(location);
-}
-
-/**
- * 免守卫的公开只读静态路径（精确匹配）。浏览器抓取 Web App Manifest 时按规范
- * 不带凭证（Chromium `manifest_fetcher.cc`：只有 link 带 `crossorigin="use-credentials"`
- * 才是 `kInclude`，否则 `kOmit`），cookie/Bearer 门永远认不出这次请求，登录用户
- * 也会恒 401。manifest 只含应用名/图标/显示模式等公开元数据，不含工作区信息，
- * 故列入白名单（语义与 `/auth` 同一类：不认证也必须可达）。
- */
-export const PUBLIC_STATIC_PATHS: readonly string[] = ["/manifest.webmanifest"];
-
-/**
- * 是否命中公开只读静态路径。`kind === "upgrade"` 一律不算：这些路径只有 HTTP
- * GET 语义，放行握手只会白扩攻击面（升级请求仍走完整认证）。
- */
-export function isPublicStaticPath(kind: GuardKind, pathname: string): boolean {
-  return kind !== "upgrade" && PUBLIC_STATIC_PATHS.includes(pathname);
-}
-
-/** 认证本地代理（`dsh-auth-proxy --mark-proxy`）附加的请求标记头。 */
-export const PROXY_MARKER_HEADER = "x-dsh-proxy";
-
-/**
- * 代理链路下会被 dsh /api 围栏判定为 loopback、但语义属于"远程可控宿主/侦察"
- * 的方法：经代理（携带标记头）的请求对这些方法直接 403，作为本地代理场景的
- * 安全边界收口。其余方法（settings 与 credentials 域的读写）经认证后正常放行。
- * 注意：生效前提是代理开启 `--mark-proxy`；无标记头时行为与未部署代理完全一致。
- */
-const PROXY_DENIED_METHODS = new Set([
-  "host.pickDirectory",
-  "host.openPath",
-  "settings.openDocument",
-  "llm.discoverModels",
-]);
-
-/** 是否命中"代理标记 + 禁行方法"：`/api/<method>` 路径上带 `X-Dsh-Proxy: 1`。 */
-export function isProxyDeniedRequest(req: IncomingMessage, pathname: string): boolean {
-  if (req.headers[PROXY_MARKER_HEADER] !== "1") return false;
-  if (!pathname.startsWith("/api/")) return false;
-  return PROXY_DENIED_METHODS.has(pathname.slice(5));
-}
+export { GUARDED, isGuarded } from "./mark.js";
+export {
+  isNavigationRequest,
+  isProxyDeniedRequest,
+  isPublicStaticPath,
+  isSafeLocation,
+  PROXY_MARKER_HEADER,
+  PUBLIC_STATIC_PATHS,
+} from "./http.js";
+export type { GuardReply } from "./http.js";
+export type { GuardRequest } from "./gate.js";
+export type { ResourceHandler } from "./resource.js";
 
 export type HttpHandler = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
 
@@ -77,11 +27,26 @@ export type UpgradeHandler = (
   head: Buffer,
 ) => void | Promise<void>;
 
-export interface WrappableRoute {
+/** handler 形态的 HTTP 路由（DSH 0.2.0/0.2.1 与 0.2.2 都支持）。 */
+export interface WrappableHttpRoute {
   kind: "exact" | "prefix";
   path: string;
   handler: HttpHandler;
+  resource?: never;
 }
+
+/** Fetch resource 形态的 HTTP 路由（DSH 0.2.2 起 `webServer.register` 接受）。 */
+export interface WrappableResourceRoute {
+  kind: "exact" | "prefix";
+  path: string;
+  resource: ResourceHandler;
+  handler?: never;
+}
+
+export type WrappableRoute = WrappableHttpRoute | WrappableResourceRoute;
+
+/** fallback 座位：旧宿主是函数，0.2.2 起官方 SPA 兜底用 `{ resource }` 对象。 */
+export type WrappableFallback = HttpHandler | { resource: ResourceHandler };
 
 export interface WrappableUpgradeRoute {
   path: string;
@@ -93,10 +58,10 @@ export interface WrappableServer {
   exact: Map<string, WrappableRoute>;
   prefixes: Map<string, WrappableRoute>;
   upgrades: Map<string, WrappableUpgradeRoute>;
-  fallback: HttpHandler | undefined;
+  fallback: WrappableFallback | undefined;
   register(route: WrappableRoute): () => void;
   registerUpgrade(route: WrappableUpgradeRoute): () => void;
-  registerFallback(handler: HttpHandler): () => void;
+  registerFallback(fallback: WrappableFallback): () => void;
 }
 
 /** 守卫日志的最小表面（自检/诊断用）。 */
@@ -104,12 +69,21 @@ export interface GuardLog {
   error(message: unknown): void;
 }
 
-interface GuardedFn {
-  [GUARDED]?: true;
+/** 运行期判定：这条路由带 resource 而不是 handler。旧宿主永远不会命中。 */
+function isResourceRoute(route: WrappableRoute): route is WrappableResourceRoute {
+  return typeof (route as WrappableResourceRoute).resource === "function";
 }
 
-export function isGuarded(target: (...args: never[]) => unknown): boolean {
-  return (target as unknown as GuardedFn)[GUARDED] === true;
+/** 运行期判定：fallback 是 `{ resource }` 对象而不是函数。 */
+function isResourceFallback(
+  fallback: WrappableFallback,
+): fallback is { resource: ResourceHandler } {
+  return typeof fallback !== "function" && typeof fallback.resource === "function";
+}
+
+/** 路由条目上实际带守卫标记的那个函数。 */
+function routeTarget(route: WrappableRoute | WrappableUpgradeRoute): unknown {
+  return "resource" in route && route.resource !== undefined ? route.resource : route.handler;
 }
 
 /**
@@ -124,7 +98,7 @@ export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandle
     const decision = await gate().decide(req, kind, pathname);
     if (decision === "allow") {
       if (isProxyDeniedRequest(req, pathname)) {
-        denyForbidden(res);
+        writeGuardReply(res, forbiddenReply());
         return;
       }
       if (isCrossSiteDocumentNavigation(req)) {
@@ -134,8 +108,8 @@ export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandle
       await handler(req, res);
       return;
     }
-    denyHttp(req, res, decision);
-  }) as HttpHandler & GuardedFn;
+    writeGuardReply(res, denyReply(req, decision));
+  }) as HttpHandler & { [GUARDED]?: true };
   guarded[GUARDED] = true;
   return guarded;
 }
@@ -154,62 +128,21 @@ export function guardUpgrade(gate: () => Gate, handler: UpgradeHandler): Upgrade
       return;
     }
     denyUpgrade(socket);
-  }) as UpgradeHandler & GuardedFn;
+  }) as UpgradeHandler & { [GUARDED]?: true };
   guarded[GUARDED] = true;
   return guarded;
 }
 
-/** 写一个纯文本状态响应（no-store 已由 denyHttp 统一设置）。 */
-function endStatus(res: ServerResponse, status: number, body: string): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(status, { "content-type": "text/plain" });
-  res.end(body);
-}
-
 /**
- * 拒绝一个 HTTP 请求，按 gate 决策渲染（P2；`decision` 缺省 = 字符串 `"deny"`）：
- * - `{deny:{redirect}}` → 302 gate 给出的目标（消毒失败则退回 LOGIN_PATH）；
- * - `{deny:{status}}` → 该 401/403；
- * - `{deny:{upgrade:true}}` → 401 兜底（正常不会落到 HTTP 面）；
- * - `"deny"`（旧门）→ 浏览器导航 302 登录页 + `next`，其余 401。
- * 一律 `cache-control: no-store`；两条 302 另加 `referrer-policy: no-referrer`：被拒的请求
- * URL 可能自带 dsh 的 launch token（`/?token=`），不加这条，浏览器跟随时会把带 token 的
- * 完整 URL 作为 Referer 送进登录页请求（进而进访问日志），绕开 `token=` 脱敏。
+ * 拒绝一个 HTTP 请求并把决策写进 node:http 响应。拒绝语义见 `denyReply`：
+ * 302 跳转一律 no-store 且带 no-referrer，401/403 一律纯文本 no-store。
  */
 export function denyHttp(
-  req: IncomingMessage,
+  req: GuardRequest,
   res: ServerResponse,
   decision: GateDeny = "deny",
 ): void {
-  if (typeof decision !== "string") {
-    const payload = decision.deny;
-    if ("redirect" in payload) {
-      res.setHeader("cache-control", "no-store");
-      res.setHeader("referrer-policy", "no-referrer");
-      res.writeHead(302, {
-        location: isSafeLocation(payload.redirect) ? payload.redirect : LOGIN_PATH,
-      });
-      res.end();
-      return;
-    }
-    if ("status" in payload) {
-      endStatus(res, payload.status, payload.status === 403 ? "forbidden" : "unauthorized");
-      return;
-    }
-    endStatus(res, 401, "unauthorized");
-    return;
-  }
-  if (isNavigationRequest(req)) {
-    const pathname = new URL(req.url ?? "/", "http://x").pathname;
-    res.setHeader("cache-control", "no-store");
-    res.setHeader("referrer-policy", "no-referrer");
-    res.writeHead(302, {
-      location: `${LOGIN_PATH}?next=${encodeURIComponent(pathname)}`,
-    });
-    res.end();
-    return;
-  }
-  endStatus(res, 401, "unauthorized");
+  writeGuardReply(res, denyReply(req, decision));
 }
 
 /** 拒绝一个 WS 升级：写 401 响应行后销毁 socket，不进入 ws 协商。 */
@@ -220,17 +153,27 @@ export function denyUpgrade(socket: Duplex): void {
 
 /** 403 拒绝（代理标记命中）：与 dsh /api 围栏同形（forbidden），禁缓存。 */
 export function denyForbidden(res: ServerResponse): void {
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(403, { "content-type": "text/plain" });
-  res.end("forbidden");
+  writeGuardReply(res, forbiddenReply());
 }
 
 const unwrappers = new WeakMap<WrappableServer, () => void>();
 
-/** 把表里 handler 仍是本次 wrap 产出的守卫版本的条目换回原路由；已删除/被别人换掉的条目不动。 */
-function rollbackTable<H extends object, R extends { handler: H }>(
-  table: Map<string, R>,
-  origins: WeakMap<H, R>,
+/** 把表里目标函数仍是本次 wrap 产出的守卫版本的条目换回原路由；已删除/被换掉的条目不动。 */
+function rollbackRoutes(
+  table: Map<string, WrappableRoute>,
+  origins: WeakMap<object, WrappableRoute>,
+): void {
+  for (const [path, entry] of [...table]) {
+    const own = routeTarget(entry);
+    const origin = typeof own === "function" ? origins.get(own) : undefined;
+    if (origin !== undefined) table.set(path, origin);
+  }
+}
+
+/** upgrade 表的逐条回滚，语义与 `rollbackRoutes` 相同。 */
+function rollbackUpgrades(
+  table: Map<string, WrappableUpgradeRoute>,
+  origins: WeakMap<object, WrappableUpgradeRoute>,
 ): void {
   for (const [path, entry] of [...table]) {
     const origin = origins.get(entry.handler);
@@ -240,13 +183,12 @@ function rollbackTable<H extends object, R extends { handler: H }>(
 
 /**
  * 包装一个 WrappableServer：存量表 + fallback 原地换守卫，三个注册方法替换为
- * 守卫版本（增量保险，apply 顺序无关）。幂等：同一 server 第二次调用返回同一
- * unwrap。
+ * 守卫版本（增量保险，apply 顺序无关）。handler 与 0.2.2 的 resource 两种路由
+ * 都进入同一套守卫；幂等：同一 server 第二次调用返回同一 unwrap。
  *
- * 返回的 unwrap 逐条回滚，不整表还原：只把 handler 仍是本次 wrap 产出的守卫版本的
- * 条目换回未守卫的原 handler（wrap 之后经包装后的 register 系方法注册的路由同样
- * 保留在表中，只摘掉守卫）；wrap 期间被拥有者卸载的条目不写回，被第三方换成别的
- * handler 的条目不碰。最后还原三个注册方法。
+ * 返回的 unwrap 逐条回滚，不整表还原：只把目标函数仍是本次 wrap 产出的守卫版本的
+ * 条目换回原路由（D27：wrap 之后注册的路由保留在表中、只摘掉守卫；wrap 期间被
+ * 拥有者卸载的条目不写回；被第三方换成别的函数的条目不碰）。最后还原三个注册方法。
  */
 export function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog): () => void {
   // 规格冻结签名：log 预留给诊断；包装/还原本身静默（自检在 index.ts 负责）。
@@ -259,12 +201,18 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
     registerUpgrade: server.registerUpgrade.bind(server),
     registerFallback: server.registerFallback.bind(server),
   };
-  // 仅记录本次 wrap 新产出的守卫 handler（已守卫的输入原样返回，不归本次回滚）。
-  const httpOrigins = new WeakMap<HttpHandler, WrappableRoute>();
-  const upgradeOrigins = new WeakMap<UpgradeHandler, WrappableUpgradeRoute>();
-  const fallbackOrigins = new WeakMap<HttpHandler, HttpHandler>();
+  // 仅记录本次 wrap 新产出的守卫函数（已守卫的输入原样返回，不归本次回滚）。
+  const httpOrigins = new WeakMap<object, WrappableRoute>();
+  const upgradeOrigins = new WeakMap<object, WrappableUpgradeRoute>();
+  const fallbackOrigins = new WeakMap<object, WrappableFallback>();
 
   const guardRoute = (route: WrappableRoute, kind: GuardKind = route.kind): WrappableRoute => {
+    if (isResourceRoute(route)) {
+      const resource = guardResource(gate, kind, route.resource);
+      if (resource === route.resource) return route;
+      httpOrigins.set(resource, route);
+      return { ...route, resource };
+    }
     const handler = guardHttp(gate, kind, route.handler);
     if (handler === route.handler) return route;
     httpOrigins.set(handler, route);
@@ -276,9 +224,15 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
     upgradeOrigins.set(handler, route);
     return { ...route, handler };
   };
-  const guardFallback = (handler: HttpHandler): HttpHandler => {
-    const guarded = guardHttp(gate, "fallback", handler);
-    if (guarded !== handler) fallbackOrigins.set(guarded, handler);
+  const guardFallback = (fallback: WrappableFallback): WrappableFallback => {
+    if (isResourceFallback(fallback)) {
+      const resource = guardResource(gate, "fallback", fallback.resource);
+      if (resource === fallback.resource) return fallback;
+      fallbackOrigins.set(resource, fallback);
+      return { ...fallback, resource };
+    }
+    const guarded = guardHttp(gate, "fallback", fallback);
+    if (guarded !== fallback) fallbackOrigins.set(guarded, fallback);
     return guarded;
   };
 
@@ -288,13 +242,15 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
   if (server.fallback !== undefined) server.fallback = guardFallback(server.fallback);
 
   const register = ((route: WrappableRoute) =>
-    original.register(guardRoute(route))) as WrappableServer["register"] & GuardedFn;
+    original.register(guardRoute(route))) as WrappableServer["register"] & { [GUARDED]?: true };
   const registerUpgrade = ((route: WrappableUpgradeRoute) =>
-    original.registerUpgrade(guardUpgradeRoute(route))) as WrappableServer["registerUpgrade"] &
-    GuardedFn;
-  const registerFallback = ((handler: HttpHandler) =>
-    original.registerFallback(guardFallback(handler))) as WrappableServer["registerFallback"] &
-    GuardedFn;
+    original.registerUpgrade(guardUpgradeRoute(route))) as WrappableServer["registerUpgrade"] & {
+    [GUARDED]?: true;
+  };
+  const registerFallback = ((fallback: WrappableFallback) =>
+    original.registerFallback(guardFallback(fallback))) as WrappableServer["registerFallback"] & {
+    [GUARDED]?: true;
+  };
   register[GUARDED] = true;
   registerUpgrade[GUARDED] = true;
   registerFallback[GUARDED] = true;
@@ -303,12 +259,15 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
   server.registerFallback = registerFallback;
 
   const unwrap = () => {
-    rollbackTable(server.exact, httpOrigins);
-    rollbackTable(server.prefixes, httpOrigins);
-    rollbackTable(server.upgrades, upgradeOrigins);
-    const fallbackOrigin =
-      server.fallback === undefined ? undefined : fallbackOrigins.get(server.fallback);
-    if (fallbackOrigin !== undefined) server.fallback = fallbackOrigin;
+    rollbackRoutes(server.exact, httpOrigins);
+    rollbackRoutes(server.prefixes, httpOrigins);
+    rollbackUpgrades(server.upgrades, upgradeOrigins);
+    const fallback = server.fallback;
+    if (fallback !== undefined) {
+      const own = typeof fallback === "function" ? fallback : fallback.resource;
+      const origin = fallbackOrigins.get(own);
+      if (origin !== undefined) server.fallback = origin;
+    }
     server.register = original.register;
     server.registerUpgrade = original.registerUpgrade;
     server.registerFallback = original.registerFallback;

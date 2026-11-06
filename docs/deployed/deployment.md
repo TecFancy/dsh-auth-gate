@@ -95,10 +95,13 @@ open another connection to check `pgrep` and the port. To stop:
 `pkill -f "[d]sh --profile web"` — the bracket trick prevents self-kill; kill and startup are in
 two separate connections.)
 
-Startup self-check (M1): if the four categories of entry points are not fully covered, it
-**fails loud** (process startup fails and reports
-`guard self-check failed`) — successful startup means the guard is in place. The log should show
-`session domain opened: dsh_auth_sessions`; no `user store unavailable` /
+Startup self-check (M1): if the four categories of entry points are not fully covered, the plugin
+**fails loud** and reports `guard self-check failed`. Since dsh 0.1.6 that does **not** stop the
+process: the startup audit treats only seven required ids as fatal, so the plugin entry stays
+inactive while the host keeps serving with no login gate. A running process therefore does not
+mean the guard is in place. Confirm the startup log shows neither `did not activate` nor
+`guard self-check failed`, and probe an unauthenticated request: it must answer 401 or 302, never
+2xx. The log should also show `session domain opened: dsh_auth_sessions`; no `user store unavailable` /
 `users file not found` (that warn is normal before first login — a missing file = empty user set,
 fail-closed).
 
@@ -170,14 +173,14 @@ accumulates prior failures from earlier steps (e.g. the `wrong` attempt in C) �
 The guard wrapper depends on `webServer`'s non-contractual internal structures (plan §7)
 — **after each dsh upgrade**:
 
-1. Start up (§3) — a fail-loud self-check means failure;
+1. Start up (§3) — then confirm the gate actually answers: an unauthenticated probe must get 401 or 302. A fail-loud self-check means the entry did not activate, and dsh may keep running without the gate;
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
 3. **Re-run the unauthenticated entry-coverage probe** (read-only, no credentials):
-   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits non-zero if any **guarded** entry answers 2xx without a session (the gate's own public endpoints are judged separately - they must stay reachable). Latest verified runs: [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md) — dsh `0.1.5-rc.2`,
-   56 entries from 8 packages, 61/61 probes rejected — and
-   [`entry-coverage-0.2.0-rc.2.md`](./entry-coverage-0.2.0-rc.2.md) — dsh `0.2.0-rc.2`, 62 entries from
-   10 packages (third-party route tables included), 67/67 rejected with the browser-navigation probe
-   asserting `302 -> /auth/login`. The navigation probe needs `Sec-Fetch-Mode: navigate`
+   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits non-zero if any **guarded** entry answers 2xx without a session (the gate's own public endpoints are judged separately - they must stay reachable). Latest verified runs: [`entry-coverage-0.2.2-rc.1.md`](./entry-coverage-0.2.2-rc.1.md) — dsh
+   `0.2.2-rc.1`, the first host with `{ resource }` routes: `/plugins` and the SPA fallback are
+   guarded, 26/26 probes rejected, and the browser-navigation probe asserts `302 -> /auth/login` —
+   plus [`entry-coverage-0.2.0-rc.2.md`](./entry-coverage-0.2.0-rc.2.md) (62 entries, 67/67) and
+   [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md). The navigation probe needs `Sec-Fetch-Mode: navigate`
    (`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`): without those headers the gate
    answers 401 by design, not 302.
 4. Check `boot.log` for any new error/warn;
@@ -219,14 +222,14 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 
 ## 6. Troubleshooting
 
-| Symptom                                   | Cause                                                                | Handling                                                         |
-| ----------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Startup failure `guard self-check failed` | Wrapper does not cover all entry points (dsh version changed)        | Upgrade dsh-auth-gate or report (do not bypass the self-check)   |
-| Login always 401                          | Wrong password / user disabled / users.yaml missing (empty user set) | `dsh-auth user list`; confirm `$DSH_HOME` matches the instance   |
-| Login 503 `user store unavailable`        | users.yaml syntax/schema error, permissions too loose (not 600)      | `chmod 600`; `dsh-auth user list` to reproduce the error message |
-| Login 429                                 | Rate-limit lock (in-memory state, cleared on restart)                | Wait for `retry-after` or restart the instance                   |
-| Rejected after browser login              | `cookieSecure: true` but no https                                    | Add TLS front termination, or temporarily false (testing only)   |
-| API still 401 after authentication        | Reverse proxy does not forward cookie/Authorization                  | Check the reverse proxy's header pass-through config             |
+| Symptom                                                   | Cause                                                                | Handling                                                                                                                       |
+| --------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Log shows `guard self-check failed` or `did not activate` | Wrapper does not cover all entry points (new dsh route shape)        | Upgrade dsh-auth-gate; until then the site is serving **without** the gate. Probe it: unauthenticated requests must be 401/302 |
+| Login always 401                                          | Wrong password / user disabled / users.yaml missing (empty user set) | `dsh-auth user list`; confirm `$DSH_HOME` matches the instance                                                                 |
+| Login 503 `user store unavailable`                        | users.yaml syntax/schema error, permissions too loose (not 600)      | `chmod 600`; `dsh-auth user list` to reproduce the error message                                                               |
+| Login 429                                                 | Rate-limit lock (in-memory state, cleared on restart)                | Wait for `retry-after` or restart the instance                                                                                 |
+| Rejected after browser login                              | `cookieSecure: true` but no https                                    | Add TLS front termination, or temporarily false (testing only)                                                                 |
+| API still 401 after authentication                        | Reverse proxy does not forward cookie/Authorization                  | Check the reverse proxy's header pass-through config                                                                           |
 
 ## 7. Security Notes (plan §8 concrete checklist)
 

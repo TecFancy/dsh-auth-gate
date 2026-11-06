@@ -131,7 +131,7 @@ describe("apply: password mode", () => {
     const auth = provided["auth"] as AuthService;
     expect(auth.gate).toBeInstanceOf(TokenGate);
     expect(gets).not.toContain("credentials"); // 惰性：apply 时未访问
-    await auth.gate.decide({ headers: { authorization: "Bearer x" } } as never, "exact", "/probe");
+    await auth.gate.decide({ headers: { authorization: "Bearer x" } }, "exact", "/probe");
     expect(gets).toContain("credentials");
   });
 

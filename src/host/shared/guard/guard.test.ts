@@ -9,6 +9,7 @@ import {
   wrapServer,
   type GuardLog,
   type HttpHandler,
+  type WrappableHttpRoute,
   type WrappableRoute,
   type WrappableServer,
   type WrappableUpgradeRoute,
@@ -138,10 +139,12 @@ describe("wrapServer: 存量与增量包装", () => {
     expect(isGuarded(server.upgrades.get("/u")!.handler)).toBe(true);
     expect(isGuarded(server.fallback)).toBe(true);
 
-    await server.exact.get("/e")!.handler(makeReq("/e"), makeRes());
-    await server.prefixes.get("/p")!.handler(makeReq("/p"), makeRes());
+    await server.exact.get("/e")!.handler!(makeReq("/e"), makeRes());
+    await server.prefixes.get("/p")!.handler!(makeReq("/p"), makeRes());
     await server.upgrades.get("/u")!.handler(makeReq("/u"), makeSocket(), Buffer.alloc(0));
-    await server.fallback(makeReq("/x"), makeRes());
+    const fallback = server.fallback;
+    if (typeof fallback !== "function") throw new Error("fallback is not a handler");
+    await fallback(makeReq("/x"), makeRes());
     expect(exactCalls).toBe(1);
     expect(prefixCalls).toBe(1);
     expect(upgradeCalls).toBe(1);
@@ -160,7 +163,7 @@ describe("wrapServer: 存量与增量包装", () => {
       },
     });
 
-    const handler = server.exact.get("/late")!.handler;
+    const handler = server.exact.get("/late")!.handler!;
     expect(isGuarded(handler)).toBe(true);
     const res = makeRes();
     await handler(makeReq("/late", "GET", "application/json"), res);
@@ -185,7 +188,7 @@ describe("wrapServer: 幂等与还原", () => {
     unwrap1();
     expect(server.exact.get("/e")).toBe(originalRoute);
     expect(server.fallback).toBe(originalFallback);
-    expect(isGuarded(server.exact.get("/e")!.handler)).toBe(false);
+    expect(isGuarded((server.exact.get("/e") as WrappableHttpRoute).handler)).toBe(false);
 
     const unwrap3 = wrapServer(server, () => gate, log);
     expect(unwrap3).not.toBe(unwrap1);
@@ -196,7 +199,7 @@ describe("wrapServer: 幂等与还原", () => {
     server.exact.set("/probe", { kind: "exact", path: "/probe", handler: () => undefined });
     let gate: Gate = { decide: () => "deny" };
     wrapServer(server, () => gate, log);
-    const handler = server.exact.get("/probe")!.handler;
+    const handler = server.exact.get("/probe")!.handler!;
 
     const res = makeRes();
     await handler(makeReq("/probe", "GET", "application/json"), res);

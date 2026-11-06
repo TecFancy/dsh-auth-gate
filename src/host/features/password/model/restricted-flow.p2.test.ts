@@ -6,6 +6,7 @@ import {
   guardUpgrade,
   wrapServer,
   type HttpHandler,
+  type WrappableHttpRoute,
   type WrappableRoute,
   type WrappableServer,
   type WrappableUpgradeRoute,
@@ -152,9 +153,11 @@ describe("受限会话：wrapServer 全入口类（验收 23）", () => {
     wrapServer(server, () => gate, { error: () => undefined });
 
     const nav = makeRes();
-    await server.exact
-      .get("/probe")!
-      .handler(req({ cookie, "sec-fetch-mode": "navigate" }, "GET", "/probe"), nav.res);
+    const probeRoute = server.exact.get("/probe") as WrappableHttpRoute;
+    await probeRoute.handler(
+      req({ cookie, "sec-fetch-mode": "navigate" }, "GET", "/probe"),
+      nav.res,
+    );
     expect(nav.status).toBe(302);
     expect(nav.headers["location"]).toBe("/auth/password");
 

@@ -1,10 +1,11 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ServerResponse } from "node:http";
+import type { GuardRequest } from "./gate.js";
 /**
  * 跨站顶层导航判定：GET + `Sec-Fetch-Site: cross-site` + `Sec-Fetch-Dest: document`。
  * 只认顶层文档（iframe 的 dest 是 `iframe`，不触发）；任一头缺失 → false，保持放行原行为。
  * `same-site` / `same-origin` / `none` 一律 false，所以弹回后的第二次请求不会再命中（无循环）。
  */
-export declare function isCrossSiteDocumentNavigation(req: IncomingMessage): boolean;
+export declare function isCrossSiteDocumentNavigation(req: GuardRequest): boolean;
 /**
  * 回一张同源弹回页，让浏览器用同源文档重新导航到当前 URL（调用方保证 gate 已放行）。
  *
@@ -15,4 +16,6 @@ export declare function isCrossSiteDocumentNavigation(req: IncomingMessage): boo
  * `/?token=` 这类 URL 可能带 dsh 的 launch token，故 `referrer-policy: no-referrer`。
  */
 export declare function serveCrossSiteBounce(res: ServerResponse): void;
+/** 同一张弹回页的 Fetch `Response` 形态，供 resource 路由的守卫使用。 */
+export declare function crossSiteBounceResponse(): Response;
 //# sourceMappingURL=cross-site-bounce.d.ts.map

@@ -498,8 +498,10 @@ systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
   `next` line onwards compatible, including future `0.3.x` and `1.x`. A declaration that lags
   a new host line costs more than it protects, because an incompatible bundle is skipped and
   the login gate then disappears silently. Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
-  order), plus `0.1.7-alpha.1` and `0.2.0-rc.2` (isolated instances); the full test
-  suite runs on the `0.2.0-rc.2` host packages. The `0.1.6-*`
+  order), plus `0.1.7-alpha.1`, `0.2.0-rc.2` and `0.2.2-rc.1` (isolated instances);
+  the full test suite runs on the `0.2.2-rc.1` host packages, and the integration
+  suite exercises their `resource` routes (the `/plugins` prefix and the SPA fallback)
+  against the real webserver. The `0.1.6-*`
   prereleases are not enumerated because no plugin version was verified against
   them (stable `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the
   host's own `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis`

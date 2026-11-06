@@ -110,20 +110,12 @@ describe("PasswordGate: first-run bootstrap channel", () => {
   it("redirects a bare token launch URL to the bootstrap endpoint", () => {
     const gate = makeGate();
     expect(
-      gate.decide(
-        { method: "GET", url: "/?token=launch-token", headers: {} } as IncomingMessage,
-        "exact",
-        "/",
-      ),
+      gate.decide({ method: "GET", url: "/?token=launch-token", headers: {} }, "exact", "/"),
     ).toEqual({ deny: { redirect: "/auth/bootstrap?token=launch-token" } });
     expect(gate.decide(fakeReq({}), "exact", "/api/x")).toBe("deny");
-    expect(
-      gate.decide(
-        { method: "POST", url: "/?token=x", headers: {} } as IncomingMessage,
-        "exact",
-        "/",
-      ),
-    ).toBe("deny");
+    expect(gate.decide({ method: "POST", url: "/?token=x", headers: {} }, "exact", "/")).toBe(
+      "deny",
+    );
   });
 
   it("keeps a bootstrap session inside /auth", () => {

@@ -1,7 +1,12 @@
-import type { IncomingMessage } from "node:http";
 import { bootstrapRedirectPath, parseCookieHeader } from "../../../shared/http/index.js";
-import type { Gate, GateDecision, GuardKind } from "../../../shared/guard/index.js";
-import { isNavigationRequest, isPublicStaticPath } from "../../../shared/guard/index.js";
+import {
+  isNavigationRequest,
+  isPublicStaticPath,
+  type Gate,
+  type GateDecision,
+  type GuardKind,
+  type GuardRequest,
+} from "../../../shared/guard/index.js";
 import { isAuthPath, LOGIN_PATH, loginPath, SETUP_PATH } from "../../../shared/protocol/index.js";
 import {
   isBootstrapSession,
@@ -38,7 +43,7 @@ export class PasswordGate implements Gate {
     this.cookieName = options.cookieName;
   }
 
-  decide(req: IncomingMessage, kind: GuardKind, pathname: string): GateDecision {
+  decide(req: GuardRequest, kind: GuardKind, pathname: string): GateDecision {
     if (isAuthPath(pathname)) {
       return this.decideAuthPath(req, kind, pathname);
     }
@@ -53,7 +58,7 @@ export class PasswordGate implements Gate {
   }
 
   /** `/auth` 前缀内：只有受限会话需要细分；其余一律交 handler（method 矩阵在 handler）。 */
-  private decideAuthPath(req: IncomingMessage, kind: GuardKind, pathname: string): GateDecision {
+  private decideAuthPath(req: GuardRequest, kind: GuardKind, pathname: string): GateDecision {
     if (!isRestrictedSession(this.sessionOf(req))) return "allow";
     if (kind === "upgrade") return { deny: { upgrade: true } };
     if (pathname !== LOGIN_PATH) {
@@ -67,7 +72,7 @@ export class PasswordGate implements Gate {
   }
 
   /** 会话解析：cookie → Bearer；store 不可用 / 无凭证 / 已吊销 / 已过期 → undefined。 */
-  private sessionOf(req: IncomingMessage): Session | undefined {
+  private sessionOf(req: GuardRequest): Session | undefined {
     const store = this.sessions();
     if (store === undefined) return undefined;
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
@@ -82,7 +87,7 @@ export class PasswordGate implements Gate {
 }
 
 /** 受限会话被拒的宿主路径：导航 → 302 改密页；WS → 拒握手；其余（API）→ 401。 */
-function denyRestricted(req: IncomingMessage, kind: GuardKind): GateDecision {
+function denyRestricted(req: GuardRequest, kind: GuardKind): GateDecision {
   if (kind === "upgrade") return { deny: { upgrade: true } };
   return isNavigationRequest(req)
     ? { deny: { redirect: RESTRICTED_REDIRECT_PATH } }
@@ -90,11 +95,11 @@ function denyRestricted(req: IncomingMessage, kind: GuardKind): GateDecision {
 }
 
 /** 首次引导会话被拒的宿主路径：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。 */
-function denyBootstrap(req: IncomingMessage): GateDecision {
+function denyBootstrap(req: GuardRequest): GateDecision {
   return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }
 
 /** 未认证（无会话/会话失效）：导航 → 302 登录页 + next；其余 → 字符串 deny（401）。 */
-function denyAnonymous(req: IncomingMessage, pathname: string): GateDecision {
+function denyAnonymous(req: GuardRequest, pathname: string): GateDecision {
   return isNavigationRequest(req) ? { deny: { redirect: loginPath(pathname) } } : "deny";
 }
