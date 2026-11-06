@@ -39,6 +39,8 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     revokeSweepMs: 0,
     totp: "off",
     logoutOrder: 1000,
+    telemetry: false,
+    installId: { get: () => "" },
   };
 }
 

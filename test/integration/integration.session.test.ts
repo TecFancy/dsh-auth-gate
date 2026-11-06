@@ -7,7 +7,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 import { digestToken, type IssuedSession } from "../../src/host/entities/session/index.js";
 
 async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
@@ -45,7 +45,7 @@ async function mountStack(root: string): Promise<{ ctx: Context; fibers: Fiber[]
     ),
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
-  fibers.push(await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig));
+  fibers.push(await ctx.plugin({ name, inject, apply, Config }, { telemetry: false }));
   return { ctx, fibers };
 }
 

@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
-import type { Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import type { AdmitHook, Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
 import { type ResourceHandler } from "./resource.js";
 export { GUARDED, isGuarded } from "./mark.js";
 export { isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, } from "./http.js";
@@ -50,13 +50,17 @@ export interface GuardLog {
  * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫按 gate 给出的
  * 决策写 302/401/403，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
  * allow 但属跨站顶层文档导航时不进原 handler，改回同源弹回页（见 `serveCrossSiteBounce`）。
+ *
+ * `onAdmit` 在 `decide()` 返回 allow 之后、守卫自己的传输层否决（代理标记、跨站弹回）之前
+ * 调用：它回答的是「门放行了这次请求」，与守卫随后怎么分流无关（见 {@link AdmitHook}）。
  */
-export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler): HttpHandler;
+export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler, onAdmit?: AdmitHook): HttpHandler;
 /**
  * 给一个 upgrade handler 套守卫。**任何**非 allow 决策（含 `{deny:{upgrade:true}}`）
  * 都在 ws 协商前直接拒握手，不进入原 handler，也不为 socket 附加任何监听器。
+ * `onAdmit` 与其他入口同义：门放行之后调用一次。
  */
-export declare function guardUpgrade(gate: () => Gate, handler: UpgradeHandler): UpgradeHandler;
+export declare function guardUpgrade(gate: () => Gate, handler: UpgradeHandler, onAdmit?: AdmitHook): UpgradeHandler;
 /**
  * 拒绝一个 HTTP 请求并把决策写进 node:http 响应。拒绝语义见 `denyReply`：
  * 302 跳转一律 no-store 且带 no-referrer，401/403 一律纯文本 no-store。
@@ -75,5 +79,5 @@ export declare function denyForbidden(res: ServerResponse): void;
  * 条目换回原路由（D27：wrap 之后注册的路由保留在表中、只摘掉守卫；wrap 期间被
  * 拥有者卸载的条目不写回；被第三方换成别的函数的条目不碰）。最后还原三个注册方法。
  */
-export declare function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog): () => void;
+export declare function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog, onAdmit?: AdmitHook): () => void;
 //# sourceMappingURL=guard.d.ts.map

@@ -2,7 +2,7 @@ import { Context } from "@deepseek-ai/cordis";
 import { WebServer } from "@deepseek-ai/dsh-host-webserver";
 import { describe, expect, it } from "vitest";
 import type { Gate, WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 
 /**
  * 真实 Cordis + WebServer 栈上的 resource 路由验收。DSH 0.2.2 起
@@ -52,7 +52,7 @@ async function mountHost(): Promise<MountedHost> {
   const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
   const server = ctx.get("webServer") as unknown as RealServer;
   registerResourceRoutes(server);
-  const authFiber = await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig);
+  const authFiber = await ctx.plugin({ name, inject, apply, Config }, { telemetry: false });
   return {
     ctx,
     server,
@@ -171,7 +171,7 @@ describe("integration: real webserver + guard on resource routes (allow paths)",
     const wsFiber = await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 });
     const server = ctx.get("webServer") as unknown as RealServer;
     registerResourceRoutes(server);
-    const authFiber = await ctx.plugin({ name, inject, apply, Config }, {} as AuthConfig);
+    const authFiber = await ctx.plugin({ name, inject, apply, Config }, { telemetry: false });
     const base = `http://127.0.0.1:${server.port}`;
     try {
       expect((await fetch(`${base}/plugins/app.js`)).status).toBe(401);

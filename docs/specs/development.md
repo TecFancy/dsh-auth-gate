@@ -48,6 +48,7 @@ src/
 ├── cli.ts                 # dsh-auth user-management CLI (bin entry)
 ├── proxy-cli.ts           # dsh-auth-proxy (bin entry)
 ├── admin-wiring.ts        # root-side assembly of the admin routes (P2)
+├── telemetry-wiring.ts    # root-side assembly of the anonymous ping (config fragment -> guard admit hook)
 ├── token-resolver.ts      # shared-token credential resolver (token mode)
 ├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
 ├── cli-skill.ts           # `dsh-auth skill install`
@@ -63,6 +64,7 @@ src/
 │   │   ├── protocol/      #     bridge to src/protocol: the host half's only way in
 │   │   ├── rate-limit/    #     two-bucket login rate limiter
 │   │   ├── skill/         #     `dsh-auth skill install`
+│   │   ├── telemetry/     #     anonymous usage ping (lazy, after an admitted request; no timer)
 │   │   └── lib/           #     leaf helpers (`dshHomeDir`)
 │   ├── entities/
 │   │   ├── session/       #     model/ session-store; api/ logout and /auth/status (AuthHttpDeps)

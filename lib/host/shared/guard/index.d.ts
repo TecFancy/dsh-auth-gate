@@ -6,7 +6,7 @@
  */
 export { crossSiteBounceResponse, isCrossSiteDocumentNavigation, serveCrossSiteBounce, } from "./cross-site-bounce.js";
 export { noopGate } from "./gate.js";
-export type { Gate, GateDecision, GateDeny, GateRedirectDeny, GateStatusDeny, GateUpgradeDeny, GuardKind, GuardRequest, } from "./gate.js";
+export type { AdmitHook, Gate, GateDecision, GateDeny, GateRedirectDeny, GateStatusDeny, GateUpgradeDeny, GuardKind, GuardRequest, } from "./gate.js";
 export { denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, wrapServer, } from "./guard.js";
 export type { GuardLog, HttpHandler, UpgradeHandler, WrappableFallback, WrappableHttpRoute, WrappableResourceRoute, WrappableRoute, WrappableServer, WrappableUpgradeRoute, } from "./guard.js";
 export { denyReply, guardReplyToResponse, writeGuardReply } from "./http.js";
