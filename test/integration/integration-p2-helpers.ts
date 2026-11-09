@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
 
@@ -124,21 +124,25 @@ export async function mountP2Stack(options: MountP2Options = {}): Promise<P2Stac
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
   fibers.push(
-    await ctx.plugin({ name, inject, apply, Config }, {
-      mode: "password",
-      cookieSecure: false,
-      usersFile,
-      publicHost: P2_PUBLIC_ORIGIN,
-      // 关掉周期扫描：本夹具不涉及禁用用户，避免后台文件 IO 干扰断言时序。
-      revokeSweepMs: 0,
-      // 缺省 totp: off ⇒ 带 secret 的 victim 仍走纯密码登录（secret 只作为"字节不动"的靶子）；
-      // 需要"同码不能在两处各用一次"的用例时才为 actor 打开 TOTP。
-      totp: options.adminTotpSecret === undefined ? "off" : "optional",
-      // 可信反代：直连 peer 是回环，因此 `x-forwarded-for` 可用来模拟不同客户端 IP
-      // （限流桶按 IP + 账号双桶，必须能把"账号桶已清"与"IP 桶仍锁"分开断言）。
-      clientIpHeader: "x-forwarded-for",
-      trustedProxyCidrs: ["127.0.0.0/8", "::1/128"],
-    } as AuthConfig),
+    await ctx.plugin(
+      { name, inject, apply, Config },
+      {
+        telemetry: false,
+        mode: "password",
+        cookieSecure: false,
+        usersFile,
+        publicHost: P2_PUBLIC_ORIGIN,
+        // 关掉周期扫描：本夹具不涉及禁用用户，避免后台文件 IO 干扰断言时序。
+        revokeSweepMs: 0,
+        // 缺省 totp: off ⇒ 带 secret 的 victim 仍走纯密码登录（secret 只作为"字节不动"的靶子）；
+        // 需要"同码不能在两处各用一次"的用例时才为 actor 打开 TOTP。
+        totp: options.adminTotpSecret === undefined ? "off" : "optional",
+        // 可信反代：直连 peer 是回环，因此 `x-forwarded-for` 可用来模拟不同客户端 IP
+        // （限流桶按 IP + 账号双桶，必须能把"账号桶已清"与"IP 桶仍锁"分开断言）。
+        clientIpHeader: "x-forwarded-for",
+        trustedProxyCidrs: ["127.0.0.0/8", "::1/128"],
+      },
+    ),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
   server.register({

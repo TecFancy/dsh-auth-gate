@@ -48,5 +48,15 @@ export interface Gate {
   ): GateDecision | Promise<GateDecision>;
 }
 
+/**
+ * 放行钩子：门返回 `allow` 之后、守卫执行原入口之前调用一次，回答的是「门放行了这次请求」。
+ *
+ * 它**不在门的判定路径上**：`decide()` 已经给出结论，钩子既不参与结论，也不在拒绝分支上出现。
+ * 四类入口（exact / prefix / fallback / upgrade、handler 与 resource 两种形态）走同一条钩子。
+ * 实现必须自己吞掉所有异常：守卫不 try/catch，钩子抛错会变成一次放行请求的失败；钩子也不得
+ * 阻塞，异步工作交给它自己在后台完成。
+ */
+export type AdmitHook = () => void;
+
 /** M1 惰性门：恒放行。M2 用 token/密码门整体替换。 */
 export const noopGate: Gate = { decide: () => "allow" };

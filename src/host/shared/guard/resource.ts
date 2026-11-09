@@ -1,4 +1,4 @@
-import type { Gate, GuardKind, GuardRequest } from "./gate.js";
+import type { AdmitHook, Gate, GuardKind, GuardRequest } from "./gate.js";
 import { crossSiteBounceResponse, isCrossSiteDocumentNavigation } from "./cross-site-bounce.js";
 import {
   badRequestReply,
@@ -36,11 +36,13 @@ export function toGuardRequest(request: Request): GuardRequest {
  *
  * 非法 URL（连带 base 的 `new URL` 都抛错）直接 400，不调门、不调 resource。
  * 门或 resource 抛错时向上传播，由宿主统一处理，绝不"出错即放行"。
+ * `onAdmit` 在门放行之后调用一次，语义与 handler 入口相同（见 {@link AdmitHook}）。
  */
 export function guardResource(
   gate: () => Gate,
   kind: GuardKind,
   resource: ResourceHandler,
+  onAdmit?: AdmitHook,
 ): ResourceHandler {
   if (isGuarded(resource)) return resource;
   const guarded = (async (request: Request, peer?: unknown): Promise<Response> => {
@@ -53,6 +55,7 @@ export function guardResource(
     const req = toGuardRequest(request);
     const decision = await gate().decide(req, kind, pathname);
     if (decision === "allow") {
+      onAdmit?.();
       if (isProxyDeniedRequest(req, pathname)) {
         return guardReplyToResponse(forbiddenReply());
       }

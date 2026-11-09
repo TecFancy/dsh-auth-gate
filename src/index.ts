@@ -2,7 +2,7 @@ import type { Context } from "@deepseek-ai/cordis";
 import { randomBytes } from "node:crypto";
 import z from "@deepseek-ai/schemastery";
 import { registerAuthEndpoints, safeEqual, TokenGate } from "./host/features/token/index.js";
-import { wrapServer, type Gate, type WrappableServer } from "./host/shared/guard/index.js";
+import * as guard from "./host/shared/guard/index.js";
 import {
   DisabledSessionSweeper,
   PasswordGate,
@@ -20,10 +20,10 @@ import {
 } from "./host/shared/http/index.js";
 import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 import { defaultUsersFilePath, loadUsersFile } from "./host/entities/user/index.js";
-import { assertGuarded } from "./host/shared/guard/index.js";
 import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
+import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export const name = "dsh-auth-gate";
@@ -31,7 +31,7 @@ export const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
 export const inject = ["webServer"] as const;
 
-export interface AuthConfig {
+export interface AuthConfig extends TelemetryFields {
   /** 认证流：token（M2）/ password（M3）。 */
   mode: "token" | "password";
   /** 会话 TTL（秒）。 */
@@ -85,7 +85,9 @@ export interface AuthConfig {
   logoutOrder: number;
 }
 
-export const Config: z<AuthConfig> = z.object({
+// 不加 `z<AuthConfig>` 断言：`.volatile()` 把字段的输出类型包成盒子，断言形式不再成立。
+// `apply` 的入参用 `AuthConfig` 描述校验后的形状（`installId` 是盒子，经 `get()` 读）。
+export const Config = z.object({
   mode: z.union([z.const("token"), z.const("password")]).default("token"),
   sessionTtl: z.natural().default(604800),
   cookieName: z.string().default("dsh_auth"),
@@ -102,6 +104,7 @@ export const Config: z<AuthConfig> = z.object({
   revokeSweepMs: z.natural().default(5000),
   totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
+  ...telemetryConfigFields,
 });
 
 /** 本插件提供的 auth 服务：门（可换流/测试注入）+ 会话层。 */
@@ -109,7 +112,7 @@ export interface AuthService {
   /** storageDomain 缺失时为 undefined（会话不可用但守卫照常挂载）。 */
   sessions: SessionStore | undefined;
   /** 可写：token 模式为 TokenGate、password 模式为 PasswordGate；测试注入假门。 */
-  gate: Gate;
+  gate: guard.Gate;
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -171,7 +174,7 @@ function mountSessionDomain(
  * 当作 disposer 存起来，注册永不发生，实测 404）。
  */
 function mountAuthEndpoints(
-  server: WrappableServer,
+  server: guard.WrappableServer,
   config: AuthConfig,
   auth: AuthService,
   resolveToken: (() => Promise<string | undefined>) | undefined,
@@ -258,7 +261,7 @@ function mountAuthEndpoints(
  * apply 内无 await；password 模式不访问 credentials 服务。
  */
 export function apply(ctx: Context, config: AuthConfig): void {
-  const server = ctx.get("webServer") as unknown as WrappableServer | undefined;
+  const server = ctx.get("webServer") as unknown as guard.WrappableServer | undefined;
   if (server === undefined) return;
   const log = ctx.logger("dsh-auth-gate");
 
@@ -309,7 +312,9 @@ export function apply(ctx: Context, config: AuthConfig): void {
     ctx.effect(() => sweeper.start(), "dsh-auth-gate: disabled session sweeper");
   }
 
-  const unwrap = wrapServer(server, () => auth.gate, log);
+  // 匿名统计挂在「门已经放行」的接缝上：钩子只在守卫的 allow 分支被调用，不在门的判定路径上，
+  // 也不在启动时调用（首个放行请求之后才可能发）；users.yaml 只在上报到期时读一次。
+  const unwrap = guard.wrapServer(server, () => auth.gate, log, wireTelemetry(ctx, config));
   ctx.effect(() => unwrap, "dsh-auth-gate: guard unwrap");
 
   // 首次引导通道（`/auth/bootstrap` → `/auth/setup` → `/auth/continue`）：只在实例未配置时签发
@@ -333,7 +338,7 @@ export function apply(ctx: Context, config: AuthConfig): void {
     "dsh-auth-gate: auth endpoints",
   );
 
-  const failures = assertGuarded(server);
+  const failures = guard.assertGuarded(server);
   if (failures.length > 0) {
     for (const failure of failures) log.error(`unwrapped entry: ${failure}`);
     throw new Error(`dsh-auth-gate: guard self-check failed: ${failures.join(", ")}`);

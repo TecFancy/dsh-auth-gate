@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import { isCrossSiteDocumentNavigation, serveCrossSiteBounce } from "./cross-site-bounce.js";
-import type { Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import type { AdmitHook, Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
 import { denyReply, forbiddenReply, isProxyDeniedRequest, writeGuardReply } from "./http.js";
 import { GUARDED, isGuarded } from "./mark.js";
 import { guardResource, type ResourceHandler } from "./resource.js";
@@ -90,13 +90,22 @@ function routeTarget(route: WrappableRoute | WrappableUpgradeRoute): unknown {
  * 给一个 HTTP handler 套守卫。已守卫（幂等）则原样返回；deny 由守卫按 gate 给出的
  * 决策写 302/401/403，不调用原 handler；错误不捕获（交给 webserver 统一处理）。
  * allow 但属跨站顶层文档导航时不进原 handler，改回同源弹回页（见 `serveCrossSiteBounce`）。
+ *
+ * `onAdmit` 在 `decide()` 返回 allow 之后、守卫自己的传输层否决（代理标记、跨站弹回）之前
+ * 调用：它回答的是「门放行了这次请求」，与守卫随后怎么分流无关（见 {@link AdmitHook}）。
  */
-export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler): HttpHandler {
+export function guardHttp(
+  gate: () => Gate,
+  kind: GuardKind,
+  handler: HttpHandler,
+  onAdmit?: AdmitHook,
+): HttpHandler {
   if (isGuarded(handler)) return handler;
   const guarded = (async (req: IncomingMessage, res: ServerResponse) => {
     const pathname = new URL(req.url ?? "/", "http://x").pathname;
     const decision = await gate().decide(req, kind, pathname);
     if (decision === "allow") {
+      onAdmit?.();
       if (isProxyDeniedRequest(req, pathname)) {
         writeGuardReply(res, forbiddenReply());
         return;
@@ -117,13 +126,19 @@ export function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandle
 /**
  * 给一个 upgrade handler 套守卫。**任何**非 allow 决策（含 `{deny:{upgrade:true}}`）
  * 都在 ws 协商前直接拒握手，不进入原 handler，也不为 socket 附加任何监听器。
+ * `onAdmit` 与其他入口同义：门放行之后调用一次。
  */
-export function guardUpgrade(gate: () => Gate, handler: UpgradeHandler): UpgradeHandler {
+export function guardUpgrade(
+  gate: () => Gate,
+  handler: UpgradeHandler,
+  onAdmit?: AdmitHook,
+): UpgradeHandler {
   if (isGuarded(handler)) return handler;
   const guarded = (async (req: IncomingMessage, socket: Duplex, head: Buffer) => {
     const pathname = new URL(req.url ?? "/", "http://x").pathname;
     const decision = await gate().decide(req, "upgrade", pathname);
     if (decision === "allow") {
+      onAdmit?.();
       await handler(req, socket, head);
       return;
     }
@@ -170,6 +185,18 @@ function rollbackRoutes(
   }
 }
 
+/** fallback 座位的回滚：只还原本次 wrap 产出的那个目标函数。 */
+function rollbackFallback(
+  server: WrappableServer,
+  origins: WeakMap<object, WrappableFallback>,
+): void {
+  const fallback = server.fallback;
+  if (fallback === undefined) return;
+  const own = typeof fallback === "function" ? fallback : fallback.resource;
+  const origin = origins.get(own);
+  if (origin !== undefined) server.fallback = origin;
+}
+
 /** upgrade 表的逐条回滚，语义与 `rollbackRoutes` 相同。 */
 function rollbackUpgrades(
   table: Map<string, WrappableUpgradeRoute>,
@@ -190,7 +217,12 @@ function rollbackUpgrades(
  * 条目换回原路由（D27：wrap 之后注册的路由保留在表中、只摘掉守卫；wrap 期间被
  * 拥有者卸载的条目不写回；被第三方换成别的函数的条目不碰）。最后还原三个注册方法。
  */
-export function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog): () => void {
+export function wrapServer(
+  server: WrappableServer,
+  gate: () => Gate,
+  log: GuardLog,
+  onAdmit?: AdmitHook,
+): () => void {
   // 规格冻结签名：log 预留给诊断；包装/还原本身静默（自检在 index.ts 负责）。
   void log;
   const existing = unwrappers.get(server);
@@ -208,30 +240,30 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
 
   const guardRoute = (route: WrappableRoute, kind: GuardKind = route.kind): WrappableRoute => {
     if (isResourceRoute(route)) {
-      const resource = guardResource(gate, kind, route.resource);
+      const resource = guardResource(gate, kind, route.resource, onAdmit);
       if (resource === route.resource) return route;
       httpOrigins.set(resource, route);
       return { ...route, resource };
     }
-    const handler = guardHttp(gate, kind, route.handler);
+    const handler = guardHttp(gate, kind, route.handler, onAdmit);
     if (handler === route.handler) return route;
     httpOrigins.set(handler, route);
     return { ...route, handler };
   };
   const guardUpgradeRoute = (route: WrappableUpgradeRoute): WrappableUpgradeRoute => {
-    const handler = guardUpgrade(gate, route.handler);
+    const handler = guardUpgrade(gate, route.handler, onAdmit);
     if (handler === route.handler) return route;
     upgradeOrigins.set(handler, route);
     return { ...route, handler };
   };
   const guardFallback = (fallback: WrappableFallback): WrappableFallback => {
     if (isResourceFallback(fallback)) {
-      const resource = guardResource(gate, "fallback", fallback.resource);
+      const resource = guardResource(gate, "fallback", fallback.resource, onAdmit);
       if (resource === fallback.resource) return fallback;
       fallbackOrigins.set(resource, fallback);
       return { ...fallback, resource };
     }
-    const guarded = guardHttp(gate, "fallback", fallback);
+    const guarded = guardHttp(gate, "fallback", fallback, onAdmit);
     if (guarded !== fallback) fallbackOrigins.set(guarded, fallback);
     return guarded;
   };
@@ -251,9 +283,7 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
     original.registerFallback(guardFallback(fallback))) as WrappableServer["registerFallback"] & {
     [GUARDED]?: true;
   };
-  register[GUARDED] = true;
-  registerUpgrade[GUARDED] = true;
-  registerFallback[GUARDED] = true;
+  for (const method of [register, registerUpgrade, registerFallback]) method[GUARDED] = true;
   server.register = register;
   server.registerUpgrade = registerUpgrade;
   server.registerFallback = registerFallback;
@@ -262,12 +292,7 @@ export function wrapServer(server: WrappableServer, gate: () => Gate, log: Guard
     rollbackRoutes(server.exact, httpOrigins);
     rollbackRoutes(server.prefixes, httpOrigins);
     rollbackUpgrades(server.upgrades, upgradeOrigins);
-    const fallback = server.fallback;
-    if (fallback !== undefined) {
-      const own = typeof fallback === "function" ? fallback : fallback.resource;
-      const origin = fallbackOrigins.get(own);
-      if (origin !== undefined) server.fallback = origin;
-    }
+    rollbackFallback(server, fallbackOrigins);
     server.register = original.register;
     server.registerUpgrade = original.registerUpgrade;
     server.registerFallback = original.registerFallback;

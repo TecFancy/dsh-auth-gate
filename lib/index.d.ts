@@ -1,12 +1,13 @@
 import type { Context } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
-import { type Gate } from "./host/shared/guard/index.js";
+import * as guard from "./host/shared/guard/index.js";
 import { SessionStore } from "./host/entities/session/index.js";
+import { type TelemetryFields } from "./telemetry-wiring.js";
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export declare const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
 export declare const inject: readonly ["webServer"];
-export interface AuthConfig {
+export interface AuthConfig extends TelemetryFields {
     /** 认证流：token（M2）/ password（M3）。 */
     mode: "token" | "password";
     /** 会话 TTL（秒）。 */
@@ -59,13 +60,43 @@ export interface AuthConfig {
      */
     logoutOrder: number;
 }
-export declare const Config: z<AuthConfig>;
+export declare const Config: z<Schemastery.ObjectS<NoInfer<{
+    installId: z<string, string, "volatile-defined">;
+    telemetry: z<boolean, boolean, "defined">;
+    mode: z<"password" | "token", "password" | "token", "defined">;
+    sessionTtl: z<number, number, "defined">;
+    cookieName: z<string, string, "defined">;
+    tokenRef: z<string, string, "defined">;
+    cookieSecure: z<boolean, boolean, "defined">;
+    usersFile: z<string, string, "defined">;
+    publicHost: z<string, string, "defined">;
+    clientIpHeader: z<string, string, "defined">;
+    trustedProxyCidrs: z<string[], string[], "defined">;
+    revokeSweepMs: z<number, number, "defined">;
+    totp: z<"off" | "optional" | "required", "off" | "optional" | "required", "defined">;
+    logoutOrder: z<number, number, "defined">;
+}>>, Schemastery.ObjectT<NoInfer<{
+    installId: z<string, string, "volatile-defined">;
+    telemetry: z<boolean, boolean, "defined">;
+    mode: z<"password" | "token", "password" | "token", "defined">;
+    sessionTtl: z<number, number, "defined">;
+    cookieName: z<string, string, "defined">;
+    tokenRef: z<string, string, "defined">;
+    cookieSecure: z<boolean, boolean, "defined">;
+    usersFile: z<string, string, "defined">;
+    publicHost: z<string, string, "defined">;
+    clientIpHeader: z<string, string, "defined">;
+    trustedProxyCidrs: z<string[], string[], "defined">;
+    revokeSweepMs: z<number, number, "defined">;
+    totp: z<"off" | "optional" | "required", "off" | "optional" | "required", "defined">;
+    logoutOrder: z<number, number, "defined">;
+}>>, "plain">;
 /** 本插件提供的 auth 服务：门（可换流/测试注入）+ 会话层。 */
 export interface AuthService {
     /** storageDomain 缺失时为 undefined（会话不可用但守卫照常挂载）。 */
     sessions: SessionStore | undefined;
     /** 可写：token 模式为 TokenGate、password 模式为 PasswordGate；测试注入假门。 */
-    gate: Gate;
+    gate: guard.Gate;
 }
 declare module "@deepseek-ai/cordis" {
     interface Context {

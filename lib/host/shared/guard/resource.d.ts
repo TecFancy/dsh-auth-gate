@@ -1,4 +1,4 @@
-import type { Gate, GuardKind, GuardRequest } from "./gate.js";
+import type { AdmitHook, Gate, GuardKind, GuardRequest } from "./gate.js";
 /**
  * Fetch 形态的 resource 路由处理函数（DSH 0.2.2 起 `webServer.register` 支持）。
  * `peer` 对插件保持不透明，守卫原样转发；返回的 `Response` 由宿主直接写回连接。
@@ -18,6 +18,7 @@ export declare function toGuardRequest(request: Request): GuardRequest;
  *
  * 非法 URL（连带 base 的 `new URL` 都抛错）直接 400，不调门、不调 resource。
  * 门或 resource 抛错时向上传播，由宿主统一处理，绝不"出错即放行"。
+ * `onAdmit` 在门放行之后调用一次，语义与 handler 入口相同（见 {@link AdmitHook}）。
  */
-export declare function guardResource(gate: () => Gate, kind: GuardKind, resource: ResourceHandler): ResourceHandler;
+export declare function guardResource(gate: () => Gate, kind: GuardKind, resource: ResourceHandler, onAdmit?: AdmitHook): ResourceHandler;
 //# sourceMappingURL=resource.d.ts.map
