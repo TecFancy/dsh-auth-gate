@@ -1,5 +1,7 @@
 import z from "@deepseek-ai/schemastery";
 import { type PasskeySettings } from "./host/features/passkey/index.js";
+import type { SessionStore } from "./host/entities/session/index.js";
+import type { WrappableServer } from "./host/shared/guard/index.js";
 /**
  * Passkey（通行密钥）配置片段与 root 侧装配。
  *
@@ -51,10 +53,46 @@ export interface PasskeyWiringConfig extends PasskeyFields {
 export interface PasskeyWiringResult {
     readonly enabled: boolean;
     readonly settings: PasskeySettings;
+    /** 登录页 passkey 入口的渲染参数；功能不可用时 undefined。 */
+    readonly login: {
+        readonly enabled: boolean;
+        readonly conditionalUi: boolean;
+    } | undefined;
 }
 /**
  * 解析并自检 passkey 配置：功能不成立时返回 `enabled: false` 并打 error 日志（fail-closed，
  * 实例照常启动）；`totp: "required"` 与 passkey 同开时打 info（passkey 满足 2FA，不降级）。
  */
 export declare function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult;
+/** `makePasskeyWiring` 需要的 root 侧输入（只含端点注册与登录页渲染用到的事实）。 */
+export interface PasskeyRouteWiringInput {
+    readonly server: WrappableServer;
+    readonly config: {
+        readonly cookieName: string;
+        readonly cookieSecure: boolean;
+        readonly sessionTtl: number;
+        readonly publicHost: string;
+        readonly clientIpHeader: string;
+        readonly trustedProxyCidrs: string[];
+    };
+    readonly auth: {
+        readonly sessions: SessionStore | undefined;
+    };
+    /** 登录成功后把浏览器送回 dsh 的 launch-token 桥（与口令登录共用）。 */
+    readonly launchTokenBridge: () => Promise<string | undefined>;
+    readonly usersPath: string;
+    readonly settings: PasskeySettings;
+    readonly log: {
+        error(message: unknown): void;
+        warn(message: unknown): void;
+        info(message: unknown): void;
+    };
+}
+/**
+ * 注册 passkey 登录的两个端点（begin + finish）。`settings.enabled === false` 时什么都不注册，
+ * 返回空 disposer：端点只在功能可用时存在，`/auth/passkey/*` 未启用时落到 `/auth` 的 404 兜底。
+ *
+ * 限速与口令登录**分开**：passkey 失败不会把口令登录的锁定桶打满，反之亦然。
+ */
+export declare function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void;
 //# sourceMappingURL=passkey-wiring.d.ts.map

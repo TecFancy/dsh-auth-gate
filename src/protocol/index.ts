@@ -20,6 +20,9 @@ export type {
   PasswordChangeErrorBody,
   PasswordChangeRequest,
   PasswordChangeResponse,
+  PasskeyAssertionRequest,
+  PasskeyLoginErrorBody,
+  PasskeyLoginOptionsResponse,
   PasswordRule,
   PolicyErrorBody,
   SessionKind,
@@ -41,6 +44,12 @@ export const LOGOUT_PATH = "/auth/logout";
 
 /** 会话探针（只认 cookie）。 */
 export const STATUS_PATH = "/auth/status";
+
+/** passkey 登录 begin（匿名 POST，返回 options + 下发 ceremony cookie）。 */
+export const PASSKEY_OPTIONS_PATH = "/auth/passkey/options";
+
+/** passkey 登录 finish（匿名表单 POST，断言 → 发会话）。 */
+export const PASSKEY_LOGIN_PATH = "/auth/passkey/login";
 
 /** 自助改密（GET SSR 页，POST 提交）；也是受限会话被拒时的导航目标。 */
 export const PASSWORD_PATH = "/auth/password";

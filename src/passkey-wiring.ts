@@ -1,5 +1,17 @@
+import type { ServerResponse } from "node:http";
 import z from "@deepseek-ai/schemastery";
-import { resolvePasskeySettings, type PasskeySettings } from "./host/features/passkey/index.js";
+import {
+  CeremonyStore,
+  registerPasskeyLoginEndpoints,
+  resolvePasskeySettings,
+  type PasskeySettings,
+} from "./host/features/passkey/index.js";
+import { issueLoginSession } from "./host/features/password/index.js";
+import { loadUsersFile, type UserRecord } from "./host/entities/user/index.js";
+import type { SessionStore } from "./host/entities/session/index.js";
+import type { WrappableServer } from "./host/shared/guard/index.js";
+import { makeClientIpResolver, parseClientIpPolicy } from "./host/shared/http/index.js";
+import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 
 /**
  * Passkey（通行密钥）配置片段与 root 侧装配。
@@ -55,6 +67,8 @@ export interface PasskeyWiringConfig extends PasskeyFields {
 export interface PasskeyWiringResult {
   readonly enabled: boolean;
   readonly settings: PasskeySettings;
+  /** 登录页 passkey 入口的渲染参数；功能不可用时 undefined。 */
+  readonly login: { readonly enabled: boolean; readonly conditionalUi: boolean } | undefined;
 }
 
 /**
@@ -76,18 +90,100 @@ export function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult {
     if (config.passkey !== "off") {
       config.log.error("passkey is password-mode only; ignored in token mode");
     }
-    return { enabled: false, settings };
+    return { enabled: false, settings, login: undefined };
   }
   if (!settings.enabled) {
     if (settings.reason !== "off") {
       config.log.error(`passkey disabled: ${settings.reason}`);
     }
-    return { enabled: false, settings };
+    return { enabled: false, settings, login: undefined };
   }
   if (settings.totpSatisfied) {
     config.log.info(
       `passkey enabled (rpId=${settings.rpId}); passkeys satisfy the TOTP two-factor policy`,
     );
   }
-  return { enabled: true, settings };
+  return {
+    enabled: true,
+    settings,
+    login: { enabled: true, conditionalUi: settings.conditionalUi },
+  };
+}
+
+/** `makePasskeyWiring` 需要的 root 侧输入（只含端点注册与登录页渲染用到的事实）。 */
+export interface PasskeyRouteWiringInput {
+  readonly server: WrappableServer;
+  readonly config: {
+    readonly cookieName: string;
+    readonly cookieSecure: boolean;
+    readonly sessionTtl: number;
+    readonly publicHost: string;
+    readonly clientIpHeader: string;
+    readonly trustedProxyCidrs: string[];
+  };
+  readonly auth: { readonly sessions: SessionStore | undefined };
+  /** 登录成功后把浏览器送回 dsh 的 launch-token 桥（与口令登录共用）。 */
+  readonly launchTokenBridge: () => Promise<string | undefined>;
+  readonly usersPath: string;
+  readonly settings: PasskeySettings;
+  readonly log: {
+    error(message: unknown): void;
+    warn(message: unknown): void;
+    info(message: unknown): void;
+  };
+}
+
+/**
+ * 注册 passkey 登录的两个端点（begin + finish）。`settings.enabled === false` 时什么都不注册，
+ * 返回空 disposer：端点只在功能可用时存在，`/auth/passkey/*` 未启用时落到 `/auth` 的 404 兜底。
+ *
+ * 限速与口令登录**分开**：passkey 失败不会把口令登录的锁定桶打满，反之亦然。
+ */
+export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
+  if (!input.settings.enabled) return () => undefined;
+  const ceremony = new CeremonyStore();
+  const limiter = new LoginRateLimiter();
+  const policy = parseClientIpPolicy(input.config.clientIpHeader, input.config.trustedProxyCidrs);
+  const clientIp = makeClientIpResolver(policy, input.log);
+  const settings = input.settings;
+  return registerPasskeyLoginEndpoints({
+    register: (route) => input.server.register(route),
+    sessions: () => input.auth.sessions,
+    cookieSecure: input.config.cookieSecure,
+    ceremony,
+    settings: {
+      rpId: settings.rpId,
+      origins: settings.origins,
+      enforceCounter: settings.enforceCounter,
+    },
+    publicHost: input.config.publicHost,
+    loadUsers: () => loadUsersFile(input.usersPath),
+    clientIp,
+    limiter,
+    issueSession: (
+      res: ServerResponse,
+      store: SessionStore,
+      username: string,
+      next: string,
+      user: UserRecord,
+      extraSetCookie: string[],
+    ) =>
+      issueLoginSession(
+        {
+          cookieName: input.config.cookieName,
+          cookieSecure: input.config.cookieSecure,
+          sessionTtl: input.config.sessionTtl,
+          launchTokenBridge: input.launchTokenBridge,
+          logger: input.log,
+        },
+        res,
+        store,
+        username,
+        next,
+        user,
+        extraSetCookie,
+      ),
+    logger: input.log,
+    now: Date.now,
+  });
 }

@@ -422,13 +422,15 @@ rather than deferring all of them to PR3.
 > All six decisions were approved on 2026-11-11 and implementation has started; PR1 begins with the contract,
 > `users.yaml` fields, the ceremony store and the CLI.
 
-> **Implementation status (2026-11-11)**: PR1 is complete and the full `npm run verify` chain is green
-> (152 files / 1327 tests, including lint/FSD/coverage/build/bundle/host checks): the
-> `/auth/status.passkeyEnabled` contract, the `users.yaml` passkey fields with cross-record validation, the
-> ceremony store + opaque cookie, the `publicHost` → RP ID/origin derivation and startup self-check, the
-> `dsh auth passkey list/rm` CLI, and the bundled config skill. The change sits in the `feat/passkey-login`
-> worktree (including the rebuilt `lib/`), uncommitted; PR2 (options/login + conditional UI) and PR3
-> (registration/management/settings/docs) remain.
+> **Implementation status (2026-11-12)**: PR1 is committed (`152e46b`). PR2 is complete and the full
+> `npm run verify` chain is green (160 files / 1379 tests, including lint/FSD/coverage/build/bundle/host
+> checks): `@simplewebauthn/server@14.1.0` (pinned exactly), `POST /auth/passkey/options` and
+> `/auth/passkey/login` (library verification, discoverable/username-less sign-in, userHandle/BE/counter
+> policy, a separate rate-limit bucket, dummy equal-work), the login-page passkey button with inline JS and
+> conditional UI (autofill, gated by `passkeyConditionalUi`), passkey retry on failure cards, and a real-stack
+> integration test with a self-built EC P-256 authenticator. The change sits in the `feat/passkey-login`
+> worktree (including the rebuilt `lib/`), uncommitted; PR3 (registration/management, settings toggle,
+> README/deployment docs, ADR moved to implemented) remains.
 
 ## 10. References
 

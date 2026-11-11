@@ -59,14 +59,15 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     installId: "" # internal anonymous install id (UUID v4), hidden and generated on first use; do not set by hand / 内部匿名安装 id（UUID v4），隐藏、首次使用时生成，不要手填
 ```
 
-- `passkey: "optional"` is still being implemented (M6): the options are already
-  accepted and validated at startup, and `/auth/status.passkeyEnabled` reflects
-  the result; the sign-in/registration endpoints ship in the next slices. A
-  passkey configuration that cannot be derived from `publicHost` stays off with
-  an error log instead of failing the instance. / `passkey: "optional"` 仍在实现中
-  （M6）：配置已被接收并在启动时校验，`/auth/status.passkeyEnabled` 会反映结果；
-  登录/注册端点随后续切片上线。无法从 `publicHost` 派生的 passkey 配置会记 error
-  日志并按 off 处理，不会拖垮实例。
+- `passkey: "optional"` is being implemented (M6): sign-in is live (passkey button,
+  conditional UI when `passkeyConditionalUi` is on), while registration/management
+  endpoints and the Settings toggle ship in the next slice. `/auth/status.passkeyEnabled`
+  reflects the startup check; a passkey configuration that cannot be derived from
+  `publicHost` stays off with an error log instead of failing the instance. /
+  `passkey: "optional"` 正在实现中（M6）：登录已可用（passkey 按钮；开启
+  `passkeyConditionalUi` 时支持自动填充），注册/管理端点与设置页开关随后续切片上线。
+  `/auth/status.passkeyEnabled` 反映启动自检结果；无法从 `publicHost` 派生的配置会记
+  error 日志并按 off 处理，不会拖垮实例。
 - Override **without** `insert` — the bundle row is already mounted; adding one
   double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
 - `telemetry: false` turns the anonymous ping off completely; `installId` is

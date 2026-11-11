@@ -10,4 +10,9 @@ export { buildCeremonyCookie, CEREMONY_COOKIE, CEREMONY_TTL_SECONDS, clearCeremo
 export { handlePasskeyCli, type PasskeyCliIo, type PasskeyFlags } from "./cli/cli.js";
 export { resolvePasskeySettings } from "./model/passkey-config.js";
 export type { PasskeyDisabledReason, PasskeySettings, PasskeySettingsInput, } from "./model/passkey-config.js";
+export { registerPasskeyLoginEndpoints } from "./api/passkey-login-endpoints.js";
+export type { PasskeyLoginDeps } from "./api/passkey-login-endpoints.js";
+export { PASSKEY_LOGIN_FAILED_MESSAGE, PASSKEY_LOGIN_LOCKED_MESSAGE, } from "./api/passkey-login-failures.js";
+export { PasskeyCounterStore, findPasskeyCredential, readPasskeyAssertion, selectVerificationCounter, } from "./model/passkey-login.js";
+export type { PasskeyAssertion, PasskeyCredentialMatch, PasskeyLoginSettings, } from "./model/passkey-login.js";
 //# sourceMappingURL=index.d.ts.map

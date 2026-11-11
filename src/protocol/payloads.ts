@@ -141,3 +141,34 @@ export type AdminResetErrorBody =
   | { error: "unauthorized" | "forbidden" | "bad_target" | "not_found" | "invalid_totp" }
   | PolicyErrorBody
   | LockedErrorBody;
+
+/** `POST /auth/passkey/options` 的 200 响应体（浏览器直接交给 `navigator.credentials.get`）。 */
+export interface PasskeyLoginOptionsResponse {
+  challenge: string;
+  rpId: string;
+  timeout: number;
+  /** 策略固定 `required`（不提供「关 UV」配置）。 */
+  userVerification: "required";
+  /** 无用户名登录：恒为空数组（discoverable credentials）。 */
+  allowCredentials: readonly never[];
+}
+
+/**
+ * `POST /auth/passkey/login` 的请求体（`application/x-www-form-urlencoded` 扁平字段）。
+ * 二进制一律 base64url；`user_handle`/`next` 可缺席。
+ */
+export interface PasskeyAssertionRequest {
+  id: string;
+  client_data_json: string;
+  authenticator_data: string;
+  signature: string;
+  user_handle?: string;
+  next?: string;
+}
+
+/** passkey 登录的 JSON 错误体（fetch 路径）；表单路径失败渲染登录卡片。 */
+export interface PasskeyLoginErrorBody {
+  error: "bad_request" | "unauthorized" | "locked" | "unavailable";
+  /** 429 时同时写 `retry-after` 头。 */
+  retryAfter?: number;
+}

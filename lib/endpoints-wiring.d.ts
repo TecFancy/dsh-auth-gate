@@ -40,6 +40,11 @@ export interface EndpointsWiringInput {
     challengeMacKey: Uint8Array;
     /** passkey 功能是否启用（`wirePasskey` 的结果；透传给 `/auth/status`，token 模式恒 false）。 */
     passkeyEnabled: boolean;
+    /** 登录页是否渲染 passkey 入口（未启用时 undefined）；条件 UI 由 `conditionalUi` 控制。 */
+    passkeyLogin?: {
+        readonly enabled: boolean;
+        readonly conditionalUi: boolean;
+    } | undefined;
     log: {
         error(message: unknown): void;
         info(message: unknown): void;

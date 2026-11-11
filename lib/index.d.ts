@@ -80,7 +80,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     clientIpHeader: z<string, string, "defined">;
     trustedProxyCidrs: z<string[], string[], "defined">;
     revokeSweepMs: z<number, number, "defined">;
-    totp: z<"off" | "optional" | "required", "off" | "optional" | "required", "defined">;
+    totp: z<"required" | "off" | "optional", "required" | "off" | "optional", "defined">;
     logoutOrder: z<number, number, "defined">;
 }>>, Schemastery.ObjectT<NoInfer<{
     installId: z<string, string, "volatile-defined">;
@@ -101,7 +101,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     clientIpHeader: z<string, string, "defined">;
     trustedProxyCidrs: z<string[], string[], "defined">;
     revokeSweepMs: z<number, number, "defined">;
-    totp: z<"off" | "optional" | "required", "off" | "optional" | "required", "defined">;
+    totp: z<"required" | "off" | "optional", "required" | "off" | "optional", "defined">;
     logoutOrder: z<number, number, "defined">;
 }>>, "plain">;
 /** 本插件提供的 auth 服务：门（可换流/测试注入）+ 会话层。 */

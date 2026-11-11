@@ -10,7 +10,7 @@
  * 改这里的值就是改对外契约（书签、反代规则、dsh 前端的跳转都认这些路径）：先改
  * `index.test.ts` 里钉住的值，再改这里。
  */
-export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
+export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasskeyAssertionRequest, PasskeyLoginErrorBody, PasskeyLoginOptionsResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
 /** 本插件全部端点的前缀；`prefix` 兜底路由挂在这里，gate 白名单也按它放行。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
 /** 登录页（GET 渲染、POST 提交）。 */
@@ -19,6 +19,10 @@ export declare const LOGIN_PATH = "/auth/login";
 export declare const LOGOUT_PATH = "/auth/logout";
 /** 会话探针（只认 cookie）。 */
 export declare const STATUS_PATH = "/auth/status";
+/** passkey 登录 begin（匿名 POST，返回 options + 下发 ceremony cookie）。 */
+export declare const PASSKEY_OPTIONS_PATH = "/auth/passkey/options";
+/** passkey 登录 finish（匿名表单 POST，断言 → 发会话）。 */
+export declare const PASSKEY_LOGIN_PATH = "/auth/passkey/login";
 /** 自助改密（GET SSR 页，POST 提交）；也是受限会话被拒时的导航目标。 */
 export declare const PASSWORD_PATH = "/auth/password";
 /** 管理面：用户列表。 */
