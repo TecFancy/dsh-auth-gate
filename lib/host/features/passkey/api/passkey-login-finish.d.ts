@@ -28,8 +28,6 @@ export interface PasskeyLoginFinishDeps {
         warn(message: unknown): void;
         info(message: unknown): void;
     };
-    /** 时钟（epoch ms）；留给后续审计/节流用，当前实现不读它。 */
-    readonly now: () => number;
 }
 /**
  * finish 主流程：405 → 415/413 → 429（先于 ceremony）→ 503（先于 consume）→ 消费 ceremony

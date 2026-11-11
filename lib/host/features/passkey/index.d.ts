@@ -15,4 +15,6 @@ export type { PasskeyLoginDeps } from "./api/passkey-login-endpoints.js";
 export { PASSKEY_LOGIN_FAILED_MESSAGE, PASSKEY_LOGIN_LOCKED_MESSAGE, } from "./api/passkey-login-failures.js";
 export { PasskeyCounterStore, findPasskeyCredential, readPasskeyAssertion, selectVerificationCounter, } from "./model/passkey-login.js";
 export type { PasskeyAssertion, PasskeyCredentialMatch, PasskeyLoginSettings, } from "./model/passkey-login.js";
+export { PasskeyOptionsQuota } from "./model/options-quota.js";
+export type { PasskeyOptionsQuotaCheck, PasskeyOptionsQuotaOptions, } from "./model/options-quota.js";
 //# sourceMappingURL=index.d.ts.map

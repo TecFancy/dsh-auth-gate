@@ -6,6 +6,7 @@
  * 次数；任何响应都不读也不反射请求文本。
  */
 import type { ServerResponse } from "node:http";
+import type { UsersLoadResult } from "../../../entities/user/index.js";
 /** 401 的唯一常量文案：未知凭据与各类校验失败共用。 */
 export declare const PASSKEY_LOGIN_FAILED_MESSAGE = "Passkey sign-in failed. Try again or use your password.";
 /** 429 固定文案（不插值秒数）：只陈述「这个网络」被限速。 */
@@ -23,4 +24,14 @@ export declare function sendPasskeyLocked(res: ServerResponse, context: PasskeyF
 export declare function sendOptionsLocked(res: ServerResponse, retryAfterSeconds: number): void;
 /** 503：会话存储未就绪（与口令登录同形：text/plain，不计失败、不消费 ceremony）。 */
 export declare function sendPasskeyUnavailable(res: ServerResponse): void;
+/**
+ * 用户文件不可用 → 503（与口令登录同形）。**必须在 consume ceremony 之前调用**：瞬时读盘
+ * 失败不该烧掉用户的在途仪式，原样重试应当还能成功。
+ */
+export declare function loadUsersOr503(deps: {
+    readonly loadUsers: () => Promise<UsersLoadResult>;
+    readonly logger: {
+        error(message: unknown): void;
+    };
+}, res: ServerResponse): Promise<UsersLoadResult | undefined>;
 //# sourceMappingURL=passkey-login-failures.d.ts.map

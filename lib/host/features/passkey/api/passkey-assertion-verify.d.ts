@@ -21,9 +21,13 @@ export interface AssertionVerificationInput {
     readonly storedCounter: number;
 }
 /**
- * 校验一条登录断言：userHandle 属于该用户 → 计数器策略 → 库验签 → BE/BS 与记录一致。
+ * 校验一条登录断言：计数器策略 → 库验签 → userHandle 属于该用户 → BE/BS 与记录一致。
  * 任何一步失败都返回原因码（不抛异常）；库的异常（含重放计数器、非法 CBOR/DER）归为
  * `verification-failed`。
+ *
+ * 顺序理由：userHandle 与 BE/BS 是**业务**判定，放在验签之后，让「凭据存在但断言无效」与
+ * 「凭据不存在」都至少完成一次库校验（计时侧信道收窄；`enforceCounter` 的验签前拒绝是
+ * 既定策略，属例外）。
  */
 export declare function verifyPasskeyAssertion(input: AssertionVerificationInput): Promise<AssertionVerdict>;
 /**
