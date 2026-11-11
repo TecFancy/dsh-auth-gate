@@ -6,6 +6,8 @@
  * 次数；任何响应都不读也不反射请求文本。
  */
 import type { ServerResponse } from "node:http";
+import type { UsersLoadResult } from "../../../entities/user/index.js";
+import { setPasskeyPermissionsPolicy } from "../../../shared/http/index.js";
 import { passwordLoginPageHtml } from "../../../shared/login-page/index.js";
 import type { PasskeyLoginErrorBody } from "../../../shared/protocol/index.js";
 
@@ -36,6 +38,7 @@ export function sendPasskeyFailure(
   clearCeremonyCookie: string,
 ): void {
   res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.setHeader("set-cookie", clearCeremonyCookie);
   res.writeHead(401, { "content-type": "text/html; charset=utf-8" });
   res.end(
@@ -53,6 +56,7 @@ export function sendPasskeyLocked(
   retryAfterSeconds: number,
 ): void {
   res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.setHeader("retry-after", String(retryAfterSeconds));
   res.writeHead(429, { "content-type": "text/html; charset=utf-8" });
   res.end(
@@ -67,6 +71,7 @@ export function sendPasskeyLocked(
 export function sendOptionsLocked(res: ServerResponse, retryAfterSeconds: number): void {
   const body: PasskeyLoginErrorBody = { error: "locked", retryAfter: retryAfterSeconds };
   res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.setHeader("retry-after", String(retryAfterSeconds));
   res.writeHead(429, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
@@ -75,6 +80,32 @@ export function sendOptionsLocked(res: ServerResponse, retryAfterSeconds: number
 /** 503：会话存储未就绪（与口令登录同形：text/plain，不计失败、不消费 ceremony）。 */
 export function sendPasskeyUnavailable(res: ServerResponse): void {
   res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.writeHead(503, { "content-type": "text/plain" });
   res.end("session store unavailable");
+}
+
+/**
+ * 用户文件不可用 → 503（与口令登录同形）。**必须在 consume ceremony 之前调用**：瞬时读盘
+ * 失败不该烧掉用户的在途仪式，原样重试应当还能成功。
+ */
+export async function loadUsersOr503(
+  deps: {
+    readonly loadUsers: () => Promise<UsersLoadResult>;
+    readonly logger: { error(message: unknown): void };
+  },
+  res: ServerResponse,
+): Promise<UsersLoadResult | undefined> {
+  try {
+    return await deps.loadUsers();
+  } catch (error) {
+    res.setHeader("cache-control", "no-store");
+    setPasskeyPermissionsPolicy(res);
+    res.writeHead(503, { "content-type": "text/plain" });
+    res.end("user store unavailable");
+    deps.logger.error(
+      `user store unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    );
+    return undefined;
+  }
 }

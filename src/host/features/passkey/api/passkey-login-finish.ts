@@ -13,6 +13,7 @@ import {
   methodNotAllowed,
   parseFormBody,
   resolvePublicHost,
+  setPasskeyPermissionsPolicy,
   validateNext,
 } from "../../../shared/http/index.js";
 import type { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
@@ -31,6 +32,7 @@ import {
   type AssertionVerdict,
 } from "./passkey-assertion-verify.js";
 import {
+  loadUsersOr503,
   sendPasskeyFailure,
   sendPasskeyLocked,
   sendPasskeyUnavailable,
@@ -60,8 +62,6 @@ export interface PasskeyLoginFinishDeps {
     warn(message: unknown): void;
     info(message: unknown): void;
   };
-  /** 时钟（epoch ms）；留给后续审计/节流用，当前实现不读它。 */
-  readonly now: () => number;
 }
 
 /** 一次已通过传输层检查的登录请求。 */
@@ -70,6 +70,7 @@ interface LoginRequest {
   readonly store: SessionStore;
   readonly ip: string;
   readonly context: PasskeyFailureContext;
+  readonly loaded: UsersLoadResult;
 }
 
 /**
@@ -82,6 +83,7 @@ export async function handlePasskeyLogin(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  setPasskeyPermissionsPolicy(res);
   if (req.method !== "POST") {
     methodNotAllowed(res, "POST");
     return;
@@ -101,14 +103,17 @@ export async function handlePasskeyLogin(
     deps.logger.info("passkey login rate limited");
     return;
   }
-  // 503 在 consume 之前：会话层未就绪不得烧掉用户的在途 ceremony（可原样重试）。
+  // 503 在 consume 之前：会话层/用户存储未就绪不得烧掉用户的在途 ceremony（可原样重试）。
   const store = deps.sessions();
   if (store === undefined) {
     sendPasskeyUnavailable(res);
     deps.logger.error("passkey login failed: session store unavailable");
     return;
   }
-  await finishLogin(deps, counters, req, res, { params, store, ip, context });
+  // 用户快照也在 consume 之前读：瞬时读盘失败不该把 ceremony 烧掉（§5.6）。
+  const loaded = await loadUsersOr503(deps, res);
+  if (loaded === undefined) return;
+  await finishLogin(deps, counters, req, res, { params, store, ip, context, loaded });
 }
 
 /** 消费 ceremony 并校验断言（先删后验：重放与并发只剩第一次能看到记录）。 */
@@ -119,7 +124,7 @@ async function finishLogin(
   res: ServerResponse,
   input: LoginRequest,
 ): Promise<void> {
-  const { params, store, ip, context } = input;
+  const { params, store, ip, context, loaded } = input;
   const ceremony = deps.ceremony.consume(readCeremonyId(req.headers.cookie) ?? "");
   const clearCookie = clearCeremonyCookie(deps.cookieSecure);
   if (ceremony?.kind !== "login") {
@@ -131,8 +136,6 @@ async function finishLogin(
     rejectLogin(deps, res, ip, undefined, context, "malformed assertion", clearCookie);
     return;
   }
-  const loaded = await loadUsersOr503(deps, res);
-  if (loaded === undefined) return;
   const match = findPasskeyCredential(loaded.snapshot, assertion.id);
   if (match === undefined || match.user.disabled) {
     await runDummyVerification({
@@ -224,24 +227,6 @@ function failureContext(
 /** ceremony 的 32 字节 challenge → 库要的 base64url（与 options 响应里的值逐字一致）。 */
 function challengeOf(ceremony: CeremonyRecord): string {
   return Buffer.from(ceremony.challenge).toString("base64url");
-}
-
-/** 用户文件不可用 → 503（与口令登录同形；不算失败、不消费 ceremony 之后的状态）。 */
-async function loadUsersOr503(
-  deps: PasskeyLoginFinishDeps,
-  res: ServerResponse,
-): Promise<UsersLoadResult | undefined> {
-  try {
-    return await deps.loadUsers();
-  } catch (error) {
-    res.setHeader("cache-control", "no-store");
-    res.writeHead(503, { "content-type": "text/plain" });
-    res.end("user store unavailable");
-    deps.logger.error(
-      `user store unavailable: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return undefined;
-  }
 }
 
 /** 415/413 响应（与口令登录同形：413 先写 `connection: close`）；无 status 的异常向上抛。 */

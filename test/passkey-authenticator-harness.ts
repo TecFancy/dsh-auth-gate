@@ -8,7 +8,11 @@
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { SessionStore } from "../src/host/entities/session/index.js";
 import type { UserRecord } from "../src/host/entities/user/index.js";
-import { CeremonyStore, type PasskeyLoginDeps } from "../src/host/features/passkey/index.js";
+import {
+  CeremonyStore,
+  PasskeyOptionsQuota,
+  type PasskeyLoginDeps,
+} from "../src/host/features/passkey/index.js";
 import type { HttpHandler } from "../src/host/shared/guard/index.js";
 import { LoginRateLimiter } from "../src/host/shared/rate-limit/index.js";
 import { MemTable } from "./token-endpoints-harness.js";
@@ -197,12 +201,17 @@ export interface PasskeyLoginHarness {
   readonly limiter: LoginRateLimiter;
   readonly store: SessionStore;
   setSessionsAvailable(value: boolean): void;
+  /** 让 `loadUsers` 下一次（及之后直到复位）抛错，用于 503 语义测试。 */
+  setUsersLoadFailure(value: boolean): void;
 }
 
 export interface PasskeyLoginHarnessOptions {
   readonly ceremony?: CeremonyStore;
+  readonly optionsQuota?: PasskeyOptionsQuota;
   readonly enforceCounter?: boolean;
   readonly cookieSecure?: boolean;
+  /** 覆盖客户端 IP（缺省固定 `TEST_CLIENT_IP`）；配额测试用来模拟多 IP。 */
+  readonly clientIp?: (fallback: string) => string;
 }
 
 /** 确定性随机源：ceremony 的 id/challenge 可预测且互不相同。 */
@@ -243,6 +252,7 @@ export function makePasskeyLoginHarness(
   const store = new SessionStore(new MemTable());
   const ceremony = options.ceremony ?? new CeremonyStore({ random: deterministicRandom() });
   let sessionsAvailable = true;
+  let usersLoadFails = false;
   const deps: PasskeyLoginDeps = {
     register: (route) => {
       routes.push(route);
@@ -251,14 +261,18 @@ export function makePasskeyLoginHarness(
     sessions: () => (sessionsAvailable ? store : undefined),
     cookieSecure: options.cookieSecure ?? true,
     ceremony,
+    optionsQuota: options.optionsQuota ?? new PasskeyOptionsQuota(),
     settings: {
       rpId: TEST_RP_ID,
       origins: [TEST_ORIGIN],
       enforceCounter: options.enforceCounter ?? false,
     },
     publicHost: "dsh.example.com",
-    loadUsers: () => Promise.resolve({ snapshot: { users }, missing: false }),
-    clientIp: () => TEST_CLIENT_IP,
+    loadUsers: () =>
+      usersLoadFails
+        ? Promise.reject(new Error("users file unavailable"))
+        : Promise.resolve({ snapshot: { users }, missing: false }),
+    clientIp: () => options.clientIp?.(TEST_CLIENT_IP) ?? TEST_CLIENT_IP,
     limiter: new LoginRateLimiter(),
     issueSession: (res, sessionStore, username, next, user, extraSetCookie) =>
       fakeIssueSession(issued, res, sessionStore, username, next, user, extraSetCookie),
@@ -267,7 +281,6 @@ export function makePasskeyLoginHarness(
       warn: (message) => logs.push({ level: "warn", message }),
       info: (message) => logs.push({ level: "info", message }),
     },
-    now: () => 1_000,
   };
   return {
     deps,
@@ -280,6 +293,9 @@ export function makePasskeyLoginHarness(
     store,
     setSessionsAvailable: (value) => {
       sessionsAvailable = value;
+    },
+    setUsersLoadFailure: (value) => {
+      usersLoadFails = value;
     },
   };
 }

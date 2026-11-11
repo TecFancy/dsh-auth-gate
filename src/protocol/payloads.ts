@@ -142,7 +142,13 @@ export type AdminResetErrorBody =
   | PolicyErrorBody
   | LockedErrorBody;
 
-/** `POST /auth/passkey/options` 的 200 响应体（浏览器直接交给 `navigator.credentials.get`）。 */
+/**
+ * `POST /auth/passkey/options` 的 200 响应体（浏览器直接交给 `navigator.credentials.get`）。
+ *
+ * **有意裁剪为五个字段**：库的 `PublicKeyCredentialRequestOptionsJSON` 还带 `extensions`/`hints`
+ * 等可选字段，本插件不使用（也不希望它们悄悄改变浏览器行为），因此这里显式投影而不是原样透传；
+ * 将来要支持某个扩展时，先在这里加字段（契约只做加法）。
+ */
 export interface PasskeyLoginOptionsResponse {
   challenge: string;
   rpId: string;

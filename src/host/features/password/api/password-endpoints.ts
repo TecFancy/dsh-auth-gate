@@ -19,6 +19,7 @@ import {
   parseCookieHeader,
   queryOf,
   resolvePublicHost,
+  setPasskeyPermissionsPolicy,
   validateNext,
 } from "../../../shared/http/index.js";
 import { handlePasswordLogin, type PasswordLoginDeps } from "../model/password-login.js";
@@ -216,6 +217,7 @@ function handleLogin(
     // ERR_HTTP_HEADERS_SENT，线上表现为连接被重置、客户端拿不到任何响应）。
     const resetStage = queryOf(req).get("stage") === "password";
     res.setHeader("cache-control", "no-store");
+    setPasskeyPermissionsPolicy(res);
     if (resetStage) {
       res.setHeader("set-cookie", buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure));
     }

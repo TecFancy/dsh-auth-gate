@@ -2,6 +2,7 @@ import type { ServerResponse } from "node:http";
 import z from "@deepseek-ai/schemastery";
 import {
   CeremonyStore,
+  PasskeyOptionsQuota,
   registerPasskeyLoginEndpoints,
   resolvePasskeySettings,
   type PasskeySettings,
@@ -143,6 +144,7 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
   if (!input.settings.enabled) return () => undefined;
   const ceremony = new CeremonyStore();
   const limiter = new LoginRateLimiter();
+  const optionsQuota = new PasskeyOptionsQuota();
   const policy = parseClientIpPolicy(input.config.clientIpHeader, input.config.trustedProxyCidrs);
   const clientIp = makeClientIpResolver(policy, input.log);
   const settings = input.settings;
@@ -151,6 +153,7 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
     sessions: () => input.auth.sessions,
     cookieSecure: input.config.cookieSecure,
     ceremony,
+    optionsQuota,
     settings: {
       rpId: settings.rpId,
       origins: settings.origins,
@@ -184,6 +187,5 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
         extraSetCookie,
       ),
     logger: input.log,
-    now: Date.now,
   });
 }

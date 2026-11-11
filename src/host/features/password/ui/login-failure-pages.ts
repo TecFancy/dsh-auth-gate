@@ -6,6 +6,7 @@
  */
 import type { ServerResponse } from "node:http";
 import { passwordLoginPageHtml, totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import { setPasskeyPermissionsPolicy } from "../../../shared/http/index.js";
 import { loginPath } from "../../../shared/protocol/index.js";
 
 /** 未知用户 / 错口令 / 禁用三态共用的唯一常量（P9 反枚举）。 */
@@ -90,6 +91,7 @@ export function sendTotpLockout(
 /** 统一写出：no-store 必须在 writeHead 之前（headers sent 之后再 setHeader 会抛 ERR_HTTP_HEADERS_SENT）。 */
 function sendHtml(res: ServerResponse, status: number, html: string): void {
   res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.writeHead(status, { "content-type": "text/html; charset=utf-8" });
   res.end(html);
 }

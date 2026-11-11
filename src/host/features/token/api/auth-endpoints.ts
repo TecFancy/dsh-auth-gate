@@ -6,6 +6,7 @@ import {
   parseFormBody,
   queryOf,
   resolvePostLoginLocation,
+  setPasskeyPermissionsPolicy,
   resolvePublicHost,
   validateNext,
   type LaunchTokenBridge,
@@ -114,6 +115,8 @@ function handleLogin(
 function serveLoginPage(deps: AuthEndpointsDeps, req: IncomingMessage, res: ServerResponse): void {
   const next = validateNext(queryOf(req).get("next") ?? "/");
   res.setHeader("cache-control", "no-store");
+  res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
   res.end(
     loginPageHtml(next, undefined, { host: resolvePublicHost(deps.publicHost, req.headers.host) }),

@@ -8,13 +8,14 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { generateAuthenticationOptions } from "@simplewebauthn/server";
 import type { HttpHandler } from "../../../shared/guard/index.js";
-import { methodNotAllowed } from "../../../shared/http/index.js";
+import { methodNotAllowed, setPasskeyPermissionsPolicy } from "../../../shared/http/index.js";
 import {
   PASSKEY_LOGIN_PATH,
   PASSKEY_OPTIONS_PATH,
   type PasskeyLoginOptionsResponse,
 } from "../../../shared/protocol/index.js";
 import { buildCeremonyCookie } from "../model/ceremony-cookie.js";
+import type { PasskeyOptionsQuota } from "../model/options-quota.js";
 import { PasskeyCounterStore } from "../model/passkey-login.js";
 import { handlePasskeyLogin, type PasskeyLoginFinishDeps } from "./passkey-login-finish.js";
 import { sendOptionsLocked } from "./passkey-login-failures.js";
@@ -27,6 +28,8 @@ const OPTIONS_TIMEOUT_MS = 120_000;
 /** 注册登录取的输入（root 侧装配把配置、存储与限速器收拢成这个形状）。 */
 export interface PasskeyLoginDeps extends PasskeyLoginFinishDeps {
   register(route: { kind: "exact"; path: string; handler: HttpHandler }): () => void;
+  /** begin 的请求配额（与登录失败限速器分开）。 */
+  readonly optionsQuota: PasskeyOptionsQuota;
 }
 
 /**
@@ -58,17 +61,20 @@ async function handleOptions(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
+  setPasskeyPermissionsPolicy(res);
   if (req.method !== "POST") {
     methodNotAllowed(res, "POST");
     return;
   }
   const ip = deps.clientIp(req);
-  const check = deps.limiter.check(ip, undefined);
-  if (!check.allowed) {
-    sendOptionsLocked(res, check.retryAfterSeconds);
+  // 配额必须**真正消耗**：只 check 不计数会被匿名方用无限 begin 挤出他人 ceremony（§5.5）。
+  const quota = deps.optionsQuota.check(ip);
+  if (!quota.allowed) {
+    sendOptionsLocked(res, quota.retryAfterSeconds);
     deps.logger.info("passkey options rate limited");
     return;
   }
+  deps.optionsQuota.consume(ip);
   // ceremony 先建：challenge 由我们的随机源生成并写进存储，库只负责编码成 base64url
   // （库自己也能生成，但那样 challenge 就不在 ceremony 里）。
   const ceremony = deps.ceremony.create({ kind: "login" });

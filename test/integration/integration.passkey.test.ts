@@ -11,6 +11,7 @@ import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
+import { PASSKEY_PERMISSIONS_POLICY } from "../../src/host/shared/http/index.js";
 import {
   PasskeyAuthenticator,
   randomBase64Url,
@@ -148,6 +149,7 @@ async function beginPasskeyLogin(base: string): Promise<{ challenge: string; coo
   const res = await fetch(`${base}/auth/passkey/options`, { method: "POST", redirect: "manual" });
   expect(res.status).toBe(200);
   expect(res.headers.get("cache-control")).toBe("no-store");
+  expect(res.headers.get("permissions-policy")).toBe(PASSKEY_PERMISSIONS_POLICY);
   const body = (await res.json()) as { challenge: string };
   const cookie = res.headers.get("set-cookie")?.split(";")[0];
   expect(cookie).toMatch(/^dsh_auth_pk=/);
@@ -159,7 +161,13 @@ async function submitAssertion(
   base: string,
   fields: PasskeyAssertionForm,
   cookie: string,
-): Promise<{ status: number; location: string | null; setCookie: string; body: string }> {
+): Promise<{
+  status: number;
+  location: string | null;
+  setCookie: string;
+  permissionsPolicy: string | null;
+  body: string;
+}> {
   const params = assertionFormParams(fields, "/dashboard");
   const res = await fetch(`${base}/auth/passkey/login`, {
     method: "POST",
@@ -171,6 +179,7 @@ async function submitAssertion(
     status: res.status,
     location: res.headers.get("location"),
     setCookie: res.headers.get("set-cookie") ?? "",
+    permissionsPolicy: res.headers.get("permissions-policy"),
     body: await res.text(),
   };
 }
@@ -203,6 +212,7 @@ describe("integration: passkey login over a real HTTP stack", () => {
       );
       expect(login.status).toBe(302);
       expect(login.location).toBe("/dashboard");
+      expect(login.permissionsPolicy).toBe(PASSKEY_PERMISSIONS_POLICY);
       expect(login.setCookie).toContain("dsh_auth_pk=; Max-Age=0");
       const sessionCookie = /(?:^|,\s*)(dsh_auth=[A-Za-z0-9_-]{43})/.exec(login.setCookie)?.[1];
       expect(sessionCookie).toBeDefined();
@@ -216,6 +226,21 @@ describe("integration: passkey login over a real HTTP stack", () => {
         name: "alice",
         passkeyEnabled: true,
       });
+    } finally {
+      await unmountStack(stack);
+    }
+  });
+
+  it("serves the login page with the passkey entry and the Permissions-Policy header", async () => {
+    const stack = await mountPasskeyStack();
+    try {
+      const page = await fetch(`${stack.base}/auth/login`);
+      expect(page.status).toBe(200);
+      expect(page.headers.get("permissions-policy")).toBe(PASSKEY_PERMISSIONS_POLICY);
+      const html = await page.text();
+      expect(html).toContain('id="passkey-btn"');
+      expect(html).toContain('action="/auth/passkey/login"');
+      expect(html).toContain('name="password"');
     } finally {
       await unmountStack(stack);
     }
@@ -236,6 +261,7 @@ describe("integration: passkey login over a real HTTP stack", () => {
         begin.cookie,
       );
       expect(login.status).toBe(401);
+      expect(login.permissionsPolicy).toBe(PASSKEY_PERMISSIONS_POLICY);
       expect(login.body).toContain("Passkey sign-in failed");
       expect(/dsh_auth=[A-Za-z0-9_-]{43}/.test(login.setCookie)).toBe(false);
       const status = await fetch(`${stack.base}/auth/status`);

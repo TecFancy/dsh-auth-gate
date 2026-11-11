@@ -23,5 +23,6 @@ export { cidrContains, normalizeIp, parseCidr } from "./ip-address.js";
 export type { CidrNetwork } from "./ip-address.js";
 export { resolvePostLoginLocation } from "./login-redirect.js";
 export type { LaunchTokenBridge } from "./login-redirect.js";
+export { PASSKEY_PERMISSIONS_POLICY, setPasskeyPermissionsPolicy } from "./permissions-policy.js";
 export { checkRequestOrigin } from "./origin.js";
 export type { OriginCheckRequest, OriginFailure, OriginVerdict } from "./origin.js";

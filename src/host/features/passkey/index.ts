@@ -42,3 +42,8 @@ export type {
   PasskeyCredentialMatch,
   PasskeyLoginSettings,
 } from "./model/passkey-login.js";
+export { PasskeyOptionsQuota } from "./model/options-quota.js";
+export type {
+  PasskeyOptionsQuotaCheck,
+  PasskeyOptionsQuotaOptions,
+} from "./model/options-quota.js";

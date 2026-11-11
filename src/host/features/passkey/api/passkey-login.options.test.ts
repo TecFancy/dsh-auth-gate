@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
+import { PASSKEY_PERMISSIONS_POLICY } from "../../../shared/http/index.js";
 import { PASSKEY_OPTIONS_PATH } from "../../../shared/protocol/index.js";
 import { makeReq, makeRes, type FakeRes } from "../../../../../test/token-endpoints-harness.js";
 import {
   makePasskeyLoginHarness,
   routeHandler,
-  TEST_CLIENT_IP,
   TEST_RP_ID,
   type PasskeyLoginHarness,
 } from "../../../../../test/passkey-authenticator-harness.js";
+import { PasskeyOptionsQuota } from "../model/options-quota.js";
 import { registerPasskeyLoginEndpoints } from "./passkey-login-endpoints.js";
 
 async function requestOptions(harness: PasskeyLoginHarness, method = "POST"): Promise<FakeRes> {
@@ -69,16 +70,18 @@ describe("POST /auth/passkey/options", () => {
   });
 
   it("answers 429 with a JSON locked body, retry-after and no ceremony cookie", async () => {
-    const harness = makePasskeyLoginHarness();
+    // begin 的配额是独立的 `PasskeyOptionsQuota`（不是登录失败限速器）：耗尽它才 429。
+    const harness = makePasskeyLoginHarness({
+      optionsQuota: new PasskeyOptionsQuota({ perIpLimit: 1, globalLimit: 100 }),
+    });
     registerPasskeyLoginEndpoints(harness.deps);
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      harness.limiter.recordFailure(TEST_CLIENT_IP, undefined);
-    }
+    expect((await requestOptions(harness)).status).toBe(200);
     const res = await requestOptions(harness);
     expect(res.status).toBe(429);
-    expect(res.headers["retry-after"]).toBe("30");
+    expect(res.headers["retry-after"]).toBe("60");
     expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.headers["permissions-policy"]).toBe(PASSKEY_PERMISSIONS_POLICY);
     expect(res.headers["set-cookie"]).toBeUndefined();
-    expect(JSON.parse(res.body)).toEqual({ error: "locked", retryAfter: 30 });
+    expect(JSON.parse(res.body)).toEqual({ error: "locked", retryAfter: 60 });
   });
 });
