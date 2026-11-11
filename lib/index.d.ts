@@ -3,11 +3,12 @@ import z from "@deepseek-ai/schemastery";
 import * as guard from "./host/shared/guard/index.js";
 import { SessionStore } from "./host/entities/session/index.js";
 import { type TelemetryFields } from "./telemetry-wiring.js";
+import { type PasskeyFields } from "./passkey-wiring.js";
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export declare const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
 export declare const inject: readonly ["webServer"];
-export interface AuthConfig extends TelemetryFields {
+export interface AuthConfig extends TelemetryFields, PasskeyFields {
     /** 认证流：token（M2）/ password（M3）。 */
     mode: "token" | "password";
     /** 会话 TTL（秒）。 */
@@ -63,6 +64,12 @@ export interface AuthConfig extends TelemetryFields {
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     installId: z<string, string, "volatile-defined">;
     telemetry: z<boolean, boolean, "defined">;
+    passkey: z<"off" | "optional", "off" | "optional", "defined">;
+    passkeyRpName: z<string, string, "defined">;
+    passkeyRpId: z<string, string, "defined">;
+    passkeyOrigins: z<string[], string[], "defined">;
+    passkeyEnforceCounter: z<boolean, boolean, "defined">;
+    passkeyConditionalUi: z<boolean, boolean, "defined">;
     mode: z<"password" | "token", "password" | "token", "defined">;
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;
@@ -78,6 +85,12 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
 }>>, Schemastery.ObjectT<NoInfer<{
     installId: z<string, string, "volatile-defined">;
     telemetry: z<boolean, boolean, "defined">;
+    passkey: z<"off" | "optional", "off" | "optional", "defined">;
+    passkeyRpName: z<string, string, "defined">;
+    passkeyRpId: z<string, string, "defined">;
+    passkeyOrigins: z<string[], string[], "defined">;
+    passkeyEnforceCounter: z<boolean, boolean, "defined">;
+    passkeyConditionalUi: z<boolean, boolean, "defined">;
     mode: z<"password" | "token", "password" | "token", "defined">;
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;

@@ -103,6 +103,19 @@ async function bodyFor(deps: PasswordEndpointsDeps, token: string | undefined): 
 
 const ALICE = { passwordHash: "h", disabled: false };
 
+/** `/auth/status` 身份投影的完整键集合（键集合相等是防泄漏断言）。 */
+const STATUS_IDENTITY_KEYS = [
+  "authenticated",
+  "logoutOrder",
+  "passkeyEnabled",
+  "name",
+  "role",
+  "disabled",
+  "totpEnabled",
+  "mustChangePassword",
+  "sessionKind",
+] as const;
+
 describe("GET /auth/status (P2 addition)", () => {
   it("appends exactly the six identity fields for an authenticated user", async () => {
     const deps = makeDeps([{ token: "good", session: session() }], {
@@ -120,18 +133,7 @@ describe("GET /auth/status (P2 addition)", () => {
         }),
     });
     const body = JSON.parse(await bodyFor(deps, "good")) as Record<string, unknown>;
-    expect(new Set(Object.keys(body))).toEqual(
-      new Set([
-        "authenticated",
-        "logoutOrder",
-        "name",
-        "role",
-        "disabled",
-        "totpEnabled",
-        "mustChangePassword",
-        "sessionKind",
-      ]),
-    );
+    expect(new Set(Object.keys(body))).toEqual(new Set(STATUS_IDENTITY_KEYS));
     expect(body).toMatchObject({
       authenticated: true,
       name: "alice",
@@ -158,17 +160,19 @@ describe("GET /auth/status (P2 addition)", () => {
     });
   });
 
-  it("keeps exactly two keys for anonymous, unknown-subject and unreadable-users cases", async () => {
+  it("keeps the base key set for anonymous, unknown-subject and unreadable-users cases", async () => {
     const anonymous = makeDeps([]);
     expect(JSON.parse(await bodyFor(anonymous, undefined))).toEqual({
       authenticated: false,
       logoutOrder: 1000,
+      passkeyEnabled: false,
     });
 
     const unknown = makeDeps([{ token: "ghost", session: session() }]);
     expect(JSON.parse(await bodyFor(unknown, "ghost"))).toEqual({
       authenticated: true,
       logoutOrder: 1000,
+      passkeyEnabled: false,
     });
 
     const logs: unknown[] = [];
@@ -182,6 +186,7 @@ describe("GET /auth/status (P2 addition)", () => {
     expect(JSON.parse(await bodyFor(broken, "good"))).toEqual({
       authenticated: true,
       logoutOrder: 1000,
+      passkeyEnabled: false,
     });
     expect(logs).toEqual(["status: users file unavailable: boom"]);
   });

@@ -113,6 +113,7 @@ function makeHarness(options?: {
   sessionTtl?: number;
   cookieSecure?: boolean;
   logoutOrder?: number;
+  passkeyEnabled?: boolean | undefined;
 }): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
@@ -139,6 +140,7 @@ function makeHarness(options?: {
       cookieSecure: options?.cookieSecure ?? true,
       sessionTtl: options?.sessionTtl ?? 604800,
       logoutOrder: options?.logoutOrder ?? 1000,
+      passkeyEnabled: options?.passkeyEnabled,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: (message) => logs.push({ level: "error", message }),
@@ -168,11 +170,13 @@ describe("GET /auth/status", () => {
       "/auth/status",
     )(makeReq({ cookie: `dsh_auth=${issued.token}` }), authed.res);
     expect(authed.status).toBe(200);
-    expect(authed.body).toBe('{"authenticated":true,"logoutOrder":1000}');
+    expect(authed.body).toBe('{"authenticated":true,"logoutOrder":1000,"passkeyEnabled":false}');
 
     const anonymous = makeRes();
     await handlerOf(harness, "exact", "/auth/status")(makeReq({}), anonymous.res);
-    expect(anonymous.body).toBe('{"authenticated":false,"logoutOrder":1000}');
+    expect(anonymous.body).toBe(
+      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+    );
 
     const bearerOnly = makeRes();
     await handlerOf(
@@ -180,7 +184,9 @@ describe("GET /auth/status", () => {
       "exact",
       "/auth/status",
     )(makeReq({ authorization: "Bearer good-token" }), bearerOnly.res);
-    expect(bearerOnly.body).toBe('{"authenticated":false,"logoutOrder":1000}');
+    expect(bearerOnly.body).toBe(
+      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+    );
   });
 
   it("echoes the configured logoutOrder for the client logout CTA", async () => {
@@ -189,6 +195,21 @@ describe("GET /auth/status", () => {
     const res = makeRes();
     await handlerOf(harness, "exact", "/auth/status")(makeReq({}), res.res);
     expect(res.status).toBe(200);
-    expect(res.body).toBe('{"authenticated":false,"logoutOrder":5000}');
+    expect(res.body).toBe('{"authenticated":false,"logoutOrder":5000,"passkeyEnabled":false}');
+  });
+
+  it("always reports passkeyEnabled (false in token mode) and forwards the deps flag", async () => {
+    const off = makeHarness();
+    registerAuthEndpoints(off.deps);
+    const offRes = makeRes();
+    await handlerOf(off, "exact", "/auth/status")(makeReq({}), offRes.res);
+    expect(JSON.parse(offRes.body)).toHaveProperty("passkeyEnabled", false);
+
+    // token 模式的根接线恒传 false；这里只证明 deps 的该字段被原样带进响应形状。
+    const on = makeHarness({ passkeyEnabled: true });
+    registerAuthEndpoints(on.deps);
+    const onRes = makeRes();
+    await handlerOf(on, "exact", "/auth/status")(makeReq({}), onRes.res);
+    expect(JSON.parse(onRes.body)).toHaveProperty("passkeyEnabled", true);
   });
 });

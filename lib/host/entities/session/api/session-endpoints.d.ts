@@ -18,8 +18,13 @@ export interface AuthHttpDeps {
     /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
     readonly logoutOrder: number;
     /**
+     * passkey 登录是否对本实例启用（配置透传）：恒写进 `/auth/status`，缺省 `false`。
+     * 只表示实例能力，不表示「当前用户是否已注册通行密钥」。
+     */
+    readonly passkeyEnabled?: boolean | undefined;
+    /**
      * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
-     * 缺省 = 保持两字段形状（加法兼容，token 模式的响应形状一字不变）。
+     * 缺省 = 不追加身份字段（加法兼容）。
      */
     readonly loadUsers?: (() => Promise<UsersLoadResult>) | undefined;
     readonly logger: {
@@ -35,8 +40,9 @@ export declare function handleLogout(deps: AuthHttpDeps, req: IncomingMessage, r
  * P2 起在 password 模式追加「关于我」字段（§1）：`name`/`role`/`disabled`/`totpEnabled`/
  * `mustChangePassword`/`sessionKind`。三条硬边界：
  * 1. **只含关于我**：绝不出现他人的任何记录（面板身份判断只依赖这些字段）。
- * 2. **键集合相等**：未认证 / subject 已不在 users.yaml / users 不可读 -> 只有既有两字段，
- *    不出现 `role: null` 之类的占位（不泄漏用户是否存在）。
+ * 2. **键集合相等**：未认证 / subject 已不在 users.yaml / users 不可读 -> 只有基础字段
+ *    （`authenticated`/`logoutOrder`/`passkeyEnabled`），不出现 `role: null` 之类的占位
+ *    （不泄漏用户是否存在）。
  * 3. 授权判定不读这里：管理端点每请求现读 users.yaml，禁止信 status 或会话快照。
  */
 export declare function handleStatus(deps: AuthHttpDeps, req: IncomingMessage, res: ServerResponse): void | Promise<void>;

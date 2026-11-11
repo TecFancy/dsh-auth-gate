@@ -24,14 +24,21 @@ export type Unchecked<T> = Partial<Record<T extends unknown ? keyof T : never, u
 /**
  * `GET /auth/status` 的 200 响应体。
  *
- * `authenticated` 与 `logoutOrder` 恒在。身份字段只在 password 模式、会话有效且账号仍在
- * `users.yaml` 时出现，否则整组缺席（不出现 `null` 占位，不泄漏账号是否存在）。
+ * `authenticated`、`logoutOrder` 与 `passkeyEnabled` 恒在。身份字段只在 password 模式、会话有效
+ * 且账号仍在 `users.yaml` 时出现，否则整组缺席（不出现 `null` 占位，不泄漏账号是否存在）。
  * 可选字段显式带 `| undefined`（`exactOptionalPropertyTypes`），JSON 里缺席与 `undefined` 等价。
  */
 export interface StatusResponse {
     authenticated: boolean;
     /** 「退出登录」按钮在通用设置页的槽位 order（host 配置透传）。 */
     logoutOrder: number;
+    /**
+     * 本实例是否启用了通行密钥（passkey）登录：host 配置透传，恒在。
+     *
+     * token 模式恒 `false`。只表示实例能力，**不**表示「当前用户是否已注册通行密钥」：
+     * 已注册凭据只出现在需要会话的凭据列表里，未认证可读的响应不泄漏这类身份信息。
+     */
+    passkeyEnabled: boolean;
     name?: string | undefined;
     role?: UserRole | undefined;
     disabled?: boolean | undefined;

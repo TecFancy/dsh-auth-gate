@@ -217,7 +217,11 @@ describe("受限会话的登出与吊销（验收 25/26/31，真实 handler）",
       h.handlerOf("exact", "/auth/status"),
     )(req({ cookie: `dsh_auth=${token}` }, "GET", "/auth/status"), res.res);
     expect(res.status).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ authenticated: false, logoutOrder: 1000 });
+    expect(JSON.parse(res.body)).toEqual({
+      authenticated: false,
+      logoutOrder: 1000,
+      passkeyEnabled: false,
+    });
   });
 });
 

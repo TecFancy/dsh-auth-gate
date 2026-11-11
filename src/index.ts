@@ -14,6 +14,7 @@ import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
+import { passkeyConfigFields, wirePasskey, type PasskeyFields } from "./passkey-wiring.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export const name = "dsh-auth-gate";
@@ -21,7 +22,7 @@ export const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
 export const inject = ["webServer"] as const;
 
-export interface AuthConfig extends TelemetryFields {
+export interface AuthConfig extends TelemetryFields, PasskeyFields {
   /** 认证流：token（M2）/ password（M3）。 */
   mode: "token" | "password";
   /** 会话 TTL（秒）。 */
@@ -94,6 +95,7 @@ export const Config = z.object({
   revokeSweepMs: z.natural().default(5000),
   totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
+  ...passkeyConfigFields,
   ...telemetryConfigFields,
 });
 
@@ -168,6 +170,7 @@ export function apply(ctx: Context, config: AuthConfig): void {
   const server = ctx.get("webServer") as unknown as guard.WrappableServer | undefined;
   if (server === undefined) return;
   const log = ctx.logger("dsh-auth-gate");
+  const passkey = wirePasskey({ ...config, log });
 
   const resolveToken = config.mode === "token" ? makeTokenResolver(ctx, config, log) : undefined;
   const launchTokenBridge = makeLaunchTokenBridge(ctx, log);
@@ -237,6 +240,7 @@ export function apply(ctx: Context, config: AuthConfig): void {
         limiter,
         replayGuard,
         challengeMacKey,
+        passkeyEnabled: passkey.enabled,
         log,
       }),
     "dsh-auth-gate: auth endpoints",

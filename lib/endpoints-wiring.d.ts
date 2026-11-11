@@ -38,6 +38,8 @@ export interface EndpointsWiringInput {
     replayGuard: TotpReplayGuard;
     /** 挑战 cookie 的进程级 HMAC 密钥（D10）。 */
     challengeMacKey: Uint8Array;
+    /** passkey 功能是否启用（`wirePasskey` 的结果；透传给 `/auth/status`，token 模式恒 false）。 */
+    passkeyEnabled: boolean;
     log: {
         error(message: unknown): void;
         info(message: unknown): void;
