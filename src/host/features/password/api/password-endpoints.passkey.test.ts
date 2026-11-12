@@ -19,7 +19,7 @@ interface PasskeyOption {
 /** 发一个 GET /auth/login 并返回 HTML。 */
 async function getLogin(url: string, passkey?: PasskeyOption): Promise<string> {
   const harness = makeHarness();
-  if (passkey !== undefined) harness.deps.passkey = passkey;
+  if (passkey !== undefined) harness.deps.passkey = () => passkey;
   registerPasswordEndpoints(harness.deps);
   const res = makeRes();
   await handlerOf(harness, "exact", "/auth/login")(loginGetReq(url), res.res);
@@ -48,5 +48,25 @@ describe("GET /auth/login: passkey entry (M6 §5.7)", () => {
     expect(body).toContain('id="passkey-form"');
     expect(body).toContain('autocomplete="username"');
     expect(body).not.toContain("isConditionalMediationAvailable");
+  });
+});
+
+describe("GET /auth/login: passkey entry reads the runtime toggle", () => {
+  it("reflects a conditional-UI change made after the endpoints were registered", async () => {
+    // 条件 UI 开关可以在设置页运行时改写：登录页必须每次渲染现取，不能缓存注册时的快照
+    // （2026-11-12 在隔离实例里实测到快照会让开关失效）。
+    const harness = makeHarness();
+    let conditionalUi = false;
+    harness.deps.passkey = () => ({ enabled: true, conditionalUi });
+    registerPasswordEndpoints(harness.deps);
+    const first = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(loginGetReq("/auth/login"), first.res);
+    expect(first.body).toContain('id="passkey-btn"');
+    expect(first.body).not.toContain("isConditionalMediationAvailable");
+
+    conditionalUi = true;
+    const second = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(loginGetReq("/auth/login"), second.res);
+    expect(second.body).toContain("isConditionalMediationAvailable");
   });
 });

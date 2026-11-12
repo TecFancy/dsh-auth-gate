@@ -150,7 +150,7 @@ export function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => vo
     kind: "exact",
     path: STATUS_PATH,
     handler: (req, res) =>
-      handleStatus({ ...deps, passkeyEnabled: deps.passkey?.enabled === true }, req, res),
+      handleStatus({ ...deps, passkeyEnabled: deps.passkey?.().enabled === true }, req, res),
   });
   if (deps.passwordChange !== undefined) {
     const change = toPasswordChangeDeps(deps, deps.passwordChange);
@@ -223,7 +223,7 @@ function handleLogin(
     }
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     if (resetStage) {
-      res.end(passwordLoginPageHtml(next, undefined, { host, notice, passkey: deps.passkey }));
+      res.end(passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }));
       return;
     }
     // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
@@ -241,7 +241,7 @@ function handleLogin(
             who: challenge,
             resetHref: loginPath(next, "password"),
           })
-        : passwordLoginPageHtml(next, undefined, { host, notice, passkey: deps.passkey }),
+        : passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }),
     );
     return;
   }
@@ -249,4 +249,11 @@ function handleLogin(
     return handlePasswordLogin(deps, req, res);
   }
   methodNotAllowed(res, "GET, POST");
+}
+
+/** 登录页 passkey 入口的当前值（每次渲染现取，条件 UI 开关可运行时改写）。 */
+function passkeyOf(
+  deps: PasswordEndpointsDeps,
+): { readonly enabled: boolean; readonly conditionalUi: boolean } | undefined {
+  return deps.passkey?.();
 }
