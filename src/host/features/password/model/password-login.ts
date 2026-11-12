@@ -42,8 +42,13 @@ export interface PasswordLoginDeps {
    * 一个锁定桶（issue #74：任何一台设备错几次密码就把整台实例锁在门外）。
    */
   clientIp?: ((req: IncomingMessage) => string) | undefined;
-  /** 登录页 passkey 入口（`wirePasskey` 启用时注入；缺省 = 不渲染）。 */
-  passkey?: { readonly enabled: boolean; readonly conditionalUi: boolean } | undefined;
+  /**
+   * 登录页 passkey 入口（`wirePasskey` 启用时注入；缺省 = 不渲染）。
+   *
+   * **必须是读取器而不是快照**：条件 UI 开关可以在设置页运行时改写，登录页每次渲染都要读
+   * 当前值（2026-11-12 在隔离实例里实测到快照会让开关失效）。
+   */
+  passkey?: (() => { readonly enabled: boolean; readonly conditionalUi: boolean }) | undefined;
   /** TOTP 模式（M4 T4）：off 忽略 secret；optional 有 secret 才两段式；required 全员两段式。 */
   totpMode: "off" | "optional" | "required";
   /** 注入的 TOTP 校验（index.ts 从 features/totp 装配；命中返回匹配 counter）。 */

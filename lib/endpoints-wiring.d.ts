@@ -41,10 +41,11 @@ export interface EndpointsWiringInput {
     /** passkey 功能是否启用（`wirePasskey` 的结果；透传给 `/auth/status`，token 模式恒 false）。 */
     passkeyEnabled: boolean;
     /** 登录页是否渲染 passkey 入口（未启用时 undefined）；条件 UI 由 `conditionalUi` 控制。 */
-    passkeyLogin?: {
+    /** 登录页 passkey 入口的读取器（每次渲染现取；条件 UI 开关可运行时改写）。 */
+    passkeyLogin?: (() => {
         readonly enabled: boolean;
         readonly conditionalUi: boolean;
-    } | undefined;
+    }) | undefined;
     log: {
         error(message: unknown): void;
         info(message: unknown): void;

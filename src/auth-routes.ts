@@ -53,7 +53,7 @@ export function mountAuthRoutes(ctx: Context, input: AuthRouteWiring): void {
         passkeyLogin:
           passkey.login === undefined
             ? undefined
-            : { enabled: true, conditionalUi: input.conditionalUi() },
+            : () => ({ enabled: true, conditionalUi: input.conditionalUi() }),
         log,
       }),
     "dsh-auth-gate: auth endpoints",
