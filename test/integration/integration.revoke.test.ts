@@ -130,7 +130,9 @@ describe("integration: disabling a user revokes live sessions", () => {
       expect(status).toBe(401);
 
       const statusRes = await fetch(`${base}/auth/status`, { headers: { cookie } });
-      expect(await statusRes.text()).toBe('{"authenticated":false,"logoutOrder":1000}');
+      expect(await statusRes.text()).toBe(
+        '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+      );
     } finally {
       await unmountStack(fibers, root);
     }

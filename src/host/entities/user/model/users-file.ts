@@ -6,6 +6,14 @@ import { parse as parseYaml, stringify } from "yaml";
 import { z } from "zod";
 import { dshHomeDir } from "../../../shared/lib/index.js";
 import type { UserRole } from "../../../shared/protocol/index.js";
+import { delay, isCode, renameWithRetry } from "./atomic-write.js";
+import type { PasskeyRecord } from "./passkey-record.js";
+import {
+  passkeyFieldsSchema,
+  readPasskeyFields,
+  validatePasskeyStore,
+  writePasskeyFields,
+} from "./passkey-record.js";
 
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
@@ -22,6 +30,10 @@ export interface UserRecord {
   role?: UserRole;
   /** P1 新增；**可选**（loader 读时补 `false`）；YAML 键 `must_change_password`，`false` 不落盘。 */
   mustChangePassword?: boolean;
+  /** base64url（解码 16–64 字节），首次注册时生成；不得含 username/邮箱等 PII。 */
+  passkeyUserHandle?: string;
+  /** 该用户的通行密钥；**可选**（loader 读时补 `[]`）；写盘时空数组不落盘。 */
+  passkeys?: PasskeyRecord[];
 }
 
 export interface UsersSnapshot {
@@ -44,6 +56,7 @@ const userRecordSchema = z
     disabled: z.boolean().optional(),
     role: z.enum(["user", "admin"]).optional(),
     must_change_password: z.boolean().optional(),
+    ...passkeyFieldsSchema,
   })
   .strict();
 
@@ -98,7 +111,12 @@ export async function loadUsersFile(filePath: string): Promise<UsersLoadResult> 
       disabled: record.disabled ?? false,
       role: record.role ?? "user",
       mustChangePassword: record.must_change_password ?? false,
+      ...readPasskeyFields(record),
     });
+  }
+  const passkeyProblem = validatePasskeyStore(users);
+  if (passkeyProblem !== undefined) {
+    throw new UsersFileError(`invalid users file: ${passkeyProblem}`);
   }
   return { snapshot: { users }, missing: false };
 }
@@ -123,6 +141,7 @@ export async function writeUsersFile(filePath: string, snapshot: UsersSnapshot):
       ...(record.disabled ? { disabled: true } : {}),
       ...(record.role === "admin" ? { role: "admin" } : {}),
       ...(record.mustChangePassword ? { must_change_password: true } : {}),
+      ...writePasskeyFields(record),
     };
   }
   const text = stringify({ version: 1, users });
@@ -130,6 +149,9 @@ export async function writeUsersFile(filePath: string, snapshot: UsersSnapshot):
   await fs.writeFile(`${filePath}.tmp`, text, { mode: 0o600 });
   await renameWithRetry(`${filePath}.tmp`, filePath);
 }
+
+/** 原子替换原语对测试暴露；实现见 `atomic-write.ts`。 */
+export { renameWithRetry };
 
 /** 锁冲突退避间隔（毫秒）。 */
 const LOCK_RETRY_MS = 25;
@@ -182,6 +204,11 @@ async function runMutation<T>(filePath: string, mutator: Mutator<T>, attempts: n
     }
     if (adminsBefore > 0 && countActiveAdmins(snapshot) === 0) {
       throw new UsersFileError("cannot remove the last admin");
+    }
+    // passkey 的跨记录不变量在锁内复核（plan：上限/全局唯一/handle 存在性不能只在锁外预检）。
+    const passkeyProblem = validatePasskeyStore(snapshot.users);
+    if (passkeyProblem !== undefined) {
+      throw new UsersFileError(`invalid users file: ${passkeyProblem}`);
     }
     await backupUsersFile(filePath);
     await writeUsersFile(filePath, snapshot);
@@ -270,47 +297,6 @@ function countActiveAdmins(snapshot: UsersSnapshot): number {
 async function backupUsersFile(filePath: string): Promise<void> {
   await fs.copyFile(filePath, `${filePath}.bak`).catch(() => undefined);
   await fs.chmod(`${filePath}.bak`, 0o600).catch(() => undefined);
-}
-
-type RenameFn = (from: string, to: string) => Promise<void>;
-
-/** Windows 上短暂占用（防病毒/索引器持有句柄）导致的 rename 失败至多重试次数。 */
-const RENAME_ATTEMPTS = 5;
-
-/** 退避基数（毫秒）；第 n 次重试前等 `n * RENAME_BACKOFF_MS`。 */
-const RENAME_BACKOFF_MS = 20;
-
-/** 目标句柄被短暂占用的错误码（Windows 实测 EPERM，另两类一并容错）。 */
-function isTransientRenameError(error: unknown): boolean {
-  return isCode(error, "EPERM") || isCode(error, "EBUSY") || isCode(error, "EACCES");
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * 原子替换的同目录 `rename`：短暂占用退避重试，其余错误立即上抛。
- * 重试耗尽后抛最后一次错误，调用方看到的失败语义不变。
- */
-export async function renameWithRetry(
-  from: string,
-  to: string,
-  rename: RenameFn = (source, target) => fs.rename(source, target),
-): Promise<void> {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await rename(from, to);
-      return;
-    } catch (error) {
-      if (attempt >= RENAME_ATTEMPTS || !isTransientRenameError(error)) throw error;
-      await delay(RENAME_BACKOFF_MS * attempt);
-    }
-  }
-}
-
-function isCode(error: unknown, code: string): boolean {
-  return error instanceof Error && "code" in error && error.code === code;
 }
 
 function isEnoent(error: unknown): boolean {

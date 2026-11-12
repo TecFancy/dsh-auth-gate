@@ -13,8 +13,15 @@ import {
  *
  * **加法兼容**：身份字段是 PR1 才有的（旧服务端只回 `authenticated`/`logoutOrder`），
  * 任一身份字段缺失即视为「不渲染管理块」，其余行为一字不变（契约 §1.1 / §3.3）。
+ * `passkeyEnabled` 线上恒在（配置透传），但旧服务端没有它：视图里因此是可选的，
+ * 缺失即 `undefined`（「不知道」，调用方不得据此推断关闭）。
  */
-export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword">;
+export type AccountStatusView = Omit<
+  StatusResponse,
+  "logoutOrder" | "mustChangePassword" | "passkeyEnabled"
+> & {
+  passkeyEnabled?: boolean | undefined;
+};
 
 /** 会话探针（只认 cookie，语义同 `/auth/status`，契约 §1.1）。 */
 const STATUS_TARGET = STATUS_PATH;
@@ -43,13 +50,15 @@ function optionalSessionKind(value: unknown): SessionKind | undefined {
  * `/auth/status` 响应体 → 视图对象。**加法兼容**（契约 §1.1/§3.3）：
  * 身份字段缺失、类型不符或取值不在白名单内，一律留 `undefined`；只有
  * `authenticated === true` 才可能让调用方继续渲染登录后的 UI。
+ * `passkeyEnabled` 同理：旧服务端没有该键、或值不是布尔 → `undefined`（不推断为关闭）。
  */
-function parseAccountStatus(body: unknown): AccountStatusView {
+export function parseAccountStatus(body: unknown): AccountStatusView {
   const source = (
     typeof body === "object" && body !== null ? body : {}
   ) as Unchecked<StatusResponse>;
   return {
     authenticated: source.authenticated === true,
+    passkeyEnabled: optionalBoolean(source.passkeyEnabled),
     name: optionalString(source.name),
     role: optionalRole(source.role),
     disabled: optionalBoolean(source.disabled),

@@ -24,14 +24,21 @@ export type Unchecked<T> = Partial<Record<T extends unknown ? keyof T : never, u
 /**
  * `GET /auth/status` 的 200 响应体。
  *
- * `authenticated` 与 `logoutOrder` 恒在。身份字段只在 password 模式、会话有效且账号仍在
- * `users.yaml` 时出现，否则整组缺席（不出现 `null` 占位，不泄漏账号是否存在）。
+ * `authenticated`、`logoutOrder` 与 `passkeyEnabled` 恒在。身份字段只在 password 模式、会话有效
+ * 且账号仍在 `users.yaml` 时出现，否则整组缺席（不出现 `null` 占位，不泄漏账号是否存在）。
  * 可选字段显式带 `| undefined`（`exactOptionalPropertyTypes`），JSON 里缺席与 `undefined` 等价。
  */
 export interface StatusResponse {
     authenticated: boolean;
     /** 「退出登录」按钮在通用设置页的槽位 order（host 配置透传）。 */
     logoutOrder: number;
+    /**
+     * 本实例是否启用了通行密钥（passkey）登录：host 配置透传，恒在。
+     *
+     * token 模式恒 `false`。只表示实例能力，**不**表示「当前用户是否已注册通行密钥」：
+     * 已注册凭据只出现在需要会话的凭据列表里，未认证可读的响应不泄漏这类身份信息。
+     */
+    passkeyEnabled: boolean;
     name?: string | undefined;
     role?: UserRole | undefined;
     disabled?: boolean | undefined;
@@ -115,4 +122,99 @@ export interface AdminResetResponse {
 export type AdminResetErrorBody = {
     error: "unauthorized" | "forbidden" | "bad_target" | "not_found" | "invalid_totp";
 } | PolicyErrorBody | LockedErrorBody;
+/**
+ * `POST /auth/passkey/options` 的 200 响应体（浏览器直接交给 `navigator.credentials.get`）。
+ *
+ * **有意裁剪为五个字段**：库的 `PublicKeyCredentialRequestOptionsJSON` 还带 `extensions`/`hints`
+ * 等可选字段，本插件不使用（也不希望它们悄悄改变浏览器行为），因此这里显式投影而不是原样透传；
+ * 将来要支持某个扩展时，先在这里加字段（契约只做加法）。
+ */
+export interface PasskeyLoginOptionsResponse {
+    challenge: string;
+    rpId: string;
+    timeout: number;
+    /** 策略固定 `required`（不提供「关 UV」配置）。 */
+    userVerification: "required";
+    /** 无用户名登录：恒为空数组（discoverable credentials）。 */
+    allowCredentials: readonly never[];
+}
+/**
+ * `POST /auth/passkey/login` 的请求体（`application/x-www-form-urlencoded` 扁平字段）。
+ * 二进制一律 base64url；`user_handle`/`next` 可缺席。
+ */
+export interface PasskeyAssertionRequest {
+    id: string;
+    client_data_json: string;
+    authenticator_data: string;
+    signature: string;
+    user_handle?: string;
+    next?: string;
+}
+/** passkey 登录的 JSON 错误体（fetch 路径）；表单路径失败渲染登录卡片。 */
+export interface PasskeyLoginErrorBody {
+    error: "bad_request" | "unauthorized" | "locked" | "unavailable";
+    /** 429 时同时写 `retry-after` 头。 */
+    retryAfter?: number;
+}
+/** 一把凭据的公开摘要（列表用）：**绝不含**公钥、userHandle 或任何密钥材料。 */
+export interface PasskeySummary {
+    /** credentialId 前 12 字符（完整值不出现在列表里）。 */
+    idPrefix: string;
+    label: string;
+    /** epoch ms。 */
+    createdAt: number;
+    /** epoch ms；0 = 从未使用。 */
+    lastUsedAt: number;
+    /** BE（可备份/可同步）。 */
+    backupEligible: boolean;
+    /** BS（已备份）。 */
+    backupState: boolean;
+    transports: string[];
+}
+/** `GET /auth/passkey` 的 200 响应体（按 createdAt 升序，client 不重排）。 */
+export interface PasskeyListResponse {
+    passkeys: PasskeySummary[];
+}
+/**
+ * `POST /auth/passkey/register/options` 的 200 响应体：库的
+ * `PublicKeyCredentialCreationOptionsJSON` 原样透传（注册侧需要 `excludeCredentials`/`rp`/`user`
+ * 等全部字段，不做裁剪）。
+ */
+export type PasskeyRegistrationOptionsResponse = Record<string, unknown>;
+/**
+ * `POST /auth/passkey/register` 的请求体（urlencoded 扁平字段，二进制一律 base64url）。
+ * `password`/`code` 是**再认证**凭据：会话本身不足以注册（防「会话被劫 → 后门 passkey」）。
+ */
+export interface PasskeyRegistrationRequest {
+    label: string;
+    password: string;
+    code: string;
+    id: string;
+    client_data_json: string;
+    attestation_object: string;
+    transports: string;
+}
+/** `POST /auth/passkey/remove` 的请求体。`all=1` 表示清空；否则按 `id` 前缀唯一匹配。 */
+export interface PasskeyRemoveRequest {
+    id: string;
+    all?: string;
+    password: string;
+    code: string;
+}
+/** `GET/POST /auth/passkey/settings` 的响应体（admin）。 */
+export interface PasskeySettingsResponse {
+    /** 登录页是否启用 passkey 自动填充（条件 UI）。 */
+    conditionalUiEnabled: boolean;
+}
+/** `POST /auth/passkey/settings` 的请求体。 */
+export interface PasskeySettingsRequest {
+    conditionalUi: string;
+}
+/** passkey 管理端点的 JSON 错误体。 */
+export interface PasskeyAdminErrorBody {
+    error: "unauthorized" | "forbidden" | "locked" | "unavailable" | "bad_request" | "not_found";
+    /** 400 `policy` 类错误的细分原因（如 `last-credential`）。 */
+    reason?: string;
+    retryAfter?: number;
+}
 //# sourceMappingURL=payloads.d.ts.map

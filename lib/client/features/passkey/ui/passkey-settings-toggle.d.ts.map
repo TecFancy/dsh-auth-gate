@@ -1,0 +1,1 @@
+{"version":3,"file":"passkey-settings-toggle.d.ts","sourceRoot":"","sources":["../../../../../src/client/features/passkey/ui/passkey-settings-toggle.tsx"],"names":[],"mappings":"AAOA,OAAO,EAAgB,KAAK,gBAAgB,EAAE,MAAM,+BAA+B,CAAC;AAoBpF,MAAM,WAAW,0BAA0B;IACzC,CAAC,EAAE,gBAAgB,CAAC;CACrB;AAED,uCAAuC;AACvC,wBAAgB,qBAAqB,CAAC,EAAE,CAAC,EAAE,EAAE,0BAA0B,sCAwEtE"}

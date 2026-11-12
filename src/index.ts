@@ -5,7 +5,7 @@ import { TokenGate } from "./host/features/token/index.js";
 import * as guard from "./host/shared/guard/index.js";
 import { DisabledSessionSweeper, PasswordGate } from "./host/features/password/index.js";
 import { makeBootstrapWiring } from "./bootstrap-wiring.js";
-import { makeEndpointsWiring } from "./endpoints-wiring.js";
+import { mountAuthRoutes } from "./auth-routes.js";
 import { TotpReplayGuard } from "./host/features/totp/index.js";
 import { DEFAULT_TRUSTED_PROXIES } from "./host/shared/http/index.js";
 import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
@@ -14,6 +14,7 @@ import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
+import { passkeyConfigFields, wirePasskey, type PasskeyFields } from "./passkey-wiring.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export const name = "dsh-auth-gate";
@@ -21,7 +22,7 @@ export const name = "dsh-auth-gate";
 /** 硬依赖：守卫包装 webServer 的路由表；storageDomain/credentials 软读（见 apply）。 */
 export const inject = ["webServer"] as const;
 
-export interface AuthConfig extends TelemetryFields {
+export interface AuthConfig extends TelemetryFields, PasskeyFields {
   /** 认证流：token（M2）/ password（M3）。 */
   mode: "token" | "password";
   /** 会话 TTL（秒）。 */
@@ -94,6 +95,7 @@ export const Config = z.object({
   revokeSweepMs: z.natural().default(5000),
   totp: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   logoutOrder: z.natural().max(10000).default(1000),
+  ...passkeyConfigFields,
   ...telemetryConfigFields,
 });
 
@@ -168,6 +170,9 @@ export function apply(ctx: Context, config: AuthConfig): void {
   const server = ctx.get("webServer") as unknown as guard.WrappableServer | undefined;
   if (server === undefined) return;
   const log = ctx.logger("dsh-auth-gate");
+  const passkey = wirePasskey({ ...config, log });
+  // 条件 UI 的运行期值：初始来自配置，admin 可在设置页改写（写回宿主 settings 服务）。
+  let passkeyConditionalUi = passkey.settings.enabled ? passkey.settings.conditionalUi : false;
 
   const resolveToken = config.mode === "token" ? makeTokenResolver(ctx, config, log) : undefined;
   const launchTokenBridge = makeLaunchTokenBridge(ctx, log);
@@ -225,22 +230,23 @@ export function apply(ctx: Context, config: AuthConfig): void {
   // 一次性 bootstrap 会话，向导完成后关窗。三条路径在 `/auth` 前缀内，门直接放行。
   ctx.effect(() => bootstrap.mount(), "dsh-auth-gate: bootstrap routes");
 
-  ctx.effect(
-    () =>
-      makeEndpointsWiring({
-        server,
-        config,
-        auth,
-        resolveToken,
-        launchTokenBridge,
-        usersPath,
-        limiter,
-        replayGuard,
-        challengeMacKey,
-        log,
-      }),
-    "dsh-auth-gate: auth endpoints",
-  );
+  mountAuthRoutes(ctx, {
+    server,
+    config,
+    auth,
+    usersPath,
+    launchTokenBridge,
+    passkey,
+    resolveToken,
+    limiter,
+    replayGuard,
+    challengeMacKey,
+    conditionalUi: () => passkeyConditionalUi,
+    setConditionalUi: (enabled) => {
+      passkeyConditionalUi = enabled;
+    },
+    log,
+  });
 
   const failures = guard.assertGuarded(server);
   if (failures.length > 0) {

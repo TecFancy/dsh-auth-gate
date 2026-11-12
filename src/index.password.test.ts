@@ -39,6 +39,12 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     revokeSweepMs: 0,
     totp: "off",
     logoutOrder: 1000,
+    passkey: "off",
+    passkeyRpName: "DeepSeek Harness",
+    passkeyRpId: "",
+    passkeyOrigins: [],
+    passkeyEnforceCounter: false,
+    passkeyConditionalUi: false,
     telemetry: false,
     installId: { get: () => "" },
   };

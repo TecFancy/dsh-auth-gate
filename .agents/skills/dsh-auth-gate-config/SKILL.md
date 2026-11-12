@@ -1,6 +1,6 @@
 ---
 name: dsh-auth-gate-config
-description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/telemetry/installId), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/telemetry/installId）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
+description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
@@ -49,10 +49,28 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
     logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
+    passkey: "off" # "off"(default) | "optional" - passkey sign-in for password mode; needs publicHost + HTTPS; M6 in progress / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS；M6 实现中）
+    passkeyRpName: "DeepSeek Harness" # RP display name in the passkey prompt / 通行密钥弹窗里的 RP 展示名
+    passkeyRpId: "" # "" = hostname(publicHost); must be a domain (never an IP) / 空 = 取 publicHost 的 hostname；必须是域名，不能是 IP
+    passkeyOrigins: [] # [] = [origin(publicHost)]; exact origins, https or http://localhost / 空 = 由 publicHost 派生；精确 origin 白名单（https 或 http://localhost）
+    passkeyEnforceCounter: false # true = reject counter regressions on device-bound credentials / 计数器回退且凭证为设备绑定时拒绝
+    passkeyConditionalUi: false # passkey autofill on the login page (admin toggle in Settings) / 登录页 passkey 自动填充（设置页开关）
     telemetry: true # anonymous usage statistics: at most one ping per process per 24h, and only after a request passed the gate; false = send nothing / 匿名使用统计：每进程最多每 24 小时一次，且只在请求通过门之后；false = 完全不发
     installId: "" # internal anonymous install id (UUID v4), hidden and generated on first use; do not set by hand / 内部匿名安装 id（UUID v4），隐藏、首次使用时生成，不要手填
 ```
 
+- `passkey: "optional"` (M6, shipped): sign-in, enrolment, self-service removal and the
+  conditional-UI toggle are all live. Enrolment and removing the last credential require
+  the current password (plus a TOTP code when enabled). A passkey satisfies both the
+  password and 2FA requirements, so `totp` constrains password sign-in only. Passkeys need
+  HTTPS and a domain: the RP ID comes from `publicHost` and cannot be an IP, so plain-http
+  intranet addresses and the local proxy cannot use them. A configuration that cannot be
+  derived from `publicHost` stays off with an error log instead of failing the instance. /
+  `passkey: "optional"`（M6，已上线）：登录、注册、自助删除与条件 UI 开关全部可用。
+  注册与删除最后一把需要当前口令（启用 TOTP 时还要验证码）。通行密钥同时满足口令与 2FA
+  要求，所以 `totp` 只约束口令登录。通行密钥需要 HTTPS 与域名：RP ID 取自 `publicHost`
+  且不能是 IP，纯 http 内网地址与本地代理都用不了。无法从 `publicHost` 派生的配置会记
+  error 日志并按 off 处理，不会拖垮实例。
 - Override **without** `insert` — the bundle row is already mounted; adding one
   double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
 - `telemetry: false` turns the anonymous ping off completely; `installId` is
@@ -80,6 +98,9 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user disab
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user enable <name>
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp enable <name> # prints base32 secret + otpauth:// URI / 生成 TOTP 密钥（打印 base32 与 otpauth:// URI）
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp disable <name>
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey list <name> # label, id prefix, created/last used, BE/BS / 列出某用户的通行密钥
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --id <prefix> # >= 8 chars, must match exactly one / 按 credentialId 前缀删除（至少 8 字符且唯一匹配）
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --all # remove every passkey of that user / 删除该用户全部通行密钥
 # Install this quick-reference skill into $DSH_HOME/skills/ for the dsh agent:
 # 技能安装（本包内置的配置速查，装进 $DSH_HOME/skills/ 供 dsh agent 加载）：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]

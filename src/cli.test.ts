@@ -204,11 +204,21 @@ describe("dsh-auth arg handling", () => {
     expect(err.join("\n")).toContain("Usage:");
   });
 
-  it("documents the passwd and role commands in USAGE", async () => {
+  it("documents the passwd, role and passkey commands in USAGE", async () => {
     const { io, err } = makeIo();
     expect(await main(["user", "explode"], io)).toBe(1);
     expect(err.join("\n")).toContain("user passwd <name>");
     expect(err.join("\n")).toContain("user role <name> <admin|user>");
+    expect(err.join("\n")).toContain("passkey list <name>");
+    expect(err.join("\n")).toContain("passkey rm <name> (--id <prefix> | --all)");
+  });
+
+  it("keeps the passkey --id value out of positional parsing", async () => {
+    const { io, err } = makeIo();
+    const missing = path.join(os.tmpdir(), "dsh-auth-missing-users-dir", "users.yaml");
+    const argv = ["passkey", "list", "--id", "xxxxxxxx", "ghost", "--file", missing];
+    expect(await main(argv, io)).toBe(1);
+    expect(err).toEqual(["user ghost not found"]);
   });
 
   it("fails when --file has no value", async () => {

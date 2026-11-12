@@ -48,6 +48,10 @@ export interface EndpointsWiringInput {
   replayGuard: TotpReplayGuard;
   /** 挑战 cookie 的进程级 HMAC 密钥（D10）。 */
   challengeMacKey: Uint8Array;
+  /** passkey 功能是否启用（`wirePasskey` 的结果；透传给 `/auth/status`，token 模式恒 false）。 */
+  passkeyEnabled: boolean;
+  /** 登录页是否渲染 passkey 入口（未启用时 undefined）；条件 UI 由 `conditionalUi` 控制。 */
+  passkeyLogin?: { readonly enabled: boolean; readonly conditionalUi: boolean } | undefined;
   log: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -86,6 +90,7 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
       cookieSecure: config.cookieSecure,
       sessionTtl: config.sessionTtl,
       logoutOrder: config.logoutOrder,
+      passkeyEnabled: input.passkeyEnabled,
       publicHost: config.publicHost,
       validateToken: async (token) => {
         const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
@@ -120,6 +125,7 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
     challengeMacKey,
     launchTokenBridge,
     logoutOrder: config.logoutOrder,
+    passkey: input.passkeyLogin,
     logger: log,
     passwordChange,
     // P2 管理面：装配细节（第三个独立限流桶、锁内写盘、吊销探针、双桶清理）在

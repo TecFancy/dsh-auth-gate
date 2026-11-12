@@ -209,14 +209,15 @@ Not doing it. Reason: the threat model is "protect the single entry of the whole
 
 ## 9. Roadmap
 
-| Phase | Content                                                                                                                              | Deliverable                                        |
-| ----- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
-| M0    | Probe verification of mount points                                                                                                   | ✅ done (probe already cleaned up)                 |
-| M1    | `dsh-auth` package skeleton + guard + startup self-check + persistent sessions (storage domain)                                      | ✅ done: npm package host half + profile row       |
-| M2    | Phase 1: random token gate (credentials reference + Bearer + login page issues cookie)                                               | ✅ done: deployable minimal public protection      |
-| M3    | Phase 2: users.yaml + password hashing (**scrypt**, see note below) + login rate limiting + `dsh-auth user` CLI                      | ✅ done: real login                                |
-| M4    | Phase 3: TOTP two-stage login + config items                                                                                         | OTP hardening                                      |
-| M5    | Standalone reverse-proxy shell mode (proxy shell): listens on public net itself + reverse-proxies a bare dsh + Host/Origin rewriting | planned (recorded 2026-08-15, awaiting scheduling) |
+| Phase | Content                                                                                                                              | Deliverable                                                   |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------- |
+| M0    | Probe verification of mount points                                                                                                   | ✅ done (probe already cleaned up)                            |
+| M1    | `dsh-auth` package skeleton + guard + startup self-check + persistent sessions (storage domain)                                      | ✅ done: npm package host half + profile row                  |
+| M2    | Phase 1: random token gate (credentials reference + Bearer + login page issues cookie)                                               | ✅ done: deployable minimal public protection                 |
+| M3    | Phase 2: users.yaml + password hashing (**scrypt**, see note below) + login rate limiting + `dsh-auth user` CLI                      | ✅ done: real login                                           |
+| M4    | Phase 3: TOTP two-stage login + config items                                                                                         | OTP hardening                                                 |
+| M5    | Standalone reverse-proxy shell mode (proxy shell): listens on public net itself + reverse-proxies a bare dsh + Host/Origin rewriting | planned (recorded 2026-08-15, awaiting scheduling)            |
+| M6    | Passkey (WebAuthn) sign-in: username-less, re-authentication on enrolment, hand-written verifier                                     | planned (2026-11-11, plan `docs/plans/passkey-login-plan.md`) |
 
 > M3 note: per the user's decision, password hashing uses `node:crypto` **scrypt** (N=2¹⁶/r=8/p=1, zero added native dependency; spec `docs/implemented/impl-m3.md` P1/P2), replacing the argon2id/bcryptjs candidates in the earlier draft of this section.
 

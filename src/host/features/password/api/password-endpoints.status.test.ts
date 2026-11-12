@@ -197,7 +197,7 @@ describe("GET /auth/status", () => {
       "/auth/status",
     )(makeReq({ method: "GET", url: "/auth/status" }), res.res);
     expect(res.status).toBe(200);
-    expect(res.body).toBe('{"authenticated":false,"logoutOrder":777}');
+    expect(res.body).toBe('{"authenticated":false,"logoutOrder":777,"passkeyEnabled":false}');
   });
 
   it("ignores a Bearer header (cookie only)", async () => {
@@ -212,6 +212,6 @@ describe("GET /auth/status", () => {
       makeReq({ method: "GET", url: "/auth/status", authorization: "Bearer some-session-token" }),
       res.res,
     );
-    expect(res.body).toBe('{"authenticated":false,"logoutOrder":1000}');
+    expect(res.body).toBe('{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}');
   });
 });
