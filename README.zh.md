@@ -189,6 +189,18 @@ dsh --profile web
 
 ![带原因的登录页](docs/demo/login-password-changed.png)
 
+用户还可以在同一个「账号安全」分区里注册**通行密钥（passkey / WebAuthn）**，之后在登录页一步
+登录，不用输用户名和密码。按钮在口令表单下方；表单下面的列表里每把凭据显示名称、创建时间、
+最近使用时间、是否可备份，以及一个删除按钮。注册和删除最后一把时需要再输一次当前口令（启用
+TOTP 时还要验证码），所以会话被劫也没法偷偷加一把后门凭据：
+
+![账号安全里的通行密钥区块：凭据列表与添加表单](docs/demo/passkey-account-security.en.png)
+
+打开 `passkey: "optional"` 后，登录页多出第二条登录路径。按 GitHub 的模型，通行密钥同时满足
+口令与 2FA 要求，所以即使账号启用了 TOTP，用通行密钥也是一步登录：
+
+![带「Sign in with a passkey」按钮的登录页](docs/demo/passkey-login.en.png)
+
 新密码至少 14 位、须同时包含四类字符，且不能与当前密码相同。启用 TOTP 后，当前 30 秒窗口内已经
 用过的验证码会视为重放并拒绝，需要等下一个验证码。
 
