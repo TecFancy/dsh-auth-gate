@@ -10,7 +10,7 @@
  * 改这里的值就是改对外契约（书签、反代规则、dsh 前端的跳转都认这些路径）：先改
  * `index.test.ts` 里钉住的值，再改这里。
  */
-export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasskeyAssertionRequest, PasskeyLoginErrorBody, PasskeyLoginOptionsResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
+export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasskeyAdminErrorBody, PasskeyAssertionRequest, PasskeyListResponse, PasskeyLoginErrorBody, PasskeyLoginOptionsResponse, PasskeyRegistrationOptionsResponse, PasskeyRegistrationRequest, PasskeyRemoveRequest, PasskeySettingsRequest, PasskeySettingsResponse, PasskeySummary, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
 /** 本插件全部端点的前缀；`prefix` 兜底路由挂在这里，gate 白名单也按它放行。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
 /** 登录页（GET 渲染、POST 提交）。 */
@@ -23,6 +23,16 @@ export declare const STATUS_PATH = "/auth/status";
 export declare const PASSKEY_OPTIONS_PATH = "/auth/passkey/options";
 /** passkey 登录 finish（匿名表单 POST，断言 → 发会话）。 */
 export declare const PASSKEY_LOGIN_PATH = "/auth/passkey/login";
+/** 已登录用户自己的凭据列表（GET JSON）。 */
+export declare const PASSKEY_PATH = "/auth/passkey";
+/** 注册 begin（已登录 + 再认证的表单 POST，返回 options + 下发 ceremony cookie）。 */
+export declare const PASSKEY_REGISTER_OPTIONS_PATH = "/auth/passkey/register/options";
+/** 注册 finish（已登录表单 POST，attestation → 写 users.yaml）。 */
+export declare const PASSKEY_REGISTER_PATH = "/auth/passkey/register";
+/** 删除自己的凭据（已登录表单 POST；删最后一把或 `--all` 需再认证）。 */
+export declare const PASSKEY_REMOVE_PATH = "/auth/passkey/remove";
+/** 条件 UI（登录页 passkey 自动填充）开关（admin GET/POST）。 */
+export declare const PASSKEY_SETTINGS_PATH = "/auth/passkey/settings";
 /** 自助改密（GET SSR 页，POST 提交）；也是受限会话被拒时的导航目标。 */
 export declare const PASSWORD_PATH = "/auth/password";
 /** 管理面：用户列表。 */

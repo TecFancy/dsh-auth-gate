@@ -5,6 +5,7 @@ import {
   type AccountTranslate,
 } from "../../../shared/i18n/index.ts";
 import { AccountPasswordForm } from "../../../features/change-password/index.ts";
+import { PasskeyBlock, PasskeySettingsToggle } from "../../../features/passkey/index.ts";
 import { HINT_STYLE, PANEL_STYLE } from "../../../shared/ui/index.ts";
 import { AdminUsersBlock } from "./admin-block.tsx";
 import { ADMIN_DICT_EN } from "../../../features/admin-users/index.ts";
@@ -43,6 +44,17 @@ function showsAdminBlock(
 }
 
 /**
+ * passkey 区块渲染门：只有服务端明确报告 `passkeyEnabled === true` 才挂块。
+ *
+ * 三条理由：默认配置是 `passkey: "off"`（端点根本不存在，挂了只会拿到 404 并显示
+ * 「暂时不可用」）；旧服务端没有该字段（`undefined` = 不知道，不推断为开启）；
+ * 关闭时零请求，与「非 admin 不试拉管理面」同一纪律。
+ */
+function showsPasskeyBlock(status: AccountStatusView): boolean {
+  return status.passkeyEnabled === true;
+}
+
+/**
  * 槽位注入的 props：`t` 来自注册时的 `locale: "auth"` seat。
  * 宿主 owner props 还有 `close`；P1.1 起不再往下传（成功后去登录页，而不是关弹窗）。
  */
@@ -65,6 +77,7 @@ export function SettingsAccountSection({ t }: SettingsAccountSectionProps) {
   return (
     <>
       <AccountPasswordForm t={translate} />
+      {showsPasskeyBlock(status) ? <PasskeyBlock t={translate} /> : null}
       {showsAdminBlock(status) ? (
         <AdminUsersBlock
           t={translate}
@@ -74,6 +87,7 @@ export function SettingsAccountSection({ t }: SettingsAccountSectionProps) {
           actorTotpEnabled={status.totpEnabled !== false}
         />
       ) : null}
+      {showsAdminBlock(status) ? <PasskeySettingsToggle t={translate} /> : null}
     </>
   );
 }

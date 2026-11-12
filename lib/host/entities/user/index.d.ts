@@ -8,4 +8,5 @@ export { MAX_PASSKEYS_PER_USER, validatePasskeyStore } from "./model/passkey-rec
 export type { PasskeyRecord } from "./model/passkey-record.js";
 export { checkPasswordPolicy, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, } from "./model/password-policy.js";
 export type { PasswordPolicyOptions, PasswordPolicyResult, PasswordRule, } from "./model/password-policy.js";
+export { PASSKEY_ALGORITHMS, PASSKEY_TRANSPORTS } from "./model/passkey-record.js";
 //# sourceMappingURL=index.d.ts.map

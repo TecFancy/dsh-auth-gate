@@ -3,12 +3,13 @@ import z from "@deepseek-ai/schemastery";
 import {
   CeremonyStore,
   PasskeyOptionsQuota,
-  registerPasskeyLoginEndpoints,
+  registerPasskeyEndpoints,
   resolvePasskeySettings,
   type PasskeySettings,
 } from "./host/features/passkey/index.js";
-import { issueLoginSession } from "./host/features/password/index.js";
-import { loadUsersFile, type UserRecord } from "./host/entities/user/index.js";
+import { hashPassword, issueLoginSession, verifyPassword } from "./host/features/password/index.js";
+import { verifyTotpCode } from "./host/features/totp/index.js";
+import { loadUsersFile, mutateUsersFile, type UserRecord } from "./host/entities/user/index.js";
 import type { SessionStore } from "./host/entities/session/index.js";
 import type { WrappableServer } from "./host/shared/guard/index.js";
 import { makeClientIpResolver, parseClientIpPolicy } from "./host/shared/http/index.js";
@@ -121,12 +122,19 @@ export interface PasskeyRouteWiringInput {
     readonly publicHost: string;
     readonly clientIpHeader: string;
     readonly trustedProxyCidrs: string[];
+    readonly totp: "off" | "optional" | "required";
   };
   readonly auth: { readonly sessions: SessionStore | undefined };
   /** 登录成功后把浏览器送回 dsh 的 launch-token 桥（与口令登录共用）。 */
   readonly launchTokenBridge: () => Promise<string | undefined>;
   readonly usersPath: string;
   readonly settings: PasskeySettings;
+  /** 条件 UI 的当前值（可由 admin 在设置页改写；`wirePasskey` 的初始值来自配置）。 */
+  readonly conditionalUi: () => boolean;
+  /** 写回条件 UI 开关（宿主 settings 服务；失败只记日志，不改内存值）。 */
+  readonly persistConditionalUi: (enabled: boolean) => Promise<void>;
+  /** 与口令登录共用的 TOTP 防重放单例（注册/删除的再认证用）。 */
+  readonly replayCheck: (username: string, counter: number, code: string) => boolean;
   readonly log: {
     error(message: unknown): void;
     warn(message: unknown): void;
@@ -148,7 +156,7 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
   const policy = parseClientIpPolicy(input.config.clientIpHeader, input.config.trustedProxyCidrs);
   const clientIp = makeClientIpResolver(policy, input.log);
   const settings = input.settings;
-  return registerPasskeyLoginEndpoints({
+  return registerPasskeyEndpoints({
     register: (route) => input.server.register(route),
     sessions: () => input.auth.sessions,
     cookieSecure: input.config.cookieSecure,
@@ -156,6 +164,7 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
     optionsQuota,
     settings: {
       rpId: settings.rpId,
+      rpName: settings.rpName,
       origins: settings.origins,
       enforceCounter: settings.enforceCounter,
     },
@@ -187,5 +196,17 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
         extraSetCookie,
       ),
     logger: input.log,
+    cookieName: input.config.cookieName,
+    totpMode: input.config.totp,
+    // 注册/管理/设置页（PR3）：再认证用口令 + TOTP，写盘走锁内 mutateUsersFile。
+    management: {
+      mutateUsers: (mutator) => mutateUsersFile(input.usersPath, mutator),
+      verify: verifyPassword,
+      hash: hashPassword,
+      verifyTotp: (secretB32, code, nowMs) => verifyTotpCode(secretB32, code, nowMs),
+      replayCheck: input.replayCheck,
+      conditionalUi: input.conditionalUi,
+      persistConditionalUi: input.persistConditionalUi,
+    },
   });
 }

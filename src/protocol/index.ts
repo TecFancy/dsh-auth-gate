@@ -20,9 +20,17 @@ export type {
   PasswordChangeErrorBody,
   PasswordChangeRequest,
   PasswordChangeResponse,
+  PasskeyAdminErrorBody,
   PasskeyAssertionRequest,
+  PasskeyListResponse,
   PasskeyLoginErrorBody,
   PasskeyLoginOptionsResponse,
+  PasskeyRegistrationOptionsResponse,
+  PasskeyRegistrationRequest,
+  PasskeyRemoveRequest,
+  PasskeySettingsRequest,
+  PasskeySettingsResponse,
+  PasskeySummary,
   PasswordRule,
   PolicyErrorBody,
   SessionKind,
@@ -50,6 +58,21 @@ export const PASSKEY_OPTIONS_PATH = "/auth/passkey/options";
 
 /** passkey 登录 finish（匿名表单 POST，断言 → 发会话）。 */
 export const PASSKEY_LOGIN_PATH = "/auth/passkey/login";
+
+/** 已登录用户自己的凭据列表（GET JSON）。 */
+export const PASSKEY_PATH = "/auth/passkey";
+
+/** 注册 begin（已登录 + 再认证的表单 POST，返回 options + 下发 ceremony cookie）。 */
+export const PASSKEY_REGISTER_OPTIONS_PATH = "/auth/passkey/register/options";
+
+/** 注册 finish（已登录表单 POST，attestation → 写 users.yaml）。 */
+export const PASSKEY_REGISTER_PATH = "/auth/passkey/register";
+
+/** 删除自己的凭据（已登录表单 POST；删最后一把或 `--all` 需再认证）。 */
+export const PASSKEY_REMOVE_PATH = "/auth/passkey/remove";
+
+/** 条件 UI（登录页 passkey 自动填充）开关（admin GET/POST）。 */
+export const PASSKEY_SETTINGS_PATH = "/auth/passkey/settings";
 
 /** 自助改密（GET SSR 页，POST 提交）；也是受限会话被拒时的导航目标。 */
 export const PASSWORD_PATH = "/auth/password";

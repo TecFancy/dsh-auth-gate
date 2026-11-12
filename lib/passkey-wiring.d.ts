@@ -74,6 +74,7 @@ export interface PasskeyRouteWiringInput {
         readonly publicHost: string;
         readonly clientIpHeader: string;
         readonly trustedProxyCidrs: string[];
+        readonly totp: "off" | "optional" | "required";
     };
     readonly auth: {
         readonly sessions: SessionStore | undefined;
@@ -82,6 +83,12 @@ export interface PasskeyRouteWiringInput {
     readonly launchTokenBridge: () => Promise<string | undefined>;
     readonly usersPath: string;
     readonly settings: PasskeySettings;
+    /** 条件 UI 的当前值（可由 admin 在设置页改写；`wirePasskey` 的初始值来自配置）。 */
+    readonly conditionalUi: () => boolean;
+    /** 写回条件 UI 开关（宿主 settings 服务；失败只记日志，不改内存值）。 */
+    readonly persistConditionalUi: (enabled: boolean) => Promise<void>;
+    /** 与口令登录共用的 TOTP 防重放单例（注册/删除的再认证用）。 */
+    readonly replayCheck: (username: string, counter: number, code: string) => boolean;
     readonly log: {
         error(message: unknown): void;
         warn(message: unknown): void;

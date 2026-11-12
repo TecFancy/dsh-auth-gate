@@ -11,6 +11,21 @@
 （对齐 GitHub 的 passkey 模型：passkey 同时满足口令与 2FA 要求，`totp` 只约束口令登录）；不接受同步 passkey
 的环境用 `passkey: "off"`。方案见 `docs/plans/passkey-login-plan_zh.md`。
 
+## 落地情况（2026-11-12）
+
+M6 分三个 PR 落地，全部通过 `npm run verify`（含 lint/FSD/覆盖率/构建/bundle/host 检查）：
+
+- **PR1**（`152e46b`）：`/auth/status.passkeyEnabled` 契约、`users.yaml` 的 `passkeyUserHandle`/`passkeys[]`
+  与跨记录校验、ceremony 存储 + 不透明 cookie、`publicHost` → RP ID/origin 派生与启动自检、
+  `dsh-auth passkey list/rm` CLI、bundled config skill。
+- **PR2**（`f20f2de`）：`@simplewebauthn/server@14.1.0`（精确锁版）、`POST /auth/passkey/options` 与
+  `/auth/passkey/login`（无用户名 discoverable、库校验、userHandle/BE 一致性、计数器策略、独立限速、
+  dummy 等量工作）、登录页 passkey 按钮 + 内联 JS + 条件 UI、真栈集成测试（自造 EC P-256 认证器）。
+- **评审修复**（`0a8f747`）：Kimi K3.1 Pro 评审后修掉 begin 配额形同虚设与 `Permissions-Policy` 未落实
+  两项 major，另修 503 顺序、userHandle 判定顺序、未用依赖与文件行数。
+- **PR3**：注册/管理/设置端点（注册与删除最后一把需再认证）、客户端「账号安全」通行密钥区块与条件 UI
+  开关、README/known-limitations/部署文档、本记录转 implemented。
+
 ## 背景
 
 登录门现在只有「共享 token」或「口令 + 可选 TOTP」。TOTP 解决不了钓鱼（实时转发 OTP 仍然有效），也不减少

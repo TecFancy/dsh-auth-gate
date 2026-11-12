@@ -362,7 +362,12 @@ WebAuthn 的 challenge 是**必须被服务端重新读出的秘密**，且必�
 
 > 六项决策已于 2026-11-11 全部拍板，本方案进入实现；PR1 从契约、`users.yaml` 字段、ceremony 存储与 CLI 开始。
 
-> **实施进度（2026-11-12）**：PR1 已提交（`152e46b`）；PR2 已完成并通过 `npm run verify` 全链路（160 文件 / 1379 tests，含 lint/FSD/覆盖率/构建/bundle/host 检查）：引入 `@simplewebauthn/server@14.1.0`（精确锁版）、`POST /auth/passkey/options` + `/auth/passkey/login`（库校验、无用户名 discoverable、userHandle/BE/计数器策略、独立限速、dummy 等量工作）、登录页 passkey 按钮 + 内联 JS + 条件 UI（autofill，受 `passkeyConditionalUi` 控制）、失败卡片透传 passkey 重试入口、真栈集成测试（自造 EC P-256 认证器）。改动在 worktree `feat/passkey-login`（含重建的 `lib/`），未提交；PR3（注册/管理、设置页开关、README/部署文档、ADR 转 implemented）待做。
+> **实施进度（2026-11-12，已完成）**：M6 三个 PR 全部落地并通过 `npm run verify` 全链路（178 文件 / 1498 tests，
+> 含 lint/FSD/覆盖率/构建/bundle/host 检查，17 条 protocol 路由）：PR1 `152e46b`（契约、`users.yaml` 存储、
+> ceremony、配置派生、CLI、config skill）、PR2 `f20f2de`（`@simplewebauthn/server@14.1.0`、options/login、
+> 登录页按钮 + 条件 UI、真栈集成测试）、评审修复 `0a8f747`（begin 配额、`Permissions-Policy`、503 顺序等）、
+> PR3（注册/管理/设置端点含再认证、客户端通行密钥区块与条件 UI 开关、README/known-limitations/部署文档、
+> D35 转 implemented）。
 
 ## 10. 参考
 

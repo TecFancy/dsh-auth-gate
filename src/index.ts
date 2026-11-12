@@ -5,7 +5,7 @@ import { TokenGate } from "./host/features/token/index.js";
 import * as guard from "./host/shared/guard/index.js";
 import { DisabledSessionSweeper, PasswordGate } from "./host/features/password/index.js";
 import { makeBootstrapWiring } from "./bootstrap-wiring.js";
-import { makeEndpointsWiring } from "./endpoints-wiring.js";
+import { mountAuthRoutes } from "./auth-routes.js";
 import { TotpReplayGuard } from "./host/features/totp/index.js";
 import { DEFAULT_TRUSTED_PROXIES } from "./host/shared/http/index.js";
 import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
@@ -14,12 +14,7 @@ import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
-import {
-  makePasskeyWiring,
-  passkeyConfigFields,
-  wirePasskey,
-  type PasskeyFields,
-} from "./passkey-wiring.js";
+import { passkeyConfigFields, wirePasskey, type PasskeyFields } from "./passkey-wiring.js";
 
 /** 稳定 Cordis 插件名（host 组合行 id）。 */
 export const name = "dsh-auth-gate";
@@ -176,6 +171,8 @@ export function apply(ctx: Context, config: AuthConfig): void {
   if (server === undefined) return;
   const log = ctx.logger("dsh-auth-gate");
   const passkey = wirePasskey({ ...config, log });
+  // 条件 UI 的运行期值：初始来自配置，admin 可在设置页改写（写回宿主 settings 服务）。
+  let passkeyConditionalUi = passkey.settings.enabled ? passkey.settings.conditionalUi : false;
 
   const resolveToken = config.mode === "token" ? makeTokenResolver(ctx, config, log) : undefined;
   const launchTokenBridge = makeLaunchTokenBridge(ctx, log);
@@ -233,65 +230,27 @@ export function apply(ctx: Context, config: AuthConfig): void {
   // 一次性 bootstrap 会话，向导完成后关窗。三条路径在 `/auth` 前缀内，门直接放行。
   ctx.effect(() => bootstrap.mount(), "dsh-auth-gate: bootstrap routes");
 
-  // passkey 登录（begin + finish）：只在 password 模式且配置自检通过时注册；未启用时
-  // `/auth/passkey/*` 落到 `/auth` 前缀的 404 兜底。限速桶与口令登录分开。
-  mountPasskeyRoutes(ctx, server, config, auth, usersPath, launchTokenBridge, passkey, log);
-
-  ctx.effect(
-    () =>
-      makeEndpointsWiring({
-        server,
-        config,
-        auth,
-        resolveToken,
-        launchTokenBridge,
-        usersPath,
-        limiter,
-        replayGuard,
-        challengeMacKey,
-        passkeyEnabled: passkey.enabled,
-        passkeyLogin: passkey.login,
-        log,
-      }),
-    "dsh-auth-gate: auth endpoints",
-  );
+  mountAuthRoutes(ctx, {
+    server,
+    config,
+    auth,
+    usersPath,
+    launchTokenBridge,
+    passkey,
+    resolveToken,
+    limiter,
+    replayGuard,
+    challengeMacKey,
+    conditionalUi: () => passkeyConditionalUi,
+    setConditionalUi: (enabled) => {
+      passkeyConditionalUi = enabled;
+    },
+    log,
+  });
 
   const failures = guard.assertGuarded(server);
   if (failures.length > 0) {
     for (const failure of failures) log.error(`unwrapped entry: ${failure}`);
     throw new Error(`dsh-auth-gate: guard self-check failed: ${failures.join(", ")}`);
   }
-}
-
-/**
- * passkey 登录路由的挂载（从 `apply` 拆出，守住 80 行函数上限）：只在配置自检通过时
- * 注册 begin/finish 两条 exact 路由；未启用时不注册，`/auth/passkey/*` 落到 `/auth` 的 404 兜底。
- */
-function mountPasskeyRoutes(
-  ctx: Context,
-  server: guard.WrappableServer,
-  config: AuthConfig,
-  auth: AuthService,
-  usersPath: string,
-  launchTokenBridge: () => Promise<string | undefined>,
-  passkey: ReturnType<typeof wirePasskey>,
-  log: {
-    error(message: unknown): void;
-    warn(message: unknown): void;
-    info(message: unknown): void;
-  },
-): void {
-  ctx.effect(
-    () =>
-      makePasskeyWiring({
-        server,
-        config,
-        auth,
-        launchTokenBridge,
-        usersPath,
-        settings: passkey.settings,
-        log,
-      }),
-    "dsh-auth-gate: passkey login routes",
-  );
 }

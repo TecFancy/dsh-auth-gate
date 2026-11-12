@@ -24,3 +24,4 @@ export type {
   PasswordPolicyResult,
   PasswordRule,
 } from "./model/password-policy.js";
+export { PASSKEY_ALGORITHMS, PASSKEY_TRANSPORTS } from "./model/passkey-record.js";

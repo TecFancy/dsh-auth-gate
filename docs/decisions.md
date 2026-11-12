@@ -499,7 +499,7 @@ Node 主版本、平台、架构，加门 mode / totp / 用户数分桶），发
 已登录完整会话**再认证**（当前口令 + TOTP 码）；服务端校验用 `@simplewebauthn/server`（浏览器侧手写 glue），RP ID/origin 只从既有
 `publicHost` 派生；凭证内嵌 `users.yaml`；v1 只提供 `passkey: "off" | "optional"`；
 passkey 登录恒为完整认证（对齐 GitHub 模型：passkey 同时满足口令与 2FA），`totp` 只约束口令登录。
-状态：**proposed，未落地**，方案见 `docs/plans/passkey-login-plan_zh.md`。
+状态：**已落地**（M6 PR1–PR3，2026-11-12），方案见 `docs/plans/passkey-login-plan_zh.md`。
 **替代方案**：维持口令 + TOTP（不解决钓鱼与口令面）；OAuth/OIDC 外部身份源（多一个外部服务）；邮件魔术链接
 （需邮件设施、弱于 origin 绑定）；只支持硬件密钥（排除「方便」）；passkey-only（锁定与恢复不成熟，v1 不做）；
 引 `@simplewebauthn/server`（21 个传递包 / ~870 KiB，主要服务我们不需要的 attestation 链）；先输用户名再
@@ -508,5 +508,5 @@ passkey（多一步且泄露账号存在性）。
 会话/限速/CSRF）都已在位，新增面集中到一条校验路径；注册再认证堵住「会话被劫 → 后门 passkey」这条
 passkey 相对 TOTP 唯一新增的持久化攻击面；`publicHost` 作唯一 RP ID 锚点，避免半外壳反代下
 「永远登录不上」的错配。
-→ [zh](decisions/proposed/2026-11-11-passkey-login.zh.md) ·
-[en](decisions/proposed/2026-11-11-passkey-login.en.md)
+→ [zh](decisions/implemented/2026-11-11-passkey-login.zh.md) ·
+[en](decisions/implemented/2026-11-11-passkey-login.en.md)

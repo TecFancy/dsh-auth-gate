@@ -59,14 +59,17 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     installId: "" # internal anonymous install id (UUID v4), hidden and generated on first use; do not set by hand / 内部匿名安装 id（UUID v4），隐藏、首次使用时生成，不要手填
 ```
 
-- `passkey: "optional"` is being implemented (M6): sign-in is live (passkey button,
-  conditional UI when `passkeyConditionalUi` is on), while registration/management
-  endpoints and the Settings toggle ship in the next slice. `/auth/status.passkeyEnabled`
-  reflects the startup check; a passkey configuration that cannot be derived from
-  `publicHost` stays off with an error log instead of failing the instance. /
-  `passkey: "optional"` 正在实现中（M6）：登录已可用（passkey 按钮；开启
-  `passkeyConditionalUi` 时支持自动填充），注册/管理端点与设置页开关随后续切片上线。
-  `/auth/status.passkeyEnabled` 反映启动自检结果；无法从 `publicHost` 派生的配置会记
+- `passkey: "optional"` (M6, shipped): sign-in, enrolment, self-service removal and the
+  conditional-UI toggle are all live. Enrolment and removing the last credential require
+  the current password (plus a TOTP code when enabled). A passkey satisfies both the
+  password and 2FA requirements, so `totp` constrains password sign-in only. Passkeys need
+  HTTPS and a domain: the RP ID comes from `publicHost` and cannot be an IP, so plain-http
+  intranet addresses and the local proxy cannot use them. A configuration that cannot be
+  derived from `publicHost` stays off with an error log instead of failing the instance. /
+  `passkey: "optional"`（M6，已上线）：登录、注册、自助删除与条件 UI 开关全部可用。
+  注册与删除最后一把需要当前口令（启用 TOTP 时还要验证码）。通行密钥同时满足口令与 2FA
+  要求，所以 `totp` 只约束口令登录。通行密钥需要 HTTPS 与域名：RP ID 取自 `publicHost`
+  且不能是 IP，纯 http 内网地址与本地代理都用不了。无法从 `publicHost` 派生的配置会记
   error 日志并按 off 处理，不会拖垮实例。
 - Override **without** `insert` — the bundle row is already mounted; adding one
   double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
@@ -95,6 +98,9 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user disab
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user enable <name>
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp enable <name> # prints base32 secret + otpauth:// URI / 生成 TOTP 密钥（打印 base32 与 otpauth:// URI）
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp disable <name>
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey list <name> # label, id prefix, created/last used, BE/BS / 列出某用户的通行密钥
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --id <prefix> # >= 8 chars, must match exactly one / 按 credentialId 前缀删除（至少 8 字符且唯一匹配）
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --all # remove every passkey of that user / 删除该用户全部通行密钥
 # Install this quick-reference skill into $DSH_HOME/skills/ for the dsh agent:
 # 技能安装（本包内置的配置速查，装进 $DSH_HOME/skills/ 供 dsh agent 加载）：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]

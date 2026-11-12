@@ -178,3 +178,72 @@ export interface PasskeyLoginErrorBody {
   /** 429 时同时写 `retry-after` 头。 */
   retryAfter?: number;
 }
+
+/** 一把凭据的公开摘要（列表用）：**绝不含**公钥、userHandle 或任何密钥材料。 */
+export interface PasskeySummary {
+  /** credentialId 前 12 字符（完整值不出现在列表里）。 */
+  idPrefix: string;
+  label: string;
+  /** epoch ms。 */
+  createdAt: number;
+  /** epoch ms；0 = 从未使用。 */
+  lastUsedAt: number;
+  /** BE（可备份/可同步）。 */
+  backupEligible: boolean;
+  /** BS（已备份）。 */
+  backupState: boolean;
+  transports: string[];
+}
+
+/** `GET /auth/passkey` 的 200 响应体（按 createdAt 升序，client 不重排）。 */
+export interface PasskeyListResponse {
+  passkeys: PasskeySummary[];
+}
+
+/**
+ * `POST /auth/passkey/register/options` 的 200 响应体：库的
+ * `PublicKeyCredentialCreationOptionsJSON` 原样透传（注册侧需要 `excludeCredentials`/`rp`/`user`
+ * 等全部字段，不做裁剪）。
+ */
+export type PasskeyRegistrationOptionsResponse = Record<string, unknown>;
+
+/**
+ * `POST /auth/passkey/register` 的请求体（urlencoded 扁平字段，二进制一律 base64url）。
+ * `password`/`code` 是**再认证**凭据：会话本身不足以注册（防「会话被劫 → 后门 passkey」）。
+ */
+export interface PasskeyRegistrationRequest {
+  label: string;
+  password: string;
+  code: string;
+  id: string;
+  client_data_json: string;
+  attestation_object: string;
+  transports: string;
+}
+
+/** `POST /auth/passkey/remove` 的请求体。`all=1` 表示清空；否则按 `id` 前缀唯一匹配。 */
+export interface PasskeyRemoveRequest {
+  id: string;
+  all?: string;
+  password: string;
+  code: string;
+}
+
+/** `GET/POST /auth/passkey/settings` 的响应体（admin）。 */
+export interface PasskeySettingsResponse {
+  /** 登录页是否启用 passkey 自动填充（条件 UI）。 */
+  conditionalUiEnabled: boolean;
+}
+
+/** `POST /auth/passkey/settings` 的请求体。 */
+export interface PasskeySettingsRequest {
+  conditionalUi: string;
+}
+
+/** passkey 管理端点的 JSON 错误体。 */
+export interface PasskeyAdminErrorBody {
+  error: "unauthorized" | "forbidden" | "locked" | "unavailable" | "bad_request" | "not_found";
+  /** 400 `policy` 类错误的细分原因（如 `last-credential`）。 */
+  reason?: string;
+  retryAfter?: number;
+}

@@ -12,6 +12,24 @@ GitHub's passkey model
 (passkeys satisfy both the password and 2FA requirements; `totp` constrains password sign-in only); environments
 that do not accept synced passkeys set `passkey: "off"`. Plan: `docs/plans/passkey-login-plan.md`.
 
+## Implementation status (2026-11-12)
+
+M6 shipped in three PRs, all green through `npm run verify` (lint/FSD/coverage/build/bundle/host checks):
+
+- **PR1** (`152e46b`): the `/auth/status.passkeyEnabled` contract, `users.yaml` `passkeyUserHandle`/`passkeys[]`
+  with cross-record validation, the ceremony store + opaque cookie, `publicHost` → RP ID/origin derivation with
+  a startup self-check, the `dsh-auth passkey list/rm` CLI, and the bundled config skill.
+- **PR2** (`f20f2de`): `@simplewebauthn/server@14.1.0` (pinned exactly), `POST /auth/passkey/options` and
+  `/auth/passkey/login` (discoverable/username-less, library verification, userHandle/BE consistency, counter
+  policy, a separate rate-limit bucket, dummy equal-work), the login-page passkey button with inline JS and
+  conditional UI, and a real-stack integration test with a self-built EC P-256 authenticator.
+- **Review fixes** (`0a8f747`): after Kimi K3.1 Pro's review, the begin quota that never consumed anything and
+  the missing `Permissions-Policy` (two majors), plus the 503 ordering, the userHandle check ordering, an unused
+  dependency and a file-length overrun.
+- **PR3**: registration/management/settings endpoints (enrolment and removing the last credential require
+  re-authentication), the client Account-security passkey block and conditional-UI toggle, README /
+  known-limitations / deployment docs, and this record moved to implemented.
+
 ## Context
 
 The gate currently offers only a shared token or "password + optional TOTP". TOTP does not stop phishing
