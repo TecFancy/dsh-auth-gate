@@ -6,6 +6,7 @@
  */
 export {
   buildPayload,
+  defaultFetch,
   makeTelemetry,
   PING_INTERVAL_MS,
   PING_TIMEOUT_MS,

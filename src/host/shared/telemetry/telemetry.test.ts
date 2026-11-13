@@ -8,6 +8,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildPayload,
+  defaultFetch,
   PING_INTERVAL_MS,
   PING_TIMEOUT_MS,
   TELEMETRY_ENDPOINT,
@@ -274,5 +275,15 @@ describe("metrics 与报文的读取器", () => {
     expect(
       buildPayload({ ...base, host: { nodeVersion: "20.1.0", platform: "darwin", arch: "arm64" } }),
     ).toMatchObject({ node: "v20", os: "darwin", arch: "arm64" });
+  });
+});
+
+describe("匿名上报：测试运行器下的守卫", () => {
+  it("refuses to send through the default sender when no test replaced fetch", async () => {
+    // 真事故的形状：测试挂真实插件、又没关上报，缺省发送器就会把报文发到生产端点。这里不注入
+    // 网络，也不替换全局 fetch，走的正是那条缺省路径。
+    await expect(defaultFetch(TELEMETRY_ENDPOINT, { method: "POST" })).rejects.toThrow(
+      /test runner/,
+    );
   });
 });

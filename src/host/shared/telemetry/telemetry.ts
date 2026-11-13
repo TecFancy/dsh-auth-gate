@@ -65,6 +65,31 @@ export interface PackageManifest {
 /** 本模块调用的 `fetch`；测试替换它，于是没有测试会打开 socket。 */
 export type TelemetryFetch = (url: string, init: RequestInit) => Promise<unknown>;
 
+/** 加载时的原生 `fetch`，用来判断测试有没有把它换掉。 */
+const NATIVE_FETCH = globalThis.fetch;
+
+/** 当前进程是不是测试运行器。 */
+function underTestRunner(): boolean {
+  return (process.env["VITEST"] ?? "").length > 0 || process.env["NODE_ENV"] === "test";
+}
+
+/**
+ * 缺省的发送器。
+ *
+ * 测试运行器下，只有**没有被替换**的 `fetch` 才拒绝发送。这层守卫来自 lingualab 的一起真事故：
+ * 那边测试通过真实入口挂载插件却没关上报，于是 `npm test` 与 CI 把真实报文写进了生产库。这里的
+ * 测试会把 `fetch` 换成一个假的来走这条路径，那种替换是显式的，照常放行；没替换的测试一律到不了
+ * 端点。真实进程里没有 `VITEST`，行为不变。
+ *
+ * 导出只为单测：它不接受注入，测试只能直接调它来钉住「测试运行器下必拒」。
+ */
+export const defaultFetch: TelemetryFetch = (url, init) => {
+  if (underTestRunner() && globalThis.fetch === NATIVE_FETCH) {
+    return Promise.reject(new Error("telemetry is off under a test runner"));
+  }
+  return globalThis.fetch(url, init);
+};
+
 /**
  * 宿主 settings 服务，只用到「把补丁合并进本插件的配置条目」这一项能力。
  *
@@ -221,7 +246,7 @@ async function postPayload(fetchFn: TelemetryFetch, payload: TelemetryPayload): 
  */
 export function makeTelemetry(options: TelemetryOptions): Telemetry {
   const clock = options.now ?? Date.now;
-  const fetchFn: TelemetryFetch = options.fetch ?? ((url, init) => globalThis.fetch(url, init));
+  const fetchFn: TelemetryFetch = options.fetch ?? defaultFetch;
   const enabled = options.enabled && MANIFEST.pkg.length > 0 && MANIFEST.version.length > 0;
   let lastPingAt: number | null = null;
   let currentId: string | null = null;
