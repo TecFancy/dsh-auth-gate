@@ -232,6 +232,27 @@ Versioning is fully automated from conventional commits on `main`
   publishes to npm (`dsh-auth-gate`, MIT-licensed); consumers can additionally
   install from git or a local tarball (`npm pack`).
 
+**npm authentication is Trusted Publishing (OIDC), not a token.** The `publish`
+job holds `id-token: write` and no `NPM_TOKEN` secret exists. npm exchanges the
+job's GitHub-signed identity for a short-lived publish token, so there is
+nothing long-lived to leak or rotate. Three things must stay true or publishing
+breaks with a bare `ENEEDAUTH`:
+
+- the trusted publisher on npmjs.com names this repository and the workflow
+  filename `release.yml` — renaming the file means updating npm first;
+- the job keeps `id-token: write` (the top-level `permissions` block does not
+  grant it);
+- `actions/setup-node` is **not** given `registry-url`. That input writes
+  `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into `.npmrc`; with no
+  token it expands to an empty string, npm reads it as "auth already
+  configured", skips the OIDC exchange and fails
+  ([actions/setup-node#1551](https://github.com/actions/setup-node/issues/1551)).
+  The repo `.npmrc` already pins the public registry.
+
+Node 24 is pinned because Trusted Publishing needs npm ≥ 11.5.1, and Node 22
+ships npm 10.9.x. `--provenance` is not passed: a trusted publish attests
+automatically.
+
 **Merge policy.** Feature/PR workflows merge into `main` with **squash** —
 each PR lands as exactly one conventional commit (the PR title):
 `gh pr merge <n> --squash`. Squash is required, not optional: release-please

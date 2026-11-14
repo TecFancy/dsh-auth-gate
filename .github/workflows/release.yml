@@ -25,13 +25,26 @@ jobs:
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created }}
     runs-on: ubuntu-latest
+    # npm Trusted Publishing (OIDC): npm exchanges this job's GitHub-signed
+    # identity for a short-lived publish token, so no NPM_TOKEN secret exists.
+    # The trust is registered on npmjs.com against this exact repo and the
+    # `release.yml` filename; renaming the file breaks publishing.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
+      # No `registry-url` here on purpose. It makes setup-node write
+      # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into .npmrc; with
+      # no token that expands to an empty string, npm reads it as "auth is
+      # already configured" and never starts the OIDC exchange, failing with
+      # ENEEDAUTH (actions/setup-node#1551). registry.npmjs.org is npm's
+      # default anyway, and the repo .npmrc pins it.
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-      - run: npm ci --registry=https://registry.npmjs.org/
-      - run: npm publish --registry=https://registry.npmjs.org/
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          node-version: 24
+          package-manager-cache: false
+      - run: npm ci
+      # No NODE_AUTH_TOKEN and no --provenance: a trusted publish attests
+      # automatically.
+      - run: npm publish
