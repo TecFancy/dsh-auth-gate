@@ -303,9 +303,13 @@ the previous or next window is also accepted (drift tolerance).
 
 ## Anonymous usage statistics
 
-This plugin sends one anonymous usage ping per process per 24 hours, and only after a request has
-already been let through the login gate. It answers one question: how many machines actually run the
-plugin, and on which version. No account, no server of ours, no third-party SDK.
+This plugin sends one usage ping per process per 24 hours, and only after a request has already been
+let through the login gate. It answers one question: how many machines actually run the plugin, and
+on which version. No account, no server of ours, no third-party SDK.
+
+The accurate description is **pseudonymous data with no IP, linked by a random install id**, not
+legally anonymous data: the same id is linkable over time, so it is only used to estimate install
+counts and version spread, never for billing, security decisions or precise public numbers.
 
 The `POST` goes to `https://t.hi-ruofei.com/v1/ping` and carries exactly:
 
@@ -330,7 +334,7 @@ nothing is sent at all:
 The install id lives in the hidden `installId` field of the same config entry and is written back
 through the host's settings service when there is one. A host without that service keeps the id in
 memory for this process (one new id per restart) rather than writing a private file to disk; deleting
-the field starts a new anonymous identity. The reasoning and the rejected alternatives are in
+the field starts a new pseudonymous identity. The reasoning and the rejected alternatives are in
 [the decision record](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md).
 
 ## Command-line tool

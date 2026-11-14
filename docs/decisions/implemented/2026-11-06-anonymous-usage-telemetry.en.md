@@ -22,6 +22,12 @@ The ping is hooked at the guard's allow branch (`guardHttp`, `guardResource`, `g
 `AdmitHook` that `wrapServer` threads into every wrapped entry): the hook runs after `decide()`
 returned `allow`, outside the decision path. There is no timer and no call at startup.
 
+**On the word "anonymous".** It is the feature's name, not a legal claim. The accurate description,
+and the one both READMEs use, is _pseudonymous data with no IP, linked by a random install id_: the
+same id is linkable over time, so the data is only used to estimate install counts and version spread,
+never for billing, security decisions or precise public numbers. No IP address is collected, and the
+endpoint stores no request metadata beyond the payload.
+
 ## Context
 
 Two questions drove this: how many machines actually run the plugin, and which version did they
