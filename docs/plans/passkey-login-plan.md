@@ -429,6 +429,7 @@ rather than deferring all of them to PR3.
 > real-stack integration test), review fixes `0a8f747` (begin quota, `Permissions-Policy`, 503 ordering, ...),
 > and PR3 (registration/management/settings endpoints with re-authentication, the client passkey block and
 > conditional-UI toggle, README/known-limitations/deployment docs, D35 moved to implemented).
+> **Isolated-instance verification (2026-11-12)**: in a separate `DSH_HOME` profile (`passkey-verify`, port 3099, `publicHost: http://localhost:3099`, `passkey: "optional"`) a Playwright + CDP virtual authenticator ran the full flow (password sign-in -> enrol a passkey -> sign out -> passkey sign-in); `/auth/status` reported `authenticated:true, name:alice, passkeyEnabled:true`, and the conditional-UI toggle was exercised in both states. The run caught and fixed two real defects (`Permissions-Policy` must be `=(self)`, not `=()`; the login page must read the passkey flags on every render instead of caching a mount-time snapshot), see PR #125. Screenshots: `docs/demo/passkey-login.en.png` and `docs/demo/passkey-account-security.en.png`.
 
 ## 10. References
 

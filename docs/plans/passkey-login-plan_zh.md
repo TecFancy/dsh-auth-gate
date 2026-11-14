@@ -368,6 +368,7 @@ WebAuthn 的 challenge 是**必须被服务端重新读出的秘密**，且必�
 > 登录页按钮 + 条件 UI、真栈集成测试）、评审修复 `0a8f747`（begin 配额、`Permissions-Policy`、503 顺序等）、
 > PR3（注册/管理/设置端点含再认证、客户端通行密钥区块与条件 UI 开关、README/known-limitations/部署文档、
 > D35 转 implemented）。
+> **隔离实例验证（2026-11-12）**：在独立 `DSH_HOME` 的 `passkey-verify` profile（端口 3099、`publicHost: http://localhost:3099`、`passkey: "optional"`）里用 Playwright + CDP 虚拟认证器走完「口令登录 → 注册通行密钥 → 登出 → 通行密钥登录」；`/auth/status` 回 `authenticated:true, name:alice,passkeyEnabled:true`，条件 UI 开关的开/关两种状态都验证过。验证中抓到并修掉两个真实缺陷（`Permissions-Policy` 必须写成 `=(self)` 而不是 `=()`；登录页的 passkey 开关必须每次渲染现取而不是挂载快照），见 PR #125。截图见 `docs/demo/passkey-login.en.png` 与 `docs/demo/passkey-account-security.en.png`。
 
 ## 10. 参考
 

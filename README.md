@@ -239,6 +239,21 @@ button is then the fallback way out):
 
 ![Login page explaining the sign-out](docs/demo/login-password-changed.png)
 
+A user can also enrol a **passkey** (WebAuthn) from the same Account security section and then
+sign in from the login page with one touch, no username or password. The button sits below the
+password form; the passkey list below the form shows each credential's name, creation and last-use
+times, whether it is backup-eligible, and a Remove action. Enrolment and removing the last
+credential ask for the current password (plus a TOTP code when enabled), so a hijacked session
+cannot add a backdoor credential:
+
+![Passkeys block in Account security: the credential list and the add form](docs/demo/passkey-account-security.en.png)
+
+With `passkey: "optional"` the login page grows a second sign-in path. Following GitHub's model a
+passkey satisfies both the password and 2FA requirements, so an account with TOTP enabled still
+signs in with a passkey in one step:
+
+![Login page with the "Sign in with a passkey" button](docs/demo/passkey-login.en.png)
+
 Passwords must be at least 14 characters, contain four character classes and
 differ from the current one. With TOTP on, a code already spent in the current
 30-second window is rejected as a replay: wait for the next code.
