@@ -246,9 +246,12 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
 
 ## 匿名使用统计
 
-这个插件每进程每 24 小时最多发一次匿名使用统计，而且只在一次请求已经通过登录门之后。它只回答
+这个插件每进程每 24 小时最多发一次使用统计，而且只在一次请求已经通过登录门之后。它只回答
 一个问题：有多少台机器真的在跑这个插件、跑的是哪个版本。没有账号，没有我们自己的服务器，也没有
 第三方 SDK。
+
+准确的说法是**无 IP、以随机 install id 关联的伪名化数据**，不是法律意义上的匿名数据：同一个 id 在时间上
+可关联，所以它只用来估装机量和版本分布，不用于计费、安全判断，也不对外宣称精确数字。
 
 上报是对 `https://t.hi-ruofei.com/v1/ping` 的一次 `POST`，内容精确如下：
 
@@ -270,7 +273,7 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
 
 安装 id 存在同一个配置条目的隐藏字段 `installId` 里，宿主提供 settings 服务时经它写回。没有这个
 服务的宿主把 id 留在进程内存里（每次重启换一个），而不是私自在磁盘上写文件；删掉这个字段就换了
-一个新的匿名身份。理由与被否决的做法见[决策记录](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md)。
+一个新的伪名化身份。理由与被否决的做法见[决策记录](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md)。
 
 ## 命令行工具
 
