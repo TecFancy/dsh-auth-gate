@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.18.1...v0.19.0) (2026-11-14)
+
+
+### Features
+
+* passkey sign-in, and one pseudonymous usage ping per day ([#128](https://github.com/TecFancy/dsh-auth-gate/issues/128)) ([7731ac1](https://github.com/TecFancy/dsh-auth-gate/commit/7731ac1a17fb5f0a7a551007047283ecba100b60))
+
 ## [0.18.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.18.0...v0.18.1) (2026-11-06)
 
 
