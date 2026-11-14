@@ -209,6 +209,23 @@ no-emdash、slice 边界、FSD 分层（Steiger）、决策记录、类型检查
 - 发布 PR 合并后，Release 工作流（`release.yml`）还会发布到 npm
   （`dsh-auth-gate`，MIT 许可）；消费者也可以从 git 或本地 tarball（`npm pack`）安装。
 
+**npm 认证走 Trusted Publishing（OIDC），不用令牌。** `publish` job 持有
+`id-token: write`，仓库里没有 `NPM_TOKEN` secret。npm 用这个 job 的 GitHub 签名身份换一个
+短时发布令牌，所以没有任何长期凭据可泄漏、也不需要轮换。以下三条任一被破坏，发布都会以一句
+光秃秃的 `ENEEDAUTH` 失败：
+
+- npmjs.com 上的 trusted publisher 必须写着本仓库和 workflow 文件名 `release.yml` ——
+  改文件名就要先去 npm 改配置；
+- job 必须保留 `id-token: write`（顶层的 `permissions` 块不授予它）；
+- **不要**给 `actions/setup-node` 传 `registry-url`。这个输入会往 `.npmrc` 写
+  `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}`；没有令牌时它展开成空串，npm 会认为
+  「认证已配置」，跳过 OIDC 交换然后失败
+  （[actions/setup-node#1551](https://github.com/actions/setup-node/issues/1551)）。
+  仓库自己的 `.npmrc` 已经钉住公共 registry。
+
+钉 Node 24 是因为 Trusted Publishing 需要 npm ≥ 11.5.1，而 Node 22 自带 npm 10.9.x。
+不传 `--provenance`：可信发布会自动生成证明。
+
 **合并策略（Merge policy）。** 功能/PR 流程以 **squash** 合并进 `main` ——
 每个 PR 恰好落成一个 conventional commit（即 PR 标题）：`gh pr merge <n> --squash`。
 Squash 是强制项而非可选项：release-please 会解析被合并分支的提交
