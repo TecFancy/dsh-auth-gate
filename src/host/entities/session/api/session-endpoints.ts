@@ -26,8 +26,13 @@ export interface AuthHttpDeps {
   /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
   readonly logoutOrder: number;
   /**
+   * passkey 登录是否对本实例启用（配置透传）：恒写进 `/auth/status`，缺省 `false`。
+   * 只表示实例能力，不表示「当前用户是否已注册通行密钥」。
+   */
+  readonly passkeyEnabled?: boolean | undefined;
+  /**
    * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
-   * 缺省 = 保持两字段形状（加法兼容，token 模式的响应形状一字不变）。
+   * 缺省 = 不追加身份字段（加法兼容）。
    */
   readonly loadUsers?: (() => Promise<UsersLoadResult>) | undefined;
   readonly logger: { info(message: unknown): void; error?(message: unknown): void };
@@ -71,8 +76,9 @@ async function logout(
  * P2 起在 password 模式追加「关于我」字段（§1）：`name`/`role`/`disabled`/`totpEnabled`/
  * `mustChangePassword`/`sessionKind`。三条硬边界：
  * 1. **只含关于我**：绝不出现他人的任何记录（面板身份判断只依赖这些字段）。
- * 2. **键集合相等**：未认证 / subject 已不在 users.yaml / users 不可读 -> 只有既有两字段，
- *    不出现 `role: null` 之类的占位（不泄漏用户是否存在）。
+ * 2. **键集合相等**：未认证 / subject 已不在 users.yaml / users 不可读 -> 只有基础字段
+ *    （`authenticated`/`logoutOrder`/`passkeyEnabled`），不出现 `role: null` 之类的占位
+ *    （不泄漏用户是否存在）。
  * 3. 授权判定不读这里：管理端点每请求现读 users.yaml，禁止信 status 或会话快照。
  */
 export function handleStatus(
@@ -97,7 +103,7 @@ export function handleStatus(
   return writeStatusWithIdentity(deps, session, deps.loadUsers, res);
 }
 
-/** 追加身份字段；读盘失败或账号已删时退回两字段（不 500、不泄漏存在性）。 */
+/** 追加身份字段；读盘失败或账号已删时退回基础字段（不 500、不泄漏存在性）。 */
 async function writeStatusWithIdentity(
   deps: AuthHttpDeps,
   session: Session,
@@ -128,13 +134,20 @@ async function writeStatusWithIdentity(
   });
 }
 
-/** 写出 `StatusResponse`（跨半边契约 D31）；`logoutOrder` 恒由 deps 补在最后。 */
+/**
+ * 写出 `StatusResponse`（跨半边契约 D31）：`logoutOrder` 与 `passkeyEnabled` 恒由 deps 补在最后
+ * （`passkeyEnabled` 缺省即 `false`，形状恒在）。
+ */
 function writeStatus(
   res: ServerResponse,
   deps: AuthHttpDeps,
-  body: Omit<StatusResponse, "logoutOrder">,
+  body: Omit<StatusResponse, "logoutOrder" | "passkeyEnabled">,
 ): void {
-  const payload: StatusResponse = { ...body, logoutOrder: deps.logoutOrder };
+  const payload: StatusResponse = {
+    ...body,
+    logoutOrder: deps.logoutOrder,
+    passkeyEnabled: deps.passkeyEnabled === true,
+  };
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "application/json" });
   res.end(JSON.stringify(payload));

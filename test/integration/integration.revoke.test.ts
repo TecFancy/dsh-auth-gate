@@ -8,7 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
 
@@ -56,12 +56,16 @@ async function mountPasswordStack(): Promise<{
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
   fibers.push(
-    await ctx.plugin({ name, inject, apply, Config }, {
-      mode: "password",
-      cookieSecure: false,
-      usersFile,
-      revokeSweepMs: SWEEP_MS,
-    } as AuthConfig),
+    await ctx.plugin(
+      { name, inject, apply, Config },
+      {
+        telemetry: false,
+        mode: "password",
+        cookieSecure: false,
+        usersFile,
+        revokeSweepMs: SWEEP_MS,
+      },
+    ),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
   server.register({
@@ -126,7 +130,9 @@ describe("integration: disabling a user revokes live sessions", () => {
       expect(status).toBe(401);
 
       const statusRes = await fetch(`${base}/auth/status`, { headers: { cookie } });
-      expect(await statusRes.text()).toBe('{"authenticated":false,"logoutOrder":1000}');
+      expect(await statusRes.text()).toBe(
+        '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+      );
     } finally {
       await unmountStack(fibers, root);
     }

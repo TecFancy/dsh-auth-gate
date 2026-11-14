@@ -1,3 +1,4 @@
+import { type PasskeyLoginOptions } from "./passkey-login.js";
 export interface LoginPageOptions {
     /** 当前实例的 origin/host（反钓鱼身份块）；空串或缺省时不渲染该行。 */
     host?: string | undefined;
@@ -15,6 +16,11 @@ export interface LoginPageOptions {
      * 绝不来自请求文本：本字段一律 escapeHtml，且不改变 error/hint 槽语义。
      */
     notice?: string | undefined;
+    /**
+     * passkey 登录入口（M6 §5.7）。缺省或 `enabled: false` → 页面与旧版逐字相同；
+     * `conditionalUi` 只影响内联脚本与用户名框的 autocomplete 提示，不改变口令路径。
+     */
+    passkey?: PasskeyLoginOptions | undefined;
 }
 /** token 模式登录页：单字段（共享访问令牌），恒时校验由端点负责。 */
 export declare function loginPageHtml(next: string, error?: string, options?: LoginPageOptions): string;

@@ -7,7 +7,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { generateTotpSecret, totpCodeAt } from "../../src/host/features/totp/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
@@ -77,12 +77,16 @@ export async function mountTotpStack(options?: {
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
   fibers.push(
-    await ctx.plugin({ name, inject, apply, Config }, {
-      mode: "password",
-      cookieSecure: false,
-      usersFile,
-      totp: options?.totp ?? "optional",
-    } as AuthConfig),
+    await ctx.plugin(
+      { name, inject, apply, Config },
+      {
+        telemetry: false,
+        mode: "password",
+        cookieSecure: false,
+        usersFile,
+        totp: options?.totp ?? "optional",
+      },
+    ),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
   server.register({

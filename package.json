@@ -105,6 +105,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.1",
+    "@simplewebauthn/server": "14.1.0",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

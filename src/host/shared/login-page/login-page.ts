@@ -6,19 +6,14 @@ import {
   SUBMIT_SCRIPT,
   TOTP_SCRIPT,
 } from "./login-page-assets.js";
+import { escapeHtml } from "./html-escape.js";
+import {
+  PASSKEY_STYLE,
+  passkeyLoginFragment,
+  passkeyLoginScript,
+  type PasskeyLoginOptions,
+} from "./passkey-login.js";
 import { LOGIN_PATH } from "../protocol/index.js";
-
-const HTML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&#39;",
-};
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch] ?? ch);
-}
 
 /** host 只做安全帽：防超长头撑爆页面；视觉截断交给 CSS（ellipsis + title 全文）。 */
 const HOST_MAX_LENGTH = 253;
@@ -40,6 +35,11 @@ export interface LoginPageOptions {
    * 绝不来自请求文本：本字段一律 escapeHtml，且不改变 error/hint 槽语义。
    */
   notice?: string | undefined;
+  /**
+   * passkey 登录入口（M6 §5.7）。缺省或 `enabled: false` → 页面与旧版逐字相同；
+   * `conditionalUi` 只影响内联脚本与用户名框的 autocomplete 提示，不改变口令路径。
+   */
+  passkey?: PasskeyLoginOptions | undefined;
 }
 
 interface FieldSpec {
@@ -77,6 +77,15 @@ interface LoginCardOptions {
   options?: LoginPageOptions | undefined;
   /** 仅 TOTP 段注入的内联增强脚本。 */
   script?: string | undefined;
+  /** 追加到共享样式表末尾的页面专属样式（passkey 按钮；token/TOTP 页不传）。 */
+  style?: string | undefined;
+  /** 插在口令表单之后、回退链接之前的片段（passkey 入口；token/TOTP 页不传）。 */
+  afterForm?: string | undefined;
+}
+
+/** 可选的页面片段：缺省/空串时一个字节都不注入，旧页面因此保持逐字不变。 */
+function blockHtml(value: string | undefined): string {
+  return value === undefined || value === "" ? "" : `${value}\n`;
 }
 
 /** 渲染公共卡片骨架（kicker/host/错误槽/hint/表单/页脚），全部动态文本 HTML-escape。 */
@@ -126,6 +135,8 @@ function renderLoginCard(spec: LoginCardOptions): string {
     opts.resetHref === undefined
       ? ""
       : `<a class="back" href="${escapeHtml(opts.resetHref)}">Use a different account</a>`;
+  // 缺省时逐字保持旧页面：不注入空行/空样式，既有页面快照断言不受影响。
+  const styleHtml = spec.style ?? "";
   // 失败页标题前缀（可达性）：整页导航后已填充的 role="alert" 常不被读屏播报
   // （APG/MDN/ARIA19 一致），GOV.UK 的做法是让 <title> 先说 "Error:"。
   const docTitle = spec.error === undefined ? spec.title : `Error: ${spec.title}`;
@@ -135,7 +146,7 @@ function renderLoginCard(spec: LoginCardOptions): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(docTitle)}</title>
-<style>${CARD_STYLE}</style>
+<style>${CARD_STYLE}${styleHtml}</style>
 </head>
 <body>
 <main class="card">
@@ -147,7 +158,7 @@ function renderLoginCard(spec: LoginCardOptions): string {
 ${noticeHtml}${errorHtml}${hintHtml}${fieldsHtml}
 <button type="submit">${escapeHtml(spec.submitLabel)}</button>
 </form>
-${resetHtml}
+${blockHtml(spec.afterForm)}${resetHtml}
 <p class="meta"><a href="https://github.com/TecFancy/dsh-auth-gate" target="_blank" rel="noopener">Secured by dsh-auth-gate</a></p>
 </main>
 ${spec.script ?? EYE_SCRIPT}
@@ -189,6 +200,11 @@ export function passwordLoginPageHtml(
   options?: LoginPageOptions,
 ): string {
   const username = options?.username ?? "";
+  // passkey 入口默认不渲染（缺省/未启用时页面与旧版逐字相同）；条件 UI 开启时
+  // 用户名框加 `webauthn` autocomplete 提示，凭据才会出现在浏览器的自动填充里。
+  const passkey = options?.passkey;
+  const passkeyEnabled = passkey?.enabled === true;
+  const conditionalUi = passkeyEnabled && passkey?.conditionalUi === true;
   // 失败页焦点策略：用户名为空（空提交 / 手机上被 autofill 清掉）→ 焦点给用户名；
   // 否则给密码框（用户只需重敲密码，且 aria-describedby 会把错误一起读出来）。
   const focusUsername = error !== undefined && username.trim() === "";
@@ -201,7 +217,7 @@ export function passwordLoginPageHtml(
         id: "username",
         label: "Username",
         name: "username",
-        autocomplete: "username",
+        autocomplete: conditionalUi ? "username webauthn" : "username",
         placeholder: "Enter your username",
         type: "text",
         autofocus: focusUsername,
@@ -224,7 +240,9 @@ export function passwordLoginPageHtml(
     next,
     error,
     options,
-    script: EYE_SCRIPT + SUBMIT_SCRIPT,
+    script: EYE_SCRIPT + SUBMIT_SCRIPT + (passkeyEnabled ? passkeyLoginScript(conditionalUi) : ""),
+    style: passkeyEnabled ? PASSKEY_STYLE : undefined,
+    afterForm: passkey === undefined ? undefined : passkeyLoginFragment(next, passkey),
   });
 }
 

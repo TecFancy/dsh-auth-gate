@@ -7,6 +7,7 @@
  * client bundle 不 import 服务端 shared 模块，半边保持解耦。
  */
 import type { PasswordRule } from "../api/index.ts";
+import { PASSKEY_DICT_EN, PASSKEY_DICT_ZH } from "./passkey-copy.ts";
 
 /** 槽位注入的标准 `t` seat（host locale translate 的形）。 */
 export type AccountTranslate = (key: string, params?: Record<string, unknown>) => string;
@@ -119,6 +120,8 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.ruleDigit]: "包含数字",
   [ACCOUNT_KEYS.ruleSpecial]: "包含特殊字符（非字母数字）",
   [ACCOUNT_KEYS.ruleSameAsOld]: "不能与当前密码相同",
+  // passkey 分片（`account.passkey.*`）：与 account 键同命名域，注册时一并进 `auth` 词典。
+  ...PASSKEY_DICT_ZH,
 };
 
 /** 英文词典。 */
@@ -162,4 +165,6 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
   [ACCOUNT_KEYS.ruleDigit]: "a digit",
   [ACCOUNT_KEYS.ruleSpecial]: "a special character (not a letter or digit)",
   [ACCOUNT_KEYS.ruleSameAsOld]: "different from the current password",
+  // passkey 分片（`account.passkey.*`）：与 account 键同命名域，注册时一并进 `auth` 词典。
+  ...PASSKEY_DICT_EN,
 };

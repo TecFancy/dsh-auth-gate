@@ -1,0 +1,1 @@
+{"version":3,"file":"passkey-block.d.ts","sourceRoot":"","sources":["../../../../../src/client/features/passkey/ui/passkey-block.tsx"],"names":[],"mappings":"AAAA;;;;;;GAMG;AACH,OAAO,EAAgB,KAAK,gBAAgB,EAAE,MAAM,+BAA+B,CAAC;AAgBpF,MAAM,WAAW,iBAAiB;IAChC,6CAA6C;IAC7C,CAAC,EAAE,gBAAgB,CAAC;CACrB;AA2BD;;;GAGG;AACH,wBAAgB,YAAY,CAAC,EAAE,CAAC,EAAE,EAAE,iBAAiB,+BAiCpD"}

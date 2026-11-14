@@ -476,3 +476,37 @@ fallback 既认函数也认 `{ resource }`；`Gate.decide()` 的入参收窄成�
 结构镜像不 import 0.2.2 独有类型，旧宿主加载不受影响；自检继续 fail loud，任何入口没守卫就抛错。
 → [zh](decisions/implemented/2026-11-06-guard-resource-routes.zh.md) ·
 [en](decisions/implemented/2026-11-06-guard-resource-routes.en.md)
+
+## D34. 匿名使用统计：放行后惰性上报，默认开、可见可关
+
+每进程每 24 小时最多一次匿名上报，只在请求通过登录门之后；报文固定 v1（包版本、随机 UUID 安装 id、
+Node 主版本、平台、架构，加门 mode / totp / 用户数分桶），发往 `https://t.hi-ruofei.com/v1/ping`。
+`telemetry` 默认 `true` 且可见可关；`installId` 为 `.volatile().hidden(true)`，经宿主 settings 服务
+写回，服务缺席时 id 只留在进程内存、照样上报，绝不写私有文件。挂载点是守卫的放行分支（经
+`AdmitHook` 接进 `wrapServer`），不在门的判定路径上、不在启动时调用、没有定时器。
+**替代方案**：机器指纹（可识别、需特权读取）；第三方统计 SDK（新增依赖与后台定时器）；账号/登录式
+统计（要服务器与个人数据）；默认关（样本太小，回答不了安装量）；把 id 写进 `$DSH_HOME` 文件（同一
+事实的第二个家）；挂进门内或会话层（把网络放到认证判定路径上）；启动即上报（没被使用的进程也算在用）。
+**为什么**：默认开让数字有意义，可见可关让同意为真；放行之后才报把信号绑在真实使用上；报文只由配置
+与进程事实组成，不含用户名/哈希/密钥/会话/token/IP/路径/主机名，威胁模型不变；失败静默且不阻塞，匿名
+上报永远不会影响一次认证判定。
+→ [zh](decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md) ·
+[en](decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md)
+
+## D35. 通行密钥（passkey / WebAuthn）作为口令之外的第二登录方式
+
+在 `password` 模式新增通行密钥登录：登录页「Sign in with a passkey」（无用户名 / discoverable），注册需
+已登录完整会话**再认证**（当前口令 + TOTP 码）；服务端校验用 `@simplewebauthn/server`（浏览器侧手写 glue），RP ID/origin 只从既有
+`publicHost` 派生；凭证内嵌 `users.yaml`；v1 只提供 `passkey: "off" | "optional"`；
+passkey 登录恒为完整认证（对齐 GitHub 模型：passkey 同时满足口令与 2FA），`totp` 只约束口令登录。
+状态：**已落地**（M6 PR1–PR3，2026-11-12），方案见 `docs/plans/passkey-login-plan_zh.md`。
+**替代方案**：维持口令 + TOTP（不解决钓鱼与口令面）；OAuth/OIDC 外部身份源（多一个外部服务）；邮件魔术链接
+（需邮件设施、弱于 origin 绑定）；只支持硬件密钥（排除「方便」）；passkey-only（锁定与恢复不成熟，v1 不做）；
+引 `@simplewebauthn/server`（21 个传递包 / ~870 KiB，主要服务我们不需要的 attestation 链）；先输用户名再
+passkey（多一步且泄露账号存在性）。
+**为什么**：抗钓鱼、无口令、浏览器原生且无外部服务，四者兼顾；仓库前置件（SSR 登录页、TLS、`publicHost`、
+会话/限速/CSRF）都已在位，新增面集中到一条校验路径；注册再认证堵住「会话被劫 → 后门 passkey」这条
+passkey 相对 TOTP 唯一新增的持久化攻击面；`publicHost` 作唯一 RP ID 锚点，避免半外壳反代下
+「永远登录不上」的错配。
+→ [zh](decisions/implemented/2026-11-11-passkey-login.zh.md) ·
+[en](decisions/implemented/2026-11-11-passkey-login.en.md)

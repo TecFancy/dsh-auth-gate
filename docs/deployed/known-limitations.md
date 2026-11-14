@@ -5,6 +5,39 @@ plugin, with the mechanism behind it and the decision record that fixed it.
 
 - Disabling a user only stops **new** logins; already-signed-in sessions stay
   valid until they expire.
+- **Passkey deployment prerequisites**: the RP ID is derived from `publicHost` and must be a domain (no IP,
+  no port), and browsers only expose WebAuthn over HTTPS (or `http://localhost`). Plain-http intranet
+  addresses, a direct `http://127.0.0.1:3080`, and the `dsh-auth-proxy` local proxy (`http://127.0.0.1:8443`)
+  therefore cannot use passkeys; an unusable configuration logs an error and behaves as `passkey: "off"`
+  without affecting password sign-in.
+- **A passkey is not device-bound**: iCloud Keychain, Google Password Manager, 1Password and friends sync the
+  private key to the cloud (`BE=1`), so a compromised cloud account plus local unlock is enough; it is not
+  equivalent to a hardware security key. Following GitHub's model, a synced passkey still counts as satisfying
+  2FA; environments that need an independent second factor set `passkey: "off"`.
+- **Passkey counters are best-effort detection**: `signCount` lives in process memory by default and is not
+  written on every sign-in, so it falls back to the `users.yaml` snapshot after a restart; synced passkeys stay
+  at 0 and concurrent use of one credential also produces regressions. `passkeyEnforceCounter: true` rejects
+  only for device-bound credentials (`be=false && bs=false`) and is not a clone-protection guarantee.
+- **The passkey ceremony is single-process state**: the begin challenge lives in an in-process map (120 s TTL,
+  1024-entry cap), so a restart or plugin reload drops in-flight ceremonies (the user retries once).
+  Multi-replica deployments need sticky sessions or shared storage and are unsupported in v1.
+- **Passkey begin has its own quota**: 20 per IP per minute and 120 globally per minute (in-process sliding
+  window, reset on restart). It is an availability guard against anonymous callers evicting other users'
+  ceremonies, not an authentication boundary.
+- **Passkeys do not validate attestation**: `attestation: "none"` means no certificate chain and no MDS
+  allow-list, so the deployment cannot tell which vendor made a credential or whether an authenticator model
+  was tampered with. Attestation policy is out of scope for v1.
+- **Passkeys have no recovery codes**: if every device is lost, sign in with the password and enrol again; if
+  the password is also forgotten, an administrator must run `dsh-auth user passwd`. v1 has no passkey-only
+  (password-disabled) mode.
+- **Enrolment and removal require re-authentication**: enrolment needs the current password (plus a TOTP code
+  when enabled); removing the last credential or using `--all` does too. A normal single removal only needs a
+  full session plus the same-origin check.
+- **Conditional UI (autofill) is off by default**: when enabled, the login page offers passkeys in the password
+  field's autofill list; it needs Chrome 108 / Firefox 119 / Safari 16+, and unsupported browsers or a
+  cancelled prompt fall back silently to the button and the password form.
+- **iOS third-party browsers may not work**: most are WKWebView builds without the WebAuthn experimental
+  feature; the login page feature-detects and shows only the password form when unavailable.
 - Login rate limiting resets when the server restarts; so does the TOTP
   replay guard (a used code in the same 30s window becomes acceptable again
   after a restart — restart and code-stealing in the same window are both

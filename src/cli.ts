@@ -3,6 +3,7 @@ import { realpathSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 import { hashPassword, verifyPassword } from "./host/features/password/index.js";
+import { handlePasskeyCli, type PasskeyFlags } from "./host/features/passkey/index.js";
 import { handleUserTotp } from "./host/features/totp/index.js";
 import { installSkillCommand } from "./cli-skill.js";
 import {
@@ -48,6 +49,8 @@ const USAGE = `Usage:
   dsh-auth user disable <name> [--file <path>]
   dsh-auth user enable <name> [--file <path>]
   dsh-auth user totp <enable|disable> <name> [--file <path>]
+  dsh-auth passkey list <name> [--file <path>]
+  dsh-auth passkey rm <name> (--id <prefix> | --all) [--file <path>]
   dsh-auth skill install [--force]`;
 
 const defaultIo: CliIo = {
@@ -89,6 +92,9 @@ export async function main(argv: string[], io: CliIo): Promise<number> {
   const ctx: CliCtx = { file, argv, io };
   const args = positionals(argv);
   if (args[0] === "skill") return args[1] === "install" ? installSkillCommand(ctx) : usage(io);
+  if (args[0] === "passkey") {
+    return handlePasskeyCli(file, args[1], args[2], passkeyFlags(argv), io);
+  }
   if (args[0] !== "user") return usage(io);
   const handlers: Record<string, () => Promise<number>> = {
     add: () => addUser(ctx, args[2]),
@@ -118,15 +124,26 @@ function pickFile(argv: string[]): Maybe<string> {
   return value;
 }
 
-/** 位置参数：剥离 flag 与 `--file <path>` 的值（`--file` 无值由 pickFile 报 usage）。 */
+/**
+ * 位置参数：剥离 boolean flag、`--file <path>` 与 `--id <prefix>` 的值（缺值由各自入口报 usage）。
+ * `--id` 的值必须一并跳过，否则 `passkey rm --id <prefix> <name>` 会把前缀当成用户名。
+ */
 function positionals(argv: string[]): string[] {
   const args: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index] ?? "";
-    if (token === "--file") index += 1;
+    if (token === "--file" || token === "--id") index += 1;
     else if (!token.startsWith("--")) args.push(token);
   }
   return args;
+}
+
+/** passkey flags：`--id <prefix>` 的值与 `--all` 布尔（值已在 positionals 里一并剔除）。 */
+function passkeyFlags(argv: string[]): PasskeyFlags {
+  const at = argv.indexOf("--id");
+  const value = at === -1 ? undefined : argv[at + 1];
+  const id = value === undefined || value.startsWith("--") ? undefined : value;
+  return { ...(id === undefined ? {} : { id }), all: argv.includes("--all") };
 }
 
 /** 明文 `--password` 一律拒绝（P1 §7：口令只走 stdin/交互输入）。 */

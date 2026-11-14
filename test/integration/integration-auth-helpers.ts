@@ -9,7 +9,7 @@ import { request } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { WrappableServer } from "../../src/host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig } from "../../src/index.js";
+import { apply, Config, inject, name } from "../../src/index.js";
 
 /**
  * `integration.auth.test.ts` 的共享装配夹具：真实 cordis + webserver + storage 栈，
@@ -90,28 +90,7 @@ export async function mountStack(options: MountStackOptions): Promise<MountedSta
   const mode = options.mode ?? "token";
   const usersFile = options.usersFile ?? join(root, "auth", "users.yaml");
   const token = options.withCredentials ? randomBytes(24).toString("base64url") : undefined;
-  let credentialsStore: Map<string, string> | undefined;
-  if (options.writableCredentials === true) {
-    credentialsStore = new Map();
-    const store = credentialsStore;
-    ctx.provide("credentials", {
-      resolve: (ref: string) => {
-        const value = store.get(ref);
-        return Promise.resolve(value === undefined ? undefined : { value, source: "test" });
-      },
-      set: (ref: string, value: string) => {
-        store.set(ref, value);
-        return Promise.resolve();
-      },
-    });
-  } else if (options.withCredentials) {
-    ctx.provide("credentials", {
-      resolve: (ref: string) =>
-        ref === "DSH_AUTH_TOKEN"
-          ? Promise.resolve({ value: token, source: "test" })
-          : Promise.resolve(undefined),
-    });
-  }
+  const credentialsStore = provideCredentials(ctx, options, token);
   const fibers: Fiber[] = [];
   fibers.push(await ctx.plugin(Storage));
   fibers.push(
@@ -138,12 +117,17 @@ export async function mountStack(options: MountStackOptions): Promise<MountedSta
   );
   fibers.push(await ctx.plugin(WebServer, { host: "127.0.0.1", port: 0 }));
   fibers.push(
-    await ctx.plugin({ name, inject, apply, Config }, {
-      cookieSecure: false,
-      mode,
-      usersFile: mode === "password" ? usersFile : "",
-      publicHost: options.publicHost ?? "",
-    } as AuthConfig),
+    await ctx.plugin(
+      { name, inject, apply, Config },
+      {
+        // 匿名统计在测试夹具里一律关掉：集成测试不打真实网络（模块契约另有单测）。
+        telemetry: false,
+        cookieSecure: false,
+        mode,
+        usersFile: mode === "password" ? usersFile : "",
+        publicHost: options.publicHost ?? "",
+      },
+    ),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
   registerProbes(server);
@@ -165,6 +149,37 @@ export async function mountStack(options: MountStackOptions): Promise<MountedSta
   }
   if (options.connection === "bare") ctx.provide("connection", {});
   return { ctx, port: server.port, fibers, root, token, usersFile, credentialsStore };
+}
+
+/** 按选项装好 credentials 服务；返回可写夹具的落点（其余情况 undefined）。 */
+function provideCredentials(
+  ctx: Context,
+  options: MountStackOptions,
+  token: string | undefined,
+): Map<string, string> | undefined {
+  const store = options.writableCredentials === true ? new Map<string, string>() : undefined;
+  if (store !== undefined) {
+    ctx.provide("credentials", {
+      resolve: (ref: string) => {
+        const value = store.get(ref);
+        return Promise.resolve(value === undefined ? undefined : { value, source: "test" });
+      },
+      set: (ref: string, value: string) => {
+        store.set(ref, value);
+        return Promise.resolve();
+      },
+    });
+    return store;
+  }
+  if (options.withCredentials) {
+    ctx.provide("credentials", {
+      resolve: (ref: string) =>
+        ref === "DSH_AUTH_TOKEN"
+          ? Promise.resolve({ value: token, source: "test" })
+          : Promise.resolve(undefined),
+    });
+  }
+  return undefined;
 }
 
 /**

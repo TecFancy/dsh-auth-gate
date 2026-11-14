@@ -233,14 +233,15 @@ export function apply(ctx, config) {
 
 ## 9. 路线图
 
-| 阶段 | 内容                                                                                | 交付物                                 |
-| ---- | ----------------------------------------------------------------------------------- | -------------------------------------- |
-| M0   | 探针验证挂载点                                                                      | ✅ 完成（探针已清理）                  |
-| M1   | `dsh-auth` 包骨架 + 守卫 + 启动自检 + 持久化会话（storage domain）                  | ✅ 完成：npm 包 host 半边 + profile 行 |
-| M2   | 阶段 1：随机 token 门（credentials 引用 + Bearer + 登录页发 cookie）                | ✅ 完成：可部署的公网最小防护          |
-| M3   | 阶段 2：users.yaml + 口令哈希（**scrypt**，见下注）+ 登录限速 + `dsh-auth user` CLI | ✅ 完成：真正登录                      |
-| M4   | 阶段 3：TOTP 两段式登录 + 配置项                                                    | OTP 加固                               |
-| M5   | 独立反代外壳模式（proxy shell）：自身监听公网 + 反代裸 dsh + Host/Origin 重写       | 规划中（2026-08-15 记录，待排期）      |
+| 阶段 | 内容                                                                                | 交付物                                                           |
+| ---- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| M0   | 探针验证挂载点                                                                      | ✅ 完成（探针已清理）                                            |
+| M1   | `dsh-auth` 包骨架 + 守卫 + 启动自检 + 持久化会话（storage domain）                  | ✅ 完成：npm 包 host 半边 + profile 行                           |
+| M2   | 阶段 1：随机 token 门（credentials 引用 + Bearer + 登录页发 cookie）                | ✅ 完成：可部署的公网最小防护                                    |
+| M3   | 阶段 2：users.yaml + 口令哈希（**scrypt**，见下注）+ 登录限速 + `dsh-auth user` CLI | ✅ 完成：真正登录                                                |
+| M4   | 阶段 3：TOTP 两段式登录 + 配置项                                                    | OTP 加固                                                         |
+| M5   | 独立反代外壳模式（proxy shell）：自身监听公网 + 反代裸 dsh + Host/Origin 重写       | 规划中（2026-08-15 记录，待排期）                                |
+| M6   | 通行密钥（passkey / WebAuthn）登录：无用户名、注册再认证、自写校验器                | 规划中（2026-11-11，方案 `docs/plans/passkey-login-plan_zh.md`） |
 
 > M3 注：口令哈希按用户拍板选用 `node:crypto` **scrypt**（N=2¹⁶/r=8/p=1，零新增原生依赖；
 > 规格 `docs/implemented/impl-m3_zh.md` P1/P2），替代本节初稿中的 argon2id/bcryptjs 候选。

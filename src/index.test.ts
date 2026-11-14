@@ -1,102 +1,18 @@
-import type { Context } from "@deepseek-ai/cordis";
-import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
-import {
-  isGuarded,
-  type WrappableRoute,
-  type WrappableServer,
-  type WrappableUpgradeRoute,
-} from "./host/shared/guard/index.js";
-import { apply, Config, inject, name, type AuthConfig, type AuthService } from "./index.js";
+import { isGuarded, type WrappableRoute } from "./host/shared/guard/index.js";
+import { apply, Config, inject, name, type AuthService } from "./index.js";
 import { SessionStore, type Session } from "./host/entities/session/index.js";
 import { TokenGate } from "./host/features/token/index.js";
-const cfg = (): AuthConfig => ({
-  mode: "token",
-  sessionTtl: 604800,
-  cookieName: "dsh_auth",
-  tokenRef: "DSH_AUTH_TOKEN",
-  cookieSecure: true,
-  usersFile: "",
-  publicHost: "",
-  clientIpHeader: "",
-  trustedProxyCidrs: ["127.0.0.0/8", "::1/128"],
-  revokeSweepMs: 5000,
-  totp: "off",
-  logoutOrder: 1000,
-});
-function makeFakeServer(): WrappableServer {
-  const exact = new Map<string, WrappableRoute>();
-  const prefixes = new Map<string, WrappableRoute>();
-  const upgrades = new Map<string, WrappableUpgradeRoute>();
-  const server: WrappableServer = {
-    exact,
-    prefixes,
-    upgrades,
-    fallback: undefined,
-    register(route) {
-      exact.set(route.path, route);
-      return () => exact.delete(route.path);
-    },
-    registerUpgrade(route) {
-      upgrades.set(route.path, route);
-      return () => upgrades.delete(route.path);
-    },
-    registerFallback(handler) {
-      server.fallback = handler;
-      return () => {
-        server.fallback = undefined;
-      };
-    },
-  };
-  return server;
-}
-interface FakeLog {
-  level: string;
-  message: unknown;
-}
-function makeCtx(
-  server: WrappableServer | undefined,
-  storageDomain: unknown,
-  credentials?: unknown,
-) {
-  const effects: (() => unknown)[] = [];
-  const logs: FakeLog[] = [];
-  const provided: Record<string, unknown> = {};
-  const ctx = {
-    get(serviceName: string): unknown {
-      if (serviceName === "webServer") return server;
-      if (serviceName === "storageDomain") return storageDomain;
-      if (serviceName === "credentials") return credentials;
-      return undefined;
-    },
-    provide(serviceName: string, value: unknown): void {
-      provided[serviceName] = value;
-    },
-    logger(): {
-      error(message: unknown): void;
-      info(message: unknown): void;
-      warn(message: unknown): void;
-    } {
-      return {
-        error: (message) => logs.push({ level: "error", message }),
-        info: (message) => logs.push({ level: "info", message }),
-        warn: (message) => logs.push({ level: "warn", message }),
-      };
-    },
-    effect(callback: () => unknown): void {
-      const disposer = callback();
-      if (typeof disposer === "function") effects.push(disposer as () => unknown);
-    },
-  } as unknown as Context;
-  return { ctx, effects, logs, provided };
-}
-const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
-function bearerReq(token: string): IncomingMessage {
-  return { headers: { authorization: `Bearer ${token}` } } as IncomingMessage;
-}
-function loggedError(logs: FakeLog[], needle: string): boolean {
-  return logs.some((entry) => entry.level === "error" && String(entry.message).includes(needle));
-}
+import {
+  INSTALL_ID,
+  cfg,
+  flush,
+  makeCtx,
+  makeFakeServer,
+  bearerReq,
+  loggedError,
+} from "../test/plugin-shape-harness.js";
+
 describe("dsh-auth-gate plugin shape", () => {
   it("uses the stable plugin name and inject list", () => {
     expect(name).toBe("dsh-auth-gate");
@@ -105,10 +21,10 @@ describe("dsh-auth-gate plugin shape", () => {
 });
 describe("Config", () => {
   it("fills defaults from an empty config", () => {
-    expect(Config({} as AuthConfig)).toEqual(cfg());
+    expect({ ...Config({}), installId: INSTALL_ID }).toEqual(cfg());
   });
   it("rejects a tokenRef that is not a credential reference", () => {
-    expect(() => Config({ tokenRef: "1bad-ref" } as AuthConfig)).toThrow();
+    expect(() => Config({ tokenRef: "1bad-ref" })).toThrow();
   });
 });
 describe("apply: mode 与装配", () => {

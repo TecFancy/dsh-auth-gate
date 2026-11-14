@@ -1,5 +1,5 @@
 export type { AuthContext, AuthSlotRegisterOptions } from "./context.ts";
 export { encodeForm } from "./form.ts";
-export { LOGOUT_URL, PASSWORD_CHANGED_LOGIN_URL, PASSWORD_PATH, STATUS_PATH, USERS_PASSWORD_PATH, USERS_PATH, } from "./protocol.ts";
-export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./protocol.ts";
+export { LOGOUT_URL, PASSKEY_LOGIN_PATH, PASSKEY_OPTIONS_PATH, PASSKEY_PATH, PASSKEY_REGISTER_OPTIONS_PATH, PASSKEY_REGISTER_PATH, PASSKEY_REMOVE_PATH, PASSKEY_SETTINGS_PATH, PASSWORD_CHANGED_LOGIN_URL, PASSWORD_PATH, STATUS_PATH, USERS_PASSWORD_PATH, USERS_PATH, } from "./protocol.ts";
+export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasskeyAdminErrorBody, PasskeyListResponse, PasskeyRegistrationRequest, PasskeyRemoveRequest, PasskeySettingsRequest, PasskeySettingsResponse, PasskeySummary, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./protocol.ts";
 //# sourceMappingURL=index.d.ts.map
