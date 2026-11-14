@@ -4,6 +4,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_ref:
+        description: >-
+          Existing tag to publish to npm (for example v0.19.0). Leave empty for a
+          normal release run.
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -23,15 +30,50 @@ jobs:
 
   publish:
     needs: release-please
-    if: ${{ needs.release-please.outputs.release_created }}
+    # Two ways in: release-please just cut a release, or an operator named an
+    # existing tag to (re)publish - the recovery path when a publish failed
+    # after the tag already existed.
+    if: >-
+      (needs.release-please.result == 'success' &&
+      needs.release-please.outputs.release_created == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_ref != '')
     runs-on: ubuntu-latest
+    # npm Trusted Publishing (OIDC): npm exchanges this job's GitHub-signed
+    # identity for a short-lived publish token, so no NPM_TOKEN secret exists.
+    # The trust is registered on npmjs.com against this exact repo and the
+    # `release.yml` filename; renaming the file breaks publishing.
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.publish_ref || github.ref }}
+      # No `registry-url` here on purpose. It makes setup-node write
+      # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into .npmrc; with
+      # no token that expands to an empty string, npm reads it as "auth is
+      # already configured" and never starts the OIDC exchange, failing with
+      # ENEEDAUTH (actions/setup-node#1551). registry.npmjs.org is npm's
+      # default anyway, and the repo .npmrc pins it.
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
-          registry-url: https://registry.npmjs.org/
-      - run: npm ci --registry=https://registry.npmjs.org/
-      - run: npm publish --registry=https://registry.npmjs.org/
+          node-version: 24
+          package-manager-cache: false
+      # Refuse to publish a tree whose version does not match the tag being
+      # published: a mismatch would put the wrong code under a version number.
+      - name: Check the checked-out version matches the tag
+        if: inputs.publish_ref != ''
+        run: |
+          want="${INPUTS_PUBLISH_REF#v}"
+          got="$(node -p "require('./package.json').version")"
+          if [ "$want" != "$got" ]; then
+            echo "::error::tag $INPUTS_PUBLISH_REF is $want but package.json says $got"
+            exit 1
+          fi
+          echo "publishing $got from $INPUTS_PUBLISH_REF"
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          INPUTS_PUBLISH_REF: ${{ inputs.publish_ref }}
+      - run: npm ci
+      # No NODE_AUTH_TOKEN and no --provenance: a trusted publish attests
+      # automatically.
+      - run: npm publish
