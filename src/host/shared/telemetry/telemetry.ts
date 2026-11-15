@@ -100,11 +100,6 @@ export interface SettingsService {
   update(namespace: string, patch: object): Promise<void>;
 }
 
-/** 配置里的 volatile 字段：值是盒子不是值，经 `get()` 读当前快照。 */
-export interface VolatileField<T> {
-  get(): T;
-}
-
 /** 报文里的机器事实；先读出来再映射，映射本身可单测。 */
 export interface HostFacts {
   readonly nodeVersion: string;

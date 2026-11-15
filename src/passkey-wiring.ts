@@ -13,6 +13,7 @@ import { loadUsersFile, mutateUsersFile, type UserRecord } from "./host/entities
 import type { SessionStore } from "./host/entities/session/index.js";
 import type { WrappableServer } from "./host/shared/guard/index.js";
 import { makeClientIpResolver, parseClientIpPolicy } from "./host/shared/http/index.js";
+import type { VolatileField } from "./host/shared/lib/index.js";
 import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 
 /**
@@ -40,8 +41,15 @@ export interface PasskeyFields {
   passkeyOrigins: string[];
   /** 计数器回退且凭证为设备绑定时是否拒绝；默认 false（只 warn，尽力检测）。 */
   passkeyEnforceCounter: boolean;
-  /** 登录页是否启用 passkey 自动填充（条件 UI）；默认 false，可由管理员在设置页打开。 */
-  passkeyConditionalUi: boolean;
+  /**
+   * 登录页是否启用 passkey 自动填充（条件 UI）；默认 false，可由管理员在设置页打开。
+   *
+   * 必须是 `.volatile()` 的盒子：宿主 `dsh-settings` 只把 volatile 字段投影成设置页表单，
+   * 也只允许写回这些字段。漏标的表现是管理员勾选后 `settings.update` 抛
+   * `Config field "passkeyConditionalUi" is not volatile`，端点把异常吞成 200、界面显示
+   * 「设置已保存」，而重启后回到配置文件的值。经 `get()` 读当前快照。
+   */
+  passkeyConditionalUi: VolatileField<boolean>;
 }
 
 /** 配置片段对应的 schema 节点（展开进 `src/index.ts` 的 `Config`）。 */
@@ -51,7 +59,7 @@ export const passkeyConfigFields = {
   passkeyRpId: z.string().default(""),
   passkeyOrigins: z.array(z.string()).default([]),
   passkeyEnforceCounter: z.boolean().default(false),
-  passkeyConditionalUi: z.boolean().default(false),
+  passkeyConditionalUi: z.boolean().default(false).volatile(),
 };
 
 /** `wirePasskey` 需要的配置子集（结构兼容 `AuthConfig`；root 直接传整个 config 即可）。 */
@@ -85,7 +93,7 @@ export function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult {
     passkeyRpId: config.passkeyRpId,
     passkeyOrigins: config.passkeyOrigins,
     passkeyEnforceCounter: config.passkeyEnforceCounter,
-    passkeyConditionalUi: config.passkeyConditionalUi,
+    passkeyConditionalUi: config.passkeyConditionalUi.get(),
     totp: config.totp,
   });
   if (config.mode !== "password") {
@@ -131,7 +139,12 @@ export interface PasskeyRouteWiringInput {
   readonly settings: PasskeySettings;
   /** 条件 UI 的当前值（可由 admin 在设置页改写；`wirePasskey` 的初始值来自配置）。 */
   readonly conditionalUi: () => boolean;
-  /** 写回条件 UI 开关（宿主 settings 服务；失败只记日志，不改内存值）。 */
+  /**
+   * 写回条件 UI 开关（宿主 settings 服务）。
+   *
+   * 内存值**先**改、再写回：写回失败只记日志，本次进程内仍然生效（开关是偏好，不是安全边界），
+   * 重启后回到配置文件的值。调用方 `src/auth-routes.ts` 的 `persistConditionalUi` 就是这个顺序。
+   */
   readonly persistConditionalUi: (enabled: boolean) => Promise<void>;
   /** 与口令登录共用的 TOTP 防重放单例（注册/删除的再认证用）。 */
   readonly replayCheck: (username: string, counter: number, code: string) => boolean;

@@ -24,5 +24,4 @@ export type {
   TelemetryOptions,
   TelemetryPayload,
   UsersBucket,
-  VolatileField,
 } from "./telemetry.js";

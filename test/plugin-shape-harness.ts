@@ -17,6 +17,9 @@ import type { AuthConfig } from "../src/index.js";
 /** `installId` 是 volatile 盒子；同一引用让默认值断言不受函数身份影响。 */
 export const INSTALL_ID = { get: () => "" };
 
+/** `passkeyConditionalUi` 同样是 volatile 盒子（设置页要写回它）。 */
+export const CONDITIONAL_UI = { get: () => false };
+
 /** 与 `Config({})` 的默认值逐字段对齐的配置对象。 */
 export const cfg = (): AuthConfig => ({
   mode: "token",
@@ -36,7 +39,7 @@ export const cfg = (): AuthConfig => ({
   passkeyRpId: "",
   passkeyOrigins: [],
   passkeyEnforceCounter: false,
-  passkeyConditionalUi: false,
+  passkeyConditionalUi: CONDITIONAL_UI,
   telemetry: true,
   installId: INSTALL_ID,
 });
