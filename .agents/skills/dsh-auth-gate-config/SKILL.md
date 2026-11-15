@@ -49,12 +49,12 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
     logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
-    passkey: "off" # "off"(default) | "optional" - passkey sign-in for password mode; needs publicHost + HTTPS; M6 in progress / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS；M6 实现中）
+    passkey: "off" # "off"(default) | "optional" - passkey sign-in for password mode; needs publicHost + HTTPS. Deployment-level: NOT volatile, so it cannot be set from the Settings page - edit this file / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS）。部署级开关，**不是** volatile 字段，设置页改不了，只能改配置文件
     passkeyRpName: "DeepSeek Harness" # RP display name in the passkey prompt / 通行密钥弹窗里的 RP 展示名
     passkeyRpId: "" # "" = hostname(publicHost); must be a domain (never an IP) / 空 = 取 publicHost 的 hostname；必须是域名，不能是 IP
     passkeyOrigins: [] # [] = [origin(publicHost)]; exact origins, https or http://localhost / 空 = 由 publicHost 派生；精确 origin 白名单（https 或 http://localhost）
     passkeyEnforceCounter: false # true = reject counter regressions on device-bound credentials / 计数器回退且凭证为设备绑定时拒绝
-    passkeyConditionalUi: false # passkey autofill on the login page (admin toggle in Settings) / 登录页 passkey 自动填充（设置页开关）
+    passkeyConditionalUi: false # passkey autofill on the login page; volatile, so an admin can toggle it in Settings > Account security / 登录页 passkey 自动填充；volatile 字段，管理员可在 设置→账号安全 里开关
     telemetry: true # anonymous usage statistics: at most one ping per process per 24h, and only after a request passed the gate; false = send nothing / 匿名使用统计：每进程最多每 24 小时一次，且只在请求通过门之后；false = 完全不发
     installId: "" # internal anonymous install id (UUID v4), hidden and generated on first use; do not set by hand / 内部匿名安装 id（UUID v4），隐藏、首次使用时生成，不要手填
 ```
@@ -71,6 +71,15 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
   要求，所以 `totp` 只约束口令登录。通行密钥需要 HTTPS 与域名：RP ID 取自 `publicHost`
   且不能是 IP，纯 http 内网地址与本地代理都用不了。无法从 `publicHost` 派生的配置会记
   error 日志并按 off 处理，不会拖垮实例。
+- **Which passkey fields the Settings page can change.** Only `passkeyConditionalUi` is
+  `.volatile()`, so it is the only one an administrator can toggle in Settings > Account
+  security. `passkey` itself is deployment-level (it needs `publicHost` and HTTPS to be
+  usable at all), so it is deliberately **not** volatile and must be set in the config file.
+  A user asking "why can't I turn on passkeys in Settings" needs the config file, not a
+  newer plugin version. / **设置页能改哪些 passkey 字段**：只有 `passkeyConditionalUi` 是
+  `.volatile()`，所以管理员只能在 设置→账号安全 里开关它。`passkey` 本身是部署级开关
+  （要有 `publicHost` 与 HTTPS 才成立），故意**不** volatile，只能改配置文件。用户问
+  「为什么设置页里打不开通行密钥」时，答案是改配置文件，不是换新版本。
 - Override **without** `insert` — the bundle row is already mounted; adding one
   double-mounts. / 配置覆盖**不带 insert**（bundle 已挂载行，加了会二次挂载）。
 - `telemetry: false` turns the anonymous ping off completely; `installId` is

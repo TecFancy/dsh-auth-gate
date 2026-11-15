@@ -44,7 +44,7 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     passkeyRpId: "",
     passkeyOrigins: [],
     passkeyEnforceCounter: false,
-    passkeyConditionalUi: false,
+    passkeyConditionalUi: { get: () => false },
     telemetry: false,
     installId: { get: () => "" },
   };

@@ -27,7 +27,7 @@ function input(overrides: Partial<PasskeyWiringConfig> = {}): PasskeyWiringConfi
     passkeyRpId: "",
     passkeyOrigins: [],
     passkeyEnforceCounter: false,
-    passkeyConditionalUi: false,
+    passkeyConditionalUi: { get: () => false },
     log: makeLog().log,
     ...overrides,
   };
@@ -42,6 +42,13 @@ describe("wirePasskey", () => {
       rpId: "dsh.example.com",
       origins: ["https://dsh.example.com"],
     });
+  });
+
+  it("unwraps the volatile conditional-UI box into the derived settings", () => {
+    // 盒子里的 true 必须真的走到派生结果里：漏了 `.get()` 的话这里会拿到盒子对象本身。
+    const result = wirePasskey(input({ passkeyConditionalUi: { get: () => true } }));
+    expect(result.settings).toMatchObject({ enabled: true, conditionalUi: true });
+    expect(result.login).toEqual({ enabled: true, conditionalUi: true });
   });
 
   it("stays off and logs nothing when passkey is off", () => {

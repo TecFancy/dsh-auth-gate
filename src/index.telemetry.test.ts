@@ -15,10 +15,11 @@ import {
   type WrappableServer,
   type WrappableUpgradeRoute,
 } from "./host/shared/guard/index.js";
-import type { VolatileField } from "./host/shared/telemetry/index.js";
+import type { VolatileField } from "./host/shared/lib/index.js";
 import { apply, type AuthConfig } from "./index.js";
 
 const INSTALL_ID: VolatileField<string> = { get: () => "" };
+const CONDITIONAL_UI: VolatileField<boolean> = { get: () => false };
 
 function makeFakeServer(): WrappableServer {
   const exact = new Map<string, WrappableRoute>();
@@ -92,7 +93,7 @@ function cfg(overrides: Partial<AuthConfig> = {}): AuthConfig {
     passkeyRpId: "",
     passkeyOrigins: [],
     passkeyEnforceCounter: false,
-    passkeyConditionalUi: false,
+    passkeyConditionalUi: CONDITIONAL_UI,
     telemetry: true,
     installId: INSTALL_ID,
     ...overrides,
