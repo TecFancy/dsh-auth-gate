@@ -2,11 +2,8 @@ import type { Context } from "@deepseek-ai/cordis";
 import z from "@deepseek-ai/schemastery";
 import { defaultUsersFilePath, loadUsersFile } from "./host/entities/user/index.js";
 import type { AdmitHook } from "./host/shared/guard/index.js";
-import {
-  makeTelemetry,
-  type SettingsService,
-  type VolatileField,
-} from "./host/shared/telemetry/index.js";
+import type { VolatileField } from "./host/shared/lib/index.js";
+import { makeTelemetry, type SettingsService } from "./host/shared/telemetry/index.js";
 
 /**
  * 匿名使用统计的 root 侧装配（与 `admin-wiring.ts` / `bootstrap-wiring.ts` 同性质）。

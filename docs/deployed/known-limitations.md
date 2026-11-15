@@ -35,7 +35,10 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   full session plus the same-origin check.
 - **Conditional UI (autofill) is off by default**: when enabled, the login page offers passkeys in the password
   field's autofill list; it needs Chrome 108 / Firefox 119 / Safari 16+, and unsupported browsers or a
-  cancelled prompt fall back silently to the button and the password form.
+  cancelled prompt fall back silently to the button and the password form. The switch is the one passkey
+  field declared `.volatile()`, so an administrator can flip it in Settings > Account security and the host
+  settings service writes it back to the profile patch. `passkey` itself is deployment-level and is
+  deliberately not volatile: it needs `publicHost` and HTTPS to be usable, so it stays config-file only.
 - **iOS third-party browsers may not work**: most are WKWebView builds without the WebAuthn experimental
   feature; the login page feature-detects and shows only the password form when unavailable.
 - Login rate limiting resets when the server restarts; so does the TOTP

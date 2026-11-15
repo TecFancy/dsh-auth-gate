@@ -69,7 +69,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     passkeyRpId: z<string, string, "defined">;
     passkeyOrigins: z<string[], string[], "defined">;
     passkeyEnforceCounter: z<boolean, boolean, "defined">;
-    passkeyConditionalUi: z<boolean, boolean, "defined">;
+    passkeyConditionalUi: z<boolean, boolean, "volatile-defined">;
     mode: z<"password" | "token", "password" | "token", "defined">;
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;
@@ -90,7 +90,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     passkeyRpId: z<string, string, "defined">;
     passkeyOrigins: z<string[], string[], "defined">;
     passkeyEnforceCounter: z<boolean, boolean, "defined">;
-    passkeyConditionalUi: z<boolean, boolean, "defined">;
+    passkeyConditionalUi: z<boolean, boolean, "volatile-defined">;
     mode: z<"password" | "token", "password" | "token", "defined">;
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;

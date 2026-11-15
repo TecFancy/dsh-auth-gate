@@ -4,6 +4,7 @@ import { apply, Config, inject, name, type AuthService } from "./index.js";
 import { SessionStore, type Session } from "./host/entities/session/index.js";
 import { TokenGate } from "./host/features/token/index.js";
 import {
+  CONDITIONAL_UI,
   INSTALL_ID,
   cfg,
   flush,
@@ -21,7 +22,10 @@ describe("dsh-auth-gate plugin shape", () => {
 });
 describe("Config", () => {
   it("fills defaults from an empty config", () => {
-    expect({ ...Config({}), installId: INSTALL_ID }).toEqual(cfg());
+    // 两个 volatile 盒子（installId / passkeyConditionalUi）带 symbol 键，换成夹具里的同一引用再比。
+    expect({ ...Config({}), installId: INSTALL_ID, passkeyConditionalUi: CONDITIONAL_UI }).toEqual(
+      cfg(),
+    );
   });
   it("rejects a tokenRef that is not a credential reference", () => {
     expect(() => Config({ tokenRef: "1bad-ref" })).toThrow();

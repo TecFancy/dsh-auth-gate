@@ -27,7 +27,7 @@ function input(overrides: Partial<PasskeyWiringConfig> = {}): PasskeyWiringConfi
     passkeyRpId: "",
     passkeyOrigins: [],
     passkeyEnforceCounter: false,
-    passkeyConditionalUi: false,
+    passkeyConditionalUi: { get: () => false },
     log: makeLog().log,
     ...overrides,
   };
