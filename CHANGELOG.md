@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.19.0...v0.19.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* make the passkey conditional-UI switch writable from Settings ([#135](https://github.com/TecFancy/dsh-auth-gate/issues/135)) ([419e7c0](https://github.com/TecFancy/dsh-auth-gate/commit/419e7c07ba705f6bd107472bd9ef3081b0b702fa))
+
 ## [0.19.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.18.1...v0.19.0) (2026-11-14)
 
 
