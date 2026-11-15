@@ -139,7 +139,12 @@ export interface PasskeyRouteWiringInput {
   readonly settings: PasskeySettings;
   /** 条件 UI 的当前值（可由 admin 在设置页改写；`wirePasskey` 的初始值来自配置）。 */
   readonly conditionalUi: () => boolean;
-  /** 写回条件 UI 开关（宿主 settings 服务；失败只记日志，不改内存值）。 */
+  /**
+   * 写回条件 UI 开关（宿主 settings 服务）。
+   *
+   * 内存值**先**改、再写回：写回失败只记日志，本次进程内仍然生效（开关是偏好，不是安全边界），
+   * 重启后回到配置文件的值。调用方 `src/auth-routes.ts` 的 `persistConditionalUi` 就是这个顺序。
+   */
   readonly persistConditionalUi: (enabled: boolean) => Promise<void>;
   /** 与口令登录共用的 TOTP 防重放单例（注册/删除的再认证用）。 */
   readonly replayCheck: (username: string, counter: number, code: string) => boolean;

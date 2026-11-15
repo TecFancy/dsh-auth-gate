@@ -32,6 +32,9 @@ describe("配置项的 volatile 元数据", () => {
   it("keeps the deployment-level passkey switch out of the settings page", () => {
     // `passkey` 是部署级开关（要 publicHost 与 HTTPS 才成立），故意**不** volatile：
     // 设置页不该出现它，否则管理员能在不满足前提的实例上把它打开。
-    expect(Config.dict?.["passkey"]?.meta.volatile).not.toBe(true);
+    // 先断言字段存在，否则「删掉整个字段」也会让下面那条判断通过。
+    const node = Config.dict?.["passkey"];
+    expect(node).toBeDefined();
+    expect(node?.meta.volatile).toBeUndefined();
   });
 });
