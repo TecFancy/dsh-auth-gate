@@ -8,18 +8,14 @@ import {
 } from "react";
 import { ACCOUNT_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
-  ACCOUNT_ICON_PATHS,
-  ACCOUNT_ICON_VIEW_BOX,
-  BUTTON_BUSY_STYLE,
-  BUTTON_STYLE,
+  ActionButton,
   FORM_STYLE,
-  HINT_STYLE,
   PANEL_STYLE,
   SUCCESS_TEXT_STYLE,
-  TITLE_ROW_STYLE,
 } from "../../../shared/ui/index.ts";
 import { redirectToLogin } from "../lib/account-redirect.ts";
 import { ACCOUNT_STATUS_ID, PasswordFields, StatusLine } from "./account-fields.tsx";
+import { AccountHeader } from "./account-header.tsx";
 import {
   EMPTY_VALUES,
   submitPassword,
@@ -28,34 +24,6 @@ import {
   type FieldName,
   type FormValues,
 } from "../model/account-submit.ts";
-
-/**
- * 本插件自设计的图标（P1.1 / D24）：盾 + 钥匙孔，16px outline。
- *
- * 内容区标题行这一份是**我们自己的 React 树**：不依赖宿主任何内部结构，可测、可卸载。
- * 导航行那一份由 `account-nav-icon.ts` 的临时 DOM 垫片贴上去（宿主没有 `icon` 挂载点，
- * 见 D24.1）。两处共用 `account-icon.ts` 的路径数据，与 `docs/demo/account-security.svg` 同源。
- */
-function AccountIcon() {
-  return (
-    <svg
-      viewBox={ACCOUNT_ICON_VIEW_BOX}
-      width={16}
-      height={16}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {ACCOUNT_ICON_PATHS.map((d) => (
-        <path key={d} d={d} />
-      ))}
-    </svg>
-  );
-}
 
 /** 提交控制器：四种 UI 状态 = idle/submitting(lock)/ok(success)/error(failure)。 */
 interface PasswordChangeController {
@@ -70,11 +38,21 @@ interface PasswordChangeController {
   relogin: () => void;
 }
 
+/** 字段的文档顺序：失败后按这个顺序找第一个错误字段聚焦。 */
+const FIELD_ORDER: FieldName[] = ["current", "password", "confirm", "code"];
+
+/** 字段 id（与 account-fields.tsx 的 `fieldId` 同形；聚焦要用）。 */
+function fieldElementId(field: FieldName): string {
+  return `dsh-auth-gate-account-${field}`;
+}
+
 /**
  * 表单状态机：
  * - 双锁 = in-flight ref（硬锁，Enter/点击并发都挡）+ submitting 按钮 disabled（可见锁）；
  * - IME 组合期由 composing ref 挡住，避免中文输入法确认键提交；
- * - 请求带 AbortController，卸载即 abort，回调再看 mounted，绝不卸载后 setState。
+ * - 请求带 AbortController，卸载即 abort，回调再看 mounted，绝不卸载后 setState；
+ * - 编辑任一字段清掉上一轮错误（重设计：原来改正后红框还在）；
+ * - 失败后把焦点落到第一个错误字段，无字段错误落到状态位。
  */
 function usePasswordChange(t: AccountTranslate): PasswordChangeController {
   const [values, setValues] = useState<FormValues>(EMPTY_VALUES);
@@ -94,8 +72,20 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     };
   }, []);
 
+  /** 失败落点：有字段错误聚焦第一个，否则聚焦状态位（tabIndex=-1）。 */
+  const focusFailure = (view: FailureView): void => {
+    const first = FIELD_ORDER.find((field) => view.fields.includes(field));
+    const target =
+      first === undefined
+        ? document.getElementById(ACCOUNT_STATUS_ID)
+        : document.getElementById(fieldElementId(first));
+    target?.focus();
+  };
+
   const setValue = (field: FieldName, value: string): void => {
     setValues((previous) => ({ ...previous, [field]: value }));
+    // 编辑即清错：过时的红框和「密码不一致」不能继续成立。
+    setFailure(null);
   };
 
   const submit = async (): Promise<void> => {
@@ -103,6 +93,7 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     const invalid = validate(values, t);
     if (invalid !== null) {
       setFailure(invalid);
+      focusFailure(invalid);
       return;
     }
     lock.current = true;
@@ -126,10 +117,15 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
         }
         return;
       }
-      if (result.kind === "failure") setFailure(result.failure);
+      if (result.kind === "failure") {
+        setFailure(result.failure);
+        focusFailure(result.failure);
+      }
     } catch {
       if (!live()) return;
-      setFailure({ message: t(ACCOUNT_KEYS.generic), rules: [], fields: [] });
+      const generic: FailureView = { message: t(ACCOUNT_KEYS.generic), rules: [], fields: [] };
+      setFailure(generic);
+      focusFailure(generic);
     } finally {
       lock.current = false;
       if (mounted.current) setSubmitting(false);
@@ -155,10 +151,15 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
  */
 export interface AccountPasswordFormProps {
   t: AccountTranslate;
+  /**
+   * 当前账号是否开启两步验证：只影响动态码框的提示文案。
+   * `undefined` = 旧服务端没给这个字段，沿用保守文案。
+   */
+  totpEnabled?: boolean | undefined;
 }
 
 /** 已登录时的自助改密表单（成功后立即跳登录页；成功态面板只是兜底）。 */
-export function AccountPasswordForm({ t }: AccountPasswordFormProps) {
+export function AccountPasswordForm({ t, totpEnabled }: AccountPasswordFormProps) {
   const form = usePasswordChange(t);
   const reloginButton = useRef<HTMLButtonElement | null>(null);
 
@@ -181,28 +182,20 @@ export function AccountPasswordForm({ t }: AccountPasswordFormProps) {
   if (form.success !== null) {
     return (
       <section style={PANEL_STYLE}>
-        <h2 style={TITLE_ROW_STYLE}>
-          <AccountIcon />
-          {t(ACCOUNT_KEYS.title)}
-        </h2>
+        <AccountHeader t={t} showIntro={false} />
         <p id={ACCOUNT_STATUS_ID} role="status" aria-live="polite" style={SUCCESS_TEXT_STYLE}>
           {form.success}
         </p>
-        <button ref={reloginButton} type="button" onClick={form.relogin} style={BUTTON_STYLE}>
+        <ActionButton ref={reloginButton} onClick={form.relogin}>
           {t(ACCOUNT_KEYS.relogin)}
-        </button>
+        </ActionButton>
       </section>
     );
   }
   const isInvalid = (field: FieldName): boolean => form.failure?.fields.includes(field) === true;
   return (
     <section style={PANEL_STYLE}>
-      <h2 style={TITLE_ROW_STYLE}>
-        <AccountIcon />
-        {t(ACCOUNT_KEYS.title)}
-      </h2>
-      <p style={HINT_STYLE}>{t(ACCOUNT_KEYS.intro)}</p>
-      <p style={HINT_STYLE}>{t(ACCOUNT_KEYS.scope)}</p>
+      <AccountHeader t={t} />
       <form
         style={FORM_STYLE}
         noValidate
@@ -216,15 +209,18 @@ export function AccountPasswordForm({ t }: AccountPasswordFormProps) {
           form.composing.current = false;
         }}
       >
-        <PasswordFields t={t} values={form.values} isInvalid={isInvalid} onChange={form.setValue} />
+        <PasswordFields
+          t={t}
+          values={form.values}
+          isInvalid={isInvalid}
+          onChange={form.setValue}
+          readOnly={form.submitting}
+          totpEnabled={totpEnabled}
+        />
         <StatusLine failure={form.failure} />
-        <button
-          type="submit"
-          disabled={form.submitting}
-          style={form.submitting ? BUTTON_BUSY_STYLE : BUTTON_STYLE}
-        >
+        <ActionButton type="submit" busy={form.submitting}>
           {form.submitting ? t(ACCOUNT_KEYS.submitting) : t(ACCOUNT_KEYS.submit)}
-        </button>
+        </ActionButton>
       </form>
     </section>
   );

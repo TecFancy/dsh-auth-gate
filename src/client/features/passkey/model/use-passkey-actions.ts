@@ -1,151 +1,231 @@
 /**
- * passkey 添加/删除的提交状态机（M6 PR3）。
+ * 通行密钥的添加 / 删除状态机（重设计 2026-11-16）。
  *
- * 与 `change-password` 同一套纪律：in-flight ref 硬锁（双击只发一次）、请求带
- * AbortController、卸载即 abort、回调里再看一眼 mounted，绝不卸载后 setState。
+ * 与改密同一套纪律：in-flight ref 硬锁（双击只发一次）、请求带 AbortController、
+ * 卸载即 abort、回调里再看一眼 mounted，绝不卸载后 setState。
+ *
+ * 重设计的三处结构变化：
+ * 1. **添加值与删除值分开**（`values` / `reauth`）。原来删除读的是添加表单的
+ *    `values`，用户要删最后一把钥匙时得先在「添加通行密钥」里输密码（评审 F6）。
+ * 2. **待删目标 `pendingRemove`**：点「删除」只设置它，不发请求；确认区展开后
+ *    才由 `confirmRemove` 真正提交（评审：破坏性动作不能一次误点就执行）。
+ * 3. **反馈互斥**：`failure` 与 `success` 不会同时有值，避免播报位读出矛盾结果。
  */
 import { useEffect, useRef, useState } from "react";
 import type { AccountTranslate } from "../../../shared/i18n/index.ts";
-import { PASSKEY_KEYS } from "../../../shared/i18n/index.ts";
-import { registerPasskey, removePasskey } from "../api/passkey-mutate.ts";
 import {
   EMPTY_PASSKEY_FORM,
+  EMPTY_PASSKEY_REAUTH,
   validatePasskeyForm,
+  validatePasskeyReauth,
   type PasskeyFailureView,
   type PasskeyFormValues,
+  type PasskeyReauthValues,
 } from "./passkey-form.ts";
+import { runAdd, runRemove, type ActionContext } from "./passkey-action-runners.ts";
 
-/** 提交控制器：表单值 + 双锁 + 失败/成功反馈 + 正在删除的 idPrefix。 */
+/** 提交控制器：添加值 / 删除值 / 待删目标 / 双锁 / 互斥反馈。 */
 export interface PasskeyActions {
+  /** 添加表单的值（label / password / code）。 */
   values: PasskeyFormValues;
+  /** 删除确认区的再认证值（password / code），与添加值完全独立。 */
+  reauth: PasskeyReauthValues;
   invalid: ("label" | "password" | "code")[];
   adding: boolean;
+  /** 正在删除的 idPrefix（null = 没有删除在飞）。 */
   removing: string | null;
+  /** 已点「删除」但还没确认的目标（null = 没有确认区展开）。 */
+  pendingRemove: string | null;
   failure: PasskeyFailureView | null;
   success: string | null;
   setValue: (field: "label" | "password" | "code", value: string) => void;
+  setReauthValue: (field: "password" | "code", value: string) => void;
+  /** 点某行的「删除」：只展开确认区，不发请求。 */
+  requestRemove: (idPrefix: string) => void;
+  /** 收起确认区并清空再认证值。 */
+  cancelRemove: () => void;
   add: () => Promise<void>;
-  remove: (idPrefix: string) => Promise<void>;
+  confirmRemove: () => Promise<void>;
   clearFeedback: () => void;
 }
 
-/** 添加结果 → UI 状态（成功清空表单并刷新列表；失败标红字段）。 */
-function applyAddResult(
-  result: Awaited<ReturnType<typeof registerPasskey>>,
-  ui: ActionContext,
-): void {
-  if (result.kind === "ok") {
-    ui.setValues(EMPTY_PASSKEY_FORM);
-    ui.setSuccess(ui.t(PASSKEY_KEYS.successAdd));
-    ui.onChanged();
-    return;
-  }
-  if (result.kind === "unsupported") {
-    ui.setFailure({ message: ui.t(PASSKEY_KEYS.unsupported), fields: [] });
-    return;
-  }
-  if (result.kind === "failure") {
-    ui.setFailure({ message: result.message, fields: result.fields });
-    ui.setInvalid(result.fields);
-  }
+/** 添加表单的字段顺序（失败后聚焦第一个错误字段用）。 */
+const ADD_FIELD_ORDER = ["label", "password", "code"] as const;
+
+/** 删除确认区的字段顺序。 */
+const REAUTH_FIELD_ORDER = ["password", "code"] as const;
+
+/** 字段 id（与 passkey-fields.tsx / passkey-remove-form.tsx 的 id 同形）。 */
+function addFieldId(field: string): string {
+  return `dsh-auth-gate-passkey-${field}`;
 }
 
-/** 删除结果 → UI 状态（成功刷新列表；失败标红字段）。 */
-function applyRemoveResult(
-  result: Awaited<ReturnType<typeof removePasskey>>,
-  ui: ActionContext,
-): void {
-  if (result.kind === "ok") {
-    ui.setSuccess(ui.t(PASSKEY_KEYS.successRemove));
-    ui.onChanged();
-    return;
-  }
-  if (result.kind === "failure") {
-    ui.setFailure(result.failure);
-    ui.setInvalid(result.failure.fields);
-  }
+/** 删除确认区的字段 id（与添加表单分开，避免同 id 冲突）。 */
+function reauthFieldId(field: string): string {
+  return `dsh-auth-gate-passkey-remove-${field}`;
 }
 
-/** 提交状态机共享的上下文（把 80 行上限留给两个 runner，而不是一个巨型 hook）。 */
-interface ActionContext {
-  values: PasskeyFormValues;
+/** 失败落点：有字段错误聚焦第一个，否则聚焦状态位。 */
+function focusFailure(
+  view: PasskeyFailureView,
+  order: readonly string[],
+  idOf: (field: string) => string,
+  statusId: string,
+): void {
+  const first = order.find((field) => view.fields.includes(field as never));
+  const target =
+    first === undefined ? document.getElementById(statusId) : document.getElementById(idOf(first));
+  target?.focus();
+}
+
+/** 反馈互斥的依赖。 */
+interface FeedbackDeps {
+  setFailure: (view: PasskeyFailureView | null) => void;
+  setSuccess: (text: string | null) => void;
+  setInvalid: (fields: ("label" | "password" | "code")[]) => void;
+}
+
+/**
+ * 反馈互斥：设失败就清成功，反之亦然。
+ *
+ * 原来 `failure` 与 `success` 是两个独立布尔，组件契约上允许同时有值，播报位会读出
+ * 互相矛盾的结果（评审 F6）。这里把「一次操作只有一个结果」变成结构保证。
+ */
+function makeFeedback(deps: FeedbackDeps): {
+  fail: (view: PasskeyFailureView | null) => void;
+  succeed: (text: string | null) => void;
+  clearFeedback: () => void;
+} {
+  return {
+    fail: (view) => {
+      deps.setFailure(view);
+      if (view !== null) deps.setSuccess(null);
+    },
+    succeed: (text) => {
+      deps.setSuccess(text);
+      if (text !== null) deps.setFailure(null);
+    },
+    clearFeedback: () => {
+      deps.setFailure(null);
+      deps.setSuccess(null);
+      deps.setInvalid([]);
+    },
+  };
+}
+
+/** 编辑动作的依赖（把四个 setter 编排起来，避免 hook 主体超 80 行）。 */
+interface EditingDeps {
+  setValues: (updater: (previous: PasskeyFormValues) => PasskeyFormValues) => void;
+  setReauth: (updater: (previous: PasskeyReauthValues) => PasskeyReauthValues) => void;
+  setFailure: (view: PasskeyFailureView | null) => void;
+  setInvalid: (
+    updater: (previous: ("label" | "password" | "code")[]) => ("label" | "password" | "code")[],
+  ) => void;
+  setPendingRemove: (idPrefix: string | null) => void;
+}
+
+/** 编辑阶段的四个动作：改添加值、改再认证值、请求删除、取消删除。 */
+function makeEditingActions(deps: EditingDeps): {
+  setValue: (field: "label" | "password" | "code", value: string) => void;
+  setReauthValue: (field: "password" | "code", value: string) => void;
+  requestRemove: (idPrefix: string) => void;
+  cancelRemove: () => void;
+} {
+  /** 编辑即清错：改正后红框不能还在。 */
+  const clearField = (field: "label" | "password" | "code"): void => {
+    deps.setFailure(null);
+    deps.setInvalid((previous) => previous.filter((item) => item !== field));
+  };
+  return {
+    setValue: (field, value) => {
+      deps.setValues((previous) => ({ ...previous, [field]: value }));
+      clearField(field);
+    },
+    setReauthValue: (field, value) => {
+      deps.setReauth((previous) => ({ ...previous, [field]: value }));
+      clearField(field);
+    },
+    requestRemove: (idPrefix) => {
+      // 切换目标时清掉上一份再认证值与错误，避免把 A 的密码用到 B 上。
+      deps.setReauth(() => EMPTY_PASSKEY_REAUTH);
+      deps.setFailure(null);
+      deps.setInvalid(() => []);
+      deps.setPendingRemove(idPrefix);
+    },
+    cancelRemove: () => {
+      deps.setPendingRemove(null);
+      deps.setReauth(() => EMPTY_PASSKEY_REAUTH);
+      deps.setFailure(null);
+      deps.setInvalid(() => []);
+    },
+  };
+}
+
+/** 提交动作的依赖。 */
+interface SubmitDeps {
   t: AccountTranslate;
-  lock: { current: boolean };
-  abort: { current: AbortController | null };
-  mounted: { current: boolean };
+  values: PasskeyFormValues;
+  reauth: PasskeyReauthValues;
+  pendingRemove: string | null;
+  context: ActionContext;
+  fail: (view: PasskeyFailureView | null) => void;
+  setInvalid: (fields: ("label" | "password" | "code")[]) => void;
   setValues: (values: PasskeyFormValues) => void;
-  setAdding: (value: boolean) => void;
-  setRemoving: (value: string | null) => void;
-  setFailure: (value: PasskeyFailureView | null) => void;
-  setInvalid: (value: ("label" | "password" | "code")[]) => void;
-  setSuccess: (value: string | null) => void;
-  clearFeedback: () => void;
-  onChanged: () => void;
+  setReauth: (values: PasskeyReauthValues) => void;
+  setPendingRemove: (idPrefix: string | null) => void;
 }
 
-/** 添加：本地校验 → 双锁 → 注册 → 结果落 UI。 */
-async function runAdd(context: ActionContext): Promise<void> {
-  const { values, t, lock, abort, mounted, setAdding, setFailure, setInvalid, setSuccess } =
-    context;
-  if (lock.current) return;
-  const problem = validatePasskeyForm(values, t);
-  if (problem !== null) {
-    setFailure(problem);
-    setInvalid(problem.fields);
-    setSuccess(null);
-    return;
-  }
-  lock.current = true;
-  setAdding(true);
-  context.clearFeedback();
-  const controller = new AbortController();
-  abort.current = controller;
-  try {
-    const result = await registerPasskey(values, controller.signal, t);
-    if (!mounted.current || controller.signal.aborted) return;
-    applyAddResult(result, context);
-  } catch {
-    if (mounted.current && !controller.signal.aborted) {
-      setFailure({ message: t(PASSKEY_KEYS.generic), fields: [] });
-    }
-  } finally {
-    lock.current = false;
-    if (mounted.current) setAdding(false);
-  }
-}
-
-/** 删除：双锁 → 删除 → 结果落 UI。 */
-async function runRemove(idPrefix: string, context: ActionContext): Promise<void> {
-  const { values, t, lock, abort, mounted, setRemoving, setFailure } = context;
-  if (lock.current) return;
-  lock.current = true;
-  setRemoving(idPrefix);
-  context.clearFeedback();
-  const controller = new AbortController();
-  abort.current = controller;
-  try {
-    const result = await removePasskey(idPrefix, values, controller.signal, t);
-    if (!mounted.current || controller.signal.aborted) return;
-    applyRemoveResult(result, context);
-  } catch {
-    if (mounted.current && !controller.signal.aborted) {
-      setFailure({ message: t(PASSKEY_KEYS.generic), fields: [] });
-    }
-  } finally {
-    lock.current = false;
-    if (mounted.current) setRemoving(null);
-  }
+/**
+ * 添加与确认删除：先本地校验（失败聚焦第一个错误字段），再交给 runner 发请求。
+ *
+ * 抽成独立 hook 是为了让 `usePasskeyActions` 主体留在 80 行以内。
+ */
+function usePasskeySubmit(deps: SubmitDeps): {
+  add: () => Promise<void>;
+  confirmRemove: () => Promise<void>;
+} {
+  const { t, values, reauth, pendingRemove, context, fail, setInvalid } = deps;
+  return {
+    add: async () => {
+      const problem = validatePasskeyForm(values, t);
+      if (problem !== null) {
+        fail(problem);
+        setInvalid(problem.fields);
+        focusFailure(problem, ADD_FIELD_ORDER, addFieldId, "dsh-auth-gate-passkey-status");
+        return;
+      }
+      await runAdd(values, context, { setValues: deps.setValues });
+    },
+    confirmRemove: async () => {
+      if (pendingRemove === null) return;
+      const problem = validatePasskeyReauth(reauth, t);
+      if (problem !== null) {
+        fail(problem);
+        setInvalid(problem.fields);
+        focusFailure(problem, REAUTH_FIELD_ORDER, reauthFieldId, "dsh-auth-gate-passkey-status");
+        return;
+      }
+      await runRemove(pendingRemove, reauth, context, {
+        clearReauth: () => {
+          deps.setReauth(EMPTY_PASSKEY_REAUTH);
+          deps.setPendingRemove(null);
+        },
+      });
+    },
+  };
 }
 
 /**
  * 添加/删除的提交状态机。`onChanged` 在成功后调用（父组件用它刷新列表）。
- * 用户取消（AbortError/NotAllowedError）静默回退：不显示错误、恢复按钮。
+ * 用户取消系统验证器（AbortError/NotAllowedError）静默回退：不显示错误、恢复按钮。
  */
 export function usePasskeyActions(t: AccountTranslate, onChanged: () => void): PasskeyActions {
   const [values, setValues] = useState<PasskeyFormValues>(EMPTY_PASSKEY_FORM);
+  const [reauth, setReauth] = useState<PasskeyReauthValues>(EMPTY_PASSKEY_REAUTH);
   const [invalid, setInvalid] = useState<("label" | "password" | "code")[]>([]);
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [failure, setFailure] = useState<PasskeyFailureView | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const lock = useRef(false);
@@ -160,60 +240,58 @@ export function usePasskeyActions(t: AccountTranslate, onChanged: () => void): P
     };
   }, []);
 
-  const setValue = (field: "label" | "password" | "code", value: string): void => {
-    setValues((previous) => ({ ...previous, [field]: value }));
+  const feedback = makeFeedback({ setFailure, setSuccess, setInvalid });
+
+  const context: ActionContext = {
+    t,
+    lock,
+    abort,
+    mounted,
+    setAdding,
+    setRemoving,
+    setFailure: feedback.fail,
+    setInvalid,
+    setSuccess: feedback.succeed,
+    clearFeedback: feedback.clearFeedback,
+    onChanged,
   };
 
-  const clearFeedback = (): void => {
-    setFailure(null);
-    setSuccess(null);
-    setInvalid([]);
-  };
+  const editing = makeEditingActions({
+    setValues,
+    setReauth,
+    setFailure,
+    setInvalid,
+    setPendingRemove,
+  });
 
-  const add = (): Promise<void> =>
-    runAdd({
-      values,
-      t,
-      lock,
-      abort,
-      mounted,
-      setValues,
-      setAdding,
-      setRemoving,
-      setFailure,
-      setInvalid,
-      setSuccess,
-      clearFeedback,
-      onChanged,
-    });
-
-  const remove = (idPrefix: string): Promise<void> =>
-    runRemove(idPrefix, {
-      values,
-      t,
-      lock,
-      abort,
-      mounted,
-      setValues,
-      setAdding,
-      setRemoving,
-      setFailure,
-      setInvalid,
-      setSuccess,
-      clearFeedback,
-      onChanged,
-    });
+  const submit = usePasskeySubmit({
+    t,
+    values,
+    reauth,
+    pendingRemove,
+    context,
+    fail: feedback.fail,
+    setInvalid,
+    setValues,
+    setReauth,
+    setPendingRemove,
+  });
 
   return {
     values,
+    reauth,
     invalid,
     adding,
     removing,
+    pendingRemove,
     failure,
     success,
-    setValue,
-    add,
-    remove,
-    clearFeedback,
+    setValue: editing.setValue,
+    setReauthValue: editing.setReauthValue,
+    requestRemove: editing.requestRemove,
+    cancelRemove: editing.cancelRemove,
+    add: submit.add,
+    confirmRemove: submit.confirmRemove,
+    clearFeedback: feedback.clearFeedback,
   };
 }

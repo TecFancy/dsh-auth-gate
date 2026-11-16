@@ -15,6 +15,18 @@ export type PasskeyFormValues = Record<PasskeyField, string>;
 /** 表单初值：提交成功后清回这一份。 */
 export const EMPTY_PASSKEY_FORM: PasskeyFormValues = { label: "", password: "", code: "" };
 
+/**
+ * 再认证值（删除专用）：只有口令与动态码，**没有 label**。
+ *
+ * 与 `PasskeyFormValues` 分开是重设计的核心修正之一：原来删除读的是添加表单的
+ * `values`，用户要删最后一把钥匙时得先在「添加通行密钥」里输密码（评审 F6）。
+ * 类型上分开以后，删除路径拿不到 label，也就不可能误用添加表单的状态。
+ */
+export type PasskeyReauthValues = Pick<PasskeyFormValues, "password" | "code">;
+
+/** 再认证初值。 */
+export const EMPTY_PASSKEY_REAUTH: PasskeyReauthValues = { password: "", code: "" };
+
 /** 名称长度上限（与 host 侧 `label` ≤ 64 字符的校验一致）。 */
 export const PASSKEY_LABEL_MAX = 64;
 
@@ -67,6 +79,22 @@ export function validatePasskeyForm(
   if (label.length > PASSKEY_LABEL_MAX) {
     return { message: t(PASSKEY_KEYS.labelTooLong), fields: ["label"] };
   }
+  if (values.password === "") {
+    return { message: t(PASSKEY_KEYS.passwordRequired), fields: ["password"] };
+  }
+  return null;
+}
+
+/**
+ * 删除前的本地校验：只要求当前口令。
+ *
+ * 动态码不在这里判：服务端只在「删最后一把」或 `all=1` 时才强制再认证，普通单删会
+ * 忽略它。客户端统一要求口令（与 UI 文案承诺一致），码留空即不发。
+ */
+export function validatePasskeyReauth(
+  values: PasskeyReauthValues,
+  t: AccountTranslate,
+): PasskeyFailureView | null {
   if (values.password === "") {
     return { message: t(PASSKEY_KEYS.passwordRequired), fields: ["password"] };
   }

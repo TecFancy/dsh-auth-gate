@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ADMIN_DICT_EN, ADMIN_DICT_ZH, ADMIN_KEYS, translateAdminFrom } from "./admin-copy.ts";
 
-/** 冻结键集 = 契约 §4 全表 40 键 + §9/A4 新增 2 键。 */
+/**
+ * 键集 = 契约 §4 全表 40 键 + §9/A4 新增 2 键 + 重设计（2026-11-16）新增 13 键。
+ *
+ * 重设计新增的是「重置入口 / 动态目标字段 / 确认阶段 / 表格 caption / 重试」，
+ * 全部由 `admin-block.tsx` 与 `admin-form.tsx` 实际渲染。
+ */
 const KEYS: string[] = Object.values(ADMIN_KEYS);
 
 const byName = (a: string, b: string): number => a.localeCompare(b);
@@ -12,7 +17,7 @@ describe("admin dictionary (contract §4 + §9/A4)", () => {
     const en = Object.keys(ADMIN_DICT_EN).sort(byName);
     expect(zh).toEqual(en);
     expect(zh).toEqual([...KEYS].sort(byName));
-    expect(KEYS).toHaveLength(42);
+    expect(KEYS).toHaveLength(55);
   });
 
   it("has a non-empty and distinct translation for every key", () => {
@@ -71,7 +76,7 @@ describe("translateAdminFrom", () => {
   it("falls back to the English dictionary for a key missing from the given one", () => {
     const partial = translateAdminFrom({ [ADMIN_KEYS.title]: "Titel" });
     expect(partial(ADMIN_KEYS.title)).toBe("Titel");
-    expect(partial(ADMIN_KEYS.submit)).toBe("Reset password");
+    expect(partial(ADMIN_KEYS.submit)).toBe("Review reset");
   });
 
   it("never renders a raw key when both dictionaries miss it", () => {

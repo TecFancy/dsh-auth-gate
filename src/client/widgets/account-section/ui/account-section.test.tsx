@@ -168,6 +168,22 @@ describe("SettingsAccountSection gate", () => {
     cleanup(root, container);
   });
 
+  it("shows the password policy up front instead of only after a failure", async () => {
+    routeFetch(() => statusOk(true));
+    const { root, container } = await render({ t: zh });
+    // 重设计：策略说明常驻在新密码框下，用户不必先失败一次才知道要求。
+    expect(container.textContent).toContain("至少 14 个字符");
+    cleanup(root, container);
+  });
+
+  it("renders the account context row only from fields the server actually sent", async () => {
+    routeFetch(() => statusOk(true));
+    const { root, container } = await render({ t: zh });
+    // 旧服务端只回 authenticated：上下文行整行不渲染，不画空徽标。
+    expect(container.textContent).not.toContain("本地账号");
+    cleanup(root, container);
+  });
+
   it("hides the form and shows the sign-in prompt when unauthenticated", async () => {
     routeFetch(() => statusOk(false));
     const { root, container } = await render({ t: zh });

@@ -52,6 +52,19 @@ export declare const ADMIN_KEYS: {
     readonly locked: "admin.locked";
     readonly lockedPlain: "admin.lockedPlain";
     readonly generic: "admin.generic";
+    readonly resetOpen: "admin.resetOpen";
+    readonly resetTitle: "admin.resetTitle";
+    readonly targetPassword: "admin.targetPassword";
+    readonly targetConfirm: "admin.targetConfirm";
+    readonly confirmTitle: "admin.confirmTitle";
+    readonly confirmWarning: "admin.confirmWarning";
+    readonly confirmSubmit: "admin.confirmSubmit";
+    readonly confirming: "admin.confirming";
+    readonly back: "admin.back";
+    readonly cancel: "admin.cancel";
+    readonly resetContext: "admin.resetContext";
+    readonly tableCaption: "admin.tableCaption";
+    readonly retry: "admin.retry";
 };
 /** 中文词典（键序与 §4 表一致，A4 的 2 键插在语义位置）。 */
 export declare const ADMIN_DICT_ZH: Record<string, string>;

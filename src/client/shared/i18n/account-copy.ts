@@ -52,6 +52,17 @@ export const ACCOUNT_KEYS = {
   ruleDigit: "account.rule.digit",
   ruleSpecial: "account.rule.special",
   ruleSameAsOld: "account.rule.sameAsOld",
+  // 重设计（2026-11-16）：账号上下文行 + 状态化动态码提示 + 重试 + 实例管理区。
+  contextLocal: "account.context.local",
+  roleAdmin: "account.role.admin",
+  roleUser: "account.role.user",
+  totpOn: "account.totp.on",
+  totpOff: "account.totp.off",
+  codeHintOn: "account.codeHintOn",
+  codeHintOff: "account.codeHintOff",
+  retry: "account.retry",
+  adminAreaTitle: "account.adminArea.title",
+  adminAreaIntro: "account.adminArea.intro",
 } as const;
 
 /** 契约 §2 策略规则名 → 词典键（`satisfies` 保证与契约的 `PasswordRule` 一一对应）。 */
@@ -120,6 +131,16 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.ruleDigit]: "包含数字",
   [ACCOUNT_KEYS.ruleSpecial]: "包含特殊字符（非字母数字）",
   [ACCOUNT_KEYS.ruleSameAsOld]: "不能与当前密码相同",
+  [ACCOUNT_KEYS.contextLocal]: "本地账号",
+  [ACCOUNT_KEYS.roleAdmin]: "管理员",
+  [ACCOUNT_KEYS.roleUser]: "普通用户",
+  [ACCOUNT_KEYS.totpOn]: "两步验证已开启",
+  [ACCOUNT_KEYS.totpOff]: "两步验证未开启",
+  [ACCOUNT_KEYS.codeHintOn]: "你的账号已开启两步验证，请输入 6 位动态码。",
+  [ACCOUNT_KEYS.codeHintOff]: "当前未开启两步验证，此栏可留空。",
+  [ACCOUNT_KEYS.retry]: "重试",
+  [ACCOUNT_KEYS.adminAreaTitle]: "实例管理",
+  [ACCOUNT_KEYS.adminAreaIntro]: "管理其他用户和本实例的登录方式。",
   // passkey 分片（`account.passkey.*`）：与 account 键同命名域，注册时一并进 `auth` 词典。
   ...PASSKEY_DICT_ZH,
 };
@@ -165,6 +186,16 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
   [ACCOUNT_KEYS.ruleDigit]: "a digit",
   [ACCOUNT_KEYS.ruleSpecial]: "a special character (not a letter or digit)",
   [ACCOUNT_KEYS.ruleSameAsOld]: "different from the current password",
+  [ACCOUNT_KEYS.contextLocal]: "Local account",
+  [ACCOUNT_KEYS.roleAdmin]: "Admin",
+  [ACCOUNT_KEYS.roleUser]: "User",
+  [ACCOUNT_KEYS.totpOn]: "Two-factor on",
+  [ACCOUNT_KEYS.totpOff]: "Two-factor off",
+  [ACCOUNT_KEYS.codeHintOn]: "Two-factor is on for your account. Enter the 6-digit code.",
+  [ACCOUNT_KEYS.codeHintOff]: "Two-factor is off. You can leave this field empty.",
+  [ACCOUNT_KEYS.retry]: "Retry",
+  [ACCOUNT_KEYS.adminAreaTitle]: "Instance management",
+  [ACCOUNT_KEYS.adminAreaIntro]: "Manage other users and sign-in for this instance.",
   // passkey 分片（`account.passkey.*`）：与 account 键同命名域，注册时一并进 `auth` 词典。
   ...PASSKEY_DICT_EN,
 };

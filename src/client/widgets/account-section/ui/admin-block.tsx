@@ -1,4 +1,14 @@
-import { useEffect, useState } from "react";
+/**
+ * 管理块（重设计 2026-11-16：固定外壳 + 重置入口默认收起）。
+ *
+ * 两处结构变化：
+ * 1. **异步状态不再丢掉标题**。原来 loading / 401 / failure 时提前返回一条裸 Notice，
+ *    「用户管理」标题和表格整体消失，状态变化会让页面跳动（评审 F8）。现在外壳
+ *    （标题 + 说明）恒定渲染，只有内容区换状态。
+ * 2. **重置表单默认收起**。它是低频且危险的动作，常驻展开会把用户表推下去；点
+ *    「重置他人密码」就地展开，取消后焦点回触发按钮。
+ */
+import { useEffect, useRef, useState } from "react";
 import {
   fetchAdminUsers,
   AdminResetForm,
@@ -7,14 +17,17 @@ import {
 import { ADMIN_KEYS, type AdminTranslate } from "../../../features/admin-users/index.ts";
 import type { AdminUserRow } from "../../../shared/api/index.ts";
 import {
+  ActionButton,
   ADMIN_BADGE_STYLE,
-  ADMIN_BLOCK_STYLE,
   ADMIN_TABLE_STYLE,
   ADMIN_TD_STYLE,
   ADMIN_TH_STYLE,
   ERROR_TEXT_STYLE,
   HINT_STYLE,
+  SECTION_ACTIONS_STYLE,
+  SECTION_HEADING_STYLE,
   TITLE_STYLE,
+  VISUALLY_HIDDEN_STYLE,
 } from "../../../shared/ui/index.ts";
 
 const TITLE_ID = "dsh-auth-gate-admin-title";
@@ -84,6 +97,7 @@ function AdminUsersTable({
 }) {
   return (
     <table style={ADMIN_TABLE_STYLE}>
+      <caption style={VISUALLY_HIDDEN_STYLE}>{t(ADMIN_KEYS.tableCaption)}</caption>
       <thead>
         <tr>
           <th style={ADMIN_TH_STYLE}>{t(ADMIN_KEYS.colUser)}</th>
@@ -131,6 +145,70 @@ function AdminNotice({ text, error }: { text: string; error?: boolean }) {
   );
 }
 
+/** 内容区：按列表状态切换（外壳恒定渲染，只有这里换）。 */
+function AdminBody({
+  t,
+  state,
+  actorName,
+  actorTotpEnabled,
+  resetting,
+  onRetry,
+  onReset,
+  onCloseReset,
+}: {
+  t: AdminTranslate;
+  state: UsersState;
+  actorName: string;
+  actorTotpEnabled: boolean;
+  resetting: boolean;
+  onRetry: () => void;
+  onReset: () => void;
+  onCloseReset: () => void;
+}) {
+  if (state.kind === "loading") return <AdminNotice text={t(ADMIN_KEYS.loading)} />;
+  if (state.kind === "unauthorized") {
+    return <AdminNotice text={t(ADMIN_KEYS.unauthorized)} error />;
+  }
+  if (state.kind === "failure") {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <AdminNotice text={t(ADMIN_KEYS.unavailable)} error />
+        <ActionButton variant="ghost" onClick={onRetry}>
+          {t(ADMIN_KEYS.retry)}
+        </ActionButton>
+      </div>
+    );
+  }
+  if (state.kind !== "ok") return null;
+  const targets = state.users.filter((user) => user.name !== actorName);
+  return (
+    <>
+      <AdminUsersTable t={t} users={state.users} actorName={actorName} />
+      {targets.length === 0 ? (
+        <p id={ADMIN_STATUS_ID} style={HINT_STYLE}>
+          {t(ADMIN_KEYS.empty)}
+        </p>
+      ) : null}
+      {resetting ? (
+        <>
+          <AdminResetForm
+            t={t}
+            users={state.users}
+            actorName={actorName}
+            actorTotpEnabled={actorTotpEnabled}
+            onReset={onReset}
+          />
+          <div>
+            <ActionButton variant="ghost" onClick={onCloseReset}>
+              {t(ADMIN_KEYS.cancel)}
+            </ActionButton>
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 export interface AdminUsersBlockProps {
   /** 槽位注入的翻译 seat（含 ADMIN 词典分片）。 */
   t: AdminTranslate;
@@ -141,38 +219,66 @@ export interface AdminUsersBlockProps {
 }
 
 /**
- * 管理块（契约 §3 / A2）：loading → denied 静默 null → unauthorized / failure 提示
- * → ok 列表 + 表单。「只有本人」时显示 `admin.empty` 且**不渲染表单**（§3.6）。
+ * 管理块（契约 §3 / A2）：外壳恒定渲染，内容区按状态切换。
+ * 「只有本人」时显示 `admin.empty` 且**不渲染重置入口**（§3.6）。
  */
 export function AdminUsersBlock({ t, actorName, actorTotpEnabled }: AdminUsersBlockProps) {
   const { state, reload } = useAdminUsers();
-  if (state.kind === "loading") return <AdminNotice text={t(ADMIN_KEYS.loading)} />;
+  const [resetting, setResetting] = useState(false);
+  const resetTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef(false);
+
+  /** 收起重置表单并把焦点还给触发按钮（等渲染完成再还）。 */
+  const closeReset = (): void => {
+    returnFocusRef.current = true;
+    setResetting(false);
+  };
+
+  useEffect(() => {
+    if (resetting || !returnFocusRef.current) return;
+    returnFocusRef.current = false;
+    resetTriggerRef.current?.focus();
+  }, [resetting]);
+
+  // denied：整块静默不渲染（这张 cookie 不是 admin / 不是 full 会话）。
   if (state.kind === "denied") return null;
-  if (state.kind === "unauthorized") {
-    return <AdminNotice text={t(ADMIN_KEYS.unauthorized)} error />;
-  }
-  if (state.kind === "failure") return <AdminNotice text={t(ADMIN_KEYS.unavailable)} error />;
-  const targets = state.users.filter((user) => user.name !== actorName);
+
+  const targets = state.kind === "ok" ? state.users.filter((user) => user.name !== actorName) : [];
+  const canReset = state.kind === "ok" && targets.length > 0;
+
   return (
-    <section style={ADMIN_BLOCK_STYLE} aria-labelledby={TITLE_ID}>
-      <h3 id={TITLE_ID} style={TITLE_STYLE}>
-        {t(ADMIN_KEYS.title)}
-      </h3>
+    <section
+      style={{ display: "flex", flexDirection: "column", gap: 8 }}
+      aria-labelledby={TITLE_ID}
+    >
+      <div style={SECTION_HEADING_STYLE}>
+        <h3 id={TITLE_ID} style={TITLE_STYLE}>
+          {t(ADMIN_KEYS.title)}
+        </h3>
+        <div style={SECTION_ACTIONS_STYLE}>
+          {canReset && !resetting ? (
+            <ActionButton
+              ref={resetTriggerRef}
+              variant="ghost"
+              aria-expanded={false}
+              onClick={() => setResetting(true)}
+            >
+              {t(ADMIN_KEYS.resetOpen)}
+            </ActionButton>
+          ) : null}
+        </div>
+      </div>
       <p style={HINT_STYLE}>{t(ADMIN_KEYS.intro)}</p>
-      <AdminUsersTable t={t} users={state.users} actorName={actorName} />
-      {targets.length === 0 ? (
-        <p id={ADMIN_STATUS_ID} style={HINT_STYLE}>
-          {t(ADMIN_KEYS.empty)}
-        </p>
-      ) : (
-        <AdminResetForm
-          t={t}
-          users={state.users}
-          actorName={actorName}
-          actorTotpEnabled={actorTotpEnabled}
-          onReset={reload}
-        />
-      )}
+      <AdminBody
+        t={t}
+        state={state}
+        actorName={actorName}
+        actorTotpEnabled={actorTotpEnabled}
+        resetting={resetting}
+        onRetry={reload}
+        onReset={reload}
+        onCloseReset={closeReset}
+      />
     </section>
   );
 }

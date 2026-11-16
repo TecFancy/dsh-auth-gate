@@ -1,11 +1,23 @@
+/**
+ * 改密表单的字段与状态区（重设计 2026-11-16：改成宿主设置页的行式布局）。
+ *
+ * 结构钉点（测试依赖，不能改）：四个 input 的 `name` 与顺序是
+ * `current` / `password` / `confirm` / `code`；`ACCOUNT_STATUS_ID` 是常驻
+ * `role="status" aria-live="polite"` 节点，也是错误字段 `aria-describedby` 的落点。
+ *
+ * 重设计新增：新密码框下常驻策略说明（原来只在失败后才说）、动态码提示按
+ * `totpEnabled` 状态化（原来恒说「已开启时填写」，未开启的用户会以为要填）。
+ */
 import { ACCOUNT_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import type { FailureView, FieldName, FormValues } from "../model/account-submit.ts";
 import {
   ERROR_TEXT_STYLE,
+  FIELD_CONTROL_STYLE,
+  FIELD_LABEL_STYLE,
+  FIELD_ROW_STYLE,
   HINT_STYLE,
-  INPUT_STYLE,
-  INVALID_INPUT_STYLE,
-  LABEL_STYLE,
+  ROW_INPUT_STYLE,
+  ROW_INVALID_INPUT_STYLE,
   RULES_STYLE,
   STATUS_STYLE,
 } from "../../../shared/ui/index.ts";
@@ -18,6 +30,9 @@ export const ACCOUNT_STATUS_ID = `${PREFIX}-status`;
 
 /** 动态验证码输入提示 id。 */
 const CODE_HINT_ID = `${PREFIX}-code-hint`;
+
+/** 新密码策略说明 id（常驻，不是错误态才出现）。 */
+const POLICY_HINT_ID = `${PREFIX}-policy-hint`;
 
 /** 字段 id（label htmlFor / aria 关联复用）。 */
 function fieldId(name: FieldName): string {
@@ -36,9 +51,11 @@ interface FieldProps {
   hint?: string | undefined;
   hintId?: string | undefined;
   inputMode?: "numeric" | undefined;
+  /** 请求在飞时只读（防快照漂移），不禁用（禁用会丢焦点）。 */
+  readOnly?: boolean | undefined;
 }
 
-/** 带 label / 错误描边 / aria 关联的输入行。 */
+/** 行式字段：左标签 + 右控件（输入 + 帮助文本）。 */
 function Field({
   id,
   name,
@@ -51,30 +68,36 @@ function Field({
   hint,
   hintId,
   inputMode,
+  readOnly,
 }: FieldProps) {
   const described = [invalid ? ACCOUNT_STATUS_ID : undefined, hintId].filter(
     (item): item is string => item !== undefined,
   );
   return (
-    <div style={LABEL_STYLE}>
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        name={name}
-        type={type}
-        value={value}
-        autoComplete={autoComplete}
-        inputMode={inputMode}
-        aria-invalid={invalid ? "true" : undefined}
-        aria-describedby={described.length === 0 ? undefined : described.join(" ")}
-        style={invalid ? INVALID_INPUT_STYLE : INPUT_STYLE}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {hint === undefined ? null : (
-        <span id={hintId} style={HINT_STYLE}>
-          {hint}
-        </span>
-      )}
+    <div style={FIELD_ROW_STYLE}>
+      <label htmlFor={id} style={FIELD_LABEL_STYLE}>
+        {label}
+      </label>
+      <div style={FIELD_CONTROL_STYLE}>
+        <input
+          id={id}
+          name={name}
+          type={type}
+          value={value}
+          autoComplete={autoComplete}
+          inputMode={inputMode}
+          readOnly={readOnly}
+          aria-invalid={invalid ? "true" : undefined}
+          aria-describedby={described.length === 0 ? undefined : described.join(" ")}
+          style={invalid ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {hint === undefined ? null : (
+          <span id={hintId} style={HINT_STYLE}>
+            {hint}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -84,10 +107,28 @@ interface PasswordFieldsProps {
   values: FormValues;
   isInvalid: (field: FieldName) => boolean;
   onChange: (field: FieldName, value: string) => void;
+  /** 请求在飞：四个输入只读。 */
+  readOnly?: boolean | undefined;
+  /**
+   * 当前账号是否开启两步验证。`undefined` = 不知道（旧服务端），此时沿用
+   * 「已开启时填写」的保守文案，不推断成关闭。
+   */
+  totpEnabled?: boolean | undefined;
 }
 
 /** 四字段（current / password / confirm / code），autocomplete 按语义固定。 */
-export function PasswordFields({ t, values, isInvalid, onChange }: PasswordFieldsProps) {
+export function PasswordFields({
+  t,
+  values,
+  isInvalid,
+  onChange,
+  readOnly,
+  totpEnabled,
+}: PasswordFieldsProps) {
+  const codeHint =
+    totpEnabled === undefined
+      ? t(ACCOUNT_KEYS.codeHint)
+      : t(totpEnabled ? ACCOUNT_KEYS.codeHintOn : ACCOUNT_KEYS.codeHintOff);
   return (
     <>
       <Field
@@ -98,6 +139,7 @@ export function PasswordFields({ t, values, isInvalid, onChange }: PasswordField
         autoComplete="current-password"
         value={values.current}
         invalid={isInvalid("current")}
+        readOnly={readOnly}
         onChange={(value) => onChange("current", value)}
       />
       <Field
@@ -108,6 +150,9 @@ export function PasswordFields({ t, values, isInvalid, onChange }: PasswordField
         autoComplete="new-password"
         value={values.password}
         invalid={isInvalid("password")}
+        readOnly={readOnly}
+        hint={t(ACCOUNT_KEYS.policyHint)}
+        hintId={POLICY_HINT_ID}
         onChange={(value) => onChange("password", value)}
       />
       <Field
@@ -118,6 +163,7 @@ export function PasswordFields({ t, values, isInvalid, onChange }: PasswordField
         autoComplete="new-password"
         value={values.confirm}
         invalid={isInvalid("confirm")}
+        readOnly={readOnly}
         onChange={(value) => onChange("confirm", value)}
       />
       <Field
@@ -129,7 +175,8 @@ export function PasswordFields({ t, values, isInvalid, onChange }: PasswordField
         autoComplete="one-time-code"
         value={values.code}
         invalid={isInvalid("code")}
-        hint={t(ACCOUNT_KEYS.codeHint)}
+        readOnly={readOnly}
+        hint={codeHint}
         hintId={CODE_HINT_ID}
         onChange={(value) => onChange("code", value)}
       />
@@ -137,10 +184,15 @@ export function PasswordFields({ t, values, isInvalid, onChange }: PasswordField
   );
 }
 
-/** 状态区：常驻 DOM 的 aria-live 播报位（idle 时留空，避免读屏漏播）。 */
+/**
+ * 状态区：常驻 DOM 的 aria-live 播报位（idle 时留空，避免读屏漏播）。
+ *
+ * `tabIndex={-1}` 让无字段的全局错误（429 / 503 / 网络）能把焦点落到这里，
+ * 读屏用户不用自己找（评审 F4 的焦点落点）。
+ */
 export function StatusLine({ failure }: { failure: FailureView | null }) {
   return (
-    <div id={ACCOUNT_STATUS_ID} role="status" aria-live="polite" style={STATUS_STYLE}>
+    <div id={ACCOUNT_STATUS_ID} role="status" aria-live="polite" tabIndex={-1} style={STATUS_STYLE}>
       {failure === null ? null : <span style={ERROR_TEXT_STYLE}>{failure.message}</span>}
       {failure === null || failure.rules.length === 0 ? null : (
         <ul style={RULES_STYLE}>

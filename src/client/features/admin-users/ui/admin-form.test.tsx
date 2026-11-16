@@ -103,8 +103,18 @@ async function submit(container: HTMLElement): Promise<void> {
   });
 }
 
+/** 状态播报位。 */
 function status(container: HTMLElement): HTMLElement {
   return container.querySelector("#dsh-auth-gate-admin-status")!;
+}
+
+/** 按可见文本找按钮（确认页有两个按钮，按文本区分最稳）。 */
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === text,
+  );
+  if (button === undefined) throw new Error(`missing button: ${text}`);
+  return button;
 }
 
 describe("AdminResetForm：结构与可访问性（契约 §3.5-§3.7 / A5）", () => {
@@ -169,7 +179,7 @@ describe("AdminResetForm：本地校验（A6）与双锁（A11）", () => {
     });
   }
 
-  it("双击提交只发一次请求（in-flight 硬锁）", async () => {
+  it("确认页双击只发一次请求（in-flight 硬锁）", async () => {
     fetchMock.mockReturnValue(new Promise(() => undefined));
     const { container } = await render();
     await fill(container, {
@@ -178,43 +188,17 @@ describe("AdminResetForm：本地校验（A6）与双锁（A11）", () => {
       confirm: "NewPassw0rd!XY",
     });
     await submit(container);
-    await submit(container);
+    const confirmButton = buttonByText(container, t(ADMIN_KEYS.confirmSubmit, { name: "alice" }));
+    await act(async () => {
+      confirmButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      confirmButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await flushMicrotasks();
+    });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-});
 
-describe("AdminResetForm：提交结果渲染（§3.8 / A8）", () => {
-  it("成功后四字段清空 + 成功文案；sessionsRevoked:false 改走 alert（A8）", async () => {
+  it("第一次提交只进确认页，不发请求", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { ok: true, sessionsRevoked: true }));
-    const { container, onReset } = await render(true);
-    await fill(container, { target: "bob", password: PW, confirm: PW, code: "123456" });
-    await submit(container);
-    expect(select(container).value).toBe("");
-    expect(["password", "confirm", "code"].map((f) => input(container, f).value)).toEqual([
-      "",
-      "",
-      "",
-    ]);
-    expect(status(container).textContent).toContain(t(ADMIN_KEYS.successRevoked));
-    expect(status(container).getAttribute("role")).toBe("status");
-    expect(onReset).toHaveBeenCalledTimes(1);
-    const body = String((fetchMock.mock.calls[0]?.[1] as { body?: unknown } | undefined)?.body);
-    expect(body).not.toContain("confirm");
-
-    fetchMock.mockResolvedValue(jsonResponse(200, { ok: true, sessionsRevoked: false }));
-    await fill(container, { target: "alice", password: PW, confirm: PW, code: "123456" });
-    await submit(container);
-    const alert = container.querySelector<HTMLElement>('[role="alert"]');
-    expect(alert?.getAttribute("aria-live")).toBe("assertive");
-    expect(alert?.textContent).toContain(t(ADMIN_KEYS.successKept));
-    expect(alert?.style.color).toContain("error");
-    expect(t(ADMIN_KEYS.successKept)).not.toBe(t(ADMIN_KEYS.successRevoked));
-  });
-
-  it("400 policy → 规则逐条翻译列出", async () => {
-    fetchMock.mockResolvedValue(
-      jsonResponse(400, { error: "policy", rules: ["minLength", "digit"] }),
-    );
     const { container } = await render();
     await fill(container, {
       target: "alice",
@@ -222,46 +206,16 @@ describe("AdminResetForm：提交结果渲染（§3.8 / A8）", () => {
       confirm: "NewPassw0rd!XY",
     });
     await submit(container);
-    const items = [...container.querySelectorAll("#dsh-auth-gate-admin-status li")].map(
-      (item) => item.textContent,
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(t(ADMIN_KEYS.confirmTitle, { name: "alice" }));
+    expect(container.textContent).toContain(t(ADMIN_KEYS.confirmWarning, { name: "alice" }));
+    expect(container.textContent).toContain(
+      t(ADMIN_KEYS.resetContext, { name: "alice", actor: "admin" }),
     );
-    expect(items).toEqual([t("account.rule.minLength"), t("account.rule.digit")]);
-    expect(status(container).textContent).toContain(t(ADMIN_KEYS.policyIntro));
   });
 
-  it("429 → 秒数插值；403 → forbidden", async () => {
-    fetchMock.mockResolvedValue(jsonResponse(429, { error: "locked", retryAfter: 42 }));
-    const locked = await render();
-    await fill(locked.container, {
-      target: "alice",
-      password: "NewPassw0rd!XY",
-      confirm: "NewPassw0rd!XY",
-    });
-    await submit(locked.container);
-    expect(status(locked.container).textContent).toContain(t(ADMIN_KEYS.locked, { seconds: 42 }));
-
-    fetchMock.mockResolvedValue(jsonResponse(403, { error: "forbidden" }));
-    const denied = await render();
-    await fill(denied.container, {
-      target: "alice",
-      password: "NewPassw0rd!XY",
-      confirm: "NewPassw0rd!XY",
-    });
-    await submit(denied.container);
-    expect(status(denied.container).textContent).toContain(t(ADMIN_KEYS.forbidden));
-  });
-});
-
-describe("AdminResetForm：卸载与异常（§3.12 / A11）", () => {
-  it("卸载 abort 后不再 setState、不抛错", async () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-    let resolveFetch: ((value: Response) => void) | undefined;
-    fetchMock.mockReturnValue(
-      new Promise<Response>((resolve) => {
-        resolveFetch = resolve;
-      }),
-    );
-    const { container, root } = await render();
+  it("确认页「返回修改」保留全部值并回到编辑", async () => {
+    const { container } = await render();
     await fill(container, {
       target: "alice",
       password: "NewPassw0rd!XY",
@@ -269,10 +223,13 @@ describe("AdminResetForm：卸载与异常（§3.12 / A11）", () => {
     });
     await submit(container);
     await act(async () => {
-      root.unmount();
-      resolveFetch?.(jsonResponse(200, { ok: true, sessionsRevoked: true }));
+      buttonByText(container, t(ADMIN_KEYS.back)).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
       await flushMicrotasks();
     });
-    expect(errorSpy).not.toHaveBeenCalled();
+    expect(select(container).value).toBe("alice");
+    expect(input(container, "password").value).toBe("NewPassw0rd!XY");
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

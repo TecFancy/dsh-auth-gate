@@ -1,5 +1,5 @@
 import { type AccountTranslate } from "../../../shared/i18n/index.ts";
-import { type PasskeyFormValues, type PasskeyMutationResult } from "../model/passkey-form.ts";
+import { type PasskeyFormValues, type PasskeyMutationResult, type PasskeyReauthValues } from "../model/passkey-form.ts";
 /** 注册结果：成功 / 失败（含字段标红）/ 已中止 / 浏览器不支持。 */
 export type RegisterPasskeyResult = {
     kind: "ok";
@@ -20,6 +20,9 @@ export declare function registerPasskey(values: PasskeyFormValues, signal: Abort
 /**
  * 删除一把凭据（按 `idPrefix` 前缀唯一匹配）。再认证凭据随请求一起发：
  * 删最后一把时服务端会强制校验，普通单删也带上（同一份表单，不区分路径）。
+ *
+ * 第二个参数是 `PasskeyReauthValues`（只有口令与动态码），**不是**添加表单的
+ * `PasskeyFormValues`：删除不该能读到添加表单的 label（评审 F6）。
  */
-export declare function removePasskey(idPrefix: string, values: PasskeyFormValues, signal: AbortSignal, t: AccountTranslate): Promise<PasskeyMutationResult>;
+export declare function removePasskey(idPrefix: string, values: PasskeyReauthValues, signal: AbortSignal, t: AccountTranslate): Promise<PasskeyMutationResult>;
 //# sourceMappingURL=passkey-mutate.d.ts.map

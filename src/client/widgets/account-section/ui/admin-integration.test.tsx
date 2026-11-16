@@ -113,6 +113,35 @@ async function submit(container: HTMLElement): Promise<void> {
   });
 }
 
+/** 按可见文本找按钮。 */
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === text,
+  );
+  if (button === undefined) throw new Error(`missing button: ${text}`);
+  return button;
+}
+
+/** 展开重置表单（重设计：默认收起）。 */
+async function openReset(container: HTMLElement): Promise<void> {
+  await act(async () => {
+    buttonByText(container, T(ADMIN_KEYS.resetOpen)).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await flushMicrotasks();
+  });
+}
+
+/** 确认页点「确认重置 {name}」：重设计后真正发请求的是这一步。 */
+async function confirmReset(container: HTMLElement, name: string): Promise<void> {
+  await act(async () => {
+    buttonByText(container, T(ADMIN_KEYS.confirmSubmit, { name })).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await flushMicrotasks();
+  });
+}
+
 function pathSet(): Set<string> {
   return new Set(requests.map(([url]) => pathOf(url)));
 }
@@ -149,6 +178,8 @@ describe("admin panel integration (real section + real block)", () => {
     mockApi(ADMIN_STATUS);
     const { root, container } = await render(createElement(SettingsAccountSection, { t: T }));
     expect(adminTitle(container)?.textContent).toBe(T(ADMIN_KEYS.title));
+    // 重设计：重置表单默认收起，先展开。
+    await openReset(container);
     // 下拉排除本人 + 空初始占位（A5）：只剩 worker，且默认不预选。
     expect(
       [...container.querySelectorAll("#dsh-auth-gate-admin-target option")].map(
@@ -169,6 +200,8 @@ describe("admin panel integration (real section + real block)", () => {
     // 用绝对值（>=2）会在 A7 坏掉时依旧变绿。
     const listsBeforeSubmit = listCalls();
     await submit(container);
+    // 重设计：第一次提交只进确认页，点确认才发请求。
+    await confirmReset(container, "worker");
 
     const call = resetCall();
     expect(call).toBeDefined();
