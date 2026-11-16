@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.21.0...v0.22.0) (2026-11-16)
+
+
+### Features
+
+* rebridge the host browser cookie after admitting an index navigation ([#148](https://github.com/TecFancy/dsh-auth-gate/issues/148)) ([d611a21](https://github.com/TecFancy/dsh-auth-gate/commit/d611a21aaf5d95f3c1049b0e181bc0a5812a60f9))
+
+
+### Reverts
+
+* undo the mistyped promotion commit ([#146](https://github.com/TecFancy/dsh-auth-gate/issues/146)) ([1d0592e](https://github.com/TecFancy/dsh-auth-gate/commit/1d0592e4b5395f1600f8f0c7b71655c24a397ca0))
+
 ## [0.21.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.20.0...v0.21.0) (2026-11-16)
 
 
