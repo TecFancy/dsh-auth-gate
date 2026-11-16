@@ -149,6 +149,20 @@ plugin, with the mechanism behind it and the decision record that fixed it.
 - dsh versions without `connection.authenticatedUrl` (older than 0.1.2-alpha) expose no
   launch token, so there is no wizard at all: those instances keep the 0.17.4 behavior
   and are configured through the CLI.
+- **The host-cookie rebridge is a repair, not a guarantee.** dsh keeps its own browser
+  cookie (`dsh-auth-<sha256(authority)>`, `SameSite=Strict`, 30 days) beside the plugin's
+  `dsh_auth`, and the gate never inspects it. After admitting a top-level navigation to
+  `/`, the guard asks dsh's `connection.requestRejection` and answers `302 /?token=…` when
+  dsh does not accept the request. That covers a proxy that starts or stops rewriting
+  `Host`, a domain or port change, an expired dsh cookie and cleared site data. It does
+  not cover a dsh build without `requestRejection` (the hook stays inactive and the old
+  behavior returns), a launch token that no longer matches the running process (several
+  replicas without sticky routing), or a browser that refuses the minted cookie. In those
+  cases the user still sees dsh's own `401 dsh web authentication required`; the one-shot
+  marker cookie guarantees that costs at most one extra hop instead of a redirect loop.
+  Only top-level `GET` navigations to `/` are rebridged: API calls, static assets,
+  WebSocket upgrades and requests already carrying `?token=` (the host's own cookie-minting
+  hop) are left alone, because a redirect cannot fix them.
 - The plugin only protects dsh's web surface. It is not a replacement for
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with
