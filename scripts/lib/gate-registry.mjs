@@ -196,12 +196,15 @@ export const GATES = [
     selfTest: false,
   },
   {
+    // The npm script runs the self-test and then the check, so this is a
+    // command gate rather than a script gate: registering only the script would
+    // drop the self-test half.
     id: "host-contract",
-    script: "check-host.mjs",
-    args: [],
+    command: "node scripts/check-host.mjs --self-test && node scripts/check-host.mjs",
+    npm: "host:check",
     scenes: ["build"],
     stages: ["verify"],
-    selfTest: true,
+    selfTest: false,
   },
   {
     // Live-entry coverage probes a real running host, so it cannot be a CI step.

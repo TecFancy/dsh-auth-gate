@@ -185,7 +185,15 @@ export function validateRegistry({
       }
     }
   }
+  // A command gate may name a script inside its command (`node scripts/x.mjs`),
+  // so the registered set is the script fields plus every `scripts/*.mjs` a
+  // command mentions. Without that, moving a gate from `script` to `command`
+  // would make its file look unregistered.
   const registered = new Set(gates.map((g) => g.script).filter((s) => s !== undefined));
+  for (const gate of gates) {
+    if (gate.command === undefined) continue;
+    for (const m of gate.command.matchAll(/scripts\/([\w.-]+\.mjs)/g)) registered.add(m[1]);
+  }
   for (const file of checkScripts) {
     if (!registered.has(file)) {
       problems.push(
