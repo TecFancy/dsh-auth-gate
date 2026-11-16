@@ -4,6 +4,7 @@ description: Use when the user asks about dsh-auth-gate configuration - supporte
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
+origin: local
 ---
 
 # dsh-auth-gate Configuration Quick Reference / dsh-auth-gate 配置速查
@@ -199,8 +200,8 @@ Run on an isolated test instance. / 隔离测试实例上验证：
 ## Key file locations / 关键文件位置
 
 - Source repo: TecFancy/dsh-auth-gate (README config table, docs/deployed/deployment.md,
-  docs/specs/dsh-auth-plan.md). / 源码仓库：TecFancy/dsh-auth-gate（README 配置表、
-  docs/deployed/deployment.md 部署清单、docs/specs/dsh-auth-plan.md 路线图）。
+  docs/history/specs/dsh-auth-plan.md). / 源码仓库：TecFancy/dsh-auth-gate（README 配置表、
+  docs/deployed/deployment.md 部署清单、docs/history/specs/dsh-auth-plan.md 路线图）。
 - This skill ships inside the package: `<package root>/.agents/skills/dsh-auth-gate-config/`,
   installed to `$DSH_HOME/skills/dsh-auth-gate-config/`, kept in sync with the main
   workspace copy `.dsh/skills/dsh-auth-gate-config/` (edit one, sync the other). /

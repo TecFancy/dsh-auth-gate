@@ -1,0 +1,120 @@
+name: Require decision record
+
+# A change that touches code (src/), core configuration, or the tooling that
+# enforces the repository's rules (scripts/, hooks, skills) must carry a note in
+# .agents/notes/ (add/update), or the PR body must declare why it is exempt with
+# a "Decision record:" line. This keeps the note obligation mechanical instead
+# of judgment-based; see .agents/notes/README.md "When to write one", whose
+# "process, tooling, or workflows (gates, scripts, CI)" bucket is what the last
+# four patterns cover.
+#
+# The release-please exemption is deliberately narrow. A release PR is generated
+# and carries no decision, so it must pass without a note - but only while its
+# head branch is the one release-please creates and its file set is exactly the
+# version bump. One extra file and the exemption is gone, because a release PR
+# that smuggled a change in is exactly the case this check exists to catch.
+
+on:
+  pull_request:
+    branches: [main, development]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-record:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const CODE_PATTERNS = [
+              /^src\//,
+              /^test\//,
+              /^deploy\//,
+              /^locale\//,
+              /^package\.json$/,
+              /^package-lock\.json$/,
+              /^cordis\.patch\.yml$/,
+              /^tsconfig.*\.json$/,
+              /^tsdown\.config\.ts$/,
+              /^vitest\.config\.ts$/,
+              /^eslint\.config\.js$/,
+              /^steiger\.config\.js$/,
+              /^commitlint\.config\.js$/,
+              /^\.lintstagedrc\.js$/,
+              /^\.prettierrc$/,
+              /^\.prettierignore$/,
+              /^\.gitattributes$/,
+              /^\.editorconfig$/,
+              /^\.github\/workflows\/.*\.yml$/,
+              /^scripts\//,
+              /^\.husky\//,
+              /^\.agents\/skills\//,
+            ];
+            const NOTE_PREFIX = ".agents/notes/";
+            // A note is a triplet; touching only the README, a sidecar or an
+            // archived file is not writing a decision.
+            const NOTE_EXEMPT = [
+              /^\.agents\/notes\/README/,
+              /^\.agents\/notes\/archived\//,
+              /\.i18n\.yaml$/,
+              /\/AGENTS\.md$/,
+            ];
+
+            // The generated release PR: its head branch and its exact file set.
+            const RELEASE_HEAD = /^release-please--branches--/;
+            const RELEASE_FILES = new Set([
+              "package.json",
+              "package-lock.json",
+              "CHANGELOG.md",
+              ".release-please-manifest.json",
+            ]);
+
+            // Paginate: listFiles defaults to 100 per page; a large PR must not
+            // silently skip files past the first page.
+            const changed = [];
+            for (let page = 1; ; page++) {
+              const { data: pageFiles } = await github.rest.pulls.listFiles({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                per_page: 100,
+                page,
+              });
+              changed.push(...pageFiles.map((f) => f.filename));
+              if (pageFiles.length < 100) break;
+            }
+
+            const head = context.payload.pull_request?.head?.ref ?? "";
+            if (RELEASE_HEAD.test(head) && changed.every((f) => RELEASE_FILES.has(f))) {
+              console.log(`Release PR (${head}) with only version files - passing.`);
+              return;
+            }
+
+            const touchesCode = changed.some((f) => CODE_PATTERNS.some((re) => re.test(f)));
+            const touchesNotes = changed.some(
+              (f) => f.startsWith(NOTE_PREFIX) && !NOTE_EXEMPT.some((re) => re.test(f)),
+            );
+            if (!touchesCode || touchesNotes) {
+              console.log("No code/config change without a note - passing.");
+              return;
+            }
+
+            const body = context.payload.pull_request?.body ?? "";
+            const m = body.match(/^Decision record:\s*(.+)$/m);
+            const declaration = m ? m[1].trim() : "";
+            if (declaration) {
+              console.log(`Decision record present: ${declaration}`);
+              return;
+            }
+
+            core.setFailed(
+              "This PR changes code/config but no .agents/notes/ note was added or updated. " +
+                "Add one in the same PR, or state an exemption in the PR body with: " +
+                "`Decision record: none - <one-line exemption reason>` (see .agents/notes/README.md).",
+            );

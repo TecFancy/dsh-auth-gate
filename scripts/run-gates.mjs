@@ -1,121 +1,338 @@
 #!/usr/bin/env node
-// Scenario gate runner (M3): named scenarios assembled from the same gates as
-// `npm run verify`, plus automatic selection of the minimal evidence set for
-// the change surface. Pre-push runs this via `.husky/pre-push`; full coverage
-// is CI's job, not every local run's. Fail-closed: unknown change shapes or a
-// broken git state fall back to the full set, never to a weaker one.
-//
-// This file is the shared template across the TecFancy dsh repos: the gate
-// list is NOT hardcoded — it is derived from the `verify` chain in
-// package.json (every `npm run <gate>` segment), and each gate is classified
-// into a scenario by name. Repos with a leaner verify chain automatically get
-// leaner scenarios.
-
-import { readFileSync } from "node:fs";
+/**
+ * Run this repository's script gates from one list (`lib/gate-registry.mjs`).
+ *
+ * `npm run verify`, the husky pre-commit hook and `ci.yml` used to carry their
+ * own hand-written copies of the gate list, so adding a gate meant editing five
+ * places and nothing noticed a missed one. They now call this runner, and the
+ * runner refuses to start when the list disagrees with the repository:
+ *   - every registered script exists, and ids are unique;
+ *   - every `scripts/check-*.mjs` and `scripts/verify-*.mjs` is registered (a
+ *     new gate cannot go unseen);
+ *   - every gate's `npm` script is exactly `node scripts/<script> <args>`;
+ *   - `verify` calls the runner, the hook and the workflow call the runner.
+ * A disagreement exits 2 before any gate runs, so drift is reported as drift and
+ * never as a verdict about the tree.
+ *
+ * Two things this runner keeps from the design it replaces, because they are
+ * worth more than uniformity with a plain registry runner:
+ *
+ *   1. **Change-surface scenarios.** `--scenario <name>` runs one named set, and
+ *      the default run derives the set from the outgoing diff. A docs-only
+ *      change must not pay for coverage and a double build; a dependency change
+ *      must pay for everything. Unknown shapes fall back to the full set, never
+ *      to a weaker one.
+ *   2. **Run every selected gate, then report.** A commit that breaks two gates
+ *      hears about both. The exit code is 2 if any gate (or the runner) hit an
+ *      environment fault, else 1 if any gate found a violation, else 0.
+ *
+ * Usage:
+ *   node scripts/run-gates.mjs                      # derive the set from the diff
+ *   node scripts/run-gates.mjs --scenario hygiene   # one named set
+ *   node scripts/run-gates.mjs --stage pre-commit   # the pre-commit set
+ *   node scripts/run-gates.mjs --base <ref>         # also hand the baseline to gates that take one
+ *   node scripts/run-gates.mjs --gate-self-tests    # every registered `--self-test`, then this runner's
+ *   node scripts/run-gates.mjs --self-test          # this runner's own negative cases
+ *   node scripts/run-gates.mjs --list               # the scenarios and their gates
+ */
 import { spawnSync } from "node:child_process";
-import { dirname, join } from "node:path";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import path from "node:path";
+import process from "node:process";
 import { fileURLToPath } from "node:url";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+import { GATES, RUNNER_NPM, SCENES, VERIFY_MUST_CALL, WIRING } from "./lib/gate-registry.mjs";
 
-// gate name -> scenario. Keep in sync when a repo adds a gate to verify.
-const SCENE_OF = {
-  "format:check": "hygiene",
-  lint: "hygiene",
-  "lint:no-emdash": "hygiene",
-  "slice:check": "hygiene",
-  "lint:fsd": "hygiene",
-  "aliases:check": "hygiene",
-  "lock:check": "hygiene",
-  "decisions:check": "hygiene",
-  "docs:check": "hygiene",
-  "readme:parity": "hygiene",
-  "screenshots:check": "hygiene",
-  "type-check": "types",
-  typecheck: "types",
-  "test:coverage": "tests",
-  test: "tests",
-  build: "build",
-  "bundle:check": "build",
-  "host:check": "build",
-};
+const TAG = "[run-gates]";
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const STAGES = ["verify", "pre-commit"];
 
-const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
-const verifyScript = pkg.scripts?.verify ?? "";
-const GATES = verifyScript
-  .split("&&")
-  .map((part) => part.trim())
-  .filter((part) => part.startsWith("npm run "))
-  .map((part) => part.replace(/^npm run /, ""));
-
-if (GATES.length === 0) {
-  console.error(
-    "package.json has no `verify` chain of `npm run <gate>` segments — the M2 baseline is missing. See AGENTS.md.",
-  );
-  process.exit(2);
-}
-const unknownGates = GATES.filter((gate) => !SCENE_OF[gate]);
-if (unknownGates.length > 0) {
-  console.error(
-    `verify chain contains gates without a scenario mapping: ${unknownGates.join(", ")} - add them to SCENE_OF in scripts/run-gates.mjs.`,
-  );
-  process.exit(2);
-}
-
-const SCENARIOS = { hygiene: [], types: [], tests: [], build: [], verify: GATES };
-for (const gate of GATES) SCENARIOS[SCENE_OF[gate]].push(gate);
-
-// Change-surface rules: the first matching rule per changed file wins, and the
-// union of the matched scenarios is what runs. `verify` is the fail-closed
-// answer for shapes the map does not know (dependency changes, unknown files).
+/**
+ * Change-surface rules: the first matching rule per changed file wins, and the
+ * union of the matched scenes is what runs. `verify` is the fail-closed answer
+ * for shapes the map does not know (dependency changes, unknown files).
+ *
+ * A `scripts/` change selects the self-tests too: editing a gate is the one
+ * change that can silently disable it, and the map this replaces sent it to
+ * `hygiene + types` only, so a broken gate stayed green.
+ */
 const RULES = [
   { re: /^src\//, scenes: ["hygiene", "types", "tests", "build"] },
-  { re: /^test\//, scenes: ["hygiene", "types", "tests"] }, // tests and harnesses outside src/
-  { re: /^lib\//, scenes: ["hygiene", "build"] }, // build artifacts
+  { re: /^test\//, scenes: ["hygiene", "types", "tests"] },
+  { re: /^lib\//, scenes: ["hygiene", "build"] },
+  { re: /^scripts\//, scenes: ["hygiene", "types"], selfTests: true },
   {
-    re: /^(scripts\/|.*\.config\.(js|mjs|ts)$|aliases\.json|tsconfig.*\.json$)/,
+    re: /^(.*\.config\.(js|mjs|ts)$|aliases\.json|tsconfig.*\.json$)/,
     scenes: ["hygiene", "types"],
   },
-  {
-    re: /^(package\.json|package-lock\.json|\.npmrc)$/,
-    scenes: ["verify"], // dependency changes ripple everywhere
-  },
-  { re: /^(docs\/|AGENTS\.md|README\.md|.*\.md$)/, scenes: ["hygiene"] },
-  { re: /^screenshots\.json$/, scenes: ["hygiene"] }, // market card list, checked by screenshots:check
-  { re: /^\./, scenes: ["hygiene"] }, // dotfiles: .github, .husky, ...
-  { re: /.*/, scenes: ["verify"] }, // unknown -> full set
+  { re: /^(package\.json|package-lock\.json|\.npmrc)$/, scenes: ["verify"] },
+  { re: /^(docs\/|AGENTS\.md|CLAUDE\.md|README\.md|README\.zh\.md|.*\.md$)/, scenes: ["hygiene"] },
+  { re: /^screenshots\.json$/, scenes: ["hygiene"] },
+  { re: /^\.agents\//, scenes: ["hygiene"] },
+  { re: /^\./, scenes: ["hygiene"] },
+  { re: /.*/, scenes: ["verify"] },
 ];
 
-function expand(scenes) {
-  const gates = [];
-  for (const scene of scenes) {
-    for (const gate of SCENARIOS[scene]) {
-      if (!gates.includes(gate)) gates.push(gate);
-    }
+function parseArgs(argv) {
+  const fail = (message) => {
+    console.error(`${TAG} ${message}`);
+    process.exit(2);
+  };
+  const args = {
+    stage: undefined,
+    base: undefined,
+    scenario: undefined,
+    list: false,
+    gateSelfTests: false,
+    selfTest: false,
+  };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    const valueOf = (flag) => {
+      const value = arg === flag ? argv[i + 1] : arg.slice(flag.length + 1);
+      // A transposed flag would otherwise be taken as the value, and a value
+      // that starts with `-` would reach a gate or git as an option.
+      if (!value || value.startsWith("-")) fail(`${flag} needs a value`);
+      if (arg === flag) i += 1;
+      return value;
+    };
+    if (arg === "--gate-self-tests") args.gateSelfTests = true;
+    else if (arg === "--self-test") args.selfTest = true;
+    else if (arg === "--list") args.list = true;
+    else if (arg === "--stage" || arg.startsWith("--stage=")) {
+      if (args.stage !== undefined) fail("--stage given more than once");
+      args.stage = valueOf("--stage");
+      if (!STAGES.includes(args.stage)) fail(`--stage must be one of: ${STAGES.join(", ")}`);
+    } else if (arg === "--scenario" || arg.startsWith("--scenario=")) {
+      if (args.scenario !== undefined) fail("--scenario given more than once");
+      args.scenario = valueOf("--scenario");
+      if (!SCENES.includes(args.scenario) && args.scenario !== "verify") {
+        fail(`--scenario must be one of: ${[...SCENES, "verify"].join(", ")}`);
+      }
+    } else if (arg === "--base" || arg.startsWith("--base=")) {
+      if (args.base !== undefined) fail("--base given more than once");
+      args.base = valueOf("--base");
+    } else fail(`unknown argument: ${arg}`);
   }
-  return gates;
+  const modes = [args.gateSelfTests, args.selfTest, args.list].filter(Boolean).length;
+  if (modes > 1) fail("--gate-self-tests, --self-test and --list are separate runs");
+  if (modes === 1 && (args.stage !== undefined || args.base !== undefined || args.scenario)) {
+    fail("a self-test or list run takes no --stage, --base or --scenario");
+  }
+  return args;
 }
 
+/**
+ * Everything the registry must agree with, as a list of problems. Pure: the
+ * caller reads the repository and passes it in, so each rule has a case in the
+ * self-test that fails for exactly that rule.
+ *
+ * @param {object} input
+ * @param {typeof GATES} input.gates
+ * @param {string[]} input.checkScripts basenames of `scripts/check-*.mjs` and `scripts/verify-*.mjs`
+ * @param {(name: string) => boolean} input.scriptExists
+ * @param {Record<string, string>} input.npmScripts `package.json` scripts
+ * @param {(file: string) => string | undefined} input.readText file text, or undefined when absent
+ * @param {{file: string, contains: string}[]} input.wiring
+ */
+export function validateRegistry({
+  gates,
+  checkScripts,
+  scriptExists,
+  npmScripts,
+  readText,
+  wiring,
+}) {
+  const problems = [];
+  const seen = new Set();
+  for (const gate of gates) {
+    if (seen.has(gate.id)) problems.push(`duplicate gate id: ${gate.id}`);
+    seen.add(gate.id);
+    if (!scriptExists(gate.script)) {
+      problems.push(`${gate.id}: scripts/${gate.script} does not exist`);
+    }
+    for (const stage of gate.stages) {
+      if (!STAGES.includes(stage)) problems.push(`${gate.id}: unknown stage "${stage}"`);
+    }
+    for (const scene of gate.scenes) {
+      if (!SCENES.includes(scene)) problems.push(`${gate.id}: unknown scene "${scene}"`);
+    }
+    if (gate.stagedPattern && !gate.stages.includes("pre-commit")) {
+      problems.push(`${gate.id}: stagedPattern is only meaningful in the pre-commit stage`);
+    }
+    // A script that is neither a gate nor explained is a script nobody runs.
+    if (gate.stages.length === 0 && !gate.manualReason) {
+      problems.push(`${gate.id}: no stages, so it needs a manualReason saying why`);
+    }
+    if (gate.stages.length > 0 && gate.manualReason) {
+      problems.push(`${gate.id}: has stages, so manualReason does not apply`);
+    }
+    if (gate.npm) {
+      const expected = ["node", `scripts/${gate.script}`, ...gate.args].join(" ");
+      if (npmScripts[gate.npm] !== expected) {
+        problems.push(
+          `${gate.id}: npm script "${gate.npm}" is ${JSON.stringify(npmScripts[gate.npm])}, expected ${JSON.stringify(expected)}`,
+        );
+      }
+    }
+  }
+  const registered = new Set(gates.map((g) => g.script));
+  for (const file of checkScripts) {
+    if (!registered.has(file)) {
+      problems.push(
+        `scripts/${file} is not in scripts/lib/gate-registry.mjs; register it, with stages [] and a manualReason if it is a report`,
+      );
+    }
+  }
+  for (const [name, command] of Object.entries(RUNNER_NPM)) {
+    if (npmScripts[name] !== command) {
+      problems.push(
+        `npm script "${name}" is ${JSON.stringify(npmScripts[name])}, expected ${JSON.stringify(command)}`,
+      );
+    }
+  }
+  for (const call of VERIFY_MUST_CALL) {
+    if (!(npmScripts.verify ?? "").includes(call))
+      problems.push(`npm script "verify" does not call "${call}"`);
+  }
+  for (const { file, contains } of wiring) {
+    const text = readText(file);
+    if (text === undefined) problems.push(`${file} is missing; it must contain "${contains}"`);
+    else if (!text.includes(contains)) problems.push(`${file} does not contain "${contains}"`);
+  }
+  return problems;
+}
+
+/** The gates one stage runs, in registry order. */
+export function selectGates(gates, { stage, staged = [] }) {
+  return gates.filter((gate) => {
+    if (!gate.stages.includes(stage)) return false;
+    if (stage !== "pre-commit" || !gate.stagedPattern) return true;
+    return staged.some((file) => gate.stagedPattern.test(file));
+  });
+}
+
+/** The gates one scenario runs, in registry order. `verify` is every gate with a stage. */
+export function gatesForScenario(gates, scenario) {
+  if (scenario === "verify") return gates.filter((g) => g.stages.length > 0);
+  return gates.filter((g) => g.scenes.includes(scenario));
+}
+
+/** The `node` arguments for one gate run. */
+export function commandFor(gate, { base } = {}) {
+  const args = [path.join("scripts", gate.script), ...gate.args];
+  if (base !== undefined && gate.takesBase) args.push("--base", base);
+  return args;
+}
+
+/** 2 wins over 1: an incomplete answer is not a verdict. */
+export function exitCodeFor(results) {
+  if (results.some((r) => r.code !== 0 && r.code !== 1)) return 2;
+  return results.some((r) => r.code === 1) ? 1 : 0;
+}
+
+/**
+ * Run every command, none skipped after a failure. `spawn(args)` returns the
+ * child's exit status, or null when it died on a signal or never started, which
+ * counts as a fault (2) and never as success.
+ */
+export function runAll(plan, spawn, log = () => {}) {
+  const results = [];
+  for (const { id, args } of plan) {
+    log(`${TAG} > ${id}: node ${args.join(" ")}`);
+    const status = spawn(args);
+    results.push({ id, code: typeof status === "number" ? status : 2 });
+  }
+  return results;
+}
+
+/**
+ * The scenes a changed-file list selects, plus whether the self-tests are owed.
+ * Pure, so the fallback rules have cases in the self-test.
+ */
+export function scenesFor(files) {
+  const scenes = new Set();
+  let selfTests = false;
+  for (const file of files) {
+    const rule = RULES.find((r) => r.re.test(file));
+    for (const scene of rule.scenes) scenes.add(scene);
+    if (rule.selfTests) selfTests = true;
+  }
+  return { scenes: [...scenes], selfTests };
+}
+
+function realSpawn(args) {
+  // No stdin for the child. `check-bilingual.mjs` reads its corpus from stdin to
+  // honour a fixture's file list, so a child that inherited an open pipe (a
+  // background shell, a CI wrapper) would wait for an EOF that never comes.
+  return spawnSync(process.execPath, args, {
+    cwd: REPO_ROOT,
+    stdio: ["ignore", "inherit", "inherit"],
+  }).status;
+}
+
+function readRepoText(file) {
+  try {
+    return readFileSync(path.join(REPO_ROOT, file), "utf8");
+  } catch {
+    return undefined;
+  }
+}
+
+function registryProblems() {
+  let npmScripts;
+  try {
+    npmScripts = JSON.parse(readRepoText("package.json") ?? "").scripts ?? {};
+  } catch {
+    return ["package.json is missing or is not valid JSON"];
+  }
+  return validateRegistry({
+    gates: GATES,
+    checkScripts: readdirSync(path.join(REPO_ROOT, "scripts")).filter((f) =>
+      /^(check|verify)-.*\.mjs$/.test(f),
+    ),
+    scriptExists: (name) => existsSync(path.join(REPO_ROOT, "scripts", name)),
+    npmScripts,
+    readText: readRepoText,
+    wiring: WIRING,
+  });
+}
+
+function stagedPaths() {
+  const result = spawnSync("git", ["diff", "--cached", "--name-only"], {
+    cwd: REPO_ROOT,
+    encoding: "utf8",
+  });
+  if (result.status !== 0) {
+    console.error(`${TAG} cannot list staged files: ${(result.stderr || "git failed").trim()}`);
+    process.exit(2);
+  }
+  return result.stdout.split("\n").filter(Boolean);
+}
+
+/**
+ * The changed files since `base`, including untracked ones. `git diff` never
+ * lists an untracked file, so a new `src/` file would otherwise skip type-check
+ * and tests entirely. Returns null when this is not a git checkout.
+ */
 function changedFiles(base) {
   let tracked = null;
   for (const candidate of [base, "HEAD"]) {
     const result = spawnSync("git", ["diff", "--name-only", candidate], {
-      cwd: ROOT,
+      cwd: REPO_ROOT,
       encoding: "utf8",
     });
     if (result.status === 0) {
       tracked = result.stdout
         .split("\n")
-        .map((line) => line.trim())
+        .map((l) => l.trim())
         .filter(Boolean);
       break;
     }
   }
-  if (tracked === null) return null; // not a git checkout
-  // `git diff` never lists untracked files — a new src/ file would otherwise
-  // skip type-check/tests entirely. Fold them in (status short format: "?? path").
+  if (tracked === null) return null;
   const status = spawnSync("git", ["status", "--porcelain", "--untracked-files=all"], {
-    cwd: ROOT,
+    cwd: REPO_ROOT,
     encoding: "utf8",
   });
   const untracked =
@@ -129,79 +346,357 @@ function changedFiles(base) {
   return [...new Set([...tracked, ...untracked])];
 }
 
-function runGates(gates) {
-  for (const gate of gates) {
-    console.log(`\n=== ${gate} ===`);
-    const result = spawnSync("npm", ["run", gate], {
-      cwd: ROOT,
-      stdio: "inherit",
-      shell: process.platform === "win32",
-    });
-    if (result.status !== 0) {
-      console.error(`\n✖ ${gate} failed — fix it and re-run.`);
-      process.exit(result.status ?? 1);
-    }
+function report(results) {
+  const failed = results.filter((r) => r.code !== 0);
+  if (failed.length === 0) {
+    console.log(`${TAG} OK - ${results.length} gate(s) passed.`);
+    return;
   }
+  const label = (r) => `${r.id} (${r.code === 1 ? "violations" : "fault"})`;
+  console.error(`${TAG} FAILED: ${failed.map(label).join(", ")}`);
 }
 
-const args = process.argv.slice(2);
-let scenario = null;
-let base = "HEAD";
-if (args.includes("--list")) {
-  console.log("Scenarios (named gate sets, same gates as `npm run verify`):\n");
-  for (const [name, gates] of Object.entries(SCENARIOS)) {
-    console.log(`  ${name.padEnd(8)} ${gates.join(", ")}`);
+function selfTestPlan() {
+  const plan = GATES.filter((g) => g.selfTest).map((g) => ({
+    id: `${g.id} self-test`,
+    args: [path.join("scripts", g.script), "--self-test"],
+  }));
+  plan.push({
+    id: "run-gates self-test",
+    args: [path.join("scripts", "run-gates.mjs"), "--self-test"],
+  });
+  return plan;
+}
+
+function printList() {
+  console.log("Scenarios (named gate sets, derived from scripts/lib/gate-registry.mjs):\n");
+  for (const scene of [...SCENES, "verify"]) {
+    const ids = gatesForScenario(GATES, scene).map((g) => g.id);
+    console.log(`  ${scene.padEnd(8)} ${ids.join(", ") || "(none)"}`);
   }
-  console.log("\nUsage: node scripts/run-gates.mjs [--scenario <name>] [--base <ref>]");
   console.log(
-    "  default: auto-detect the change surface against HEAD (pre-push passes --base @{u})",
+    "\nUsage: node scripts/run-gates.mjs [--scenario <name>] [--stage <name>] [--base <ref>]",
   );
-  process.exit(0);
+  console.log("  default: derive the scenario set from the change surface against HEAD");
+  console.log(
+    "  --stage pre-commit: the hook's set (stagedPattern gates only when their paths are staged)",
+  );
 }
-for (let i = 0; i < args.length; i++) {
-  if (args[i] === "--scenario") scenario = args[++i];
-  else if (args[i] === "--base") base = args[++i];
-  else {
-    console.error(`Unknown argument: ${args[i]}`);
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args.selfTest) return selfTest();
+  if (args.list) return printList();
+
+  const problems = registryProblems();
+  if (problems.length > 0) {
+    for (const problem of problems) console.error(`${TAG} REGISTRY: ${problem}`);
+    console.error(
+      `${TAG} the gate list disagrees with the repository; fix it before any gate runs.`,
+    );
     process.exit(2);
   }
-}
 
-if (scenario) {
-  if (!SCENARIOS[scenario]) {
-    console.error(`Unknown scenario "${scenario}" — see --list.`);
+  if (args.gateSelfTests) {
+    const results = runAll(selfTestPlan(), realSpawn, console.log);
+    report(results);
+    process.exit(exitCodeFor(results));
+  }
+
+  if (args.stage !== undefined) {
+    const needsStaged = args.stage === "pre-commit" && GATES.some((g) => g.stagedPattern);
+    const selected = selectGates(GATES, {
+      stage: args.stage,
+      staged: needsStaged ? stagedPaths() : [],
+    });
+    const results = runAll(
+      selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) })),
+      realSpawn,
+      console.log,
+    );
+    report(results);
+    process.exit(exitCodeFor(results));
+  }
+
+  if (args.scenario !== undefined) {
+    const selected = gatesForScenario(GATES, args.scenario);
+    const results = runAll(
+      selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) })),
+      realSpawn,
+      console.log,
+    );
+    report(results);
+    process.exit(exitCodeFor(results));
+  }
+
+  // Default: derive the set from the change surface.
+  const files = changedFiles(args.base ?? "HEAD");
+  if (files === null) {
+    console.error(`${TAG} not a git checkout - pass --scenario <name> explicitly (see --list).`);
     process.exit(2);
   }
-  const gates = expand([scenario]);
-  console.log(`Scenario ${scenario}: ${gates.length} gates\n`);
-  runGates(gates);
-  console.log(`\n✓ ${scenario} passed (${gates.length} gates).`);
-  process.exit(0);
+  if (files.length === 0) {
+    console.log(`${TAG} no changes since the base - running the hygiene scenario.`);
+    const results = runAll(
+      gatesForScenario(GATES, "hygiene").map((g) => ({ id: g.id, args: commandFor(g) })),
+      realSpawn,
+      console.log,
+    );
+    report(results);
+    process.exit(exitCodeFor(results));
+  }
+
+  const { scenes, selfTests } = scenesFor(files);
+  const full = scenes.includes("verify");
+  const selected = full
+    ? gatesForScenario(GATES, "verify")
+    : [...new Set(scenes.flatMap((s) => gatesForScenario(GATES, s)))];
+  const plan = selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) }));
+  if (selfTests) plan.push(...selfTestPlan());
+  console.log(
+    `${TAG} ${files.length} changed file(s) -> scenes: ${scenes.join(", ")}` +
+      (full ? " (full set)" : "") +
+      (selfTests ? " + gate self-tests" : ""),
+  );
+  const results = runAll(plan, realSpawn, console.log);
+  report(results);
+  process.exit(exitCodeFor(results));
 }
 
-const files = changedFiles(base);
-if (files === null) {
-  console.error("Not a git checkout — pass --scenario <name> explicitly (see --list).");
-  process.exit(2);
-}
-if (files.length === 0) {
-  console.log("No changes since the base — running the hygiene scenario.");
-  runGates(expand(["hygiene"]));
-  console.log("\n✓ hygiene passed (no changes found).");
-  process.exit(0);
+/** Negative cases: each registry rule, the selection rules, and the aggregation. */
+async function selfTest() {
+  const failures = [];
+  const expect = (cond, label) => {
+    if (!cond) failures.push(label);
+  };
+
+  const g = (over) => ({
+    id: "x",
+    script: "check-x.mjs",
+    args: [],
+    scenes: ["hygiene"],
+    stages: ["verify"],
+    selfTest: true,
+    ...over,
+  });
+  const base = () => ({
+    gates: [g({ npm: "x:check" })],
+    checkScripts: ["check-x.mjs"],
+    scriptExists: () => true,
+    npmScripts: {
+      "x:check": "node scripts/check-x.mjs",
+      ...RUNNER_NPM,
+      verify: VERIFY_MUST_CALL.join(" && "),
+    },
+    readText: (file) =>
+      WIRING.filter((w) => w.file === file)
+        .map((w) => w.contains)
+        .join("\n"),
+    wiring: WIRING,
+  });
+  const problemsOf = (over) => validateRegistry({ ...base(), ...over });
+  expect(
+    problemsOf({}).length === 0,
+    `a consistent registry reported: ${problemsOf({}).join("; ")}`,
+  );
+  const has = (list, needle) => list.some((p) => p.includes(needle));
+
+  expect(has(problemsOf({ gates: [g(), g()] }), "duplicate gate id"), "duplicate id");
+  expect(has(problemsOf({ scriptExists: () => false }), "does not exist"), "missing script file");
+  expect(
+    has(problemsOf({ gates: [g({ stages: ["nightly"] })] }), "unknown stage"),
+    "unknown stage",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ scenes: ["nightly"] })] }), "unknown scene"),
+    "unknown scene",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ stagedPattern: /a/ })] }), "stagedPattern"),
+    "stagedPattern outside pre-commit",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ stages: [] })] }), "needs a manualReason"),
+    "a gate with no stage and no reason",
+  );
+  expect(
+    has(
+      problemsOf({ gates: [g({ stages: [], manualReason: "why" })] }),
+      "manualReason does not apply",
+    ) === false,
+    "a manual gate with a reason is accepted",
+  );
+  expect(
+    has(
+      problemsOf({ checkScripts: ["check-x.mjs", "verify-new.mjs"] }),
+      "verify-new.mjs is not in",
+    ),
+    "an unregistered verify script",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ npm: "x:check", args: ["--y"] })] }), 'npm script "x:check"'),
+    "npm script out of step with args",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ npm: "x:missing" })] }), 'npm script "x:missing"'),
+    "a registered npm script that does not exist",
+  );
+  expect(
+    has(
+      problemsOf({ npmScripts: { ...base().npmScripts, "gates:check": "echo" } }),
+      'npm script "gates:check"',
+    ),
+    "runner npm script",
+  );
+  expect(
+    has(
+      problemsOf({ npmScripts: { ...base().npmScripts, verify: "npm run lint" } }),
+      'does not call "npm run gates:check"',
+    ),
+    "verify not calling the runner",
+  );
+  expect(
+    has(problemsOf({ readText: () => undefined }), "is missing"),
+    "a wiring file that is absent",
+  );
+  expect(
+    has(problemsOf({ readText: () => "node scripts/check-bilingual.mjs\n" }), "does not contain"),
+    "a hook edited back to a hand list",
+  );
+
+  // Stage selection.
+  const set = [
+    g({ id: "a", stages: ["verify", "pre-commit"] }),
+    g({ id: "b", stages: ["verify"] }),
+    g({ id: "c", stages: ["verify", "pre-commit"], stagedPattern: /^skills\// }),
+    g({ id: "d", stages: [], manualReason: "report" }),
+  ];
+  const ids = (list) => list.map((x) => x.id).join(",");
+  expect(
+    ids(selectGates(set, { stage: "verify" })) === "a,b,c",
+    "verify runs every verify gate, staged or not",
+  );
+  expect(
+    ids(selectGates(set, { stage: "pre-commit", staged: [] })) === "a",
+    "pre-commit skips a gate whose paths are not staged",
+  );
+  expect(
+    ids(selectGates(set, { stage: "pre-commit", staged: ["skills/x/SKILL.md"] })) === "a,c",
+    "pre-commit runs a gate whose paths are staged",
+  );
+  expect(
+    ids(selectGates(set, { stage: "verify" })).includes("d") === false,
+    "a gate with no stage never runs as a gate",
+  );
+
+  // Scenario selection.
+  const sceneSet = [
+    g({ id: "h", scenes: ["hygiene"] }),
+    g({ id: "t", scenes: ["types"] }),
+    g({ id: "b2", scenes: ["build"] }),
+    g({ id: "m", scenes: [], stages: [], manualReason: "report" }),
+  ];
+  expect(ids(gatesForScenario(sceneSet, "hygiene")) === "h", "a scene selects its own gates");
+  expect(
+    ids(gatesForScenario(sceneSet, "verify")) === "h,t,b2",
+    "the verify scenario is every gate with a stage",
+  );
+  expect(
+    ids(gatesForScenario(sceneSet, "verify")).includes("m") === false,
+    "a manual gate is in no scenario",
+  );
+
+  // Change-surface derivation.
+  expect(scenesFor(["docs/x.md"]).scenes.join(",") === "hygiene", "a docs change is hygiene only");
+  expect(
+    scenesFor(["src/index.ts"]).scenes.join(",") === "hygiene,types,tests,build",
+    "a src change is everything",
+  );
+  expect(scenesFor(["scripts/check-x.mjs"]).selfTests, "a scripts change owes the self-tests");
+  expect(
+    scenesFor(["scripts/check-x.mjs"]).scenes.join(",") === "hygiene,types",
+    "a scripts change keeps its scenes",
+  );
+  expect(
+    scenesFor(["package.json"]).scenes.join(",") === "verify",
+    "a dependency change falls back to the full set",
+  );
+  expect(
+    scenesFor(["something-unknown.xyz"]).scenes.join(",") === "verify",
+    "an unknown file falls back to the full set",
+  );
+  expect(
+    scenesFor([".agents/skills/x/SKILL.md"]).scenes.join(",") === "hygiene",
+    "a skill change is hygiene",
+  );
+
+  // Command line.
+  const sealed = g({ takesBase: true, args: ["--w"] });
+  expect(
+    commandFor(sealed, { base: "abc" }).join(" ").endsWith("--w --base abc"),
+    "base is handed to a gate that takes one",
+  );
+  expect(
+    !commandFor(g(), { base: "abc" }).includes("--base"),
+    "base is withheld from a gate that does not",
+  );
+  expect(!commandFor(sealed).includes("--base"), "no base given, none passed");
+
+  // Aggregation.
+  const seenIds = [];
+  const results = runAll(
+    [
+      { id: "p", args: ["p"] },
+      { id: "q", args: ["q"] },
+      { id: "r", args: ["r"] },
+    ],
+    (a) => {
+      seenIds.push(a[0]);
+      return a[0] === "p" ? 1 : 0;
+    },
+  );
+  expect(seenIds.join("") === "pqr", "a failing gate does not stop the rest");
+  expect(exitCodeFor(results) === 1, "violations exit 1");
+  expect(
+    exitCodeFor(runAll([{ id: "s", args: ["s"] }], () => null)) === 2,
+    "a signalled or unstarted gate is a fault",
+  );
+  expect(
+    exitCodeFor(runAll([{ id: "s", args: ["s"] }], () => 3)) === 2,
+    "an unexpected exit status is a fault",
+  );
+  expect(exitCodeFor([{ code: 1 }, { code: 2 }]) === 2, "a fault wins over violations");
+  expect(exitCodeFor([]) === 0, "no gates exits 0");
+
+  // The real registry must agree with the real repository: this is the case that
+  // fails when a gate is added to one place and not the others.
+  const live = registryProblems();
+  expect(live.length === 0, `the live registry disagrees with the repository: ${live.join("; ")}`);
+
+  // Argument handling runs in a child so process.exit does not end this test.
+  const child = (a) =>
+    spawnSync(process.execPath, [fileURLToPath(import.meta.url), ...a], { encoding: "utf8" });
+  expect(child(["--nope"]).status === 2, "unknown argument exits 2");
+  expect(child(["--stage", "nightly"]).status === 2, "unknown stage exits 2");
+  expect(child(["--stage"]).status === 2, "--stage without a value exits 2");
+  expect(child(["--scenario", "nightly"]).status === 2, "unknown scenario exits 2");
+  expect(child(["--base", "--stage"]).status === 2, "a flag taken as a --base value exits 2");
+  expect(
+    child(["--self-test", "--stage", "verify"]).status === 2,
+    "--self-test takes no other arguments",
+  );
+  expect(
+    child(["--self-test", "--gate-self-tests"]).status === 2,
+    "the two self-test modes are exclusive",
+  );
+
+  if (failures.length) {
+    for (const failure of failures) console.error(`${TAG} SELF-TEST FAIL: ${failure}`);
+    process.exit(1);
+  }
+  console.log(
+    `${TAG} self-test passed (registry rules, stage and scenario selection, change-surface derivation, base forwarding, run-all aggregation and fault precedence, live registry, argument guards).`,
+  );
 }
 
-const scenes = new Set();
-for (const file of files) {
-  const rule = RULES.find((r) => r.re.test(file));
-  for (const scene of rule.scenes) scenes.add(scene);
-}
-const gates = expand([...scenes]);
-const full = scenes.has("verify") || gates.length === GATES.length;
-console.log(
-  `Auto-detected ${files.length} changed file(s) → scenarios: ${[...scenes].join(", ")}` +
-    (full ? " (full set)" : "") +
-    "\n",
-);
-runGates(gates);
-console.log(`\n✓ ${full ? "full set" : [...scenes].join(" + ")} passed (${gates.length} gates).`);
+await main();

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/feature/2026-08-30-configurable-logout-order
+2026-08-30-configurable-logout-order.md: e7b90743d89ecb8ea7730ee859f5240ec3fc4f6d
+2026-08-30-configurable-logout-order.zh.md: d2808fa4351f5d47be03a767ed4398977e2fc203

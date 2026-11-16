@@ -1,10 +1,12 @@
 # 反代部署指南
 
+[English](reverse-proxy.md) | 中文
+
 给**公网** dsh web 实例部署 dsh-auth-gate 必然经过反向代理（TLS 终结）。本文沉淀
 2026-08-15 生产环境的实测经验：可用的 Caddy 配置、设置页 `403` 背后的浏览器信任栅栏
 坑、以及推荐的「半外壳」拓扑。
 
-> 配套文档：`docs/deployed/deployment_zh.md`（中文运维清单与验收步骤）、`docs/specs/dsh-auth-plan_zh.md` §9
+> 配套文档：`docs/deployed/deployment_zh.md`（中文运维清单与验收步骤）、`docs/history/specs/dsh-auth-plan_zh.md` §9
 > M5（规划中的独立外壳）。
 
 ## 1. 为什么必须走反代
@@ -41,7 +43,7 @@ dsh 0.1.0-rc.6 的 `/api` 有浏览器信任栅栏（防 DNS rebinding + CSRF）
 | -------------------------- | ---------------------------- | -------------------- | ------------------ | -------------------------------------------------- |
 | 普通反代（Caddy 原样透传） | dsh-auth-gate                | 否                   | privileged API 403 | 除设置页外都正常                                   |
 | **半外壳（推荐）**         | dsh-auth-gate                | **是**（Caddy 两行） | **全功能**         | 登录页/限速/吊销全保留                             |
-| 独立外壳（M5，路线图）     | dsh-auth-gate 自身做代理进程 | 内置                 | 全功能             | dsh 零插件；见 `docs/specs/dsh-auth-plan_zh.md` §9 |
+| 独立外壳（M5，路线图）     | dsh-auth-gate 自身做代理进程 | 内置                 | 全功能             | dsh 零插件；见 `docs/history/specs/dsh-auth-plan_zh.md` §9 |
 
 重写架空栅栏由门卫补偿：会话 cookie 为 `SameSite=Lax`，跨站/DNS rebinding 请求拿不到
 cookie → 门卫 401。纵深防御从「栅栏 + 门卫」变为「门卫 + SameSite」。
@@ -78,7 +80,7 @@ dsh.example.com {
 
 0.1.2-alpha 起 dsh web 有页面级 launch-token 门：新浏览器需先访问 `/?token=<launchToken>`
 才会 mint 30 天有效、绑定 Host authority 的 cookie。dsh-auth-gate 在登录成功后**相对**
-跳转 `/?token=…` 自动过门（详见 `docs/implemented/impl-launch-token-bridge_zh.md`）。
+跳转 `/?token=…` 自动过门（详见 `docs/history/specs/impl-launch-token-bridge_zh.md`）。
 
 - **相对跳转在两种拓扑下都成立**（普通透传 / 半外壳）：浏览器停留在你的域名，
   mint 的 cookie 按实际（可能被重写后的）请求 Host 绑定，后续校验一致。

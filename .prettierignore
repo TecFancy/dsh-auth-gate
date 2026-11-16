@@ -15,3 +15,16 @@ CHANGELOG.md
 
 # session-memory plugin buffer (gitignored, written while agents run)
 .remember/
+
+# Generated, read-only mirror of .agents/skills (see scripts/sync-skills.mjs).
+.claude/skills
+
+# docs/ prose is hand-maintained markdown; Prettier is not enforced there.
+# The bilingual gate enforces exactly one trailing newline on each side.
+docs/
+
+# Agent Notes are hand-written prose in the same shape as docs/, and Prettier
+# reflowing a note after `bilingual:re-record` has recorded its sidecar is what
+# makes every note edit a two-commit dance. `check-bilingual.mjs` still enforces
+# exactly one trailing newline on each side; `.editorconfig` still applies.
+.agents/notes/

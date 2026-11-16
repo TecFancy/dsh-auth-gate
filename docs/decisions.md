@@ -1,560 +1,61 @@
 # Decisions
 
-本插件重大决策的编号索引。每条记录按状态放在
-[`docs/decisions/{proposed,implemented,archived}/`](decisions/) 下，双语（`.zh.md`/`.en.md`）
-成对；本页只有一句话摘要 + 链接，细节与取舍看记录本身。约定见
-[`docs/decisions/README.md`](decisions/README.md)。
-
-> 注：M1–M3 的冻结决策表（D1–D16 / M1–M22 / P1–P26）是阶段执行契约，仍以
-> `docs/implemented/impl-mN.md` 为准；本索引从 2026-08-30 起收录「为什么层」记录，已实施的
-> 重大决策按精选策略回填登记。
-
-## D1. 认证门失败即关闭（fail-closed）
-
-守卫在凭证无法确认时恒 deny（服务缺失、解析失败均按无凭证处理），失败在日志中响亮。
-**替代方案**：服务缺失时放行（fail-open）；服务就绪后才挂门。**为什么**：误锁可人工解开，
-误放无法追回。
-→ [zh](decisions/implemented/2026-08-30-fail-closed-auth-gate.zh.md) ·
-[en](decisions/implemented/2026-08-30-fail-closed-auth-gate.en.md)（回填自 M2/M3）
-
-## D2. 守卫包装 webServer，不 fork
-
-插件内包装 webServer 四类入口 + 启动自检（fail loud），不改 dsh web 宿主。
-**替代方案**：fork dsh-web-app；靠路由注册顺序；不做自检。**为什么**：包装是最小侵入面，
-自检把「静默未挂门」变成「启动即失败」。
-→ [zh](decisions/implemented/2026-08-30-guard-wrap-seam.zh.md) ·
-[en](decisions/implemented/2026-08-30-guard-wrap-seam.en.md)（回填自 M1）
-
-## D3. scrypt 参数随哈希存储，验证按存储值重派生
-
-`node:crypto` scrypt + 参数随哈希存储，升级参数不使存量哈希失效，验证侧恒时比较。
-**替代方案**：bcrypt/argon2（引进依赖）；只认当前模块常量（升级即全员失效）。
-**为什么**：免依赖 + 加固成为滚动变更。
-→ [zh](decisions/implemented/2026-08-30-scrypt-portable-params.zh.md) ·
-[en](decisions/implemented/2026-08-30-scrypt-portable-params.en.md)（回填自 M3）
-
-## D4. 退出按钮槽位 order 可配置
-
-`logoutOrder` 配置项（默认 1000），经 `/auth/status` 透传 client 半边。
-**替代方案**：固定常量；运行时自动探测最大 order。**为什么**：显式旋钮比探测更可预期。
-→ [zh](decisions/implemented/2026-08-30-configurable-logout-order.zh.md) ·
-[en](decisions/implemented/2026-08-30-configurable-logout-order.en.md)（回填自 v0.10.0）
-
-## D5. src 分层 + 跨 slice 只走 barrel（已归档，被 D30 取代）
-
-`gate/`/`session/` 核心机制层 + `features/{token,password,proxy}` + `shared/` 叶子层，
-跨 slice 唯一 barrel 入口，feature 同层互禁；verify 链新增 slice/bundle/no-emdash/build 门禁。
-**替代方案**：完整 FSD；保持平铺；session 作 feature slice（执行中被边界检查否决，降层）；
-轻量 ADR 制度（被官方实践否决）。**为什么**：层匹配依赖图，机器约束防回潮。
-目录部分已被 D30 取代（`gate/`/`session/`/`http/` 核心机制层改为 FSD 的 `src/host/` 下三层，client 半边也分层）；
-「跨 slice 只走 index.ts」「feature 同层互禁」「client 与 host 互不引用」三条纪律保留，改由 Steiger 与
-`slice:check` 执行。
-→ [zh](decisions/archived/2026-08-30-layered-src-with-barrels.zh.md) ·
-[en](decisions/archived/2026-08-30-layered-src-with-barrels.en.md)（2026-08-30 实施，2026-10-13 归档）
-
-## D6. TOTP 两段式登录采用无状态挑战 cookie
-
-密码通过后发短 TTL 挑战 cookie（无服务端状态），验证码通过才发正式会话并同帧清零。
-**替代方案**：内存 pending 会话；挑战页重提交密码；签名挑战令牌。**为什么**：
-中间态压成浏览器状态，服务端零存储、重启无感，安全边界仍在验证码本身。
-→ [zh](decisions/implemented/2026-08-30-totp-two-stage-challenge-cookie.zh.md) ·
-[en](decisions/implemented/2026-08-30-totp-two-stage-challenge-cookie.en.md)
-
-## D7. TOTP 三态配置，默认 off
-
-`totp: "off" | "optional" | "required"`，默认 `"off"`（升级零惊扰）。
-**替代方案**：布尔开关；默认 optional；仅按用户手工开挖。**为什么**：三态覆盖
-升级兼容、渐进启用、强制基线三种场景。
-→ [zh](decisions/implemented/2026-08-30-totp-config-off-by-default.zh.md) ·
-[en](decisions/implemented/2026-08-30-totp-config-off-by-default.en.md)
-
-## D8. M3 遗留评估项维持不实施
-
-revokeBySubject / 登录 CSRF token / 限速与防重放持久化，M4 再评估后全部**维持不做**
-（各留 TODO(auth-m5)）。**替代方案**：gate 路径现读用户文件；新增 CSRF token；
-状态落盘。**为什么**：收益在单门模型下边际递减，现状与局限均已文档化，
-「评估后明确不做」即是 M3 契约要求的收尾。
-→ [zh](decisions/implemented/2026-08-30-totp-disposition-of-m3-leftovers.zh.md) ·
-[en](decisions/implemented/2026-08-30-totp-disposition-of-m3-leftovers.en.md)
-
-## D9. TOTP 独立 slice，能力经根装配注入 password
-
-`features/totp/` 与 token/password/proxy 并列；password 不 import totp，由 index.ts
-把 verifyTotp/replayCheck/clock 注入 deps。**替代方案**：TOTP 放 shared；
-直接同层互引；全写进 password。**为什么**：保持依赖图清晰 + slice:check 守护，
-注入复用 M3 既有模式。
-→ [zh](decisions/implemented/2026-08-30-totp-slice-and-injection.zh.md) ·
-[en](decisions/implemented/2026-08-30-totp-slice-and-injection.en.md)
-
-## D10. TOTP 挑战 cookie 加 HMAC 签名（取代 D6 的「不签名」）
-
-挑战 cookie 值加第三段 MAC（HMAC-SHA256，进程级随机密钥，无新配置/依赖）：伪造 cookie
-不再能跳过密码阶段。D6 的其余决定（无状态、TTL 300s、SameSite=Lax）不变；代价是重启/
-插件重载后在途挑战失效（≤5 分钟，README 已写明）。**替代方案**：维持不签名只文档化；
-服务端 pending 挑战。**为什么**：「跳过密码」把 TOTP 从第二因素降成唯一因素，单门公网
-不可接受；进程级 HMAC 与内存限速/防重放同一寿命模型。
-→ [zh](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.zh.md) ·
-[en](decisions/implemented/2026-08-30-totp-signed-challenge-cookie.en.md)
-
-## D11. 认证 HTTP 端点公共件独立成 http 层（已归档，被 D30 取代）
-
-token/password 重复的端点件（logout/status/兜底/Method 守卫）抽进新核心机制层
-`src/http/`（与 gate、session 并列，经 barrel 引用），`shared` 保持叶子层不变。
-**替代方案**：下沉 `shared`（破坏叶子约束，或得把 cookie 构造当参数注入）；
-塞进 `session`（methodNotAllowed 与会话无关）；保持重复（改一处得记得另一处）。
-**为什么**：去重只有这一条依赖方向干净的落点，slice:check 加白名单即可守护。
-`src/http/` 层已被 D30 取代：与会话无关的件进 `src/host/shared/http`，`handleLogout`/`handleStatus`
-进 `src/host/entities/session/api`。
-→ [zh](decisions/archived/2026-09-13-http-endpoint-layer.zh.md) ·
-[en](decisions/archived/2026-09-13-http-endpoint-layer.en.md)（2026-10-13 归档）
-
-## D12. 宿主要求声明 + storage-domain 转 peer
-
-顶层 `engines.dsh` 声明宿主走廊 `^0.1.0-rc.6 || ^0.1.5-rc.2`；
-`@deepseek-ai/dsh-storage-domain` 从 `dependencies` 移到 `peerDependencies`
-（同范围，devDependencies 留一份给本仓构建/测试），运行时不带副本。
-**替代方案**：只加 engines 而依赖字段不动（嵌套旧线副本留在进程里）；范围只写
-`^0.1.5-rc.2`（对 0.1.2-alpha/0.1.5-rc.1 假报低于下限）或只写 `^0.1.0-rc.6`
-（严格语义下匹配不到当前宿主，市场打假警告）；放 `dsh.engines.dsh`（顶层才是
-官方位置，同时存在时市场只认顶层）。
-**为什么**：`||` 让两条走廊在严格 semver 下都成立，dev 走廊与生产宿主都覆盖；
-交给宿主后 pnpm 不再装第二份 domain 契约，插件随宿主升级。
-→ [zh](decisions/implemented/2026-09-14-host-requirement-declaration.zh.md) ·
-[en](decisions/implemented/2026-09-14-host-requirement-declaration.en.md)
-
-## D13. PWA manifest 列入免守卫公开静态路径
-
-浏览器抓 manifest 按规范不带凭证（Chromium 仅 `crossorigin="use-credentials"` 才带上），
-cookie 门永远认不出 → 登录后恒 401。`guard.ts` 加精确白名单
-`PUBLIC_STATIC_PATHS = ["/manifest.webmanifest"]` + `isPublicStaticPath(kind, pathname)`
-（upgrade 不算），两个门共用。
-**替代方案**：Caddy 直答/托管（内容双份、路径随 dsh 版本腐化、只修一台）；
-改 dist 的 `<link>` 加 `crossorigin`（改官方产物，升级即覆盖）；放行整个 `/assets`
-前缀（公开面过大）；加 `publicPaths` 配置项（违背 M4/P12 冻结决策）。
-**为什么**：manifest 只含应用名/图标/显示模式，与 `/auth` 同属「不认证也必须可达」；
-精确匹配 + 排除 upgrade 让新增攻击面只有一个只读 GET，白名单只有一处。
-→ [zh](decisions/implemented/2026-09-18-public-static-manifest.zh.md) ·
-[en](decisions/implemented/2026-09-18-public-static-manifest.en.md)
-
-## D14. 身份块 host 走 publicHost 配置（空值回退请求头 Host）
-
-反钓鱼身份块原读 `req.headers.host`，半外壳反代把 Host 改写成 `127.0.0.1:3080`，
-远程用户看到回环地址。新增 `publicHost` 配置 + `resolvePublicHost()`（配置优先、
-空值回退 Host 头），三个变体的渲染点统一走它，只影响展示、不参与鉴权。
-**替代方案**：读 `X-Forwarded-Host`（可伪造，违背 P10 不读 XFF）；改反代透传 Host
-（牵动 loopback 栅栏与 launch-token 桥，属于动生产）；只写文档（反钓鱼等于失效）。
-**为什么**：运营侧配置是唯一既不可被请求伪造、又不动生产拓扑的来源；空值回退让
-现有部署行为零变化。
-→ [zh](decisions/implemented/2026-09-22-public-host-identity.zh.md) ·
-[en](decisions/implemented/2026-09-22-public-host-identity.en.md)
-
-## D15. 登录页视觉语言：冷中性检查点卡
-
-保留反钓鱼身份块，视觉从「暖纸色工具站」改为冷中性 + 柔和层次 + 发丝分隔线，域名升为
-视觉主角（22px + 中性标记）；grok-4.6 三路候选（编辑式排印 / 柔和层次 / 检查点控制台）
-在隔离实例真实渲染对比后，取 B 打底 + A 的分隔线 + C 的域名强调。
-**替代方案**：保持 09-17 观感（主人反馈「有点复古」）；回上游品牌蓝 + 盾牌 logo
-（削弱反钓鱼语义）；通用 SaaS 现代风（无差别、AI 味重）；只取三候选中的单一路线。
-**为什么**：层次与过渡解决观感，分隔线建立信息分区，域名强调把身份块立回视觉锚点，
-正好服务这个页面的安全职责；取舍过程留档可查。
-→ [zh](decisions/implemented/2026-09-22-login-page-identity-redesign.zh.md) ·
-[en](decisions/implemented/2026-09-22-login-page-identity-redesign.en.md)
-
-## D16. 示例域名一律用 example.com（真实部署域名不随包发布）
-
-真实部署域名从文档、部署样例、测试与代码默认值中移除，统一写 `dsh.example.com`
-（隔离实例 `dsh-test.example.com`），`dsh-auth-proxy --target` 默认值随之改为保留域名；
-规则写进开发约定。（后续 D17 移除了该默认值：`--target` 改必填。）
-**替代方案**：只改文档、保留默认值（仍随 `lib/` 发到 npm）；`--target` 改必填（CLI 行为
-变更，另议）；加门禁脚本扫描（脚本自身得写下被禁字符串，等于放进仓库）；重写 git 历史。
-**为什么**：RFC 2606 保留域名永不指向真实服务，规则一眼可验；顺带修掉「公开包默认把
-流量导向作者生产环境」这个真实缺陷。
-→ [zh](decisions/implemented/2026-09-22-example-domain-in-examples.zh.md) ·
-[en](decisions/implemented/2026-09-22-example-domain-in-examples.en.md)
-
-## D17. `dsh-auth-proxy` 的 `--target` 改必填（不再有默认上游）
-
-`--target` 缺参数即抛 `--target is required`、打印用法并退出 1，不连接任何上游；USAGE 里不再带
-方括号，文档配置表的「默认」一列写「必填」，D16 留下的保留域名默认值随之移除。
-**替代方案**：保留 `example.com` 默认值（默认行为无意义，报错远离病因）；只改文档写明必须显式传；
-从环境变量取默认（多一条隐式来源）；从 `publicHost` 推断（越过 D14 划定的展示边界）。
-**为什么**：上游 origin 只有调用方知道，没有可推断的默认值；必填让「忘传」得到一条可直接处置的
-报错，而不是远端 TLS 错误，与仓库 fail-closed 纪律一致。
-→ [zh](decisions/implemented/2026-09-22-required-proxy-target.zh.md) ·
-[en](decisions/implemented/2026-09-22-required-proxy-target.en.md)
-
-## D18. 随包技能保持单文件 SKILL.md（不启用 references/）
-
-配置速查技能正文全部留在 `SKILL.md`，不用 `references/` 子目录；两条测试锁进 CI（技能目录无
-`references/`、`Config` schema 里每个配置项都出现在技能正文里）。2026-09-02 的拆分（故障表 +
-验证技巧进 references/，主文件 13.9KB→6.5KB）作为超集残留弃用，不再复活。
-**替代方案**：按原方案拆分（省显式打开那一次的 ~2.2k tokens，换来 stub 计数腐烂、二次读取与
-三份副本的同步面）；按语言拆两份（面板不能选语言，正文必须双语）；单文件压缩正文（删掉的正是
-最常查的故障矩阵）；只写约定不加测试。
-**为什么**：技能是用户显式打开的低频速查，「打开即得答案」才是它的价值；单文件把同步面从三份
-降到一份，并有测试拦住 schema 与技能正文的漂移。
-→ [zh](decisions/implemented/2026-09-22-single-file-bundled-skill.zh.md) ·
-[en](decisions/implemented/2026-09-22-single-file-bundled-skill.en.md)
-
-## D19. 限速桶的客户端身份改走受信反代头（`clientIpHeader` + `trustedProxyCidrs`）
-
-新增 `clientIpHeader`（默认 `""` = 一个头都不读）与 `trustedProxyCidrs`（默认只信回环
-`127.0.0.0/8`、`::1/128`）：只有直连 peer 落在受信集合内才读该头，取「从右往左跳过受信跳后的第一个
-合法 IP」，缺失/不可解析/超长则回退 peer 并告警（每类一条）；密码路径与 TOTP 第二段共用同一个取值点。
-这是对 P10（「IP 取 `socket.remoteAddress`，不读 XFF」）的**显式例外**：默认语义逐字节不变，配置写错
-只会变窄（非法头名 → 不读头；非法 CIDR → 只信回环；`0.0.0.0/0`、`::/0` 一律拒绝），绝不卸载或放宽守卫。
-**替代方案**：无条件信任指定的转发头（issue #74 原文；可伪造换桶、定向锁人、灌满 `byIp`）；只按账号
-分桶或 `(peer, username)` 组合键（没恢复 per-client 预算，还会掩盖「头没配上」）；默认读 XFF 或取最左
-值；缺头即 503（配置笔误变全站登录不可用）；只改文档（继续接受「任何人 5 次错密码全家登不上」）。
-**为什么**：与 express `trust proxy` / nginx `real_ip` 同一模型 —— 可信性来自 peer 而不是头本身；
-默认配置对所有既有部署零变化；「从右往左跳过受信跳」是 XFF 链唯一安全方向；归一化保证同一客户端
-始终落在同一个桶。
-→ [zh](decisions/implemented/2026-09-22-trusted-proxy-client-ip.zh.md) ·
-[en](decisions/implemented/2026-09-22-trusted-proxy-client-ip.en.md)
-
-## D20. 登录失败渲染登录卡片（HTML），不再返回裸文本页
-
-错凭据（未知用户 / 错口令 / 禁用三态同一）**保持 401**，但 content-type 改为 `text/html`，body 换成
-既有登录卡片 + error slot（唯一常量 `Invalid username or password.`）：用户名 HTML 转义后
-`value=` 回填（无条件，含未知/禁用，避免枚举侧通道）、密码永不回填、密码框保持 `autofocus`、
-两个字段 `aria-invalid`/`aria-describedby="err"`、`<title>` 加 `Error: ` 前缀。锁定**保持 429 +
-`retry-after`**，body 换成同一张卡片，文案按「这个网络」陈述并带上静态秒数，提交按钮**不** disabled
-（无 JS 仍可重试），不披露剩余次数、不做活倒计时；TOTP 第二段 429 渲染挑战卡。用户名查库前先 trim
-（密码不 trim）；失败页带提交守卫脚本（`aria-busy` + `Signing in...`），并在**失败页渲染后**用
-`history.replaceState` 把历史项换成 GET，使 F5 不再重放 POST（在 submit 事件里改无效——POST 导航在
-处理器返回后才提交；无 JS 仍会重放，如实记录）。
-**替代方案**：PRG 303（砸冻结 401、脚本误判成功导航、撞 Chromium 密码管理器指南）；200 重渲染
-（Keycloak 形态，破坏 401 契约）；fetch 内联注入（双路径 / CSP / 行为分叉）；独立错误页（新 CSS 撞
-6KB 预算、丢反钓鱼身份块）；一次性 form ticket（无 JS 下唯一能关 F5 计次，但与 #81 锁语义耦合，
-暂缓）；活倒计时 + disabled（无 JS 永久搁浅，WCAG 2.2.1；NAT 下不诚实）；按 `Accept` 内容协商
-（`*/*` 分不开两端）；为合规补 `WWW-Authenticate: Basic`（浏览器原生对话框会盖住卡片，刻意偏离
-RFC 9110 §15.5.2 并记录在此）。
-**为什么**：这是删掉「空白页死胡同」的最小改动，状态码、常量、不反射规则、日志纪律、无 JS 提交路径、
-6KB CSS 预算、切片边界与依赖集合全部不变，且与 0.11.1 起已发布并有测试覆盖的 TOTP 修复同构。
-→ [zh](decisions/implemented/2026-09-22-login-failure-html-card.zh.md) ·
-[en](decisions/implemented/2026-09-22-login-failure-html-card.en.md)
-
-## D21. token 模式登录失败渲染登录卡片（HTML），不再返回裸文本页
-
-错 token **保持 401**（+ `no-store`），content-type 改 `text/html`，body 换成 token 版登录卡片 + error
-slot（唯一常量 `Invalid access token.`，`INVALID_TOKEN`）；令牌字段**永不回填**（回显秘密＝写进页面/
-响应缓存/浏览器历史），保持 `autofocus` + `aria-invalid`/`aria-describedby`，`<title>` 加 `Error: `
-前缀；反钓鱼身份块照旧按 `publicHost`/Host 渲染（D14）。**刻意不改**：415（表单恒发 urlencoded，浏览器
-不可达）与 503（运维故障，用户无从修复，机器可读更有用）；413 也保留 `text/plain` 与 M19
-`connection: close` 精确语义（粘贴超 16 KB 可达，但自作自受且无可操作，改卡片要新增文案＋动冻结形状）
-—— 记为已知残留。**刻意不加**：D20 的提交守卫脚本 —— token 模式没有失败预算可消耗（无限速器），双击/
-刷新都锁不住人；但刷新重放的是**原来那条带原 token 的 POST**（不是卡片上的空字段），所以
-`replaceState` 本有卫生价值（别让秘密留在可重放历史项里），只是要动共享页面 API，本次推迟并如实记录。
-同趟收尾 TOTP 第二段遗留文案：`rejectTotp` 的 `invalid credentials` → `Invalid or expired code.`
-（`INVALID_TOTP_CODE`；同一常量纪律但不复用凭据常量 —— 那时口令已通过，失败手因是验证码）。**取代 D20
-里「token mode keeps its `text/plain` 401」一句**（`impl-m3` P14 同句一并修订），D20 其余全部有效。
-**替代方案**：维持裸文本 + 写文档（死胡同就是缺陷本身）；303 PRG / 200 重渲染（破坏冻结 401，同 D20）；
-专用 token 错误页（新 CSS 撞 6KB 预算 + 丢反钓鱼身份块）；回填提交的 token 帮用户自查（等于把秘密写
-进页面/历史/缓存）；TOTP 复用 `INVALID_CREDENTIALS`（手因错位）；413/415/503 一并改 HTML（协议层/运维
-层失败，机器可读更有用）。
-**为什么**：与 D20 同构的最小改动，状态码、一常量规则、不反射规则、日志纪律、无 JS 提交路径、6KB CSS
-预算、切片边界与依赖集合全部不变；真实入口集成测试（`integration.auth.test.ts`）从「只断言状态码」
-升级为断言 HTML 失败体，退回 `text/plain` 会在 CI 被拦。
-→ [zh](decisions/implemented/2026-09-23-token-failure-html-card.zh.md) ·
-[en](decisions/implemented/2026-09-23-token-failure-html-card.en.md)
-
-## D22. 设置面板自助改密：POST /auth/password，写盘成功后全踢会话
-
-已登录用户在设置面板自助改密，服务端只新增一条精确路由 `POST /auth/password`（仅 password 模式
-注册，urlencoded：`current` / `password` / `code`）。处理顺序冻结，**先写盘成功、再吊销该 subject
-的全部会话（含当前会话）**：写盘失败只回 503 并保留全部会话，绝不出现「全被踢但密码没改」；成功
-后清 cookie + `200 {"ok":true}`。TOTP 二次确认共用登录路径的同一 `replayGuard` 单例（同窗
-重放判 401 `invalid_totp`，需等下一枚验证码）；独立限速桶（IP + subject，成功即清桶，避免锁人
-放大与自锁）。路由模型由「1 prefix + 3 exact」修订为「1 prefix + 4 exact」，M2 规格 M5/M15 行与
-正文按惯例加 D22 修订注记。**已知残留**：写盘成功后 `revokeBySubject` 抛错时不重试、仍如实返回 200
-（只记 error 日志），极端情况下「新口令已生效但旧 cookie 仍可用」，窗口由会话 TTL（默认 7 天）兜底；
-P2 候选 = 撤销失败重试/告警。
-**替代方案**：单独改密页 + 302 + form 提交（fetch 会把失败读成成功导航、新页面撞 6 KB CSS 预算）；
-只踢其他设备（无法区分哪个会话是攻击者的）；免 TOTP 确认（会话被偷即永久接管）；登录路径强制改密
-分流（本期只预留 `must_change_password`）；与登录共用限速桶（DoS 放大器）；改密端点自建
-`replayGuard`（同一枚验证码同窗被接受两次）。
-**为什么**：最小服务端改动，全部复用生产已验证部件（恒时口令验证、`DUMMY_HASH` 存在性等时、
-`LoginRateLimiter`、`TotpReplayGuard` 单例、清 cookie），不加依赖、不开新提权面；顺序硬约束把最糟
-的失败模式结构性排除，全踢含当前会话让「改密 = 终点」可断言。
-→ [zh](decisions/implemented/2026-09-23-self-service-password-change.zh.md) ·
-[en](decisions/implemented/2026-09-23-self-service-password-change.en.md)
-
-## D23. 口令策略（≥14 位四类字符）与 users.yaml 变更面（独立锁 + CAS）
-
-新口令策略独立成 shared 叶子模块 `src/shared/password-policy.ts`：≥14 位 + 四类字符
-（`[A-Z]` / `[a-z]` / `[0-9]` / 非字母数字）+ 不得等于旧口令 + `maxLength` 256；**不 trim、不截断、
-不做 NFKC**（会作废存量哈希）；规则枚举即 400 `policy` 的 `rules`；校验顺序 = 长度 → 字符类 →
-旧哈希（最贵放最后），`sameAsOld` 经注入比较器判定，shared 不依赖 features。
-`users.yaml` 的变更收敛到 `mutateUsersFile` 锁内 RMW：独立 `users.yaml.lock`（`wx` 0600 + pid/mtime
-陈旧兜底，**绝不锁在会被 tmp→rename 换 inode 的 users.yaml 上**）、写前 mtime/size CAS（≤3 次重跑）、
-写前 `.bak`（0600）+ 原子写、`finally` 释放锁、统一 `UsersFileError`、**last-admin 不变量**（变更后
-admin 数由 >0 变 0 即拒绝，`disable` / `role demote` 自动受保护）。角色用
-`role: "user" | "admin"` 枚举、缺省不落盘（既有 YAML 字节不变）、**授予只走 CLI**
-（`user role` / `user add --admin`，不开 HTTP 提权面），`must_change_password` 本期只预留、登录路径
-不读。CLI 新增 `user passwd`（禁 `--password` 明文参数；管道读两行、TTY 隐藏回显），既有 `add` /
-`disable` 同样改走 `mutateUsersFile`。
-**替代方案**：bcrypt/argon2（作废全部存量哈希）；密码历史（schema 与写盘形态变大）；boolean
-`admin`（无法表达第三角色、语义藏在字段存在性里）；锁在 `users.yaml` 本身（rename 换 inode 等于
-没锁）；无锁直写（并发丢更新 = 静默数据损坏）；只加锁不做写前 CAS（挡不住锁外的编辑器/备份还原）；
-引入 SQLite（依赖与迁移成本，体量不需要）。
-**为什么**：把「不该静默发生的事」变成显式的、可测试的、机器可读的失败；P1 只做策略 + 锁 + CLI +
-自助端点所需公共面，schema 一次定死保证 P2 管理面只加不返工。
-→ [zh](decisions/implemented/2026-09-23-password-policy-and-users-lock.zh.md) ·
-[en](decisions/implemented/2026-09-23-password-policy-and-users-lock.en.md)
-
-## D24. 改密后的去向、登录页原因提示，与设置导航身份（文案/order/图标）
-
-改密成功后不再停在"死会话"设置面板上：**D24.1 起成功响应一到就**
-`location.replace("/auth/login?next=%2F&notice=password-changed")`（原先的 2500ms 缓冲由主人
-拍板取消：宿主全局 401 处理也往登录页导航但不带原因键，缓冲期就是竞态窗口），成功文案与
-**「重新登录」**按钮降级为兜底态；`GET /auth/login` 用**精确白名单**把
-`notice` 映射成编译期常量（独立 `role="status"` 槽、只挂密码卡，TOTP 页/失败页/POST 重渲染
-都不带），query 只"选"文案、绝不拼接或回显。设置导航身份改为 id 保持
-`dsh-auth-gate-account`（**不抢**宿主 0.1.7 官方云账户的 `account`）、nav 文案
-**「账号安全 / Account security」**、`order` 500 → **900**（大于已知全部条目、落在导航靠后，
-但不承诺全局最后——宿主排序没有并列决胜）。图标：宿主 `settings.section` 没有 `icon` 选项
-（`navIcon(id)` 是宿主硬编码 if 链，第三方段恒为默认齿轮），D24 原本只画在内容区；**D24.1 起**
-补一层临时 DOM 垫片 `src/client/account-nav-icon.ts`：只认我们自己那一行（`<button>` 最后一个
-元素子节点是文案 span），藏宿主齿轮、插入同一枚盾牌 SVG，找不到就静默退回齿轮，宿主重渲染后
-自愈，"上游支持 `icon` 后整体删除"写进迁移表；"不闪"由隔离实例的 rAF 逐帧探针验证
-（观察器回调是微任务，先于绘制）。
-**替代方案**：服务端 302（吞掉冻结的 200 JSON）；`location.assign`（死页面留在历史栈/bfcache）；
-flash cookie 携带 notice（扩大会话面）；抢 `id: "account"`（0.1.7 双挂载 + 语义错位）；
-order 保持 500（更易撞车，且 `-10 … 20` 之间没有契约空隙）。
-**为什么**：改密闭环的最后一跳要"走得了、看得懂、回得来"；所有新文案都是编译期常量 + 白名单
-选择，既解释原因又不引入反射面；导航身份的唯一硬约束是**不与宿主官方段撞名撞 id**，而 order
-只能声明"大于已知条目"，不能声明"最后"；D24.1 的导航垫片是"视觉临时、逻辑可退"的取舍 -
-匹配不上就退回齿轮，不动功能与安全，代价是宿主改版时要按 D24.1 迁移表复核。
-**D24.3（2026-09-24）**：截图改回**一套英文界面**（`*.zh.png` 全部删除；parity 门禁改为"两版图片
-集合相同 + `docs/demo/` 不得出现 `*.zh.png`"，并补上**表格行/列数**比较——正是这条抓出中文配置表
-漏了 `clientIpHeader`/`trustedProxyCidrs` 两行）；中文 README 按中文技术写作习惯重写（骨架与事实
-不变，去掉直译词、统一术语），grok-4.6 双语评审；npm `description` 随 0.15.0 发版生效，GitHub
-仓库描述与 topics 单独更新。
-→ [zh](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.zh.md) ·
-[en](decisions/implemented/2026-09-23-post-change-redirect-and-nav-identity.en.md)
-
-## D25. 管理员重置口令与强制改密登录门
-
-新增两条管理端点（仅 password 模式）：`GET /auth/users`（字段白名单列表，非 admin / 受限会话
-`403`）与 `POST /auth/users/password`（admin 重置他人口令，`target` 只认 body，`code` 只在 actor
-自己启用 TOTP 时要求）；口令模式路由模型变为 **1 prefix + 6 exact**（token 模式仍 3 exact）。
-处理顺序硬约束：Origin → 401 → 非 admin 403 → 受限 403 → 限流 → 目标名 400 → 404 →
-`target === actor` 403 → 策略 400 → 条件式 TOTP 401 → 锁内写盘（置 `must_change_password`，
-**不动目标 `totpSecret`**）→ 吊销目标全部会话（不含 actor）→ 清目标两个桶 → 成功 `200`
-（body `{"ok":true,"sessionsRevoked":boolean}`）+ 审计。P1 预留的 `must_change_password` 变成真门：登录
-通过后签发 **受限会话**（`kind: "password-change-only"`，15 分钟、不续期），只允许
-`GET`/`POST /auth/password`（POST 仍必须带 `current`）、`GET /auth/status`、`POST /auth/logout`，
-`/auth/users*` 一律 403，宿主 /api、静态、`/plugins`、WS 全 deny（导航 `302 /auth/password`，
-API `401`），gate **只信 `session.kind`**。`GET /auth/password` 服务端渲染**零外链、无 JS** 的
-改密表单（未认证 → `302 /auth/login?next=/auth/password`），`allow` 修为 `GET, POST`。
-`/auth/status` 加法追加 `name`/`role`/`disabled`/`totpEnabled`/`mustChangePassword`/`sessionKind`
-（未认证键集合相等，不新增 `/auth/me`）。已认证状态变更 POST 加 fail-closed 的
-`Origin` / `Sec-Fetch-Site` 校验（`publicHost` 未配置时**不得**用 `Host` 比对放行，不给脚本豁免），
-CLI 顺带补 `dsh-auth user enable`。
-**替代方案**：正常会话 + 全路径 302 强制改密（漏一条就等于没做）；新增 `GET /auth/me`
-（多一条路由与鉴权面）；独立 `/auth/password-change` 页路由；用 `Accept` 子串判导航（假绿）；
-Origin 也覆盖 `/auth/login`（未认证易锁死）；`disabled` 目标拒绝重置 409（挡掉运维救命场景）；
-给脚本开 Origin 豁免；`target` 也认 query；写 audit 文件或往 `users.yaml` 追加审计行。
-**为什么**：受限会话是闸门唯一能**证明否定命题**的形态（这枚 cookie 除了改密表单哪儿都到不了，
-不需要给任何宿主路径开白名单）；复用 `GET /auth/password` 让路由只增长两条管理端点；重置流程保持
-P1 的顺序不变量并按评审加两处（写盘打标记、吊销失败如实上报 `sessionsRevoked:false`）；列表走
-字段白名单、状态走加法字段、授权每请求现读 `users.yaml`（CLI 改角色/禁用立即生效），审计只走
-结构化日志。
-**残留（如实记档）**：Origin 不覆盖 `/auth/login`（仍只有 `SameSite=Lax`）；revoke 失败仍 `200`
-且不重试/不告警；CLI `user passwd` 不设标记；重置仍 `disabled` 的账号不会让它能登录（需先
-`user enable`）；同站子域 CSRF 未收口；锁夺取 0 字节窗口未修；admin 未开 TOTP 时管理面是单因素。
-→ [zh](decisions/implemented/2026-09-24-admin-password-reset.zh.md) ·
-[en](decisions/implemented/2026-09-24-admin-password-reset.en.md)
-
-## D26. 宿主走廊扩到 0.2.x：engines 与 storage-domain peer 同时声明 `^0.2.0-rc.1`
-
-`engines.dsh` 与 `@deepseek-ai/dsh-storage-domain` peer **同时**追加 `|| ^0.2.0-rc.1`（两串逐字相同），
-dev/测试宿主 cohort 上移到 `^0.2.0-rc.1`（解析 `0.2.0-rc.2`）；不改源码。
-**替代方案**：只改 engines（闸门不读，零效果）；只改 peer（徽章与 npm engine 检查仍是旧走廊，两处可漂移）；
-只留 `^0.2.0-rc.1`（丢掉生产在跑的 0.1.7-rc.2 与回滚路径）；dev cohort 留 0.1.x（新宿主零覆盖）；
-等 0.2.0 稳定（闸门已在 next 线生效，失败形态是 fail-open）；dev 包精确钉（与仓库 caret 风格不符，只增改动）。
-**为什么**：0.2.0 的兼容闸门只读 peer —— 声明 peer 才真正解锁安装，且不兼容的 bundle 会被**静默跳过**
-（门消失 = fail-open）；两串同文保住 D12 的单一徽章且不可能漂移；追加而非替换同时保住生产 0.1.7-rc.2；
-dev cohort 上移让 968 例（含真挂 webServer 的集成测试）与真实入口覆盖都跑到新宿主上。
-→ [zh](decisions/implemented/2026-09-29-dsh-020-host-corridor.zh.md) ·
-[en](decisions/implemented/2026-09-29-dsh-020-host-corridor.en.md)
-
-## D27. 守卫 unwrap 逐条回滚，不按快照整表还原
-
-`wrapServer` 的 disposer 只把仍是本次 wrap 产出的守卫 handler 换回原 handler；wrap 期间被删的条目不写回，
-被别人替换的不动，wrap 之后注册的路由保留、只摘守卫。取代 impl-m1 D6 的「快照还原、post-wrap 注册随还原丢弃」。
-**替代方案**：保留快照还原；快照还原 + 合并后续注册；dispose 时只还原注册方法、表里守卫不动。
-**为什么**：单插件重载（改配置）时快照还原会抹掉别的插件后注册的路由、复活已卸载插件的路由，
-并让其重新加载撞上 `duplicate route`；守卫只拥有自己创建的 handler，回滚只碰这些。
-→ [zh](decisions/implemented/2026-10-11-guard-unwrap-per-entry.zh.md) ·
-[en](decisions/implemented/2026-10-11-guard-unwrap-per-entry.en.md)
-
-## D28. 宿主走廊末尾改用下界：两处声明 `>=0.2.0-rc.1`，不再随宿主换线追加
-
-`engines.dsh` 与 `@deepseek-ai/dsh-storage-domain` peer **同时**把末尾的 `^0.2.0-rc.1` 换成
-`>=0.2.0-rc.1`（两串逐字相同），前面三个 0.1.x 替代项保留为验证记录；守卫测试的期望串与
-覆盖断言同步改写；不改源码。
-**替代方案**：维持枚举、每条新宿主线追加一次（换线当天登录门静默消失）；整条只留 `>=0.1.0-rc.6`
-（丢掉验证记录，而保留枚举零成本）；写 `>` 不写 `>=`（下界版本自己被判不兼容）；每个宿主版本追加
-一项（caret 已覆盖整条线）；等 dsh 稳定版（闸门已在 `next` 的 rc 线生效）；给下界加上界
-（破坏性变更落在哪条线不可知，等于把问题挪到下个线边界）。
-**为什么**：闸门判定带 `includePrerelease`，下界一次接住以后所有宿主；而判不兼容的形态是插件包被
-**静默跳过**、登录门消失（fail-open），比加载后报错危险得多，所以走廊在下界一侧留宽；范围写宽不会
-让 pnpm 多装一份 storage-domain（peer 去重吃依赖图里那份，线上 lock 已证）。
-代价如实记档：未来宿主的破坏性变更不再由闸门拦住，兜底要靠运行时自检。
-本记录 2026-10-07 落笔时编号为 D27；2026-10-11 合并 0.17.1 时与守卫回滚那条撞号，顺延为 D28。
-→ [zh](decisions/implemented/2026-10-07-host-corridor-floor.zh.md) ·
-[en](decisions/implemented/2026-10-07-host-corridor-floor.en.md)
-
-## D29. 跨站顶层导航先回一张同源弹回页
-
-gate 已放行、但请求是跨站顶层文档导航（`GET` + `Sec-Fetch-Site: cross-site` + `Sec-Fetch-Dest: document`）时，
-`guardHttp` 不进原 handler，回一张静态页（唯一脚本 `location.replace(location.href)`，CSP 钉脚本 sha256，
-`no-store` + `no-referrer`），由同源文档重新导航，让 dsh 的 `SameSite=Strict` cookie 随第二次请求送出。
-**替代方案**：外层 cookie 也改 Strict（每次跨站进入都被踢去登录）；插件改写内层 cookie（耦合宿主内部）；302/303 回同一 URL
-（跨站发起者不变）；把 URL 插值进页面（多一个反射面）。
-**为什么**：外层 Lax、内层 Strict，跨站导航只带前者，dsh 回 401，F5 沿用跨站上下文修不好；
-同源文档发起的导航才算同站，且重试的 `Sec-Fetch-Site` 是 `same-origin`，构造上不循环。
-→ [zh](decisions/implemented/2026-10-13-cross-site-navigation-bounce.zh.md) ·
-[en](decisions/implemented/2026-10-13-cross-site-navigation-bounce.en.md)
-
-## D30. host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 分层
-
-两个半边都改用 Feature-Sliced Design 分层并由 Steiger 守护（`npm run lint:fsd` 先后跑 `src/host` 与
-`src/client`）：host 收进 `src/host/{shared,entities,features}`（无 widgets/pages/app，入口与装配留在
-`src/` 根），client 在 `src/client/` 下用 `shared`/`entities`/`features`/`widgets`（`index.tsx` 留在树根，
-无 `pages`、无 `app`），integration 测试搬进 `test/integration/`。`slice:check` 缩成 Steiger 看不到的部分
-（两半边互不导入、根文件只经 index.ts 进 host、导入无法解析即失败、不许有游离文件）。取代 D5 与 D11 的目录部分，
-二者归档。`context.ts` 落在 `shared/api`；client 没有强迫任何改名。
-**替代方案**：保持 D5 只整理测试；只改 client；host 不加 `src/host/` 外壳；host 照搬五层；ESLint
-`no-restricted-paths` 分区代替 Steiger；`handleLogout`/`handleStatus` 留 `shared/http` 靠注入；integration
-测试留在 `src/` 根。**为什么**：与 dsh-lingualab、dsh-plugin-framework 同一套结构，检查换成现成工具，层与依赖图
-重新对齐，并顺带堵住 helper 进包、`lib/` 积累孤儿两个发布漏洞。
-→ [zh](decisions/implemented/2026-10-12-fsd-host-and-client.zh.md) ·
-[en](decisions/implemented/2026-10-12-fsd-host-and-client.en.md)（2026-10-13 实施）
-
-## D31. `/auth/*` 路径与载荷形状收进跨半边契约 `src/protocol/`
-
-路由路径、登录页原因键与由它们拼出的 URL 只在 `src/protocol/index.ts` 定义一次（纯常量与纯函数，不 import
-任何东西），host 经 `src/host/shared/protocol/`、client 经 `src/client/shared/api/protocol.ts` 两个桥进入，
-其余文件不再写路径字面量；`slice:check` 强制只有两个桥能引用它。端点的请求体、响应体、错误体与共用取值集合
-是 `src/protocol/payloads.ts` 里的纯类型，经同样两个桥进入，取代了 client 手写的 `admin-types.ts` 镜像。
-**替代方案**：放进 `host/shared`（client 要开直引例外，误引 barrel 会把 Node 代码打进 bundle）；推广源码文本钉子
-（只能发现、不能消除重复）；两半边直引不设桥（Steiger 看到越树深层 import）；保留载荷镜像靠测试兜（改名照样编译）；
-契约里放 zod schema（契约须零 import，zod 会进 bundle）；契约里再放路由表（与按接线注册的实际集合不符）。
-**为什么**：一份定义直接消除漂移的来源，契约零依赖所以两种构建都能安全包含，桥让 D30 的分层检查不受影响。
-→ [zh](decisions/implemented/2026-10-16-cross-half-protocol.zh.md) ·
-[en](decisions/implemented/2026-10-16-cross-half-protocol.en.md)
-
-## D32. 未配置实例认 launch token 进首次配置向导，配置成立即关窗
-
-全新安装后，`GET /?token=<launchToken>` 在实例未配置时不再 302 到登录页，而是签一个最长 1 小时、只放行
-`/auth/*` 的 bootstrap 会话并 302 到 `/auth/setup` 向导；在向导里生成共享令牌或创建第一个管理员后窗口立即
-关闭，旧 launch URL 再访问按原样拒绝。校验、未配置探针与会话签发全在新端点 `/auth/bootstrap`，两个门只在
-本来就要 deny 的位置多做一次形态重定向，`guard.ts`/`wrapServer`/`Gate` 词表一行不改。
-**替代方案**：launch token 永久放行（等于一把绕过 TOTP 与密码的第二把钥匙）；守卫 `next` 保留 search
-（D-bridge-9 已否决）；给 guard 加引导钩子（动冻结契约，收益不足）；探针把读盘失败算作未配置（一次故障即
-开门）；只在 client 面板做入口（bundle 挂了再次锁死）。
-**为什么**：未配置可以每次请求实时判定，配置成立后判据自然为假，不需要额外状态；门保持零 IO，冻结契约不动；
-引导会话有 1 小时与 `/auth/*` 两重边界，临时放人进来仍然进不到 dsh。代价如实记档：launch token 会出现在
-`Location: /auth/bootstrap?token=` 上，与原始请求 URL 同级暴露。
-→ [zh](decisions/implemented/2026-10-26-first-run-launch-bootstrap.zh.md) ·
-[en](decisions/implemented/2026-10-26-first-run-launch-bootstrap.en.md)
-
-## D33. 守卫同时支持 handler 与 DSH 0.2.2 的 resource 路由
-
-0.2.2 起 `webServer` 的路由可以是 `{ resource }`（Fetch `Request` 进、`Response` 出），官方 `/plugins`
-前缀与 SPA 兜底已经换成这种形态。`wrapServer` 改成同时包装两种路由（联合类型加运行期探测），
-fallback 既认函数也认 `{ resource }`；`Gate.decide()` 的入参收窄成只含 `url`、`method`、`headers` 的
-`GuardRequest`，resource 入口由 `toGuardRequest()` 复制三项后传入；拒绝语义抽成传输无关的
-`GuardReply`，handler 与 resource 各用一种方式写回；放行路径零拷贝。`peerDependencies` 与
-`engines.dsh` 保持原范围，同一份包同时服务 0.2.0、0.2.1 与 0.2.2。
-**替代方案**：peer 下限提到 `>=0.2.2`（放弃两代旧宿主）；把 `Response` 转成假 `ServerResponse`
-（破坏流式、gzip、Range）；放行时缓冲再包装（白增延迟与内存）；只改 `lib/` 编译产物（不可发布）；
-缺 handler 就跳过（`/plugins` 与 SPA 兜底裸奔，正是本次要修的缺陷）。
-**为什么**：拒绝语义只写一份，两种传输行为不漂移；运行期探测让一份包服务三代宿主，消费者不用迁移；
-结构镜像不 import 0.2.2 独有类型，旧宿主加载不受影响；自检继续 fail loud，任何入口没守卫就抛错。
-→ [zh](decisions/implemented/2026-11-06-guard-resource-routes.zh.md) ·
-[en](decisions/implemented/2026-11-06-guard-resource-routes.en.md)
-
-## D34. 匿名使用统计：放行后惰性上报，默认开、可见可关
-
-每进程每 24 小时最多一次匿名上报，只在请求通过登录门之后；报文固定 v1（包版本、随机 UUID 安装 id、
-Node 主版本、平台、架构，加门 mode / totp / 用户数分桶），发往 `https://t.hi-ruofei.com/v1/ping`。
-`telemetry` 默认 `true` 且可见可关；`installId` 为 `.volatile().hidden(true)`，经宿主 settings 服务
-写回，服务缺席时 id 只留在进程内存、照样上报，绝不写私有文件。挂载点是守卫的放行分支（经
-`AdmitHook` 接进 `wrapServer`），不在门的判定路径上、不在启动时调用、没有定时器。
-**替代方案**：机器指纹（可识别、需特权读取）；第三方统计 SDK（新增依赖与后台定时器）；账号/登录式
-统计（要服务器与个人数据）；默认关（样本太小，回答不了安装量）；把 id 写进 `$DSH_HOME` 文件（同一
-事实的第二个家）；挂进门内或会话层（把网络放到认证判定路径上）；启动即上报（没被使用的进程也算在用）。
-**为什么**：默认开让数字有意义，可见可关让同意为真；放行之后才报把信号绑在真实使用上；报文只由配置
-与进程事实组成，不含用户名/哈希/密钥/会话/token/IP/路径/主机名，威胁模型不变；失败静默且不阻塞，匿名
-上报永远不会影响一次认证判定。
-→ [zh](decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md) ·
-[en](decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md)
-
-## D35. 通行密钥（passkey / WebAuthn）作为口令之外的第二登录方式
-
-在 `password` 模式新增通行密钥登录：登录页「Sign in with a passkey」（无用户名 / discoverable），注册需
-已登录完整会话**再认证**（当前口令 + TOTP 码）；服务端校验用 `@simplewebauthn/server`（浏览器侧手写 glue），RP ID/origin 只从既有
-`publicHost` 派生；凭证内嵌 `users.yaml`；v1 只提供 `passkey: "off" | "optional"`；
-passkey 登录恒为完整认证（对齐 GitHub 模型：passkey 同时满足口令与 2FA），`totp` 只约束口令登录。
-状态：**已落地**（M6 PR1–PR3，2026-11-12），方案见 `docs/plans/passkey-login-plan_zh.md`。
-**替代方案**：维持口令 + TOTP（不解决钓鱼与口令面）；OAuth/OIDC 外部身份源（多一个外部服务）；邮件魔术链接
-（需邮件设施、弱于 origin 绑定）；只支持硬件密钥（排除「方便」）；passkey-only（锁定与恢复不成熟，v1 不做）；
-引 `@simplewebauthn/server`（21 个传递包 / ~870 KiB，主要服务我们不需要的 attestation 链）；先输用户名再
-passkey（多一步且泄露账号存在性）。
-**为什么**：抗钓鱼、无口令、浏览器原生且无外部服务，四者兼顾；仓库前置件（SSR 登录页、TLS、`publicHost`、
-会话/限速/CSRF）都已在位，新增面集中到一条校验路径；注册再认证堵住「会话被劫 → 后门 passkey」这条
-passkey 相对 TOTP 唯一新增的持久化攻击面；`publicHost` 作唯一 RP ID 锚点，避免半外壳反代下
-「永远登录不上」的错配。
-→ [zh](decisions/implemented/2026-11-11-passkey-login.zh.md) ·
-[en](decisions/implemented/2026-11-11-passkey-login.en.md)
-
-## D36. 市场卡片截图由仓库根 `screenshots.json` 声明，并挂一道门禁
-
-插件市场卡片的缩略图只读目录里的 `screenshots` 字段，该字段由上游每晚从**插件仓库根目录的
-`screenshots.json`** 解析而来；README 的图只进安装弹窗，已安装的插件看不到。因此在仓库根声明 6 张
-`docs/demo/` 横图，并新增 `npm run screenshots:check` 校验 1-8 张、相对路径不出仓库、只收位图、
-文件必须存在，接进 `verify` 链、hygiene 场景与 CI。
-**替代方案**：只靠 README 自动抽取（卡片不生效）；往上游 `data/screenshots.json` 加 key（上游明确
-不再接受，且绝对 URL 改名后静默失效）；把图放进 npm 包 `files`（registry 读 GitHub HEAD）；
-只加 JSON 不写门禁（就是上游 773 张里 41 张 404 的成因）。
-**为什么**：图放自己仓库，改图推一下即可、下次 nightly 自动生效；相对路径改名会被门禁当场发现，
-而不是在别人的页面上烂成 404；门禁规则逐条对齐上游契约，本地通过即等于 registry 接受。
-→ [zh](decisions/implemented/2026-11-16-market-card-screenshots.zh.md) ·
-[en](decisions/implemented/2026-11-16-market-card-screenshots.en.md)
-
-## D37. 放行后问一次宿主，不认就重铸它的浏览器 cookie
-
-dsh 自己有第二层 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=Strict`，30 天），本插件的门
-只看自己的 `dsh_auth`，于是「门放行、宿主 401」时用户看到的是宿主那句
-`dsh web authentication required` 而不是登录页。守卫放行一次到 `/` 的顶层导航之后调用宿主文档化的
-`connection.requestRejection`，回 `401` 就 `302 /?token=<launchToken>` 重铸，并下发一次性标记 cookie
-（`dsh_auth_rebridge`，60 秒）防循环；标记还在时不再重铸，把宿主的 401 原样交出去。跨站弹回排在
-重铸之前：跨站导航里新签发的 Strict cookie 照样不会被发送，先重铸会把弹回能修好的场景变成 401。
-**替代方案**：在守卫里自己签 `dsh-auth-*`（复制未冻结的宿主内部格式，issue #69 已拒绝）；把宿主
-401 改成跳登录页（耦合宿主文案，桥坏时反复登录）；只靠跨站弹回页（解决不了 cookie 名字对不上）；
-每次导航都跳 `/?token=`（多一次往返、token 进日志、无标记时成环）。
-**为什么**：`requestRejection` 是宿主文档化的接缝，只读请求头、不写响应，正好能在放行之后问一次；
-不复制任何宿主内部格式，dsh 改 cookie 方案时钩子跟着它的判定走，最坏情况是钩子失效、行为回到从前。
-→ [zh](decisions/implemented/2026-11-16-host-cookie-rebridge.zh.md) ·
-[en](decisions/implemented/2026-11-16-host-cookie-rebridge.en.md)
-
-## D38. 只允许通行密钥登录（passkey-only）是实例级配置，不是账号级开关
-
-`passkey` 增加 `"required"`：口令与「口令 + TOTP」都不能建立新会话，登录页只渲染通行密钥入口。
-**实例级**，没有 per-user 字段、没有开启端点、没有设置页开关；开关它等于改配置文件加重启。配套：
-WebAuthn 配置失效时口令**保持关闭**并渲染固定原因码（不退回口令登录）；删最后一把凭据被拒绝
-（HTTP `400 last-credential`，锁内复核；CLI 一律要 `--force`）；恢复只有「改回 `"optional"` 并重启」
-一条路。
-**替代方案**：账号级 `password_login_disabled` + 开启端点 + 会话 `authMethod` 追踪（7–9 人日，
-但在不做用户隔离的模型里「只给一个账号关口令」不成立）；只加枚举不改失效语义（配置一坏就悄悄
-退回口令，违反 issue 第 4 点）；CLI 恢复命令（读不到插件配置，无条件清标志等于本地后门）；
-设置页开关（会话被劫后能一键恢复口令入口）。
-**为什么**：策略的载体决定安全属性——放配置文件里，开关天然要求服务器权限，恢复路径与开启路径
-同一条；放 Web 界面或 users.yaml 里，会多出「被劫会话能改策略」或「坏状态读不出来、CLI 也救不了」
-两种失败模式。实例级而非账号级，是因为这道门保护整个实例、门内不做隔离，账号级策略会制造
-「每个账号有独立安全边界」的错觉（D36 反对的同一类误导）。
-→ [zh](decisions/implemented/2026-11-16-passkey-only-login.zh.md) ·
-[en](decisions/implemented/2026-11-16-passkey-only-login.en.md)
+[中文](decisions_zh.md)
+
+The numbered decisions this plugin made, D1 through D38. **This page is a
+compatibility table, not a live index.** The decisions themselves live in
+[`.agents/notes/`](../.agents/notes/), one note per decision, and the notes
+tree is the index: browse its lifecycle and class folders, or search the
+repository.
+
+The table exists for one reason: code comments and older documents cite a
+decision by number (`D31`), and that citation has to keep resolving. Each
+note carries the same number on its `Legacy ID:` line, so `git grep D31`
+finds both the citation and the note.
+
+New decisions do not get a number. They get a note in the lifecycle folder
+that matches their status, and the note's path is its identity.
+
+| # | Decision | Status | Note |
+| --- | --- | --- | --- |
+| D1 | 认证门失败即关闭（fail-closed） | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-fail-closed-auth-gate.md) |
+| D2 | 守卫包装 webServer，不 fork | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-guard-wrap-seam.md) |
+| D3 | scrypt 参数随哈希存储，验证按存储值重派生 | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-scrypt-portable-params.md) |
+| D4 | 退出按钮槽位 order 可配置 | implemented | [note](../.agents/notes/implemented/feature/2026-08-30-configurable-logout-order.md) |
+| D5 | src 分层 + 跨 slice 只走 barrel（已归档，被 D30 取代） | archived | [note](../.agents/notes/archived/architecture/2026-08-30-layered-src-with-barrels.md) |
+| D6 | TOTP 两段式登录采用无状态挑战 cookie | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-totp-two-stage-challenge-cookie.md) |
+| D7 | TOTP 三态配置，默认 off | implemented | [note](../.agents/notes/implemented/feature/2026-08-30-totp-config-off-by-default.md) |
+| D8 | M3 遗留评估项维持不实施 | implemented | [note](../.agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers.md) |
+| D9 | TOTP 独立 slice，能力经根装配注入 password | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-totp-slice-and-injection.md) |
+| D10 | TOTP 挑战 cookie 加 HMAC 签名（取代 D6 的「不签名」） | implemented | [note](../.agents/notes/implemented/architecture/2026-08-30-totp-signed-challenge-cookie.md) |
+| D11 | 认证 HTTP 端点公共件独立成 http 层（已归档，被 D30 取代） | archived | [note](../.agents/notes/archived/architecture/2026-09-13-http-endpoint-layer.md) |
+| D12 | 宿主要求声明 + storage-domain 转 peer | implemented | [note](../.agents/notes/implemented/process/2026-09-14-host-requirement-declaration.md) |
+| D13 | PWA manifest 列入免守卫公开静态路径 | implemented | [note](../.agents/notes/implemented/feature/2026-09-18-public-static-manifest.md) |
+| D14 | 身份块 host 走 publicHost 配置（空值回退请求头 Host） | implemented | [note](../.agents/notes/implemented/feature/2026-09-22-public-host-identity.md) |
+| D15 | 登录页视觉语言：冷中性检查点卡 | implemented | [note](../.agents/notes/implemented/feature/2026-09-22-login-page-identity-redesign.md) |
+| D16 | 示例域名一律用 example.com（真实部署域名不随包发布） | implemented | [note](../.agents/notes/implemented/process/2026-09-22-example-domain-in-examples.md) |
+| D17 | `dsh-auth-proxy` 的 `--target` 改必填（不再有默认上游） | implemented | [note](../.agents/notes/implemented/feature/2026-09-22-required-proxy-target.md) |
+| D18 | 随包技能保持单文件 SKILL.md（不启用 references/） | implemented | [note](../.agents/notes/implemented/process/2026-09-22-single-file-bundled-skill.md) |
+| D19 | 限速桶的客户端身份改走受信反代头（`clientIpHeader` + `trustedProxyCidrs`） | implemented | [note](../.agents/notes/implemented/architecture/2026-09-22-trusted-proxy-client-ip.md) |
+| D20 | 登录失败渲染登录卡片（HTML），不再返回裸文本页 | implemented | [note](../.agents/notes/implemented/feature/2026-09-22-login-failure-html-card.md) |
+| D21 | token 模式登录失败渲染登录卡片（HTML），不再返回裸文本页 | implemented | [note](../.agents/notes/implemented/feature/2026-09-23-token-failure-html-card.md) |
+| D22 | 设置面板自助改密：POST /auth/password，写盘成功后全踢会话 | implemented | [note](../.agents/notes/implemented/feature/2026-09-23-self-service-password-change.md) |
+| D23 | 口令策略（≥14 位四类字符）与 users.yaml 变更面（独立锁 + CAS） | implemented | [note](../.agents/notes/implemented/architecture/2026-09-23-password-policy-and-users-lock.md) |
+| D24 | 改密后的去向、登录页原因提示，与设置导航身份（文案/order/图标） | implemented | [note](../.agents/notes/implemented/feature/2026-09-23-post-change-redirect-and-nav-identity.md) |
+| D25 | 管理员重置口令与强制改密登录门 | implemented | [note](../.agents/notes/implemented/feature/2026-09-24-admin-password-reset.md) |
+| D26 | 宿主走廊扩到 0.2.x：engines 与 storage-domain peer 同时声明 `^0.2.0-rc.1` | implemented | [note](../.agents/notes/implemented/process/2026-09-29-dsh-020-host-corridor.md) |
+| D27 | 守卫 unwrap 逐条回滚，不按快照整表还原 | implemented | [note](../.agents/notes/implemented/architecture/2026-10-11-guard-unwrap-per-entry.md) |
+| D28 | 宿主走廊末尾改用下界：两处声明 `>=0.2.0-rc.1`，不再随宿主换线追加 | implemented | [note](../.agents/notes/implemented/process/2026-10-07-host-corridor-floor.md) |
+| D29 | 跨站顶层导航先回一张同源弹回页 | implemented | [note](../.agents/notes/implemented/architecture/2026-10-13-cross-site-navigation-bounce.md) |
+| D30 | host 半边进 `src/host/` 用 FSD 下三层，client 半边用 FSD 分层 | implemented | [note](../.agents/notes/implemented/architecture/2026-10-12-fsd-host-and-client.md) |
+| D31 | `/auth/*` 路径与载荷形状收进跨半边契约 `src/protocol/` | implemented | [note](../.agents/notes/implemented/architecture/2026-10-16-cross-half-protocol.md) |
+| D32 | 未配置实例认 launch token 进首次配置向导，配置成立即关窗 | implemented | [note](../.agents/notes/implemented/feature/2026-10-26-first-run-launch-bootstrap.md) |
+| D33 | 守卫同时支持 handler 与 DSH 0.2.2 的 resource 路由 | implemented | [note](../.agents/notes/implemented/architecture/2026-11-06-guard-resource-routes.md) |
+| D34 | 匿名使用统计：放行后惰性上报，默认开、可见可关 | implemented | [note](../.agents/notes/implemented/feature/2026-11-06-anonymous-usage-telemetry.md) |
+| D35 | 通行密钥（passkey / WebAuthn）作为口令之外的第二登录方式 | implemented | [note](../.agents/notes/implemented/feature/2026-11-11-passkey-login.md) |
+| D36 | 市场卡片截图由仓库根 `screenshots.json` 声明，并挂一道门禁 | implemented | [note](../.agents/notes/implemented/process/2026-11-16-market-card-screenshots.md) |
+| D37 | 放行后问一次宿主，不认就重铸它的浏览器 cookie | implemented | [note](../.agents/notes/implemented/bug-fix/2026-11-16-host-cookie-rebridge.md) |
+| D38 | 只允许通行密钥登录（passkey-only）是实例级配置，不是账号级开关 | implemented | [note](../.agents/notes/implemented/feature/2026-11-16-passkey-only-login.md) |
+
+The note system's rules (lifecycles, classes, the body skeleton, archiving) are in
+[`.agents/notes/README.md`](../.agents/notes/README.md).

@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/feature/2026-11-16-passkey-only-login
+2026-11-16-passkey-only-login.md: 198417d7cfb7f24df369025f0162c16a33db4787
+2026-11-16-passkey-only-login.zh.md: b98d254f9dcf35bc16dfc7bee873605395c08dc5

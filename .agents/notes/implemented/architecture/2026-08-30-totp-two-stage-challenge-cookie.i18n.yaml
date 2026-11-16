@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-08-30-totp-two-stage-challenge-cookie
+2026-08-30-totp-two-stage-challenge-cookie.md: 523fe4726d5eb169c3f68612e7ef57b809f3e67d
+2026-08-30-totp-two-stage-challenge-cookie.zh.md: 1c36a7baff35373f57952b4e6306ca1b61c3cb3d

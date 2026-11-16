@@ -1,5 +1,7 @@
 # 认证本地代理（dsh-auth proxy）方案
 
+[English](local-proxy.md) | 中文
+
 > 状态：已评审，按此实施。目标读者：本仓库维护者与部署方。
 > 约束：**不修改 dsh 源码**；Phase 1 不改 auth-gate 服务端逻辑。
 

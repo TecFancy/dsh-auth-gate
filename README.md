@@ -216,7 +216,7 @@ After signing in, they land on your instance:
 On dsh 0.1.2-alpha+ (which guards pages with a launch token), signing in
 auto-bridges the token gate: the login redirect takes a short relative
 `/?token=…` hop that sets the dsh cookie, then lands on `/` (details in
-`docs/implemented/impl-launch-token-bridge.md`).
+`docs/history/specs/impl-launch-token-bridge.md`).
 
 That dsh cookie is a **second, independent layer**: it is named after the request
 authority (`dsh-auth-<sha256(host)>`), signed with dsh's own secret, and lasts 30 days.
@@ -386,7 +386,7 @@ The install id lives in the hidden `installId` field of the same config entry an
 through the host's settings service when there is one. A host without that service keeps the id in
 memory for this process (one new id per restart) rather than writing a private file to disk; deleting
 the field starts a new pseudonymous identity. The reasoning and the rejected alternatives are in
-[the decision record](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.en.md).
+[the decision record](.agents/notes/implemented/feature/2026-11-06-anonymous-usage-telemetry.md).
 
 ## Command-line tool
 
@@ -451,7 +451,7 @@ still requires the current password, and success clears the mark and signs the u
 can sign in normally. A reset does **not** touch the target's TOTP secret, and resetting a
 disabled account does not let it sign in: the login path rejects disabled users, so run
 `dsh-auth user enable <name>` first. The full contract is in
-[D25](docs/decisions/implemented/2026-09-24-admin-password-reset.en.md).
+[D25](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.md).
 
 ## Bundled configuration skill
 
@@ -664,7 +664,7 @@ Built on the engineering conventions of
 cross-slice imports (Feature-Sliced Design layers, checked by Steiger), the `npm run verify` gate chain, and decision records. `verify`
 runs format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity /
 type-check / coverage 80% / build / bundle / host contract; tests, build and the release flow are
-documented in `docs/specs/development.md`.
+documented in `docs/conventions.md`.
 
 ## License
 

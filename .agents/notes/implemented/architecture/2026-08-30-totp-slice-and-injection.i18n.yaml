@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-08-30-totp-slice-and-injection
+2026-08-30-totp-slice-and-injection.md: 50cda1001dc0cfa9266d9e274f37f1c51526a6c4
+2026-08-30-totp-slice-and-injection.zh.md: 89839de989ce5e9c2aad5da4e71ebd87f71765d3

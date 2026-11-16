@@ -1,1 +1,9 @@
+# Pre-commit: format/fix staged files, then the whole-tree gates. lint-staged
+# runs first (format + fix), then the runner executes the pre-commit set from
+# scripts/lib/gate-registry.mjs, the one list of gates. The gates verify the
+# whole tree, not just staged files, because bilingual checks compare both sides
+# of a pair; the registry names the two that run only when their sources are
+# staged (the skills mirror and front matter, which a byte-copy mirror would
+# carry through unchecked).
 npx lint-staged --concurrent 1
+node scripts/run-gates.mjs --stage pre-commit

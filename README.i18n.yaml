@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- README
+README.md: 2c5a139ff4cb259a50654963ee308d481c89925a
+README.zh.md: 62d51b8288e3d63295ba6bbd4f83806dec3acca2
