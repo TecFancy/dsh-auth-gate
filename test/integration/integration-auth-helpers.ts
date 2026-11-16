@@ -62,7 +62,7 @@ export interface MountStackOptions {
    * 这个函数（旧版 dsh），桥应回落到 `next`。刻意在插件 apply **之后**才 provide，
    * 用来锁住桥「登录时才 `ctx.get("connection")`」的惰性查找（晚注册的 connection 同样有效）。
    */
-  connection?: "authenticatedUrl" | "bare" | "rejecting" | "accepting";
+  connection?: "authenticatedUrl" | "bare";
   /** 认证流（默认 token）；password 模式需要 `usersFile`（默认落在临时目录里）。 */
   mode?: "token" | "password";
   /** password 模式的 users.yaml 路径；缺省用临时目录下的一份（绝不碰真实 DSH_HOME）。 */
@@ -148,15 +148,6 @@ export async function mountStack(options: MountStackOptions): Promise<MountedSta
     });
   }
   if (options.connection === "bare") ctx.provide("connection", {});
-  // 重铸钩子（D37）用的假宿主：`requestRejection` 恒拒或恒认，`authenticatedUrl` 给一枚
-  // 可辨认的 launch token。两者都带 `authenticatedUrl`，因为重铸要读 token 才能拼 `/?token=`。
-  if (options.connection === "rejecting" || options.connection === "accepting") {
-    const rejection = options.connection === "rejecting" ? 401 : undefined;
-    ctx.provide("connection", {
-      authenticatedUrl: () => "http://other.example:9999/deep/path?extra=1&token=launchTok-it",
-      requestRejection: () => rejection,
-    });
-  }
   return { ctx, port: server.port, fibers, root, token, usersFile, credentialsStore };
 }
 

@@ -524,19 +524,3 @@ passkey 相对 TOTP 唯一新增的持久化攻击面；`publicHost` 作唯一 R
 而不是在别人的页面上烂成 404；门禁规则逐条对齐上游契约，本地通过即等于 registry 接受。
 → [zh](decisions/implemented/2026-11-16-market-card-screenshots.zh.md) ·
 [en](decisions/implemented/2026-11-16-market-card-screenshots.en.md)
-
-## D37. 放行后问一次宿主，不认就重铸它的浏览器 cookie
-
-dsh 自己有第二层 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=Strict`，30 天），本插件的门
-只看自己的 `dsh_auth`，于是「门放行、宿主 401」时用户看到的是宿主那句
-`dsh web authentication required` 而不是登录页。守卫放行一次到 `/` 的顶层导航之后调用宿主文档化的
-`connection.requestRejection`，回 `401` 就 `302 /?token=<launchToken>` 重铸，并下发一次性标记 cookie
-（`dsh_auth_rebridge`，60 秒）防循环；标记还在时不再重铸，把宿主的 401 原样交出去。跨站弹回排在
-重铸之前：跨站导航里新签发的 Strict cookie 照样不会被发送，先重铸会把弹回能修好的场景变成 401。
-**替代方案**：在守卫里自己签 `dsh-auth-*`（复制未冻结的宿主内部格式，issue #69 已拒绝）；把宿主
-401 改成跳登录页（耦合宿主文案，桥坏时反复登录）；只靠跨站弹回页（解决不了 cookie 名字对不上）；
-每次导航都跳 `/?token=`（多一次往返、token 进日志、无标记时成环）。
-**为什么**：`requestRejection` 是宿主文档化的接缝，只读请求头、不写响应，正好能在放行之后问一次；
-不复制任何宿主内部格式，dsh 改 cookie 方案时钩子跟着它的判定走，最坏情况是钩子失效、行为回到从前。
-→ [zh](decisions/implemented/2026-11-16-host-cookie-rebridge.zh.md) ·
-[en](decisions/implemented/2026-11-16-host-cookie-rebridge.en.md)

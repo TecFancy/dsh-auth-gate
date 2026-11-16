@@ -43,16 +43,6 @@ export declare function badRequestReply(): GuardReply;
 /** 403：代理标记命中禁行方法。与 dsh /api 围栏同形（forbidden），禁缓存。 */
 export declare function forbiddenReply(): GuardReply;
 /**
- * 放行后重铸的 302 响应模型：与拒绝用的 302 同形（`no-store` + `no-referrer`），但语义是
- * 「门已经放行，只是先把浏览器送去重铸宿主 cookie」，不是拒绝。
- *
- * `setCookie` 原样写进 `set-cookie`（值由调用方构造，属性也由它负责）。只收**一条**：多条
- * `Set-Cookie` 不能用逗号合并（`Expires` 自带逗号，合了就是坏头），而 `GuardReply.headers` 是
- * 单值表，所以这里刻意不给数组。调用方必须已经消毒过 `location`（见 `rebridgeDecision`）：
- * 这里不做兜底，因为兜底成登录页会把已认证用户踢出去。
- */
-export declare function rebridgeReply(location: string, setCookie?: string): GuardReply;
-/**
  * 计算一个拒绝决策的响应模型（P2；`decision` 缺省 = 字符串 `"deny"`）：
  * - `{deny:{redirect}}` → 302 gate 给出的目标（消毒失败则退回 LOGIN_PATH）；
  * - `{deny:{status}}` → 该 401/403；

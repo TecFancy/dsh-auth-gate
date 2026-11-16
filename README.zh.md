@@ -164,14 +164,6 @@ dsh --profile web
 登录跳转会先经过一次相对地址 `/?token=…` 换取 dsh cookie，然后进入 `/`（细节见
 `docs/implemented/impl-launch-token-bridge_zh.md`）。
 
-那张 dsh cookie 是**独立的第二层**：名字取自请求的 authority（`dsh-auth-<sha256(host)>`），
-用 dsh 自己的密钥签名，有效期 30 天。本插件的门只检查自己的 `dsh_auth` 会话，所以会话有效时
-仍可能撞上 dsh 那句 `401 dsh web authentication required`——反代开始或停止改写 `Host` 之后、
-换域名或端口之后、dsh cookie 过期之后，以及清过站点数据之后都会这样。守卫现在放行一次到 `/`
-的顶层导航之后会问一次 dsh 文档化的 `connection.requestRejection` 接缝，dsh 回 401 就回
-`302 /?token=…` 重新签发。一次性标记 cookie 把这件事限制在最多多一跳，所以重铸不成功时
-留下的是 dsh 自己的 401，而不是重定向环（D37）。
-
 设置面板里有一个醒目的**「Sign out」（退出登录）**按钮，位置在**Settings → General
 （设置 → 通用设置）**页最后一行设置项的下方。它是居中、危险色的实心按钮（16px 门形图标加
 本地化文字，配色使用主题 token，深浅色自适应）；文案跟随 GUI 语言切换，用的就是设置页语言切换
