@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.20.0...v0.21.0) (2026-11-16)
+
+
+### Features
+
+* **account:** redesign the Account security settings page ([#141](https://github.com/TecFancy/dsh-auth-gate/issues/141)) ([95f9aef](https://github.com/TecFancy/dsh-auth-gate/commit/95f9aef3a941e6b54fa929fc4802252eaf0cc313))
+
 ## [0.20.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.19.1...v0.20.0) (2026-11-16)
 
 
