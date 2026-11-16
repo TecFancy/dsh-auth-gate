@@ -150,3 +150,19 @@ point at a path that no longer exists.
 notes yet it would only produce noise. `gen-zh-brief` and the local blob pinning
 were not adopted: the sidecar records the confirmed state, and the briefing tool
 is worth adding only once the cost of updating a pair is measured.
+
+Two known weaknesses in the bilingual gate's backlog mechanism, both accepted
+for now:
+
+- **The exemption is per pair, not per finding.** A pair on the known-drift list
+  is exempt from every structural rule, so a new defect in one of those five
+  pairs does not fail. The list cannot grow (an entry added since the base
+  fails) and cannot stay stale (an entry whose pair is now clean fails), so the
+  exposure is bounded to the five pairs already marked for repair. Exempting per
+  finding would need a stable signature per finding, and most of the 25 are
+  "code block bytes differ", whose position moves with any edit.
+- **The list is parsed out of this script's source.** `readKnownDriftAt` reads
+  the file at the base ref and extracts the `KNOWN_DRIFT` array with a regular
+  expression. A change to how the list is written makes the reader throw, which
+  fails closed (the gate exits 2) rather than passing, but the list belongs in a
+  JSON file beside the script.
