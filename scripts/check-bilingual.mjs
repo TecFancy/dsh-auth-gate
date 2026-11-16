@@ -304,16 +304,34 @@ function pairedLocale(rel) {
 /**
  * The KNOWN_DRIFT entries recorded at `ref`.
  *
- * Returns a Set on success. Throws when the ref cannot be read or the list
- * cannot be found in it: a caller that asked for a baseline and did not get one
- * must not be told the list was compared. The one case that returns null is "no
- * baseline was asked for", which is a fixture tree, not a verdict.
+ * Returns a Set when the list can be read, and `null` when the ref is valid but
+ * predates this script - the change that introduces the list has nothing to
+ * compare against, so the growth check is skipped for that one change. Throws
+ * when the ref itself cannot be read, or when the script is there but the list
+ * is not: a caller who named a baseline and did not get one must not be told the
+ * list was compared.
  */
 function readKnownDriftAt(ref) {
-  const text = execFileSync("git", ["-C", ROOT, "show", `${ref}:scripts/check-bilingual.mjs`], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-  });
+  // Resolve the ref first, so "no such ref" and "no such file in the ref" are
+  // different answers rather than one failed `git show`.
+  try {
+    execFileSync("git", ["-C", ROOT, "rev-parse", "--verify", `${ref}^{commit}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    throw new Error(`${ref} is not a commit in this repository`);
+  }
+  let text;
+  try {
+    text = execFileSync("git", ["-C", ROOT, "show", `${ref}:scripts/check-bilingual.mjs`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    // The ref is valid; the script is not in it. That is the introducing change.
+    return null;
+  }
   const start = text.indexOf("const KNOWN_DRIFT = new Set([");
   if (start === -1) {
     throw new Error(`${ref}:scripts/check-bilingual.mjs has no KNOWN_DRIFT list`);
@@ -880,11 +898,17 @@ async function main() {
         console.error(`[check-bilingual] cannot read the KNOWN_DRIFT baseline: ${error.message}`);
         process.exit(2);
       }
-      for (const rel of KNOWN_DRIFT) {
-        if (!baseline.has(rel)) {
-          problems.push(
-            `${rel}: added to KNOWN_DRIFT since ${ARGS.base} - the list may only shrink; fix the pair instead`,
-          );
+      if (baseline === null) {
+        console.log(
+          `[check-bilingual] ${ARGS.base} predates this gate, so there is no backlog to compare against; the growth check starts from the next change.`,
+        );
+      } else {
+        for (const rel of KNOWN_DRIFT) {
+          if (!baseline.has(rel)) {
+            problems.push(
+              `${rel}: added to KNOWN_DRIFT since ${ARGS.base} - the list may only shrink; fix the pair instead`,
+            );
+          }
         }
       }
     }
