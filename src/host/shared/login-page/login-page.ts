@@ -42,7 +42,7 @@ export interface LoginPageOptions {
   passkey?: PasskeyLoginOptions | undefined;
 }
 
-interface FieldSpec {
+export interface FieldSpec {
   id: string;
   label: string;
   name: string;
@@ -61,7 +61,7 @@ interface FieldSpec {
   className?: string | undefined;
 }
 
-interface LoginCardOptions {
+export interface LoginCardOptions {
   /** 文档标题（<title>）。 */
   title: string;
   /** kicker 文案（<h1>）：Sign in / Two-factor。 */
@@ -81,6 +81,11 @@ interface LoginCardOptions {
   style?: string | undefined;
   /** 插在口令表单之后、回退链接之前的片段（passkey 入口；token/TOTP 页不传）。 */
   afterForm?: string | undefined;
+  /**
+   * `false` = 不渲染 `<form>` 骨架（passkey-only 页：没有可提交的字段，登录走 passkey 自己的
+   * 隐藏表单）。此时 `fields`/`submitLabel`/`next` 都不参与渲染，`afterForm` 直接落在卡片主体里。
+   */
+  form?: false | undefined;
 }
 
 /** 可选的页面片段：缺省/空串时一个字节都不注入，旧页面因此保持逐字不变。 */
@@ -89,7 +94,7 @@ function blockHtml(value: string | undefined): string {
 }
 
 /** 渲染公共卡片骨架（kicker/host/错误槽/hint/表单/页脚），全部动态文本 HTML-escape。 */
-function renderLoginCard(spec: LoginCardOptions): string {
+export function renderLoginCard(spec: LoginCardOptions): string {
   const opts = spec.options ?? {};
   const host = (opts.host ?? "").trim().slice(0, HOST_MAX_LENGTH);
   const hostHtml =
@@ -140,6 +145,16 @@ function renderLoginCard(spec: LoginCardOptions): string {
   // 失败页标题前缀（可达性）：整页导航后已填充的 role="alert" 常不被读屏播报
   // （APG/MDN/ARIA19 一致），GOV.UK 的做法是让 <title> 先说 "Error:"。
   const docTitle = spec.error === undefined ? spec.title : `Error: ${spec.title}`;
+  // passkey-only 页没有可提交字段：不渲染 <form>，片段直接进卡片主体。
+  const bodyHtml =
+    spec.form === false
+      ? `${noticeHtml}${errorHtml}${hintHtml}${blockHtml(spec.afterForm)}`
+      : `<form method="post" action="${LOGIN_PATH}">
+<input type="hidden" name="next" value="${escapeHtml(spec.next)}">
+${noticeHtml}${errorHtml}${hintHtml}${fieldsHtml}
+<button type="submit">${escapeHtml(spec.submitLabel)}</button>
+</form>
+${blockHtml(spec.afterForm)}`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -153,12 +168,7 @@ function renderLoginCard(spec: LoginCardOptions): string {
 <div class="head">
 <h1 class="kicker">${escapeHtml(spec.kicker)}</h1>${hostHtml}${whoHtml}
 </div>
-<form method="post" action="${LOGIN_PATH}">
-<input type="hidden" name="next" value="${escapeHtml(spec.next)}">
-${noticeHtml}${errorHtml}${hintHtml}${fieldsHtml}
-<button type="submit">${escapeHtml(spec.submitLabel)}</button>
-</form>
-${blockHtml(spec.afterForm)}${resetHtml}
+${bodyHtml}${resetHtml}
 <p class="meta"><a href="https://github.com/TecFancy/dsh-auth-gate" target="_blank" rel="noopener">Secured by dsh-auth-gate</a></p>
 </main>
 ${spec.script ?? EYE_SCRIPT}

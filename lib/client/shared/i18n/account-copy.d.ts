@@ -50,6 +50,11 @@ export declare const ACCOUNT_KEYS: {
     readonly retry: "account.retry";
     readonly adminAreaTitle: "account.adminArea.title";
     readonly adminAreaIntro: "account.adminArea.intro";
+    /**
+     * passkey-only 提示（`passkey: "required"`，issue #133）：改密表单仍然可用，但改完不能
+     * 用它登录 - 不说明的话，用户会以为改完密码就能回到登录页。
+     */
+    readonly passkeyOnlyNotice: "account.passkeyOnlyNotice";
 };
 /** 规则名翻译；未知规则原样回显（不发明契约之外的文案）。 */
 export declare function ruleText(rule: string, t: AccountTranslate): string;

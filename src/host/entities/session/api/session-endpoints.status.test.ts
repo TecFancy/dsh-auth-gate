@@ -1,99 +1,16 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
-import type { Session, SessionStore } from "../model/session-store.js";
 import type { UsersLoadResult } from "../../user/@x/session.js";
-import { handleStatus, type AuthHttpDeps } from "./session-endpoints.js";
-
-/** One `users.yaml` entry, derived from the only user type the session entity may see. */
-type UserRecord =
-  UsersLoadResult["snapshot"]["users"] extends Map<string, infer Record> ? Record : never;
-
-/**
- * `handleStatus` 直测（不经任何 features 的路由注册）：方法门、会话判定、
- * 「关于我」投影与三条硬边界（只含关于我、键集合相等、读盘失败不 500）。
- * 会话存储只伪造 `getByToken`：被测的是 status 投影，不是存储。
- */
-
-interface Captured {
-  res: ServerResponse;
-  status: () => number | undefined;
-  headers: Record<string, string>;
-  json: () => Record<string, unknown>;
-}
-
-function makeRes(): Captured {
-  let status: number | undefined;
-  let body = "";
-  const headers: Record<string, string> = {};
-  const res = {
-    setHeader: (name: string, value: string): void => {
-      headers[name.toLowerCase()] = value;
-    },
-    writeHead: (code: number, extra?: Record<string, string>): void => {
-      status = code;
-      Object.assign(headers, extra);
-    },
-    end: (chunk?: string): void => {
-      body = chunk ?? "";
-    },
-  } as unknown as ServerResponse;
-  return {
-    res,
-    status: () => status,
-    headers,
-    json: () => JSON.parse(body) as Record<string, unknown>,
-  };
-}
-
-function session(overrides: Partial<Session> = {}): Session {
-  return { subject: "alice", createdAt: 0, expiresAt: 1, revoked: false, ...overrides };
-}
-
-function storeWith(rows: Record<string, Session>): SessionStore {
-  return { getByToken: (token: string) => rows[token] } as unknown as SessionStore;
-}
-
-function usersOf(entries: Record<string, UserRecord>): () => Promise<UsersLoadResult> {
-  return () =>
-    Promise.resolve({ snapshot: { users: new Map(Object.entries(entries)) }, missing: false });
-}
-
-interface DepsOptions {
-  store?: SessionStore | undefined;
-  loadUsers?: AuthHttpDeps["loadUsers"];
-  passkeyEnabled?: boolean | undefined;
-  errors?: unknown[] | undefined;
-}
-
-function makeDeps(options: DepsOptions = {}): AuthHttpDeps {
-  const errors = options.errors;
-  return {
-    sessions: () => ("store" in options ? options.store : storeWith({ good: session() })),
-    cookieName: "dsh_auth",
-    cookieSecure: false,
-    logoutOrder: 42,
-    passkeyEnabled: options.passkeyEnabled,
-    loadUsers: options.loadUsers,
-    logger: {
-      info: () => undefined,
-      ...(errors === undefined ? {} : { error: (message: unknown) => errors.push(message) }),
-    },
-  };
-}
-
-function statusReq(cookie?: string, method = "GET"): IncomingMessage {
-  return {
-    method,
-    url: "/auth/status",
-    headers: cookie === undefined ? {} : { cookie },
-  } as unknown as IncomingMessage;
-}
-
-async function status(deps: AuthHttpDeps, cookie?: string): Promise<Captured> {
-  const res = makeRes();
-  await handleStatus(deps, statusReq(cookie), res.res);
-  return res;
-}
+import {
+  makeDeps,
+  makeRes,
+  session,
+  status,
+  statusReq,
+  storeWith,
+  usersOf,
+  type UserRecord,
+} from "../../../../../test/session-status-harness.js";
+import { handleStatus } from "./session-endpoints.js";
 
 const ALICE: UserRecord = { passwordHash: "h", disabled: false };
 
@@ -115,49 +32,41 @@ describe("handleStatus: session check (token mode, no loadUsers)", () => {
     expect(res.status()).toBe(200);
     expect(res.headers["content-type"]).toBe("application/json");
     expect(res.headers["cache-control"]).toBe("no-store");
-    expect(res.json()).toEqual({ authenticated: true, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: true,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
   });
 
   it("reports unauthenticated for a missing, empty, foreign or unknown cookie", async () => {
     for (const cookie of [undefined, "dsh_auth=", "other=good", "dsh_auth=bad"]) {
       const res = await status(makeDeps(), cookie);
       expect(res.status()).toBe(200);
-      expect(res.json()).toEqual({ authenticated: false, logoutOrder: 42, passkeyEnabled: false });
+      expect(res.json()).toEqual({
+        authenticated: false,
+        logoutOrder: 42,
+        passkeyEnabled: false,
+        passwordLoginDisabled: false,
+      });
     }
   });
 
   it("reports unauthenticated when the session channel is unavailable", async () => {
     const res = await status(makeDeps({ store: undefined }), "dsh_auth=good");
-    expect(res.json()).toEqual({ authenticated: false, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: false,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
   });
 
   it("answers synchronously when it does not read users", () => {
     const res = makeRes();
     expect(handleStatus(makeDeps(), statusReq("dsh_auth=good"), res.res)).toBeUndefined();
     expect(res.status()).toBe(200);
-  });
-});
-
-describe("handleStatus: passkeyEnabled", () => {
-  it("is always present and false by default, in both auth states", async () => {
-    for (const cookie of ["dsh_auth=good", "dsh_auth=bad"]) {
-      const res = await status(makeDeps(), cookie);
-      expect(res.json()).toHaveProperty("passkeyEnabled", false);
-    }
-  });
-
-  it("echoes the configured flag in both auth states", async () => {
-    const deps = makeDeps({ passkeyEnabled: true, loadUsers: usersOf({ alice: ALICE }) });
-    const authed = await status(deps, "dsh_auth=good");
-    expect(authed.json()).toMatchObject({ authenticated: true, passkeyEnabled: true });
-    const anonymous = await status(deps, "dsh_auth=bad");
-    expect(anonymous.json()).toMatchObject({ authenticated: false, passkeyEnabled: true });
-  });
-
-  it("stays present in the fallback shape when users are unreadable", async () => {
-    const loadUsers = (): Promise<UsersLoadResult> => Promise.reject(new Error("boom"));
-    const res = await status(makeDeps({ passkeyEnabled: true, loadUsers }), "dsh_auth=good");
-    expect(res.json()).toEqual({ authenticated: true, logoutOrder: 42, passkeyEnabled: true });
   });
 });
 
@@ -169,7 +78,12 @@ describe("handleStatus: identity fields (password mode)", () => {
       return usersOf({ alice: ALICE })();
     };
     const res = await status(makeDeps({ loadUsers }), "dsh_auth=bad");
-    expect(res.json()).toEqual({ authenticated: false, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: false,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
     expect(reads).toBe(0);
   });
 
@@ -185,6 +99,7 @@ describe("handleStatus: identity fields (password mode)", () => {
       sessionKind: "full",
       logoutOrder: 42,
       passkeyEnabled: false,
+      passwordLoginDisabled: false,
     });
   });
 
@@ -219,7 +134,12 @@ describe("handleStatus: identity fields (password mode)", () => {
 
   it("keeps the base fields when the subject is no longer in users", async () => {
     const res = await status(makeDeps({ loadUsers: usersOf({ bob: ALICE }) }), "dsh_auth=good");
-    expect(res.json()).toEqual({ authenticated: true, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: true,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
   });
 });
 
@@ -229,7 +149,12 @@ describe("handleStatus: users file unavailable", () => {
     const loadUsers = (): Promise<UsersLoadResult> => Promise.reject(new Error("bad yaml"));
     const res = await status(makeDeps({ loadUsers, errors }), "dsh_auth=good");
     expect(res.status()).toBe(200);
-    expect(res.json()).toEqual({ authenticated: true, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: true,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
     expect(errors).toEqual(["status: users file unavailable: bad yaml"]);
   });
 
@@ -244,6 +169,11 @@ describe("handleStatus: users file unavailable", () => {
   it("tolerates a logger without error()", async () => {
     const loadUsers = (): Promise<UsersLoadResult> => Promise.reject(new Error("gone"));
     const res = await status(makeDeps({ loadUsers }), "dsh_auth=good");
-    expect(res.json()).toEqual({ authenticated: true, logoutOrder: 42, passkeyEnabled: false });
+    expect(res.json()).toEqual({
+      authenticated: true,
+      logoutOrder: 42,
+      passkeyEnabled: false,
+      passwordLoginDisabled: false,
+    });
   });
 });

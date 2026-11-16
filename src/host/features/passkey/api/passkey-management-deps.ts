@@ -57,6 +57,11 @@ export interface PasskeyManagementDeps {
   readonly limiter: LoginRateLimiter;
   /** TOTP 策略：`off` 忽略 secret；其余在用户有 secret 时要求验证码。 */
   readonly totpMode: "off" | "optional" | "required";
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`）。为 true 时删除最后一把凭据会被拒绝：
+   * 口令已经不能登录，删光凭据等于把账号锁死。
+   */
+  readonly passwordLoginDisabled?: boolean | undefined;
   readonly logger: {
     error(message: unknown): void;
     warn(message: unknown): void;

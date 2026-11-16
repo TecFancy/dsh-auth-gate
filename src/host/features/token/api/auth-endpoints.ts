@@ -47,6 +47,11 @@ export interface AuthEndpointsDeps {
    * `handleStatus` 按结构匹配读取它并恒写进 `/auth/status`；presence 不改变 token 登录行为。
    */
   passkeyEnabled?: boolean | undefined;
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`）：token 模式恒 `false`（那里没有口令登录）。
+   * `handleStatus` 按结构匹配读取它并恒写进 `/auth/status`。
+   */
+  passwordLoginDisabled?: boolean | undefined;
   validateToken: (token: string) => Promise<boolean>; // 恒时校验（index.ts 注入 safeEqual 闭包）
   /**
    * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。

@@ -212,6 +212,8 @@ export interface PasskeyLoginHarnessOptions {
   readonly cookieSecure?: boolean;
   /** 覆盖客户端 IP（缺省固定 `TEST_CLIENT_IP`）；配额测试用来模拟多 IP。 */
   readonly clientIp?: (fallback: string) => string;
+  /** `passkey: "required"`：失败卡换成无口令表单的 passkey-only 变体。 */
+  readonly passwordLoginDisabled?: boolean;
 }
 
 /** 确定性随机源：ceremony 的 id/challenge 可预测且互不相同。 */
@@ -273,6 +275,7 @@ export function makePasskeyLoginHarness(
         ? Promise.reject(new Error("users file unavailable"))
         : Promise.resolve({ snapshot: { users }, missing: false }),
     clientIp: () => options.clientIp?.(TEST_CLIENT_IP) ?? TEST_CLIENT_IP,
+    passwordLoginDisabled: options.passwordLoginDisabled ?? false,
     limiter: new LoginRateLimiter(),
     issueSession: (res, sessionStore, username, next, user, extraSetCookie) =>
       fakeIssueSession(issued, res, sessionStore, username, next, user, extraSetCookie),

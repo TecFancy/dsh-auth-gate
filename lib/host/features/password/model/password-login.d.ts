@@ -51,6 +51,16 @@ export interface PasswordLoginDeps {
      * 桥失败绝不阻塞登录成功。
      */
     launchTokenBridge?: () => Promise<string | undefined>;
+    /**
+     * 口令登录是否被策略关闭（`passkey: "required"`，issue #133）。
+     *
+     * 为 `true` 时**两条**口令路径都在读 users.yaml 之前拒绝：密码分支与 TOTP 挑战分支。
+     * 后者必须单独拦 - 它不经过密码校验，只要手里有合法的挑战 cookie（HMAC 签名、5 分钟有效）
+     * 就能凭验证码直接换会话，是「先完成第一段、再开启 passkey-only、再提交旧挑战」的绕过口。
+     *
+     * 拒绝发生在读盘与 scrypt 之前，因此不做恒时验证也不产生账号枚举侧信道：所有输入同响应。
+     */
+    passwordLoginDisabled?: boolean | undefined;
     logger: {
         error(message: unknown): void;
         info(message: unknown): void;

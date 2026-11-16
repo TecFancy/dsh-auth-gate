@@ -221,6 +221,7 @@ describe("受限会话的登出与吊销（验收 25/26/31，真实 handler）",
       authenticated: false,
       logoutOrder: 1000,
       passkeyEnabled: false,
+      passwordLoginDisabled: false,
     });
   });
 });

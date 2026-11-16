@@ -29,3 +29,33 @@ describe("parseAccountStatus: passkeyEnabled", () => {
     }
   });
 });
+
+/**
+ * `passwordLoginDisabled`（`passkey: "required"`，issue #133）：与 `passkeyEnabled` 同一套
+ * 加法兼容规则 - 缺键或非布尔一律 `undefined`，调用方不得据此推断「口令可用」。
+ */
+describe("parseAccountStatus: passwordLoginDisabled", () => {
+  it("keeps true and false as sent by a new server", () => {
+    expect(
+      parseAccountStatus({ authenticated: true, passwordLoginDisabled: true })
+        .passwordLoginDisabled,
+    ).toBe(true);
+    expect(
+      parseAccountStatus({ authenticated: true, passwordLoginDisabled: false })
+        .passwordLoginDisabled,
+    ).toBe(false);
+  });
+
+  it("leaves it undefined for an old server that omits the key", () => {
+    expect(parseAccountStatus({ authenticated: true }).passwordLoginDisabled).toBeUndefined();
+  });
+
+  it("leaves it undefined for a non-boolean value", () => {
+    for (const value of ["true", 1, null, {}]) {
+      expect(
+        parseAccountStatus({ authenticated: true, passwordLoginDisabled: value })
+          .passwordLoginDisabled,
+      ).toBeUndefined();
+    }
+  });
+});

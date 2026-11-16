@@ -5,12 +5,23 @@
  * 请求文本（防开放重定向式任意文案）。
  */
 import type { ServerResponse } from "node:http";
-import { passwordLoginPageHtml, totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import {
+  passkeyOnlyLoginPageHtml,
+  passwordLoginPageHtml,
+  totpChallengePageHtml,
+} from "../../../shared/login-page/index.js";
 import { setPasskeyPermissionsPolicy } from "../../../shared/http/index.js";
 import { loginPath } from "../../../shared/protocol/index.js";
 
 /** 未知用户 / 错口令 / 禁用三态共用的唯一常量（P9 反枚举）。 */
 export const INVALID_CREDENTIALS = "Invalid username or password.";
+
+/**
+ * 口令登录被策略关闭时的唯一常量（`passkey: "required"`）。不复用 `INVALID_CREDENTIALS`：
+ * 这里凭据可能完全正确，说「用户名或密码错」会把用户引向改密码这条死路。
+ */
+export const PASSKEY_ONLY_DISABLED_TEXT =
+  "This instance requires a passkey. Password sign-in is disabled.";
 
 /**
  * TOTP 第二段拒绝的唯一常量（D21）：错码、重放码、账号已无 secret 三态共用。
@@ -85,6 +96,23 @@ export function sendTotpLockout(
       who: ctx.username,
       resetHref: loginPath(ctx.next, "password"),
     }),
+  );
+}
+
+/**
+ * 403 口令登录已被策略关闭（`passkey: "required"`，issue #133）：渲染 passkey-only 卡片。
+ *
+ * 状态码取 403 而不是 401：凭据可能完全正确，拒绝的理由是策略而不是身份，401 会误导客户端
+ * 去重试。响应与输入无关（不读用户名、不读密码、不读挑战 cookie），因此没有枚举侧信道。
+ */
+export function sendPasswordLoginDisabled(
+  res: ServerResponse,
+  ctx: { host: string; next: string },
+): void {
+  sendHtml(
+    res,
+    403,
+    passkeyOnlyLoginPageHtml(ctx.next, PASSKEY_ONLY_DISABLED_TEXT, { host: ctx.host }),
   );
 }
 

@@ -28,8 +28,28 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   allow-list, so the deployment cannot tell which vendor made a credential or whether an authenticator model
   was tampered with. Attestation policy is out of scope for v1.
 - **Passkeys have no recovery codes**: if every device is lost, sign in with the password and enrol again; if
-  the password is also forgotten, an administrator must run `dsh-auth user passwd`. v1 has no passkey-only
-  (password-disabled) mode.
+  the password is also forgotten, an administrator must run `dsh-auth user passwd`.
+- **Passkey-only (`passkey: "required"`) is instance-level and has no in-app escape hatch**: the policy lives in
+  the config file, so turning it on or off is a file edit plus a restart, performed by whoever holds server
+  access. There is no per-account variant, because this gate protects the whole instance and does not isolate
+  users from each other. Consequences worth knowing before enabling it:
+  - **Enrol and verify a passkey first.** Turning it on with no usable credential locks everyone out. The
+    plugin logs an error at startup when it can see the problem, but it cannot know whether a credential still
+    works on the user's device.
+  - **A broken WebAuthn configuration does not restore password sign-in.** If `publicHost`, the RP ID or the
+    origins become unusable, the instance stays closed and the login page shows the fixed reason
+    (`public-host-missing`, `rp-id-invalid`, `origin-invalid`, …). Fix the configuration, or set `passkey` back
+    to `"optional"` and restart.
+  - **Removing the last credential is refused** over HTTP (`400` with `reason: "last-credential"`) and by the
+    CLI unless `--force` is passed. The CLI cannot read the plugin configuration, so it asks for `--force`
+    unconditionally rather than guessing.
+  - **An administrator resetting a password does not restore access.** The reset still sets
+    `must_change_password`, but that restricted session can only be reached by signing in, which the policy
+    blocks. Recovery is the config edit above, not the admin panel.
+  - **Existing sessions keep working.** The policy blocks new sessions only, exactly like disabling a user; a
+    session issued before the switch stays valid until it expires.
+  - **The password hash is kept** and still authenticates credential changes (enrolment, self-service password
+    change, admin reset). It just cannot create a session.
 - **Enrolment and removal require re-authentication**: enrolment needs the current password (plus a TOTP code
   when enabled); removing the last credential or using `--all` does too. A normal single removal only needs a
   full session plus the same-origin check.

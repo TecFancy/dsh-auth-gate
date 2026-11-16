@@ -29,10 +29,17 @@ import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
  */
 export interface PasskeyFields {
   /**
-   * 通行密钥登录开关：`"off"`（默认，出厂关闭）或 `"optional"`（用户可自行注册/使用）。
+   * 通行密钥登录开关：`"off"`（默认，出厂关闭）、`"optional"`（用户可自行注册/使用）或
+   * `"required"`（passkey-only：口令与「口令 + TOTP」都不能建立新会话）。
+   *
    * 仅 password 模式生效；token 模式配非 off 只记 error 并按 off 处理。
+   *
+   * `"required"` 是**实例级**策略，不是账号级：这道门保护的是整个实例，登录用户之间不做隔离
+   * （见 `docs/decisions/implemented/2026-11-15-no-user-isolation.zh.md`），所以「某个账号单独
+   * 禁用口令」在这个模型里没有意义。开启前必须已经注册并验证过至少一把通行密钥，否则实例会
+   * 进入谁都进不来的状态；恢复办法是改回 `"optional"` 并重启。
    */
-  passkey: "off" | "optional";
+  passkey: "off" | "optional" | "required";
   /** 浏览器 passkey 弹窗里的 RP 展示名（不参与校验）。 */
   passkeyRpName: string;
   /** RP ID 覆盖值；`""` = 取 `publicHost` 的 hostname（无端口、无 scheme）。 */
@@ -54,7 +61,7 @@ export interface PasskeyFields {
 
 /** 配置片段对应的 schema 节点（展开进 `src/index.ts` 的 `Config`）。 */
 export const passkeyConfigFields = {
-  passkey: z.union([z.const("off"), z.const("optional")]).default("off"),
+  passkey: z.union([z.const("off"), z.const("optional"), z.const("required")]).default("off"),
   passkeyRpName: z.string().default("DeepSeek Harness"),
   passkeyRpId: z.string().default(""),
   passkeyOrigins: z.array(z.string()).default([]),
@@ -76,6 +83,11 @@ export interface PasskeyWiringConfig extends PasskeyFields {
 /** 装配结果：`enabled` 只表示「password 模式下功能可用」，`settings` 供后续端点使用。 */
 export interface PasskeyWiringResult {
   readonly enabled: boolean;
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`）。**与 `enabled` 正交**：WebAuthn 参数写坏时
+   * `enabled: false` 而这里仍是 `true`，实例进入「谁都进不来」的 fail-closed 状态，绝不退回口令。
+   */
+  readonly passwordLoginDisabled: boolean;
   readonly settings: PasskeySettings;
   /** 登录页 passkey 入口的渲染参数；功能不可用时 undefined。 */
   readonly login: { readonly enabled: boolean; readonly conditionalUi: boolean } | undefined;
@@ -84,6 +96,9 @@ export interface PasskeyWiringResult {
 /**
  * 解析并自检 passkey 配置：功能不成立时返回 `enabled: false` 并打 error 日志（fail-closed，
  * 实例照常启动）；`totp: "required"` 与 passkey 同开时打 info（passkey 满足 2FA，不降级）。
+ *
+ * `passkey: "required"` 且 WebAuthn 参数不成立时，error 日志额外说明「口令登录同样关闭」，
+ * 因为这是运维最需要立刻看到的一句话：实例此刻谁都进不来。
  */
 export function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult {
   const settings = resolvePasskeySettings({
@@ -96,25 +111,37 @@ export function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult {
     passkeyConditionalUi: config.passkeyConditionalUi.get(),
     totp: config.totp,
   });
+  const passwordLoginDisabled = settings.passwordLoginDisabled;
   if (config.mode !== "password") {
     if (config.passkey !== "off") {
       config.log.error("passkey is password-mode only; ignored in token mode");
     }
-    return { enabled: false, settings, login: undefined };
+    // token 模式没有口令登录可言，`required` 在这里没有意义：不关闭任何东西。
+    return { enabled: false, passwordLoginDisabled: false, settings, login: undefined };
   }
   if (!settings.enabled) {
     if (settings.reason !== "off") {
       config.log.error(`passkey disabled: ${settings.reason}`);
+      if (passwordLoginDisabled) {
+        config.log.error(
+          "passkey is required but unusable: password sign-in stays disabled, so nobody can sign in " +
+            'until the WebAuthn configuration is fixed or passkey is set back to "optional"',
+        );
+      }
     }
-    return { enabled: false, settings, login: undefined };
+    return { enabled: false, passwordLoginDisabled, settings, login: undefined };
   }
   if (settings.totpSatisfied) {
     config.log.info(
       `passkey enabled (rpId=${settings.rpId}); passkeys satisfy the TOTP two-factor policy`,
     );
   }
+  if (passwordLoginDisabled) {
+    config.log.info("passkey is required: password sign-in is disabled for this instance");
+  }
   return {
     enabled: true,
+    passwordLoginDisabled,
     settings,
     login: { enabled: true, conditionalUi: settings.conditionalUi },
   };
@@ -211,6 +238,9 @@ export function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void {
     logger: input.log,
     cookieName: input.config.cookieName,
     totpMode: input.config.totp,
+    // passkey-only 下失败卡不渲染口令表单（那张卡上没有可用的退路），
+    // 删除最后一把凭据也会被拒绝（口令已关，删光等于锁死）。
+    passwordLoginDisabled: input.settings.passwordLoginDisabled,
     // 注册/管理/设置页（PR3）：再认证用口令 + TOTP，写盘走锁内 mutateUsersFile。
     management: {
       mutateUsers: (mutator) => mutateUsersFile(input.usersPath, mutator),

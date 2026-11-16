@@ -4,6 +4,9 @@
  * 与口令登录的失败页纪律相同（D20/D21）：401 恒为同一张卡片 + 同一个常量文案，不区分
  * 「未知凭据 / 验签失败 / userHandle 或 BE 不一致」；429 按「这个网络」陈述，不显示剩余
  * 次数；任何响应都不读也不反射请求文本。
+ *
+ * `passkey: "required"` 时失败卡换成 passkey-only 变体：那张卡上没有口令表单，文案也不能
+ * 再写「改用密码」 - 那条路已经被策略关掉了。
  */
 import type { ServerResponse } from "node:http";
 import type { UsersLoadResult } from "../../../entities/user/index.js";
@@ -11,10 +14,12 @@ import type { UsersLoadResult } from "../../../entities/user/index.js";
 export declare const PASSKEY_LOGIN_FAILED_MESSAGE = "Passkey sign-in failed. Try again or use your password.";
 /** 429 固定文案（不插值秒数）：只陈述「这个网络」被限速。 */
 export declare const PASSKEY_LOGIN_LOCKED_MESSAGE = "Too many sign-in attempts from this network. Try again later.";
-/** 失败页上下文（反钓鱼身份块 + 已消毒的 next）。 */
+/** 失败页上下文（反钓鱼身份块 + 已消毒的 next + 口令是否被策略关闭）。 */
 export interface PasskeyFailureContext {
     readonly host: string;
     readonly next: string;
+    /** `passkey: "required"`：失败卡不渲染口令表单，文案也不提「改用密码」。 */
+    readonly passwordLoginDisabled?: boolean | undefined;
 }
 /** 401：登录卡片（error slot）并清掉已消费的 ceremony cookie（无会话 cookie）。 */
 export declare function sendPasskeyFailure(res: ServerResponse, context: PasskeyFailureContext, clearCeremonyCookie: string): void;

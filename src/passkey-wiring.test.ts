@@ -96,3 +96,35 @@ describe("wirePasskey", () => {
     expect(entries).toEqual([]);
   });
 });
+
+describe("wirePasskey: passkey-only (required)", () => {
+  it("enables the feature and disables password login", () => {
+    const { entries, log } = makeLog();
+    const result = wirePasskey(input({ passkey: "required", log }));
+    expect(result.enabled).toBe(true);
+    expect(result.passwordLoginDisabled).toBe(true);
+    expect(entries.map((entry) => entry.level)).toEqual(["info"]);
+    expect(entries[0]?.message).toContain("password sign-in is disabled");
+  });
+
+  it("keeps password login disabled when the WebAuthn configuration is unusable", () => {
+    // issue #133 第 4 点：配置写坏不得自动恢复在线口令登录。
+    const { entries, log } = makeLog();
+    const result = wirePasskey(input({ passkey: "required", publicHost: "", log }));
+    expect(result.enabled).toBe(false);
+    expect(result.passwordLoginDisabled).toBe(true);
+    expect(result.login).toBeUndefined();
+    expect(entries.map((entry) => entry.level)).toEqual(["error", "error"]);
+    expect(entries[1]?.message).toContain("nobody can sign in");
+  });
+
+  it("does not disable password login in optional mode", () => {
+    const result = wirePasskey(input({ passkey: "optional" }));
+    expect(result.passwordLoginDisabled).toBe(false);
+  });
+
+  it("does not disable password login in token mode (there is none)", () => {
+    const result = wirePasskey(input({ mode: "token", passkey: "required" }));
+    expect(result.passwordLoginDisabled).toBe(false);
+  });
+});

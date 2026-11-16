@@ -64,7 +64,7 @@ export interface AuthConfig extends TelemetryFields, PasskeyFields {
 export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     installId: z<string, string, "volatile-defined">;
     telemetry: z<boolean, boolean, "defined">;
-    passkey: z<"off" | "optional", "off" | "optional", "defined">;
+    passkey: z<"required" | "off" | "optional", "required" | "off" | "optional", "defined">;
     passkeyRpName: z<string, string, "defined">;
     passkeyRpId: z<string, string, "defined">;
     passkeyOrigins: z<string[], string[], "defined">;
@@ -85,7 +85,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
 }>>, Schemastery.ObjectT<NoInfer<{
     installId: z<string, string, "volatile-defined">;
     telemetry: z<boolean, boolean, "defined">;
-    passkey: z<"off" | "optional", "off" | "optional", "defined">;
+    passkey: z<"required" | "off" | "optional", "required" | "off" | "optional", "defined">;
     passkeyRpName: z<string, string, "defined">;
     passkeyRpId: z<string, string, "defined">;
     passkeyOrigins: z<string[], string[], "defined">;
