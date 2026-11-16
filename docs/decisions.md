@@ -510,3 +510,17 @@ passkey 相对 TOTP 唯一新增的持久化攻击面；`publicHost` 作唯一 R
 「永远登录不上」的错配。
 → [zh](decisions/implemented/2026-11-11-passkey-login.zh.md) ·
 [en](decisions/implemented/2026-11-11-passkey-login.en.md)
+
+## D36. 市场卡片截图由仓库根 `screenshots.json` 声明，并挂一道门禁
+
+插件市场卡片的缩略图只读目录里的 `screenshots` 字段，该字段由上游每晚从**插件仓库根目录的
+`screenshots.json`** 解析而来；README 的图只进安装弹窗，已安装的插件看不到。因此在仓库根声明 6 张
+`docs/demo/` 横图，并新增 `npm run screenshots:check` 校验 1-8 张、相对路径不出仓库、只收位图、
+文件必须存在，接进 `verify` 链、hygiene 场景与 CI。
+**替代方案**：只靠 README 自动抽取（卡片不生效）；往上游 `data/screenshots.json` 加 key（上游明确
+不再接受，且绝对 URL 改名后静默失效）；把图放进 npm 包 `files`（registry 读 GitHub HEAD）；
+只加 JSON 不写门禁（就是上游 773 张里 41 张 404 的成因）。
+**为什么**：图放自己仓库，改图推一下即可、下次 nightly 自动生效；相对路径改名会被门禁当场发现，
+而不是在别人的页面上烂成 404；门禁规则逐条对齐上游契约，本地通过即等于 registry 接受。
+→ [zh](decisions/implemented/2026-11-16-market-card-screenshots.zh.md) ·
+[en](decisions/implemented/2026-11-16-market-card-screenshots.en.md)

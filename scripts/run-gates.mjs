@@ -30,6 +30,7 @@ const SCENE_OF = {
   "decisions:check": "hygiene",
   "docs:check": "hygiene",
   "readme:parity": "hygiene",
+  "screenshots:check": "hygiene",
   "type-check": "types",
   typecheck: "types",
   "test:coverage": "tests",
@@ -80,6 +81,7 @@ const RULES = [
     scenes: ["verify"], // dependency changes ripple everywhere
   },
   { re: /^(docs\/|AGENTS\.md|README\.md|.*\.md$)/, scenes: ["hygiene"] },
+  { re: /^screenshots\.json$/, scenes: ["hygiene"] }, // market card list, checked by screenshots:check
   { re: /^\./, scenes: ["hygiene"] }, // dotfiles: .github, .husky, ...
   { re: /.*/, scenes: ["verify"] }, // unknown -> full set
 ];
