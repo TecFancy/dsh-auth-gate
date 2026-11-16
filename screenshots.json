@@ -4,5 +4,7 @@
   "docs/demo/totp-code.png",
   "docs/demo/passkey-login.en.png",
   "docs/demo/passkey-account-security.en.png",
-  "docs/demo/login-password-changed.png"
+  "docs/demo/login-password-changed.png",
+  "docs/demo/passkey-only-login.en.png",
+  "docs/demo/passkey-only-unavailable.en.png"
 ]

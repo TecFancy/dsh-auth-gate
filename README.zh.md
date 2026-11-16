@@ -64,6 +64,13 @@
   登录。注册必须再输一次当前口令（启用 TOTP 时还要验证码），避免会话被劫后被人加上后门凭据。
   通行密钥依赖 HTTPS 与域名（RP ID 从 `publicHost` 派生，**不能是 IP**），所以纯 http 内网地址和
   `dsh-auth-proxy` 的本地代理模式用不了；没有 JavaScript 时口令登录完全不受影响。
+- **可选的「只允许通行密钥」登录。** `passkey: "required"` 把实例切成 passkey-only：服务端拒绝用
+  口令或「口令 + TOTP」建立新会话，登录页只渲染通行密钥入口。这是**实例级**策略，不是账号级——
+  这道门保护的是整个实例，登录用户之间不做隔离，所以「只给某个账号关掉口令」在这里没有意义。
+  开启前必须先注册并验证过一把通行密钥；WebAuthn 配置不成立时实例保持关闭状态，不会悄悄退回
+  口令登录，登录页会显示固定的原因码。恢复是刻意设计成本地操作的：把 `passkey` 改回 `"optional"`、
+  重启、用口令登录、重新注册，再改回 `"required"`。口令哈希会保留，继续用于凭据变更（注册通行
+  密钥、改密、管理员重置）的再认证，只是不能用来建立会话。
 - **默认配置就是安全的。** 密码以哈希形式保存；登录有限速，密码连续输错会临时锁定来源地址；会话
   cookie 带有安全属性；配置缺失或损坏时**直接拒绝访问，而不是悄悄放行**。用户名或密码错误时，
   登录卡片会重新显示，并带上 `Invalid username or password.`：用户名保留，密码需要重新输入。
@@ -209,6 +216,16 @@ TOTP 时还要验证码），所以会话被劫也没法偷偷加一把后门凭
 
 ![带「Sign in with a passkey」按钮的登录页](docs/demo/passkey-login.en.png)
 
+打开 `passkey: "required"` 后实例变成 passkey-only：登录页只保留通行密钥入口，提交口令会返回
+`403` 并渲染同一张卡（响应与输入无关，因此不构成账号枚举侧信道）：
+
+![passkey-only 模式的登录页：没有口令表单](docs/demo/passkey-only-login.en.png)
+
+如果此时 WebAuthn 配置本身坏掉，口令登录**保持关闭**，卡片显示固定原因码和运维可以做的事。这正是
+与 `passkey: "optional"` 的区别：后者配置坏掉只是关掉功能，不影响口令登录：
+
+![通行密钥配置不可用时的诊断页](docs/demo/passkey-only-unavailable.en.png)
+
 新密码至少 14 位、须同时包含四类字符，且不能与当前密码相同。启用 TOTP 后，当前 30 秒窗口内已经
 用过的验证码会视为重放并拒绝，需要等下一个验证码。
 
@@ -252,7 +269,7 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
 | `clientIpHeader`        | `""`                         | 限速用的客户端真实 IP 请求头（`x-forwarded-for`；Cloudflare 后面可用 `cf-connecting-ip`）。留空表示完全不读取请求头。只有当请求的对端落在 `trustedProxyCidrs` 内时才会读取；不配置时，同机反代会造成所有客户端共用一个锁定桶（issue #74）                                                                                                                                                                                                  |
 | `trustedProxyCidrs`     | `["127.0.0.0/8", "::1/128"]` | 哪些对端有权提供 `clientIpHeader`（默认只信任回环；没有地址的对端，例如 Unix socket，视为本地）。无效条目会被丢弃并记 error 日志，信任范围收窄为回环；显式写成 `[]` 表示谁都不信任；`0.0.0.0/0` 和 `::/0` 一律拒绝                                                                                                                                                                                                                         |
 | `logoutOrder`           | `1000`                       | 「退出登录」按钮在 设置 → 通用设置 页里的排序值（数值越大越靠下）。如果其他插件注册了更大的值，可以调大这个数                                                                                                                                                                                                                                                                                                                              |
-| `passkey`               | `"off"`                      | 仅密码模式。`"optional"` 打开通行密钥登录与注册；`"off"` 关闭（端点不注册，`/auth/passkey/*` 返回 404）。依赖 `publicHost` 与 HTTPS，配置不成立时记 error 日志并按 off 处理，不影响口令登录                                                                                                                                                                                                                                                |
+| `passkey`               | `"off"`                      | 仅密码模式。`"optional"` 打开通行密钥登录与注册；`"required"` 把实例切成 passkey-only（口令与「口令 + TOTP」都不能建立会话，登录页只渲染通行密钥入口）；`"off"` 关闭（端点不注册，`/auth/passkey/*` 返回 404）。依赖 `publicHost` 与 HTTPS，配置不成立时记 error 日志并按 off 处理，不影响口令登录——**`"required"` 除外**：那时口令登录保持关闭，登录页显示固定原因码（改回 `"optional"` 并重启即可恢复）                                  |
 | `passkeyRpName`         | `"DeepSeek Harness"`         | 浏览器通行密钥弹窗里显示的站点名（不参与校验）                                                                                                                                                                                                                                                                                                                                                                                             |
 | `passkeyRpId`           | `""`                         | RP ID 覆盖值；留空取 `publicHost` 的 hostname。必须是域名（不能是 IP、不能带端口或 scheme）                                                                                                                                                                                                                                                                                                                                                |
 | `passkeyOrigins`        | `[]`                         | 允许的 origin 精确白名单；留空取 `publicHost` 的 origin。域名迁移或换端口时把新旧 origin 都列上                                                                                                                                                                                                                                                                                                                                            |

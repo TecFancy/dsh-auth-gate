@@ -49,7 +49,7 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
     logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
-    passkey: "off" # "off"(default) | "optional" - passkey sign-in for password mode; needs publicHost + HTTPS. Deployment-level: NOT volatile, so it cannot be set from the Settings page - edit this file / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS）。部署级开关，**不是** volatile 字段，设置页改不了，只能改配置文件
+    passkey: "off" # "off"(default) | "optional" | "required" - passkey sign-in for password mode; "required" = passkey-only (password cannot start a session). Needs publicHost + HTTPS. Deployment-level: NOT volatile, so it cannot be set from the Settings page - edit this file / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS）。"required" = 只允许通行密钥（口令不能建立会话）。部署级开关，**不是** volatile 字段，设置页改不了，只能改配置文件
     passkeyRpName: "DeepSeek Harness" # RP display name in the passkey prompt / 通行密钥弹窗里的 RP 展示名
     passkeyRpId: "" # "" = hostname(publicHost); must be a domain (never an IP) / 空 = 取 publicHost 的 hostname；必须是域名，不能是 IP
     passkeyOrigins: [] # [] = [origin(publicHost)]; exact origins, https or http://localhost / 空 = 由 publicHost 派生；精确 origin 白名单（https 或 http://localhost）
@@ -110,6 +110,7 @@ pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth user totp 
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey list <name> # label, id prefix, created/last used, BE/BS / 列出某用户的通行密钥
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --id <prefix> # >= 8 chars, must match exactly one / 按 credentialId 前缀删除（至少 8 字符且唯一匹配）
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --all # remove every passkey of that user / 删除该用户全部通行密钥
+pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth passkey rm <name> --all --force # required to remove the last credential (passkey-only would lock the account out) / 删掉最后一把必须加 --force（passkey-only 下会锁死账号）
 # Install this quick-reference skill into $DSH_HOME/skills/ for the dsh agent:
 # 技能安装（本包内置的配置速查，装进 $DSH_HOME/skills/ 供 dsh agent 加载）：
 pnpm --dir "${DSH_HOME:-$HOME/.dsh}/profiles/<profile>" exec dsh-auth skill install [--force]

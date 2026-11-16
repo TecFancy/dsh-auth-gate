@@ -16,10 +16,17 @@ import type { VolatileField } from "./host/shared/lib/index.js";
  */
 export interface PasskeyFields {
     /**
-     * 通行密钥登录开关：`"off"`（默认，出厂关闭）或 `"optional"`（用户可自行注册/使用）。
+     * 通行密钥登录开关：`"off"`（默认，出厂关闭）、`"optional"`（用户可自行注册/使用）或
+     * `"required"`（passkey-only：口令与「口令 + TOTP」都不能建立新会话）。
+     *
      * 仅 password 模式生效；token 模式配非 off 只记 error 并按 off 处理。
+     *
+     * `"required"` 是**实例级**策略，不是账号级：这道门保护的是整个实例，登录用户之间不做隔离
+     * （见 `docs/decisions/implemented/2026-11-15-no-user-isolation.zh.md`），所以「某个账号单独
+     * 禁用口令」在这个模型里没有意义。开启前必须已经注册并验证过至少一把通行密钥，否则实例会
+     * 进入谁都进不来的状态；恢复办法是改回 `"optional"` 并重启。
      */
-    passkey: "off" | "optional";
+    passkey: "off" | "optional" | "required";
     /** 浏览器 passkey 弹窗里的 RP 展示名（不参与校验）。 */
     passkeyRpName: string;
     /** RP ID 覆盖值；`""` = 取 `publicHost` 的 hostname（无端口、无 scheme）。 */
@@ -40,7 +47,7 @@ export interface PasskeyFields {
 }
 /** 配置片段对应的 schema 节点（展开进 `src/index.ts` 的 `Config`）。 */
 export declare const passkeyConfigFields: {
-    passkey: z<"off" | "optional", "off" | "optional", "defined">;
+    passkey: z<"required" | "off" | "optional", "required" | "off" | "optional", "defined">;
     passkeyRpName: z<string, string, "defined">;
     passkeyRpId: z<string, string, "defined">;
     passkeyOrigins: z<string[], string[], "defined">;
@@ -60,6 +67,11 @@ export interface PasskeyWiringConfig extends PasskeyFields {
 /** 装配结果：`enabled` 只表示「password 模式下功能可用」，`settings` 供后续端点使用。 */
 export interface PasskeyWiringResult {
     readonly enabled: boolean;
+    /**
+     * 口令登录是否被策略关闭（`passkey: "required"`）。**与 `enabled` 正交**：WebAuthn 参数写坏时
+     * `enabled: false` 而这里仍是 `true`，实例进入「谁都进不来」的 fail-closed 状态，绝不退回口令。
+     */
+    readonly passwordLoginDisabled: boolean;
     readonly settings: PasskeySettings;
     /** 登录页 passkey 入口的渲染参数；功能不可用时 undefined。 */
     readonly login: {
@@ -70,6 +82,9 @@ export interface PasskeyWiringResult {
 /**
  * 解析并自检 passkey 配置：功能不成立时返回 `enabled: false` 并打 error 日志（fail-closed，
  * 实例照常启动）；`totp: "required"` 与 passkey 同开时打 info（passkey 满足 2FA，不降级）。
+ *
+ * `passkey: "required"` 且 WebAuthn 参数不成立时，error 日志额外说明「口令登录同样关闭」，
+ * 因为这是运维最需要立刻看到的一句话：实例此刻谁都进不来。
  */
 export declare function wirePasskey(config: PasskeyWiringConfig): PasskeyWiringResult;
 /** `makePasskeyWiring` 需要的 root 侧输入（只含端点注册与登录页渲染用到的事实）。 */

@@ -8,8 +8,10 @@ import { type StatusResponse } from "../../../shared/api/index.ts";
  * `passkeyEnabled` 线上恒在（配置透传），但旧服务端没有它：视图里因此是可选的，
  * 缺失即 `undefined`（「不知道」，调用方不得据此推断关闭）。
  */
-export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword" | "passkeyEnabled"> & {
+export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword" | "passkeyEnabled" | "passwordLoginDisabled"> & {
     passkeyEnabled?: boolean | undefined;
+    /** 口令登录是否被策略关闭（`passkey: "required"`）；旧服务端缺该键 → `undefined`。 */
+    passwordLoginDisabled?: boolean | undefined;
 };
 /**
  * `/auth/status` 响应体 → 视图对象。**加法兼容**（契约 §1.1/§3.3）：

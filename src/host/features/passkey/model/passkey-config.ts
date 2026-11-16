@@ -5,6 +5,9 @@
  *
  * 派生规则（任何一条不成立都返回对应的 disabled reason，绝不「尽力而为」）：
  * - `passkey === "off"` → `"off"`（优先级最高，此时不检查其它字段）。
+ * - `passwordLoginDisabled = passkey === "required"`：**与 WebAuthn 参数是否成立无关**。
+ *   配置写坏时功能降级为不可用，但「口令不能登录」这条策略照旧生效（issue #133 第 4 点：
+ *   配置失效不得自动恢复在线口令登录）。
  * - `publicHost` trim 后为空 → `"public-host-missing"`；没有 `://` 时按 `https://` 补齐；
  *   `new URL` 解析失败、非 http(s)、带 path/query/fragment 或 userinfo → `"public-host-invalid"`。
  * - `rpId = passkeyRpId || hostname(publicHost)`（显式值 trim 后小写）。它必须是域名形状：
@@ -20,8 +23,14 @@
 
 /** 派生 passkey 参数所需的配置子集（结构兼容 root 侧的 `AuthConfig`）。 */
 export interface PasskeySettingsInput {
-  /** 功能开关；`"off"` 时其余字段一律不参与派生。 */
-  readonly passkey: "off" | "optional";
+  /**
+   * 功能开关；`"off"` 时其余字段一律不参与派生。
+   *
+   * `"required"` = passkey-only：口令与「口令 + TOTP」都不能建立新会话，只有通行密钥可以。
+   * 它同时要求 WebAuthn 参数成立，否则实例进入「谁都进不来」的 fail-closed 状态（见
+   * `passwordLoginDisabled`），而不是退回口令登录。
+   */
+  readonly passkey: "off" | "optional" | "required";
   /** RP ID 与 origin 的唯一锚点；绝不读请求头 `Host`。 */
   readonly publicHost: string;
   /** 浏览器 passkey 弹窗的 RP 展示名，不参与校验。 */
@@ -42,10 +51,17 @@ export interface PasskeySettingsInput {
 export type PasskeyDisabledReason =
   "off" | "public-host-missing" | "public-host-invalid" | "rp-id-invalid" | "origin-invalid";
 
-/** 派生结果：`enabled: false` 时只有 reason，调用方按 off 处理。 */
+/**
+ * 派生结果：`enabled: false` 时只有 reason，调用方按 off 处理。
+ *
+ * `passwordLoginDisabled` 在**两个分支里都在**，因为它是策略而不是能力：`passkey: "required"`
+ * 而 WebAuthn 参数不成立时，结果是 `enabled: false` + `passwordLoginDisabled: true`--功能不可用，
+ * 口令也仍然关闭。调用方必须按这个字段决定口令路径，不能按 `enabled` 推断。
+ */
 export type PasskeySettings =
   | {
       readonly enabled: true;
+      readonly passwordLoginDisabled: boolean;
       readonly rpId: string;
       readonly rpName: string;
       /** 规范化后的精确 origin 白名单（含 publicHost 派生项或显式列表）。 */
@@ -55,7 +71,11 @@ export type PasskeySettings =
       /** `totp !== "off"`：passkey 满足既有两因子策略，仅用于 info 日志。 */
       readonly totpSatisfied: boolean;
     }
-  | { readonly enabled: false; readonly reason: PasskeyDisabledReason };
+  | {
+      readonly enabled: false;
+      readonly passwordLoginDisabled: boolean;
+      readonly reason: PasskeyDisabledReason;
+    };
 
 const SCHEME_PREFIX = /^[a-z][a-z0-9+.-]*:\/\//i;
 const DOMAIN_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
@@ -65,19 +85,23 @@ const MAX_DOMAIN_LENGTH = 253;
 /**
  * 把配置派生为 WebAuthn 参数。纯函数：同一输入恒得到同一输出，不读写外部状态。
  * 失败时返回 `enabled: false` 与固定 reason，由调用方记 error 并降级为 off。
+ *
+ * `passwordLoginDisabled` 先于所有 WebAuthn 检查算出：它是策略，不随参数校验结果变化。
  */
 export function resolvePasskeySettings(input: PasskeySettingsInput): PasskeySettings {
-  if (input.passkey === "off") return disabled("off");
+  const passwordLoginDisabled = input.passkey === "required";
+  if (input.passkey === "off") return disabled("off", passwordLoginDisabled);
   const configuredHost = input.publicHost.trim();
-  if (configuredHost === "") return disabled("public-host-missing");
+  if (configuredHost === "") return disabled("public-host-missing", passwordLoginDisabled);
   const publicHost = parsePublicHost(configuredHost);
-  if (publicHost === undefined) return disabled("public-host-invalid");
+  if (publicHost === undefined) return disabled("public-host-invalid", passwordLoginDisabled);
   const rpId = resolveRpId(input.passkeyRpId, publicHost.hostname);
-  if (!isValidRpId(rpId)) return disabled("rp-id-invalid");
+  if (!isValidRpId(rpId)) return disabled("rp-id-invalid", passwordLoginDisabled);
   const origins = resolveOrigins(input.passkeyOrigins, publicHost, rpId);
-  if (origins === undefined) return disabled("origin-invalid");
+  if (origins === undefined) return disabled("origin-invalid", passwordLoginDisabled);
   return {
     enabled: true,
+    passwordLoginDisabled,
     rpId,
     rpName: input.passkeyRpName,
     origins,
@@ -87,8 +111,8 @@ export function resolvePasskeySettings(input: PasskeySettingsInput): PasskeySett
   };
 }
 
-function disabled(reason: PasskeyDisabledReason): PasskeySettings {
-  return { enabled: false, reason };
+function disabled(reason: PasskeyDisabledReason, passwordLoginDisabled: boolean): PasskeySettings {
+  return { enabled: false, passwordLoginDisabled, reason };
 }
 
 /** publicHost 归一化后的对外身份：`origin` 用于 origin 白名单，`hostname` 用于派生 rpId。 */

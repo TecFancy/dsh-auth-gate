@@ -57,6 +57,11 @@ export interface PasskeyLoginFinishDeps {
     user: UserRecord,
     extraSetCookie: string[],
   ) => Promise<void>;
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`）：只影响失败卡的形状与文案 - passkey-only
+   * 下那张卡上没有口令表单，也不能再写「改用密码」。
+   */
+  readonly passwordLoginDisabled?: boolean | undefined;
   readonly logger: {
     error(message: unknown): void;
     warn(message: unknown): void;
@@ -221,6 +226,7 @@ function failureContext(
   return {
     host: resolvePublicHost(deps.publicHost, req.headers.host),
     next: validateNext(params.get("next") ?? "/"),
+    passwordLoginDisabled: deps.passwordLoginDisabled === true,
   };
 }
 

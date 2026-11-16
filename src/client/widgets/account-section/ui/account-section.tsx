@@ -90,6 +90,11 @@ export function SettingsAccountSection({ t }: SettingsAccountSectionProps) {
         role={status.role}
         totpEnabled={status.totpEnabled}
       />
+      {status.passwordLoginDisabled === true ? (
+        <p style={HINT_STYLE} role="status">
+          {translate(ACCOUNT_KEYS.passkeyOnlyNotice)}
+        </p>
+      ) : null}
       <AccountPasswordForm t={translate} totpEnabled={status.totpEnabled} />
       {showsPasskeyBlock(status) ? (
         <PasskeyBlock t={translate} totpEnabled={status.totpEnabled} />

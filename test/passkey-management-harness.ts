@@ -61,6 +61,8 @@ export interface ManagementHarness {
   setPersistFailure(value: boolean): void;
   /** 让 TOTP 校验恒失败（错码/重放）。 */
   setTotpFailure(value: boolean): void;
+  /** 切换 `passkey: "required"`（删除最后一把凭据会被拒绝）。 */
+  setPasswordLoginDisabled(value: boolean): void;
   /** 签发一个会话并返回 cookie 头（`kind` 缺省 full）。 */
   issueSessionCookie(
     username: string,
@@ -119,6 +121,8 @@ interface HarnessState {
   usersLoadFails: boolean;
   persistFails: boolean;
   totpFails: boolean;
+  /** `passkey: "required"`：删除最后一把凭据会被拒绝。 */
+  passwordLoginDisabled: boolean;
 }
 
 /** 构造 deps（`users` 是可变快照，测试随时 `harness.users.set(...)`）。 */
@@ -155,6 +159,10 @@ function makeDeps(state: HarnessState): PasskeyEndpointsDeps {
     },
     now: () => 1_700_000_000_000,
     totpMode: "optional",
+    // getter：`setPasswordLoginDisabled` 在 deps 建好之后才调用，快照会读不到新值。
+    get passwordLoginDisabled(): boolean {
+      return state.passwordLoginDisabled;
+    },
     management: {
       mutateUsers: (mutator) => {
         if (state.writeFails) return Promise.reject(new Error("write failed"));
@@ -190,6 +198,7 @@ export function makeManagementHarness(): ManagementHarness {
     usersLoadFails: false,
     persistFails: false,
     totpFails: false,
+    passwordLoginDisabled: false,
   };
   const deps = makeDeps(state);
   return {
@@ -213,6 +222,9 @@ export function makeManagementHarness(): ManagementHarness {
     },
     setTotpFailure: (value) => {
       state.totpFails = value;
+    },
+    setPasswordLoginDisabled: (value) => {
+      state.passwordLoginDisabled = value;
     },
     issueSessionCookie: async (username, kind = "full") => {
       const { token } = await state.store.create(username, 60_000, kind);

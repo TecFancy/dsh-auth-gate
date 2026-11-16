@@ -5,7 +5,6 @@ import {
   parseCookieHeader,
   resolvePublicHost,
 } from "../../../shared/http/index.js";
-import { totpChallengePageHtml } from "../../../shared/login-page/index.js";
 import { loginPath } from "../../../shared/protocol/index.js";
 import { DUMMY_HASH } from "../lib/password.js";
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
@@ -13,10 +12,9 @@ import { type UsersLoadResult } from "../../../entities/user/index.js";
 import { buildSetCookie, type SessionStore } from "../../../entities/session/index.js";
 import { issueLoginSession } from "./session-issue.js";
 import {
-  INVALID_TOTP_CODE,
   sendInvalidCredentials,
   sendLockout,
-  sendTotpLockout,
+  sendPasswordLoginDisabled,
 } from "../ui/login-failure-pages.js";
 import {
   buildChallengeValue,
@@ -24,6 +22,8 @@ import {
   CHALLENGE_TTL_SECONDS,
   parseChallengeValue,
 } from "./challenge-cookie.js";
+import { handleTotpSubmit } from "./password-login.totp.js";
+import { loadUsersOr503, requireStore } from "./login-store.js";
 
 export interface PasswordLoginDeps {
   sessions: () => SessionStore | undefined;
@@ -71,6 +71,16 @@ export interface PasswordLoginDeps {
    * 桥失败绝不阻塞登录成功。
    */
   launchTokenBridge?: () => Promise<string | undefined>;
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`，issue #133）。
+   *
+   * 为 `true` 时**两条**口令路径都在读 users.yaml 之前拒绝：密码分支与 TOTP 挑战分支。
+   * 后者必须单独拦 - 它不经过密码校验，只要手里有合法的挑战 cookie（HMAC 签名、5 分钟有效）
+   * 就能凭验证码直接换会话，是「先完成第一段、再开启 passkey-only、再提交旧挑战」的绕过口。
+   *
+   * 拒绝发生在读盘与 scrypt 之前，因此不做恒时验证也不产生账号枚举侧信道：所有输入同响应。
+   */
+  passwordLoginDisabled?: boolean | undefined;
   logger: {
     error(message: unknown): void;
     info(message: unknown): void;
@@ -103,6 +113,13 @@ export async function handlePasswordLogin(
   const next = validateNext(params.get("next") ?? "/");
   const ip = deps.clientIp?.(req) ?? req.socket.remoteAddress ?? "";
   const host = resolvePublicHost(deps.publicHost, req.headers.host);
+  // passkey-only：两条口令路径都在读盘之前拒绝（见 deps.passwordLoginDisabled 的注释）。
+  // 放在这里而不是各分支内部，是为了让「密码」与「TOTP 挑战」共用同一个出口，不会漏一条。
+  if (deps.passwordLoginDisabled === true) {
+    sendPasswordLoginDisabled(res, { host, next });
+    deps.logger.info("password login rejected: passkey is required");
+    return;
+  }
   const challenge = parseChallengeValue(
     parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
     deps.now(),
@@ -117,54 +134,6 @@ export async function handlePasswordLogin(
     return;
   }
   await handlePasswordSubmit(deps, res, params, next, ip, host);
-}
-
-/** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
-async function handleTotpSubmit(
-  deps: PasswordLoginDeps,
-  host: string,
-  res: ServerResponse,
-  username: string,
-  code: string,
-  next: string,
-  ip: string,
-): Promise<void> {
-  const lockout = lockoutSeconds(deps, ip, username);
-  if (lockout !== undefined) {
-    sendTotpLockout(res, { host, next, username }, lockout);
-    deps.logger.info("rate limit exceeded");
-    return;
-  }
-  const loaded = await loadUsersOr503(deps, res);
-  if (loaded === undefined) return;
-  const user = loaded.snapshot.users.get(username);
-  if (user?.totpSecret === undefined) {
-    deps.limiter.recordFailure(ip, username);
-    rejectTotp(deps, host, res, next, username);
-    return;
-  }
-
-  // disabled 检查放在恒时验证之后（对齐 P9 密码路径：禁用用户仍跑真实验证，
-  // 不给禁用账号计时侧信道）；码已匹配时防重放已登记，fail-closed 可接受。
-  const matched = deps.verifyTotp(user.totpSecret, code, deps.now());
-  const replay = matched !== undefined && deps.replayCheck(username, matched, code);
-  if (matched === undefined || !replay || user.disabled) {
-    deps.limiter.recordFailure(ip, username);
-    rejectTotp(deps, host, res, next, username);
-    return;
-  }
-
-  // 先取 store 再清桶：session store 不可用（503）时不 recordSuccess，
-  // 已积累的失败计数保留（T8 限速连续）。
-  const store = requireStore(deps, res);
-  if (store === undefined) return;
-  deps.limiter.recordSuccess(ip, username);
-  // 清挑战 cookie + 发会话（M4 T6：一次性，防重放再收窄）；set-cookie 用数组
-  // （Node 重复 setHeader 会覆盖，必须同一次写两个 cookie）。
-  // P2 ④：带 must_change_password 标记 → 受限会话（302 /auth/password，忽略 next）。
-  await issueLoginSession(deps, res, store, username, next, user, [
-    buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure),
-  ]);
 }
 
 /** 密码提交：限速 → 用户文件 → 恒时验证 → 按 totpMode 发会话或发挑战 cookie。 */
@@ -233,57 +202,6 @@ async function handlePasswordSubmit(
   // P2 ④：带 must_change_password 标记 → 受限会话（TTL 15 分钟、302 /auth/password）；
   // 无标记 → 正式会话（回归：既有 P14 行为不变）。
   await issueLoginSession(deps, res, store, username, next, user);
-}
-
-/** TOTP 拒绝路径（P1.3）：401 + 挑战页 HTML（error slot 固定常量文案，浏览器表单可见；
- * 不读 query error=，避免开放重定向式任意文案；挑战 cookie 保留，可重试）。
- * 文案取 `INVALID_TOTP_CODE`（D21）：走到这一步口令是对的，不能复用凭据常量。 */
-function rejectTotp(
-  deps: PasswordLoginDeps,
-  host: string,
-  res: ServerResponse,
-  next: string,
-  username: string,
-): void {
-  deps.logger.info("login rejected");
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(401, { "content-type": "text/html; charset=utf-8" });
-  res.end(
-    totpChallengePageHtml(next, INVALID_TOTP_CODE, {
-      host,
-      who: username,
-      resetHref: loginPath(next, "password"),
-    }),
-  );
-}
-
-/** 会话存储不可用 → 503（不计失败、不清桶，T8）；可用则返回 store。 */
-function requireStore(deps: PasswordLoginDeps, res: ServerResponse): SessionStore | undefined {
-  const store = deps.sessions();
-  if (store !== undefined) return store;
-  res.setHeader("cache-control", "no-store");
-  res.writeHead(503, { "content-type": "text/plain" });
-  res.end("session store unavailable");
-  deps.logger.error("login failed: session store unavailable");
-  return undefined;
-}
-
-/** 读取用户文件；失败 → 503 + error 日志并返回 undefined（不计失败）。 */
-async function loadUsersOr503(
-  deps: PasswordLoginDeps,
-  res: ServerResponse,
-): Promise<UsersLoadResult | undefined> {
-  try {
-    return await deps.loadUsers();
-  } catch (error) {
-    res.setHeader("cache-control", "no-store");
-    res.writeHead(503, { "content-type": "text/plain" });
-    res.end("user store unavailable");
-    deps.logger.error(
-      `user store unavailable: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return undefined;
-  }
 }
 
 /** 恒时验证 + 拒绝路径（P9：未知/错口令/禁用统一 401 + 计失败）；返回是否已拒绝。 */

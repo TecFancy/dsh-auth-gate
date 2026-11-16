@@ -23,6 +23,11 @@ export interface AuthHttpDeps {
      */
     readonly passkeyEnabled?: boolean | undefined;
     /**
+     * 口令登录是否被策略关闭（`passkey: "required"`）：恒写进 `/auth/status`，缺省 `false`。
+     * 与 `passkeyEnabled` 正交 - WebAuthn 配置写坏时前者仍是 `true`。
+     */
+    readonly passwordLoginDisabled?: boolean | undefined;
+    /**
      * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
      * 缺省 = 不追加身份字段（加法兼容）。
      */

@@ -52,6 +52,11 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
     /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
     logoutOrder: number;
     /**
+     * `passkey: "required"` 但 WebAuthn 配置不成立时的固定原因（`PasskeyDisabledReason`），
+     * 只用于诊断卡文案。`passwordLoginDisabled` 为 true 且 `passkey` 入口不可用时才读它。
+     */
+    passkeyDisabledReason?: string | undefined;
+    /**
      * 改密接线（§5）。缺省 → 不注册 `/auth/password`（加法式公共面：既有测试 harness
      * 的对象字面量不必改动）；index.ts 在 password 模式下**总是**注入，生产唯一路径
      * 不存在「静默不注册」的空间（反退化测试见 password-change.test.ts）。

@@ -50,6 +50,8 @@ export function mountAuthRoutes(ctx: Context, input: AuthRouteWiring): void {
         replayGuard: input.replayGuard,
         challengeMacKey: input.challengeMacKey,
         passkeyEnabled: passkey.enabled,
+        passwordLoginDisabled: passkey.passwordLoginDisabled,
+        passkeyDisabledReason: passkey.settings.enabled ? undefined : passkey.settings.reason,
         passkeyLogin:
           passkey.login === undefined
             ? undefined

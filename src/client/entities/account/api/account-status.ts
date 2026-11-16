@@ -18,9 +18,11 @@ import {
  */
 export type AccountStatusView = Omit<
   StatusResponse,
-  "logoutOrder" | "mustChangePassword" | "passkeyEnabled"
+  "logoutOrder" | "mustChangePassword" | "passkeyEnabled" | "passwordLoginDisabled"
 > & {
   passkeyEnabled?: boolean | undefined;
+  /** 口令登录是否被策略关闭（`passkey: "required"`）；旧服务端缺该键 → `undefined`。 */
+  passwordLoginDisabled?: boolean | undefined;
 };
 
 /** 会话探针（只认 cookie，语义同 `/auth/status`，契约 §1.1）。 */
@@ -59,6 +61,7 @@ export function parseAccountStatus(body: unknown): AccountStatusView {
   return {
     authenticated: source.authenticated === true,
     passkeyEnabled: optionalBoolean(source.passkeyEnabled),
+    passwordLoginDisabled: optionalBoolean(source.passwordLoginDisabled),
     name: optionalString(source.name),
     role: optionalRole(source.role),
     disabled: optionalBoolean(source.disabled),

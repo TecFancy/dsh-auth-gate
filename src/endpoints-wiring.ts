@@ -50,6 +50,13 @@ export interface EndpointsWiringInput {
   challengeMacKey: Uint8Array;
   /** passkey 功能是否启用（`wirePasskey` 的结果；透传给 `/auth/status`，token 模式恒 false）。 */
   passkeyEnabled: boolean;
+  /**
+   * 口令登录是否被策略关闭（`passkey: "required"`）。**与 `passkeyEnabled` 正交**：WebAuthn
+   * 配置写坏时前者仍是 true，实例进入谁都进不来的 fail-closed 状态。
+   */
+  passwordLoginDisabled: boolean;
+  /** `passwordLoginDisabled` 且 WebAuthn 不可用时的固定原因（诊断卡文案）。 */
+  passkeyDisabledReason?: string | undefined;
   /** 登录页是否渲染 passkey 入口（未启用时 undefined）；条件 UI 由 `conditionalUi` 控制。 */
   /** 登录页 passkey 入口的读取器（每次渲染现取；条件 UI 开关可运行时改写）。 */
   passkeyLogin?: (() => { readonly enabled: boolean; readonly conditionalUi: boolean }) | undefined;
@@ -92,6 +99,8 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
       sessionTtl: config.sessionTtl,
       logoutOrder: config.logoutOrder,
       passkeyEnabled: input.passkeyEnabled,
+      // token 模式没有口令登录，`required` 在那里不关闭任何东西（wirePasskey 已归零）。
+      passwordLoginDisabled: input.passwordLoginDisabled,
       publicHost: config.publicHost,
       validateToken: async (token) => {
         const stored = await (resolveToken ?? (() => Promise.resolve(undefined)))();
@@ -127,6 +136,8 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
     launchTokenBridge,
     logoutOrder: config.logoutOrder,
     passkey: input.passkeyLogin,
+    passwordLoginDisabled: input.passwordLoginDisabled,
+    passkeyDisabledReason: input.passkeyDisabledReason,
     logger: log,
     passwordChange,
     // P2 管理面：装配细节（第三个独立限流桶、锁内写盘、吊销探针、双桶清理）在

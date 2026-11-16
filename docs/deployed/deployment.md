@@ -81,6 +81,28 @@ dsh plugin --profile web add dsh-auth-gate   # forwards to pnpm, resolved from p
    to your public domain whenever the reverse proxy rewrites `Host`, see D14).
 3. Confirm no other line occupies the `dsh-auth-gate` id (the patch stack overrides by id).
 
+### 2.1 Turning on passkey-only (`passkey: "required"`)
+
+The policy is instance-level and lives in the config file, so the switch is a file edit plus a restart. Do it
+in this order — the first two steps are what keep you out of a lockout:
+
+1. With `passkey: "optional"`, sign in, open Settings → Account security, enrol a passkey, sign out, and sign
+   back in **with that passkey**. Enrol a second credential on a different device or authenticator; the
+   protocol only requires one, but one is one point of failure.
+2. Confirm `/auth/status` answers `passkeyEnabled: true` and the login page shows the passkey button.
+3. Set `passkey: "required"` in the profile's `cordis.patch.yml` and restart the service.
+4. Confirm the login page no longer renders a password field, and that a password POST answers `403`.
+
+**Recovery, if nobody can sign in:** set `passkey` back to `"optional"`, restart, sign in with the password,
+enrol a working credential, then set it back to `"required"` and restart again. This is the only recovery
+path; there is no CLI command and no web toggle. If the WebAuthn configuration itself is broken, the login
+page shows the fixed reason (`public-host-missing`, `rp-id-invalid`, `origin-invalid`, …) and password
+sign-in stays disabled — fix the configuration or revert to `"optional"`.
+
+Two consequences to plan for before enabling it: an administrator password reset does **not** restore access
+(the reset still sets `must_change_password`, but that restricted session can only be reached by signing in),
+and sessions issued before the switch stay valid until they expire.
+
 ## 3. Startup and Health Check
 
 ```bash
