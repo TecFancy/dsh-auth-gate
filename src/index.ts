@@ -11,7 +11,6 @@ import { DEFAULT_TRUSTED_PROXIES } from "./host/shared/http/index.js";
 import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 import { defaultUsersFilePath, loadUsersFile } from "./host/entities/user/index.js";
 import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
-import { makeRebridge } from "./rebridge-wiring.js";
 import { makeTokenResolver } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
@@ -224,17 +223,7 @@ export function apply(ctx: Context, config: AuthConfig): void {
 
   // 匿名统计挂在「门已经放行」的接缝上：钩子只在守卫的 allow 分支被调用，不在门的判定路径上，
   // 也不在启动时调用（首个放行请求之后才可能发）；users.yaml 只在上报到期时读一次。
-  //
-  // 重铸钩子（D37）挂在同一个接缝上、排在统计之后：门放行只说明**外层**会话有效，宿主自己那层
-  // cookie 可能已经对不上（反代改写 Host、换域名、过期、清站点数据），那时宿主会回它自己的 401。
-  // 钩子问一次宿主的 `requestRejection`，不认就 302 到 `/?token=` 重铸，带一次性标记防循环。
-  const unwrap = guard.wrapServer(
-    server,
-    () => auth.gate,
-    log,
-    wireTelemetry(ctx, config),
-    makeRebridge(ctx, config, log),
-  );
+  const unwrap = guard.wrapServer(server, () => auth.gate, log, wireTelemetry(ctx, config));
   ctx.effect(() => unwrap, "dsh-auth-gate: guard unwrap");
 
   // 首次引导通道（`/auth/bootstrap` → `/auth/setup` → `/auth/continue`）：只在实例未配置时签发
