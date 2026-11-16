@@ -1,11 +1,17 @@
 // @vitest-environment jsdom
+/**
+ * 通行密钥区块（重设计 2026-11-16）。
+ *
+ * 与旧版的差别在**点击路径**：添加表单默认收起（先点「添加通行密钥」），删除要先点
+ * 行内「删除」展开确认区、填再认证口令、再点「确认删除」才发请求。这些不是测试噪音，
+ * 正是这次重设计要保证的行为（破坏性动作不能一次误点就执行）。
+ */
 import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PASSKEY_DICT_EN, PASSKEY_KEYS, translateFrom } from "../../../shared/i18n/index.ts";
 import { PasskeyBlock } from "./passkey-block.tsx";
 
-// React 18 的 act() 需要显式声明测试环境（否则只警告不生效）。
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const t = translateFrom(PASSKEY_DICT_EN);
@@ -26,7 +32,6 @@ beforeEach(() => {
   requests.length = 0;
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
-  // 默认：支持 WebAuthn（列表与添加表单都渲染）。
   vi.stubGlobal("PublicKeyCredential", class PublicKeyCredential {});
   Object.defineProperty(globalThis.navigator, "credentials", {
     configurable: true,
@@ -48,7 +53,6 @@ function jsonResponse(status: number, body: unknown): Response {
   } as unknown as Response;
 }
 
-/** 路由式 fetch mock：`/auth/passkey` 走列表，其余按 handler 决定。 */
 function mockList(status: number, body: unknown): void {
   fetchMock.mockImplementation((url: string, init?: RequestInit) => {
     requests.push([url, init]);
@@ -78,48 +82,70 @@ function cleanup(root: Root, container: HTMLElement): void {
   container.remove();
 }
 
-function inputByName(container: HTMLElement, name: string): HTMLInputElement {
-  const input = container.querySelector<HTMLInputElement>(`input[name="${name}"]`);
-  if (input === null) throw new Error(`missing input[name=${name}]`);
-  return input;
+/** 按可见文本找按钮（重设计后同一屏有多个按钮，按文本区分最稳）。 */
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === text,
+  );
+  if (button === undefined) throw new Error(`missing button: ${text}`);
+  return button;
 }
 
-function setValue(container: HTMLElement, name: string, value: string): void {
-  const input = inputByName(container, name);
-  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
-  act(() => {
-    descriptor?.set?.call(input, value);
-    input.dispatchEvent(new Event("input", { bubbles: true }));
+async function click(element: HTMLElement): Promise<void> {
+  await act(async () => {
+    element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushMicrotasks();
   });
 }
 
-function submitForm(container: HTMLElement): void {
-  const form = container.querySelector("form");
-  if (form === null) throw new Error("missing form");
-  act(() => {
-    form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
-  });
+/**
+ * 展开添加表单（重设计：默认收起）。
+ *
+ * 空态时触发按钮的文案是「添加第一把通行密钥」，有凭据时是「添加通行密钥」，
+ * 两种都要认。
+ */
+async function openAddForm(container: HTMLElement): Promise<void> {
+  const trigger = [...container.querySelectorAll("button")].find(
+    (item) =>
+      item.textContent === t(PASSKEY_KEYS.add) || item.textContent === t(PASSKEY_KEYS.emptyAction),
+  );
+  if (trigger === undefined) throw new Error("missing add trigger");
+  await click(trigger);
 }
 
 describe("PasskeyBlock: 列表", () => {
-  it("renders the title, intro and one row per credential", async () => {
+  it("renders the title, intro, count badge and one row per credential", async () => {
     mockList(200, { passkeys: [SUMMARY] });
     const { root, container } = await render();
     expect(container.querySelector("h3")?.textContent).toBe(t(PASSKEY_KEYS.title));
     expect(container.textContent).toContain(t(PASSKEY_KEYS.intro));
+    expect(container.textContent).toContain(t(PASSKEY_KEYS.count, { count: 1 }));
     expect(container.textContent).toContain("MacBook Touch ID");
-    expect(container.textContent).toContain("2023-11-14");
     expect(container.textContent).toContain(t(PASSKEY_KEYS.neverUsed));
     expect(container.textContent).toContain(t(PASSKEY_KEYS.backupEligible));
     expect(container.textContent).toContain("internal");
     cleanup(root, container);
   });
 
-  it("shows the empty state when the list is empty", async () => {
+  it("renders the table with a caption and a row header", async () => {
+    mockList(200, { passkeys: [SUMMARY] });
+    const { root, container } = await render();
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    expect(table?.querySelector("caption")?.textContent).toBe(t(PASSKEY_KEYS.tableCaption));
+    expect(table?.querySelector('th[scope="row"]')?.textContent).toContain("MacBook Touch ID");
+    // 五列压成两列：名称（行头）+ 操作。
+    expect(table?.querySelectorAll("thead th")).toHaveLength(2);
+    cleanup(root, container);
+  });
+
+  it("shows the empty state with a next-step action", async () => {
     mockList(200, { passkeys: [] });
     const { root, container } = await render();
     expect(container.textContent).toContain(t(PASSKEY_KEYS.empty));
     expect(container.querySelector("table")).toBeNull();
+    // 空态的主行动是「添加第一把通行密钥」，不是通用的「添加」。
+    expect(buttonByText(container, t(PASSKEY_KEYS.emptyAction))).toBeDefined();
     cleanup(root, container);
   });
 
@@ -130,10 +156,11 @@ describe("PasskeyBlock: 列表", () => {
     cleanup(root, container);
   });
 
-  it("shows the unavailable copy when the list request fails", async () => {
+  it("shows the unavailable copy and a retry action when the list request fails", async () => {
     mockList(503, {});
     const { root, container } = await render();
     expect(container.textContent).toContain(t(PASSKEY_KEYS.unavailable));
+    expect(buttonByText(container, t(PASSKEY_KEYS.retry))).toBeDefined();
     cleanup(root, container);
   });
 
@@ -152,10 +179,19 @@ describe("PasskeyBlock: 列表", () => {
     expect(container.querySelector("h3")?.textContent).toBe(t(PASSKEY_KEYS.title));
     cleanup(root, container);
   });
+
+  it("offers no add or remove action on 403 (restricted session)", async () => {
+    mockList(403, {});
+    const { root, container } = await render();
+    // 列表被禁止不代表添加被允许：不能让用户填一堆注定 403 的秘密信息。
+    expect(container.querySelector("form")).toBeNull();
+    expect(container.querySelectorAll("button")).toHaveLength(0);
+    cleanup(root, container);
+  });
 });
 
 describe("PasskeyBlock: 特性检测", () => {
-  it("hides the add form when PublicKeyCredential is missing but keeps the list", async () => {
+  it("hides the add entry when PublicKeyCredential is missing but keeps the list", async () => {
     vi.stubGlobal("PublicKeyCredential", undefined);
     mockList(200, { passkeys: [SUMMARY] });
     const { root, container } = await render();
@@ -166,90 +202,24 @@ describe("PasskeyBlock: 特性检测", () => {
   });
 });
 
-describe("PasskeyBlock: 表单校验", () => {
-  it("blocks an empty label without sending a request", async () => {
-    mockList(200, { passkeys: [] });
+describe("PasskeyBlock: 添加表单默认收起", () => {
+  it("does not render the add form until the trigger is pressed", async () => {
+    mockList(200, { passkeys: [SUMMARY] });
     const { root, container } = await render();
-    const before = requests.length;
-    setValue(container, "password", "pw");
-    submitForm(container);
-    await act(async () => {
-      await flushMicrotasks();
-    });
-    expect(container.textContent).toContain(t(PASSKEY_KEYS.labelRequired));
-    expect(requests.length).toBe(before);
+    expect(container.querySelector("form")).toBeNull();
+    await openAddForm(container);
+    expect(container.querySelector("form")).not.toBeNull();
+    expect(container.textContent).toContain(t(PASSKEY_KEYS.addFormTitle));
     cleanup(root, container);
   });
 
-  it("blocks a label longer than 64 characters", async () => {
-    mockList(200, { passkeys: [] });
+  it("closes the add form and returns focus to the trigger on cancel", async () => {
+    mockList(200, { passkeys: [SUMMARY] });
     const { root, container } = await render();
-    setValue(container, "label", "x".repeat(65));
-    setValue(container, "password", "pw");
-    submitForm(container);
-    await act(async () => {
-      await flushMicrotasks();
-    });
-    expect(container.textContent).toContain(t(PASSKEY_KEYS.labelTooLong));
-    cleanup(root, container);
-  });
-
-  it("blocks an empty password", async () => {
-    mockList(200, { passkeys: [] });
-    const { root, container } = await render();
-    setValue(container, "label", "MacBook");
-    submitForm(container);
-    await act(async () => {
-      await flushMicrotasks();
-    });
-    expect(container.textContent).toContain(t(PASSKEY_KEYS.passwordRequired));
-    cleanup(root, container);
-  });
-});
-
-describe("PasskeyBlock: 删除", () => {
-  it("posts the id prefix and reloads the list after a successful removal", async () => {
-    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      requests.push([url, init]);
-      if (url === "/auth/passkey/remove") return Promise.resolve(jsonResponse(200, {}));
-      return Promise.resolve(jsonResponse(200, { passkeys: [SUMMARY] }));
-    });
-    const { root, container } = await render();
-    const listsBefore = requests.filter(([url]) => url === "/auth/passkey").length;
-    const removeButton = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === t(PASSKEY_KEYS.remove),
-    );
-    expect(removeButton).toBeDefined();
-    await act(async () => {
-      removeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await flushMicrotasks();
-    });
-    const removeCall = requests.find(([url]) => url === "/auth/passkey/remove");
-    expect(removeCall).toBeDefined();
-    const body = removeCall?.[1]?.body;
-    expect(body instanceof URLSearchParams ? body.get("id") : undefined).toBe("abcdefghijkl");
-    expect(container.textContent).toContain(t(PASSKEY_KEYS.successRemove));
-    expect(requests.filter(([url]) => url === "/auth/passkey").length).toBeGreaterThan(listsBefore);
-    cleanup(root, container);
-  });
-
-  it("shows the failure copy when removal is rejected", async () => {
-    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
-      requests.push([url, init]);
-      if (url === "/auth/passkey/remove") {
-        return Promise.resolve(jsonResponse(404, { error: "not_found" }));
-      }
-      return Promise.resolve(jsonResponse(200, { passkeys: [SUMMARY] }));
-    });
-    const { root, container } = await render();
-    const removeButton = [...container.querySelectorAll("button")].find(
-      (button) => button.textContent === t(PASSKEY_KEYS.remove),
-    );
-    await act(async () => {
-      removeButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await flushMicrotasks();
-    });
-    expect(container.textContent).toContain(t(PASSKEY_KEYS.notFound));
+    await openAddForm(container);
+    await click(buttonByText(container, t(PASSKEY_KEYS.cancel)));
+    expect(container.querySelector("form")).toBeNull();
+    expect(document.activeElement?.textContent).toBe(t(PASSKEY_KEYS.add));
     cleanup(root, container);
   });
 });

@@ -55,6 +55,20 @@ export const ADMIN_KEYS = {
   locked: "admin.locked",
   lockedPlain: "admin.lockedPlain",
   generic: "admin.generic",
+  // 重设计（2026-11-16）：重置入口、动态目标字段、确认阶段、表格 caption。
+  resetOpen: "admin.resetOpen",
+  resetTitle: "admin.resetTitle",
+  targetPassword: "admin.targetPassword",
+  targetConfirm: "admin.targetConfirm",
+  confirmTitle: "admin.confirmTitle",
+  confirmWarning: "admin.confirmWarning",
+  confirmSubmit: "admin.confirmSubmit",
+  confirming: "admin.confirming",
+  back: "admin.back",
+  cancel: "admin.cancel",
+  resetContext: "admin.resetContext",
+  tableCaption: "admin.tableCaption",
+  retry: "admin.retry",
 } as const;
 
 /** 中文词典（键序与 §4 表一致，A4 的 2 键插在语义位置）。 */
@@ -85,7 +99,7 @@ export const ADMIN_DICT_ZH: Record<string, string> = {
   [ADMIN_KEYS.code]: "动态验证码",
   [ADMIN_KEYS.codeHint]: "你已开启两步验证，重置他人密码需填写动态码。",
   [ADMIN_KEYS.policyHint]: "新密码至少 14 个字符，且含大写字母、小写字母、数字和特殊字符。",
-  [ADMIN_KEYS.submit]: "重置密码",
+  [ADMIN_KEYS.submit]: "检查重置",
   [ADMIN_KEYS.submitting]: "提交中...",
   [ADMIN_KEYS.successRevoked]: "已重置，该用户的会话已全部吊销。",
   [ADMIN_KEYS.successKept]: "已重置，但该用户的现有会话仍然有效（吊销失败），请手动处理。",
@@ -102,6 +116,20 @@ export const ADMIN_DICT_ZH: Record<string, string> = {
   [ADMIN_KEYS.locked]: "尝试次数过多，请在 {seconds} 秒后重试。",
   [ADMIN_KEYS.lockedPlain]: "尝试次数过多，请稍后重试。",
   [ADMIN_KEYS.generic]: "重置失败，请稍后重试。",
+  [ADMIN_KEYS.resetOpen]: "重置他人密码",
+  [ADMIN_KEYS.resetTitle]: "为其他用户设置新密码",
+  [ADMIN_KEYS.targetPassword]: "{name} 的新密码",
+  [ADMIN_KEYS.targetConfirm]: "确认 {name} 的新密码",
+  [ADMIN_KEYS.confirmTitle]: "确认重置 {name} 的密码？",
+  [ADMIN_KEYS.confirmWarning]:
+    "旧密码会立即失效；系统会尝试吊销 {name} 的所有会话。此操作不可撤销。",
+  [ADMIN_KEYS.confirmSubmit]: "确认重置 {name} 的密码",
+  [ADMIN_KEYS.confirming]: "正在重置 {name}...",
+  [ADMIN_KEYS.back]: "返回修改",
+  [ADMIN_KEYS.cancel]: "取消并清空",
+  [ADMIN_KEYS.resetContext]: "目标：{name}。不会修改你的账号 {actor}。",
+  [ADMIN_KEYS.tableCaption]: "实例用户列表",
+  [ADMIN_KEYS.retry]: "重试",
 };
 
 /** 英文词典（键序与中文一致）。 */
@@ -135,7 +163,7 @@ export const ADMIN_DICT_EN: Record<string, string> = {
     "Two-factor is on for your account, so resetting another user needs a code.",
   [ADMIN_KEYS.policyHint]:
     "At least 14 characters with an uppercase letter, a lowercase letter, a digit and a special character.",
-  [ADMIN_KEYS.submit]: "Reset password",
+  [ADMIN_KEYS.submit]: "Review reset",
   [ADMIN_KEYS.submitting]: "Submitting...",
   [ADMIN_KEYS.successRevoked]: "Reset done. All of that user's sessions were revoked.",
   [ADMIN_KEYS.successKept]:
@@ -153,6 +181,20 @@ export const ADMIN_DICT_EN: Record<string, string> = {
   [ADMIN_KEYS.locked]: "Too many attempts. Try again in {seconds} seconds.",
   [ADMIN_KEYS.lockedPlain]: "Too many attempts. Try again later.",
   [ADMIN_KEYS.generic]: "Could not reset the password. Please try again later.",
+  [ADMIN_KEYS.resetOpen]: "Reset another user's password",
+  [ADMIN_KEYS.resetTitle]: "Set a new password for another user",
+  [ADMIN_KEYS.targetPassword]: "New password for {name}",
+  [ADMIN_KEYS.targetConfirm]: "Confirm the new password for {name}",
+  [ADMIN_KEYS.confirmTitle]: "Reset {name}'s password?",
+  [ADMIN_KEYS.confirmWarning]:
+    "The old password stops working immediately, and the system will try to revoke all of {name}'s sessions. This cannot be undone.",
+  [ADMIN_KEYS.confirmSubmit]: "Confirm reset for {name}",
+  [ADMIN_KEYS.confirming]: "Resetting {name}...",
+  [ADMIN_KEYS.back]: "Back to edit",
+  [ADMIN_KEYS.cancel]: "Cancel and clear",
+  [ADMIN_KEYS.resetContext]: "Target: {name}. Your account, {actor}, is unchanged.",
+  [ADMIN_KEYS.tableCaption]: "Instance users",
+  [ADMIN_KEYS.retry]: "Retry",
 };
 
 /**

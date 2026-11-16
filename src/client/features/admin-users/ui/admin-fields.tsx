@@ -1,11 +1,13 @@
 import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
 import {
   ERROR_TEXT_STYLE,
+  FIELD_CONTROL_STYLE,
+  FIELD_LABEL_STYLE,
+  FIELD_ROW_STYLE,
   HINT_STYLE,
-  INPUT_STYLE,
-  INVALID_INPUT_STYLE,
-  LABEL_STYLE,
   RULES_STYLE,
+  ROW_INVALID_INPUT_STYLE,
+  ROW_INPUT_STYLE,
   STATUS_STYLE,
   SUCCESS_TEXT_STYLE,
 } from "../../../shared/ui/index.ts";
@@ -57,25 +59,29 @@ export function AdminTextField({
   // 字段语义固定：新口令两框 `new-password`，动态码 `one-time-code` + 数字键盘。
   const isCode = field === "code";
   return (
-    <div style={LABEL_STYLE}>
-      <label htmlFor={id}>{label}</label>
-      <input
-        id={id}
-        name={field}
-        type={isCode ? "text" : "password"}
-        value={value}
-        autoComplete={isCode ? "one-time-code" : "new-password"}
-        inputMode={isCode ? "numeric" : undefined}
-        aria-invalid={invalid ? "true" : undefined}
-        aria-describedby={described.length === 0 ? undefined : described.join(" ")}
-        style={invalid ? INVALID_INPUT_STYLE : INPUT_STYLE}
-        onChange={(event) => onChange(event.target.value)}
-      />
-      {hint === undefined ? null : (
-        <span id={hintId} style={HINT_STYLE}>
-          {hint}
-        </span>
-      )}
+    <div style={FIELD_ROW_STYLE}>
+      <label htmlFor={id} style={FIELD_LABEL_STYLE}>
+        {label}
+      </label>
+      <div style={FIELD_CONTROL_STYLE}>
+        <input
+          id={id}
+          name={field}
+          type={isCode ? "text" : "password"}
+          value={value}
+          autoComplete={isCode ? "one-time-code" : "new-password"}
+          inputMode={isCode ? "numeric" : undefined}
+          aria-invalid={invalid ? "true" : undefined}
+          aria-describedby={described.length === 0 ? undefined : described.join(" ")}
+          style={invalid ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        {hint === undefined ? null : (
+          <span id={hintId} style={HINT_STYLE}>
+            {hint}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
@@ -91,7 +97,7 @@ export function AdminStatus({
   const warning = success?.warning === true;
   return (
     <>
-      <div id={ADMIN_STATUS_ID} role="status" aria-live="polite" style={STATUS_STYLE}>
+      <div id={ADMIN_STATUS_ID} role="status" aria-live="polite" tabIndex={-1} style={STATUS_STYLE}>
         {failure === null ? null : <span style={ERROR_TEXT_STYLE}>{failure.message}</span>}
         {failure === null || failure.rules.length === 0 ? null : (
           <ul style={RULES_STYLE}>

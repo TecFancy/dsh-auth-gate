@@ -49,7 +49,7 @@ describe("removePasskey", () => {
     });
     const result = await removePasskey(
       "abcdefghijkl",
-      { label: "", password: "pw", code: "" },
+      { password: "pw", code: "" },
       new AbortController().signal,
       t,
     );
@@ -63,7 +63,7 @@ describe("removePasskey", () => {
     fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(404, { error: "not_found" })));
     const missing = await removePasskey(
       "abcdefghijkl",
-      { label: "", password: "", code: "" },
+      { password: "", code: "" },
       new AbortController().signal,
       t,
     );
@@ -71,7 +71,7 @@ describe("removePasskey", () => {
     fetchMock.mockImplementation(() => Promise.resolve(jsonResponse(403, { error: "forbidden" })));
     const denied = await removePasskey(
       "abcdefghijkl",
-      { label: "", password: "", code: "" },
+      { password: "", code: "" },
       new AbortController().signal,
       t,
     );

@@ -8,8 +8,8 @@ export interface AdminUsersBlockProps {
     actorTotpEnabled: boolean;
 }
 /**
- * 管理块（契约 §3 / A2）：loading → denied 静默 null → unauthorized / failure 提示
- * → ok 列表 + 表单。「只有本人」时显示 `admin.empty` 且**不渲染表单**（§3.6）。
+ * 管理块（契约 §3 / A2）：外壳恒定渲染，内容区按状态切换。
+ * 「只有本人」时显示 `admin.empty` 且**不渲染重置入口**（§3.6）。
  */
 export declare function AdminUsersBlock({ t, actorName, actorTotpEnabled }: AdminUsersBlockProps): import("react").JSX.Element | null;
 //# sourceMappingURL=admin-block.d.ts.map

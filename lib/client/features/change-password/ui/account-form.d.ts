@@ -6,7 +6,12 @@ import { type AccountTranslate } from "../../../shared/i18n/index.ts";
  */
 export interface AccountPasswordFormProps {
     t: AccountTranslate;
+    /**
+     * 当前账号是否开启两步验证：只影响动态码框的提示文案。
+     * `undefined` = 旧服务端没给这个字段，沿用保守文案。
+     */
+    totpEnabled?: boolean | undefined;
 }
 /** 已登录时的自助改密表单（成功后立即跳登录页；成功态面板只是兜底）。 */
-export declare function AccountPasswordForm({ t }: AccountPasswordFormProps): import("react").JSX.Element;
+export declare function AccountPasswordForm({ t, totpEnabled }: AccountPasswordFormProps): import("react").JSX.Element;
 //# sourceMappingURL=account-form.d.ts.map
