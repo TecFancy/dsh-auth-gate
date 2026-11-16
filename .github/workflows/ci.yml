@@ -46,6 +46,9 @@ jobs:
         # previous tip (all-zero SHA), and then only the content check applies.
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        # The condition below is POSIX shell. Windows runners default to pwsh,
+        # where `[ -z "$X" ]` is not a test, so the step needs bash explicitly.
+        shell: bash
         run: |
           if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
             npm run gates:check

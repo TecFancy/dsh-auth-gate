@@ -214,6 +214,58 @@ export const GATES = [
     selfTest: false,
     manualReason: "probes a real running dsh host; needs a deployed instance and credentials",
   },
+  // npm commands, not script gates. They are registered here for the same
+  // reason the script gates are: `verify`, the change-surface scenarios and
+  // the CI job all derive their step list from this one file, so a step that
+  // is missing here is a step nobody runs.
+  {
+    id: "format",
+    command: "prettier --check .",
+    npm: "format:check",
+    scenes: ["hygiene"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
+    id: "lint",
+    command: "eslint .",
+    npm: "lint",
+    scenes: ["hygiene"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
+    id: "fsd-layering",
+    command: "steiger src/host && steiger src/client",
+    npm: "lint:fsd",
+    scenes: ["hygiene"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
+    id: "type-check",
+    command: "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    npm: "type-check",
+    scenes: ["types"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
+    id: "tests",
+    command: "vitest run --coverage",
+    npm: "test:coverage",
+    scenes: ["tests"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
+    id: "build",
+    command: "node scripts/clean-lib.mjs && tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
+    npm: "build",
+    scenes: ["build"],
+    stages: ["verify"],
+    selfTest: false,
+  },
 ];
 
 /**

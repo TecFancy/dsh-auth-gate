@@ -91,7 +91,13 @@ jobs:
             }
 
             const head = context.payload.pull_request?.head?.ref ?? "";
-            if (RELEASE_HEAD.test(head) && changed.every((f) => RELEASE_FILES.has(f))) {
+            // `every` on an empty list is true, so the length check is what
+            // stops an empty PR from being read as a release PR.
+            if (
+              RELEASE_HEAD.test(head) &&
+              changed.length > 0 &&
+              changed.every((f) => RELEASE_FILES.has(f))
+            ) {
               console.log(`Release PR (${head}) with only version files - passing.`);
               return;
             }

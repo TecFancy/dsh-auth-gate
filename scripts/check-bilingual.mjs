@@ -90,6 +90,7 @@ const ARGS = (() => {
     selfTest: false,
     status: false,
     root: undefined,
+    base: undefined,
   };
   const anchors = [];
   const pairs = [];
@@ -109,6 +110,12 @@ const ARGS = (() => {
       if (!value || value.startsWith("--")) fail("--pair needs a document path or stem");
       pairs.push(value.replace(/\.(zh\.md|i18n\.yaml|md)$/, ""));
       if (arg === "--pair") i += 1;
+    } else if (arg === "--base" || arg.startsWith("--base=")) {
+      if (parsed.base !== undefined) fail("--base given more than once");
+      const value = arg === "--base" ? argv[i + 1] : arg.slice("--base=".length);
+      if (!value || value.startsWith("--")) fail("--base needs a git ref");
+      parsed.base = value;
+      if (arg === "--base") i += 1;
     } else if (arg === "--root" || arg.startsWith("--root=")) {
       if (parsed.root !== undefined) fail("--root given more than once");
       const value = arg === "--root" ? argv[i + 1] : arg.slice("--root=".length);
@@ -225,6 +232,12 @@ const SELF_BILINGUAL = new Set(["docs/i18n/terminology.md", "docs/i18n/style-sam
  *   3. **It is never silent.** Every run prints the count and each drifted
  *      message, so the debt is visible in the output rather than swallowed.
  */
+/**
+ * The recorded backlog. `--base <ref>` compares this list with the one at that
+ * ref: an entry added since the base fails, so the list cannot grow to cover a
+ * new defect. The list is also checked against the tree (an entry whose pair is
+ * now clean fails), so it cannot stay stale either.
+ */
 const KNOWN_DRIFT = new Set([
   "README.md",
   "docs/deployed/deployment.md",
@@ -286,6 +299,32 @@ function pairedLocale(rel) {
     locale: info.locale,
     paths: { en: info.locale === "en" ? rel : other, zh: info.locale === "zh" ? rel : other },
   };
+}
+
+/**
+ * The KNOWN_DRIFT entries recorded at `ref`, or null when the ref cannot be
+ * read. Null means "no baseline to compare against", which is the honest answer
+ * for a fixture tree or a clone that does not have the base commit; the caller
+ * then skips the growth check rather than inventing a verdict.
+ */
+function readKnownDriftAt(ref) {
+  let text;
+  try {
+    text = execFileSync("git", ["-C", ROOT, "show", `${ref}:scripts/check-bilingual.mjs`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+  } catch {
+    return null;
+  }
+  const start = text.indexOf("const KNOWN_DRIFT = new Set([");
+  if (start === -1) return new Set();
+  const end = text.indexOf("]);", start);
+  if (end === -1) return null;
+  const body = text.slice(start, end);
+  const entries = new Set();
+  for (const m of body.matchAll(/"([^"]+)"/g)) entries.add(m[1]);
+  return entries;
 }
 
 function isExcluded(rel) {
@@ -827,6 +866,19 @@ async function main() {
         problems.push(
           `${rel}: listed in KNOWN_DRIFT but its two sides now agree - remove the entry`,
         );
+      }
+    }
+    // The list may not grow. An entry that is not in the baseline is a new
+    // suppression, which is the shape this list exists to prevent.
+    const base = ARGS.base ?? "HEAD";
+    const baseline = readKnownDriftAt(base);
+    if (baseline !== null) {
+      for (const rel of KNOWN_DRIFT) {
+        if (!baseline.has(rel)) {
+          problems.push(
+            `${rel}: added to KNOWN_DRIFT since ${base} - the list may only shrink; fix the pair instead`,
+          );
+        }
       }
     }
   }

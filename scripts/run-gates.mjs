@@ -148,7 +148,13 @@ export function validateRegistry({
   for (const gate of gates) {
     if (seen.has(gate.id)) problems.push(`duplicate gate id: ${gate.id}`);
     seen.add(gate.id);
-    if (!scriptExists(gate.script)) {
+    if (gate.script === undefined && gate.command === undefined) {
+      problems.push(`${gate.id}: needs either a script or a command`);
+    }
+    if (gate.script !== undefined && gate.command !== undefined) {
+      problems.push(`${gate.id}: has both a script and a command; pick one`);
+    }
+    if (gate.script !== undefined && !scriptExists(gate.script)) {
       problems.push(`${gate.id}: scripts/${gate.script} does not exist`);
     }
     for (const stage of gate.stages) {
@@ -168,7 +174,10 @@ export function validateRegistry({
       problems.push(`${gate.id}: has stages, so manualReason does not apply`);
     }
     if (gate.npm) {
-      const expected = ["node", `scripts/${gate.script}`, ...gate.args].join(" ");
+      const expected =
+        gate.command !== undefined
+          ? gate.command
+          : ["node", `scripts/${gate.script}`, ...gate.args].join(" ");
       if (npmScripts[gate.npm] !== expected) {
         problems.push(
           `${gate.id}: npm script "${gate.npm}" is ${JSON.stringify(npmScripts[gate.npm])}, expected ${JSON.stringify(expected)}`,
@@ -176,7 +185,7 @@ export function validateRegistry({
       }
     }
   }
-  const registered = new Set(gates.map((g) => g.script));
+  const registered = new Set(gates.map((g) => g.script).filter((s) => s !== undefined));
   for (const file of checkScripts) {
     if (!registered.has(file)) {
       problems.push(
@@ -218,11 +227,18 @@ export function gatesForScenario(gates, scenario) {
   return gates.filter((g) => g.scenes.includes(scenario));
 }
 
-/** The `node` arguments for one gate run. */
+/**
+ * How one gate runs. A script gate is `node scripts/<script> <args>`; a command
+ * gate is its npm command, run through the shell. `base` is appended to a
+ * script gate that takes one, and to a command gate as `-- --base <ref>`.
+ */
 export function commandFor(gate, { base } = {}) {
+  if (gate.command !== undefined) {
+    return { command: gate.command, base: gate.takesBase ? base : undefined };
+  }
   const args = [path.join("scripts", gate.script), ...gate.args];
   if (base !== undefined && gate.takesBase) args.push("--base", base);
-  return args;
+  return { args };
 }
 
 /** 2 wins over 1: an incomplete answer is not a verdict. */
@@ -238,9 +254,10 @@ export function exitCodeFor(results) {
  */
 export function runAll(plan, spawn, log = () => {}) {
   const results = [];
-  for (const { id, args } of plan) {
-    log(`${TAG} > ${id}: node ${args.join(" ")}`);
-    const status = spawn(args);
+  for (const entry of plan) {
+    const { id } = entry;
+    log(`${TAG} > ${id}: ${entry.command ?? `node ${entry.args.join(" ")}`}`);
+    const status = spawn(entry);
     results.push({ id, code: typeof status === "number" ? status : 2 });
   }
   return results;
@@ -261,14 +278,22 @@ export function scenesFor(files) {
   return { scenes: [...scenes], selfTests };
 }
 
-function realSpawn(args) {
+function realSpawn(entry) {
   // No stdin for the child. `check-bilingual.mjs` reads its corpus from stdin to
   // honour a fixture's file list, so a child that inherited an open pipe (a
   // background shell, a CI wrapper) would wait for an EOF that never comes.
-  return spawnSync(process.execPath, args, {
-    cwd: REPO_ROOT,
-    stdio: ["ignore", "inherit", "inherit"],
-  }).status;
+  const stdio = ["ignore", "inherit", "inherit"];
+  if (entry.command !== undefined) {
+    const full =
+      entry.base === undefined ? entry.command : `${entry.command} -- --base ${entry.base}`;
+    // A command gate runs a package binary (`tsc`, `eslint`, `steiger`), and
+    // those live in node_modules/.bin. npm puts that directory on PATH for its
+    // own scripts; a runner invoked directly does not, so it is prepended here.
+    const bin = path.join(REPO_ROOT, "node_modules", ".bin");
+    const env = { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` };
+    return spawnSync(full, { cwd: REPO_ROOT, stdio, shell: true, env }).status;
+  }
+  return spawnSync(process.execPath, entry.args, { cwd: REPO_ROOT, stdio }).status;
 }
 
 function readRepoText(file) {
@@ -410,7 +435,7 @@ async function main() {
       staged: needsStaged ? stagedPaths() : [],
     });
     const results = runAll(
-      selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) })),
+      selected.map((g) => ({ id: g.id, ...commandFor(g, { base: args.base }) })),
       realSpawn,
       console.log,
     );
@@ -421,7 +446,7 @@ async function main() {
   if (args.scenario !== undefined) {
     const selected = gatesForScenario(GATES, args.scenario);
     const results = runAll(
-      selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) })),
+      selected.map((g) => ({ id: g.id, ...commandFor(g, { base: args.base }) })),
       realSpawn,
       console.log,
     );
@@ -438,7 +463,7 @@ async function main() {
   if (files.length === 0) {
     console.log(`${TAG} no changes since the base - running the hygiene scenario.`);
     const results = runAll(
-      gatesForScenario(GATES, "hygiene").map((g) => ({ id: g.id, args: commandFor(g) })),
+      gatesForScenario(GATES, "hygiene").map((g) => ({ id: g.id, ...commandFor(g) })),
       realSpawn,
       console.log,
     );
@@ -451,7 +476,7 @@ async function main() {
   const selected = full
     ? gatesForScenario(GATES, "verify")
     : [...new Set(scenes.flatMap((s) => gatesForScenario(GATES, s)))];
-  const plan = selected.map((g) => ({ id: g.id, args: commandFor(g, { base: args.base }) }));
+  const plan = selected.map((g) => ({ id: g.id, ...commandFor(g, { base: args.base }) }));
   if (selfTests) plan.push(...selfTestPlan());
   console.log(
     `${TAG} ${files.length} changed file(s) -> scenes: ${scenes.join(", ")}` +
@@ -633,14 +658,35 @@ async function selfTest() {
   // Command line.
   const sealed = g({ takesBase: true, args: ["--w"] });
   expect(
-    commandFor(sealed, { base: "abc" }).join(" ").endsWith("--w --base abc"),
-    "base is handed to a gate that takes one",
+    commandFor(sealed, { base: "abc" }).args.join(" ").endsWith("--w --base abc"),
+    "base is handed to a script gate that takes one",
   );
   expect(
-    !commandFor(g(), { base: "abc" }).includes("--base"),
+    !commandFor(g(), { base: "abc" }).args.includes("--base"),
     "base is withheld from a gate that does not",
   );
-  expect(!commandFor(sealed).includes("--base"), "no base given, none passed");
+  expect(!commandFor(sealed).args.includes("--base"), "no base given, none passed");
+
+  // A command gate runs its npm command, not a script path.
+  const cmd = g({ script: undefined, command: "npm run lint", npm: "lint", args: undefined });
+  expect(commandFor(cmd).command === "npm run lint", "a command gate runs its command");
+  expect(commandFor(cmd).args === undefined, "a command gate has no node args");
+  expect(
+    commandFor({ ...cmd, takesBase: true }, { base: "abc" }).base === "abc",
+    "a command gate that takes a base receives it",
+  );
+  expect(
+    commandFor({ ...cmd, takesBase: false }, { base: "abc" }).base === undefined,
+    "a command gate that does not take a base withholds it",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ script: undefined, command: undefined })] }), "needs either"),
+    "a gate with neither a script nor a command",
+  );
+  expect(
+    has(problemsOf({ gates: [g({ command: "npm run lint" })] }), "has both a script and a command"),
+    "a gate with both a script and a command",
+  );
 
   // Aggregation.
   const seenIds = [];
@@ -650,12 +696,17 @@ async function selfTest() {
       { id: "q", args: ["q"] },
       { id: "r", args: ["r"] },
     ],
-    (a) => {
-      seenIds.push(a[0]);
-      return a[0] === "p" ? 1 : 0;
+    (entry) => {
+      seenIds.push(entry.id);
+      return entry.id === "p" ? 1 : 0;
     },
   );
   expect(seenIds.join("") === "pqr", "a failing gate does not stop the rest");
+  expect(
+    runAll([{ id: "c", command: "npm run lint" }], (e) => (e.command === "npm run lint" ? 0 : 1))
+      .length === 1,
+    "a command gate reaches the spawner with its command",
+  );
   expect(exitCodeFor(results) === 1, "violations exit 1");
   expect(
     exitCodeFor(runAll([{ id: "s", args: ["s"] }], () => null)) === 2,

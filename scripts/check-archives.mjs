@@ -94,7 +94,17 @@ const LEGACY_ARCHIVE = {
   retirable: true,
   rootFiles: new Set([".gitkeep", ".manifest.json"]),
 };
-const ARCHIVES = [NOTES_ARCHIVE, LEGACY_ARCHIVE];
+const HISTORY_ARCHIVE = {
+  id: "history",
+  dir: "docs/history",
+  seal: VERSIONED_SEAL,
+  classed: false,
+  nested: true,
+  retirable: false,
+  // The area's own README is prose about the area, not a frozen artifact.
+  rootFiles: new Set(["README.md", "README_zh.md", "manifest.json"]),
+};
+const ARCHIVES = [NOTES_ARCHIVE, LEGACY_ARCHIVE, HISTORY_ARCHIVE];
 
 const SEAL_HINT = "node scripts/check-archives.mjs --write";
 
@@ -146,7 +156,8 @@ export function collectArtifacts(root, archive) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       const abs = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (archive.classed && !prefix) visit(abs, rel);
+        if (archive.nested) visit(abs, rel);
+        else if (archive.classed && !prefix) visit(abs, rel);
         else {
           problems.push(
             `${rel}/: ${archive.classed ? "no nested directories under a class" : "the legacy archive is flat"}`,
@@ -159,7 +170,7 @@ export function collectArtifacts(root, archive) {
         continue;
       }
       if (!prefix && archive.rootFiles.has(entry.name)) continue;
-      if (!prefix && archive.classed) {
+      if (!prefix && (archive.classed || archive.nested)) {
         problems.push(`${rel}: unexpected file at the archive root`);
         continue;
       }
