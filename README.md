@@ -206,6 +206,17 @@ auto-bridges the token gate: the login redirect takes a short relative
 `/?token=…` hop that sets the dsh cookie, then lands on `/` (details in
 `docs/implemented/impl-launch-token-bridge.md`).
 
+That dsh cookie is a **second, independent layer**: it is named after the request
+authority (`dsh-auth-<sha256(host)>`), signed with dsh's own secret, and lasts 30 days.
+The plugin's gate only checks its own `dsh_auth` session, so a valid session can still
+meet dsh's `401 dsh web authentication required` — after a reverse proxy starts or stops
+rewriting `Host`, after a domain or port change, when the dsh cookie expires, or after
+site data is cleared. The guard now asks dsh's documented `connection.requestRejection`
+seam after admitting a top-level navigation to `/`, and when dsh answers `401` it replies
+`302 /?token=…` to mint a fresh cookie. A one-shot marker cookie keeps that to a single
+extra hop, so a rebridge that cannot succeed leaves dsh's own 401 in place instead of
+looping (D37).
+
 A prominent **Sign out / 退出登录** button sits inside the **Settings panel**
 (the Settings → General page, below the last preference row). It's a centered,
 danger-styled filled button (16px door icon + localized label, theme tokens

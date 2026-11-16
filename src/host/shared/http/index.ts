@@ -15,7 +15,7 @@ export {
   resolveClientIp,
 } from "./client-ip.js";
 export type { ClientIpLogger, ClientIpPolicy, ClientIpResolver } from "./client-ip.js";
-export { parseCookieHeader } from "./cookie.js";
+export { buildCookie, parseCookieHeader } from "./cookie.js";
 export { authCatchAll, methodNotAllowed, queryOf } from "./endpoints.js";
 export { FORM_BODY_LIMIT, formField, parseFormBody } from "./form-body.js";
 export { resolvePublicHost } from "./host.js";
