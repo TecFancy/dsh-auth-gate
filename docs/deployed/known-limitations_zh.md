@@ -62,6 +62,16 @@ README 里只留了短清单；这里是完整版：每条已知局限、它背�
 - 不带会话的 `/auth/users/password` 拒绝请求按 `info` 级审计，target 先剥控制符再截到
   64 字符。因此匿名扫描每请求会写一行日志：这行是 Origin 校验唯一的信号，故保留不删，
   改用「限payload」的方式收敛；若在意体量，请在审计日志侧做去重或保留策略。
+- **宿主 cookie 的重铸是补救，不是保证。** dsh 自己还有一层 `dsh-auth-<sha256(authority)>`
+  （`SameSite=Strict`，30 天），本插件的门从不检查它。守卫放行一次到 `/` 的顶层导航之后会问
+  一次 dsh 的 `connection.requestRejection`，dsh 回 401 就回 `302 /?token=…`。
+  这覆盖了反代开始或停止改写 `Host`、换域名或端口、dsh cookie 过期、清站点数据这几种情况。
+  覆盖不到的是：没有 `requestRejection` 的 dsh 版本（钩子停用，行为回到从前）、与当前进程
+  对不上的启动令牌（多副本且没有粘滞路由）、以及浏览器拒收新签发的 cookie。这几种情况下
+  用户看到的仍是 dsh 自己的 `401 dsh web authentication required`；一次性标记 cookie 保证
+  代价最多是多一跳，而不是重定向环。只有到 `/` 的顶层 `GET` 导航会被重铸：API 调用、静态
+  资源和 WebSocket 升级都不碰，因为重定向修不了它们；已经带着 `?token=` 的请求也不碰，那一跳
+  正是宿主在签发 cookie 的地方。
 - 管理块属于 **client 半边**（设置 → 账号安全）：依赖宿主 Web 应用的客户端 bundle，bundle 更新后
   需要刷新一次页面才会出现；CLI 与 HTTP 端点在它之外始终可用。
 - 非 admin，或受限会话，看不到管理块，但这只是呈现层：服务端对每个管理请求都会现读
