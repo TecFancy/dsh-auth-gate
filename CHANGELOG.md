@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.19.1...v0.20.0) (2026-11-16)
+
+
+### Features
+
+* **market:** declare card screenshots and gate the list ([#138](https://github.com/TecFancy/dsh-auth-gate/issues/138)) ([87b8a83](https://github.com/TecFancy/dsh-auth-gate/commit/87b8a83f78f2655d55f61cbe001462050b19daea))
+
 ## [0.19.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.19.0...v0.19.1) (2026-11-15)
 
 
