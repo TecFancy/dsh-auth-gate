@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Duplex } from "node:stream";
 import type { AdmitHook, Gate, GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import { type AdmitRebridge } from "./rebridge.js";
 import { type ResourceHandler } from "./resource.js";
 export { GUARDED, isGuarded } from "./mark.js";
 export { isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, } from "./http.js";
@@ -53,8 +54,17 @@ export interface GuardLog {
  *
  * `onAdmit` 在 `decide()` 返回 allow 之后、守卫自己的传输层否决（代理标记、跨站弹回）之前
  * 调用：它回答的是「门放行了这次请求」，与守卫随后怎么分流无关（见 {@link AdmitHook}）。
+ *
+ * `rebridge` 在 `onAdmit` 之后询问：它回答「这次放行的请求要不要先重铸宿主 cookie」。给出
+ * 站内 Location 时守卫 302 到它、不调用原 handler（见 {@link AdmitRebridge}）。
+ *
+ * 顺序有讲究：**跨站弹回排在重铸之前**。两者修的是不同的病：弹回修「Strict cookie 存在但
+ * 跨站导航不带它」，重铸修「cookie 名字对不上或已过期」。跨站导航里宿主必然回 401，若先重铸，
+ * 新签发的 Strict cookie 在整条跨站重定向链上照样不会被发送，反而把弹回本来能修好的场景变成
+ * 401（issue #69 记录的 `ERR_TOO_MANY_REDIRECTS` 就是这条链）。弹回后是同源重试，那时才轮到
+ * 重铸判断宿主到底认不认。
  */
-export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler, onAdmit?: AdmitHook): HttpHandler;
+export declare function guardHttp(gate: () => Gate, kind: GuardKind, handler: HttpHandler, onAdmit?: AdmitHook, rebridgeHook?: AdmitRebridge): HttpHandler;
 /**
  * 给一个 upgrade handler 套守卫。**任何**非 allow 决策（含 `{deny:{upgrade:true}}`）
  * 都在 ws 协商前直接拒握手，不进入原 handler，也不为 socket 附加任何监听器。
@@ -78,6 +88,9 @@ export declare function denyForbidden(res: ServerResponse): void;
  * 返回的 unwrap 逐条回滚，不整表还原：只把目标函数仍是本次 wrap 产出的守卫版本的
  * 条目换回原路由（D27：wrap 之后注册的路由保留在表中、只摘掉守卫；wrap 期间被
  * 拥有者卸载的条目不写回；被第三方换成别的函数的条目不碰）。最后还原三个注册方法。
+ *
+ * `rebridge` 透传给每个 HTTP 入口（handler 与 resource 两种形态、存量与晚注册、fallback），
+ * 语义见 {@link AdmitRebridge}；upgrade 入口不接它，握手没法用重定向修复。
  */
-export declare function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog, onAdmit?: AdmitHook): () => void;
+export declare function wrapServer(server: WrappableServer, gate: () => Gate, log: GuardLog, onAdmit?: AdmitHook, rebridge?: AdmitRebridge): () => void;
 //# sourceMappingURL=guard.d.ts.map

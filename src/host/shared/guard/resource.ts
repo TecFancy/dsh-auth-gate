@@ -6,8 +6,10 @@ import {
   forbiddenReply,
   guardReplyToResponse,
   isProxyDeniedRequest,
+  rebridgeReply,
 } from "./http.js";
 import { GUARDED, isGuarded } from "./mark.js";
+import { rebridgeDecision, type AdmitRebridge } from "./rebridge.js";
 
 /**
  * Fetch 形态的 resource 路由处理函数（DSH 0.2.2 起 `webServer.register` 支持）。
@@ -36,13 +38,16 @@ export function toGuardRequest(request: Request): GuardRequest {
  *
  * 非法 URL（连带 base 的 `new URL` 都抛错）直接 400，不调门、不调 resource。
  * 门或 resource 抛错时向上传播，由宿主统一处理，绝不"出错即放行"。
- * `onAdmit` 在门放行之后调用一次，语义与 handler 入口相同（见 {@link AdmitHook}）。
+ * `onAdmit` 在门放行之后调用一次，语义与 handler 入口相同（见 {@link AdmitHook}）；
+ * `rebridge` 的询问时机与顺序也与 handler 入口相同：跨站弹回在前、重铸在后（见
+ * {@link AdmitRebridge}）。
  */
 export function guardResource(
   gate: () => Gate,
   kind: GuardKind,
   resource: ResourceHandler,
   onAdmit?: AdmitHook,
+  rebridgeHook?: AdmitRebridge,
 ): ResourceHandler {
   if (isGuarded(resource)) return resource;
   const guarded = (async (request: Request, peer?: unknown): Promise<Response> => {
@@ -61,6 +66,12 @@ export function guardResource(
       }
       if (isCrossSiteDocumentNavigation(req)) {
         return crossSiteBounceResponse();
+      }
+      const rebridge = rebridgeDecision(rebridgeHook, req, kind, pathname);
+      if (rebridge !== undefined) {
+        const reply = rebridgeReply(rebridge.location, rebridge.setCookie);
+        if (request.method === "HEAD") reply.body = null;
+        return guardReplyToResponse(reply);
       }
       return resource(request, peer);
     }

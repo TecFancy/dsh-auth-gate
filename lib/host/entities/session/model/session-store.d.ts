@@ -5,6 +5,9 @@ export declare const COOKIE_FLAGS = "Path=/; HttpOnly; Secure; SameSite=Lax";
 /**
  * 精确输出 `<name>=<token>; Max-Age=<secs>; Path=/; HttpOnly; Secure; SameSite=Lax`；
  * `secure=false` 时省略 `; Secure`（http 测试/开发，M7）。
+ *
+ * 属性模板只有一份，在 `shared/http` 的 `buildCookie`：重铸标记与它会话 cookie 共用同一组
+ * 属性，避免两处各写一遍后漂移。本函数保留名字与签名，因为 M1/M2 的冻结测试钉的是它。
  */
 export declare function buildSetCookie(cookieName: string, token: string, maxAgeSeconds: number, secure?: boolean): string;
 /** 会话 token 的落盘键：sha256 hex 小写（64 字符）；介质上永不出现原始 token。 */
