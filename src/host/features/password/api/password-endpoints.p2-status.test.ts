@@ -108,6 +108,7 @@ const STATUS_IDENTITY_KEYS = [
   "authenticated",
   "logoutOrder",
   "passkeyEnabled",
+  "passwordLoginDisabled",
   "name",
   "role",
   "disabled",
@@ -166,6 +167,7 @@ describe("GET /auth/status (P2 addition)", () => {
       authenticated: false,
       logoutOrder: 1000,
       passkeyEnabled: false,
+      passwordLoginDisabled: false,
     });
 
     const unknown = makeDeps([{ token: "ghost", session: session() }]);
@@ -173,6 +175,7 @@ describe("GET /auth/status (P2 addition)", () => {
       authenticated: true,
       logoutOrder: 1000,
       passkeyEnabled: false,
+      passwordLoginDisabled: false,
     });
 
     const logs: unknown[] = [];
@@ -187,6 +190,7 @@ describe("GET /auth/status (P2 addition)", () => {
       authenticated: true,
       logoutOrder: 1000,
       passkeyEnabled: false,
+      passwordLoginDisabled: false,
     });
     expect(logs).toEqual(["status: users file unavailable: boom"]);
   });

@@ -95,11 +95,36 @@ describe("resolvePasskeySettings: disabled reasons", () => {
     });
   }
 
-  it("returns only enabled+reason when disabled", () => {
+  it("returns enabled+passwordLoginDisabled+reason when disabled", () => {
     expect(resolvePasskeySettings(input({ publicHost: "" }))).toEqual({
       enabled: false,
+      passwordLoginDisabled: false,
       reason: "public-host-missing",
     });
+  });
+});
+
+describe("resolvePasskeySettings: passkey-only policy", () => {
+  it("disables password login only for required", () => {
+    expect(enabledSettings({ passkey: "optional" }).passwordLoginDisabled).toBe(false);
+    expect(enabledSettings({ passkey: "required" }).passwordLoginDisabled).toBe(true);
+    expect(disabledReason({ passkey: "off" })).toBe("off");
+  });
+
+  it("keeps password login disabled when the WebAuthn configuration is unusable", () => {
+    // issue #133 第 4 点：配置写坏不得自动恢复在线口令登录。
+    for (const [name, overrides, reason] of DISABLED_CASES) {
+      if (overrides.passkey === "off") continue;
+      const settings = resolvePasskeySettings(input({ ...overrides, passkey: "required" }));
+      expect(settings.enabled, name).toBe(false);
+      expect(settings.passwordLoginDisabled, name).toBe(true);
+      expect(settings.enabled ? undefined : settings.reason, name).toBe(reason);
+    }
+  });
+
+  it("does not disable password login for a broken configuration in optional mode", () => {
+    const settings = resolvePasskeySettings(input({ passkey: "optional", publicHost: "" }));
+    expect(settings.passwordLoginDisabled).toBe(false);
   });
 });
 

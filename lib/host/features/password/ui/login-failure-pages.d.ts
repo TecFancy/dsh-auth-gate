@@ -8,6 +8,11 @@ import type { ServerResponse } from "node:http";
 /** 未知用户 / 错口令 / 禁用三态共用的唯一常量（P9 反枚举）。 */
 export declare const INVALID_CREDENTIALS = "Invalid username or password.";
 /**
+ * 口令登录被策略关闭时的唯一常量（`passkey: "required"`）。不复用 `INVALID_CREDENTIALS`：
+ * 这里凭据可能完全正确，说「用户名或密码错」会把用户引向改密码这条死路。
+ */
+export declare const PASSKEY_ONLY_DISABLED_TEXT = "This instance requires a passkey. Password sign-in is disabled.";
+/**
  * TOTP 第二段拒绝的唯一常量（D21）：错码、重放码、账号已无 secret 三态共用。
  * 不复用 `INVALID_CREDENTIALS`：走到这一步口令是对的，说「用户名或密码错」会指向错误的
  * 手因；也不能细分重放/过期/漂移，否则等于给攻击者一个反馈探针。
@@ -32,4 +37,14 @@ export declare function sendInvalidCredentials(res: ServerResponse, ctx: Failure
 export declare function sendLockout(res: ServerResponse, ctx: FailurePageContext, retryAfterSeconds: number): void;
 /** 429 TOTP 段：挑战卡 + 锁定文案（挑战 cookie 保留，窗口过后可继续同一账号）。 */
 export declare function sendTotpLockout(res: ServerResponse, ctx: FailurePageContext, retryAfterSeconds: number): void;
+/**
+ * 403 口令登录已被策略关闭（`passkey: "required"`，issue #133）：渲染 passkey-only 卡片。
+ *
+ * 状态码取 403 而不是 401：凭据可能完全正确，拒绝的理由是策略而不是身份，401 会误导客户端
+ * 去重试。响应与输入无关（不读用户名、不读密码、不读挑战 cookie），因此没有枚举侧信道。
+ */
+export declare function sendPasswordLoginDisabled(res: ServerResponse, ctx: {
+    host: string;
+    next: string;
+}): void;
 //# sourceMappingURL=login-failure-pages.d.ts.map

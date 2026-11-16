@@ -114,6 +114,7 @@ function makeHarness(options?: {
   cookieSecure?: boolean;
   logoutOrder?: number;
   passkeyEnabled?: boolean | undefined;
+  passwordLoginDisabled?: boolean | undefined;
 }): Harness {
   const routes: Harness["routes"] = [];
   const table = new MemTable();
@@ -141,6 +142,7 @@ function makeHarness(options?: {
       sessionTtl: options?.sessionTtl ?? 604800,
       logoutOrder: options?.logoutOrder ?? 1000,
       passkeyEnabled: options?.passkeyEnabled,
+      passwordLoginDisabled: options?.passwordLoginDisabled,
       validateToken: (token) => Promise.resolve(token === "good-token"),
       logger: {
         error: (message) => logs.push({ level: "error", message }),
@@ -170,12 +172,14 @@ describe("GET /auth/status", () => {
       "/auth/status",
     )(makeReq({ cookie: `dsh_auth=${issued.token}` }), authed.res);
     expect(authed.status).toBe(200);
-    expect(authed.body).toBe('{"authenticated":true,"logoutOrder":1000,"passkeyEnabled":false}');
+    expect(authed.body).toBe(
+      '{"authenticated":true,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
+    );
 
     const anonymous = makeRes();
     await handlerOf(harness, "exact", "/auth/status")(makeReq({}), anonymous.res);
     expect(anonymous.body).toBe(
-      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
     );
 
     const bearerOnly = makeRes();
@@ -185,7 +189,7 @@ describe("GET /auth/status", () => {
       "/auth/status",
     )(makeReq({ authorization: "Bearer good-token" }), bearerOnly.res);
     expect(bearerOnly.body).toBe(
-      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false}',
+      '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
     );
   });
 
@@ -195,7 +199,9 @@ describe("GET /auth/status", () => {
     const res = makeRes();
     await handlerOf(harness, "exact", "/auth/status")(makeReq({}), res.res);
     expect(res.status).toBe(200);
-    expect(res.body).toBe('{"authenticated":false,"logoutOrder":5000,"passkeyEnabled":false}');
+    expect(res.body).toBe(
+      '{"authenticated":false,"logoutOrder":5000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
+    );
   });
 
   it("always reports passkeyEnabled (false in token mode) and forwards the deps flag", async () => {
@@ -211,5 +217,20 @@ describe("GET /auth/status", () => {
     const onRes = makeRes();
     await handlerOf(on, "exact", "/auth/status")(makeReq({}), onRes.res);
     expect(JSON.parse(onRes.body)).toHaveProperty("passkeyEnabled", true);
+  });
+
+  it("always reports passwordLoginDisabled (false in token mode) and forwards the deps flag", async () => {
+    // token 模式没有口令登录，根接线恒传 false；这里只证明 deps 的该字段被原样带进响应形状。
+    const off = makeHarness();
+    registerAuthEndpoints(off.deps);
+    const offRes = makeRes();
+    await handlerOf(off, "exact", "/auth/status")(makeReq({}), offRes.res);
+    expect(JSON.parse(offRes.body)).toHaveProperty("passwordLoginDisabled", false);
+
+    const on = makeHarness({ passwordLoginDisabled: true });
+    registerAuthEndpoints(on.deps);
+    const onRes = makeRes();
+    await handlerOf(on, "exact", "/auth/status")(makeReq({}), onRes.res);
+    expect(JSON.parse(onRes.body)).toHaveProperty("passwordLoginDisabled", true);
   });
 });

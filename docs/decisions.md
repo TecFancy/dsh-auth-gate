@@ -540,3 +540,21 @@ dsh 自己有第二层 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=Stric
 不复制任何宿主内部格式，dsh 改 cookie 方案时钩子跟着它的判定走，最坏情况是钩子失效、行为回到从前。
 → [zh](decisions/implemented/2026-11-16-host-cookie-rebridge.zh.md) ·
 [en](decisions/implemented/2026-11-16-host-cookie-rebridge.en.md)
+
+## D38. 只允许通行密钥登录（passkey-only）是实例级配置，不是账号级开关
+
+`passkey` 增加 `"required"`：口令与「口令 + TOTP」都不能建立新会话，登录页只渲染通行密钥入口。
+**实例级**，没有 per-user 字段、没有开启端点、没有设置页开关；开关它等于改配置文件加重启。配套：
+WebAuthn 配置失效时口令**保持关闭**并渲染固定原因码（不退回口令登录）；删最后一把凭据被拒绝
+（HTTP `400 last-credential`，锁内复核；CLI 一律要 `--force`）；恢复只有「改回 `"optional"` 并重启」
+一条路。
+**替代方案**：账号级 `password_login_disabled` + 开启端点 + 会话 `authMethod` 追踪（7–9 人日，
+但在不做用户隔离的模型里「只给一个账号关口令」不成立）；只加枚举不改失效语义（配置一坏就悄悄
+退回口令，违反 issue 第 4 点）；CLI 恢复命令（读不到插件配置，无条件清标志等于本地后门）；
+设置页开关（会话被劫后能一键恢复口令入口）。
+**为什么**：策略的载体决定安全属性——放配置文件里，开关天然要求服务器权限，恢复路径与开启路径
+同一条；放 Web 界面或 users.yaml 里，会多出「被劫会话能改策略」或「坏状态读不出来、CLI 也救不了」
+两种失败模式。实例级而非账号级，是因为这道门保护整个实例、门内不做隔离，账号级策略会制造
+「每个账号有独立安全边界」的错觉（D36 反对的同一类误导）。
+→ [zh](decisions/implemented/2026-11-16-passkey-only-login.zh.md) ·
+[en](decisions/implemented/2026-11-16-passkey-only-login.en.md)

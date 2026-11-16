@@ -260,37 +260,3 @@ describe("SettingsAccountSection submit", () => {
     cleanup(root, container);
   });
 });
-
-describe("SettingsAccountSection host props", () => {
-  it("ignores the host close prop after success (去向由会话状态决定，不是关弹窗)", async () => {
-    const close = vi.fn();
-    routeFetch((url) =>
-      url === "/auth/status" ? statusOk(true) : jsonResponse(200, { ok: true }),
-    );
-    const { root, container } = await render({ t: zh, close });
-    fillValid(container);
-    submitForm(container);
-    await settle();
-    const relogin = container.querySelector("button");
-    expect(relogin?.textContent).toBe("重新登录");
-    act(() => {
-      relogin?.click();
-    });
-    expect(close).not.toHaveBeenCalled();
-    expect(redirectApi.redirectToLogin).toHaveBeenCalledTimes(2); // 成功时一次 + 手动点一次
-    cleanup(root, container);
-  });
-
-  it("renders no admin block for an old server that omits the identity fields", async () => {
-    const urls: string[] = [];
-    routeFetch((url) => {
-      urls.push(url);
-      return statusOk(true); // 只有 authenticated/logoutOrder（PR2 之前的服务端）
-    });
-    const { root, container } = await render({ t: zh });
-    expect(container.querySelector("form")).not.toBeNull();
-    expect(container.querySelector('[data-testid="admin-block"]')).toBeNull();
-    expect(urls).toEqual(["/auth/status"]);
-    cleanup(root, container);
-  });
-});

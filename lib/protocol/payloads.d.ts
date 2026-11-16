@@ -39,6 +39,14 @@ export interface StatusResponse {
      * 已注册凭据只出现在需要会话的凭据列表里，未认证可读的响应不泄漏这类身份信息。
      */
     passkeyEnabled: boolean;
+    /**
+     * 本实例是否关闭了口令登录（`passkey: "required"`，issue #133）：host 配置透传，恒在。
+     *
+     * 与 `passkeyEnabled` **正交**：WebAuthn 配置写坏时 `passkeyEnabled` 为 `false` 而这里仍是
+     * `true`（实例进入谁都进不来的状态）。客户端用它解释「为什么登录页没有密码框」，
+     * 以及为什么设置页的改密表单仍然存在（口令继续作为管理再认证的秘密）。
+     */
+    passwordLoginDisabled: boolean;
     name?: string | undefined;
     role?: UserRole | undefined;
     disabled?: boolean | undefined;

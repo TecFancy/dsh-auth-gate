@@ -21,13 +21,19 @@ export interface PasskeyCliIo {
 export interface PasskeyFlags {
   id?: string;
   all?: boolean;
+  /** 允许删掉最后一把（`passkey: "required"` 下会锁死账号，必须显式确认）。 */
+  force?: boolean;
 }
 
 /**
  * `dsh-auth passkey <list|rm>`：运维面查看/删除某用户的通行密钥。
  *
- * list 只读；rm 在 `mutateUsersFile` 锁内重读并做前缀唯一匹配（并发注册也不会漏判歧义），
- * 删掉最后一把只输出 warning、不阻断：口令始终是最后恢复通道。
+ * list 只读；rm 在 `mutateUsersFile` 锁内重读并做前缀唯一匹配（并发注册也不会漏判歧义）。
+ *
+ * **删掉最后一把默认拒绝**，要 `--force` 才放行。CLI 读不到插件配置（`passkey` 在
+ * Cordis 配置里，不在 users.yaml），所以无法判断实例是不是 passkey-only；一律要求显式确认
+ * 比「口令可用时也拦」更安全 - 口令可用时删光凭据本来就没有正当理由，而 passkey-only 下
+ * 删光等于锁死账号。HTTP 端点那边能读到配置，因此只在 `required` 时拒绝。
  */
 export async function handlePasskeyCli(
   file: string,
@@ -74,10 +80,11 @@ async function removePasskeys(
   if (name === undefined) return usage(io);
   const prefix = flags.id?.trim();
   const all = flags.all === true;
+  const force = flags.force === true;
   if (all && prefix !== undefined) return usage(io);
-  if (all) return removeAll(file, name, io);
+  if (all) return removeAll(file, name, io, force);
   if (prefix === undefined) return usage(io);
-  return removeByPrefix(file, name, prefix, io);
+  return removeByPrefix(file, name, prefix, io, force);
 }
 
 /** 前缀唯一匹配后删除一把；前缀过短/无匹配/歧义都在锁内报错，不落盘。 */
@@ -86,6 +93,7 @@ async function removeByPrefix(
   name: string,
   prefix: string,
   io: PasskeyCliIo,
+  force: boolean,
 ): Promise<number> {
   if (prefix.length < MIN_ID_PREFIX_LENGTH) {
     io.err(`--id must be at least ${MIN_ID_PREFIX_LENGTH} characters`);
@@ -101,6 +109,7 @@ async function removeByPrefix(
     if (matches.length > 1) {
       throw new UsersFileError(`passkey id prefix is ambiguous (${matches.length} matches)`);
     }
+    if (passkeys.length === 1 && !force) throw new LastCredentialError(name);
     snapshot.users.set(name, {
       ...user,
       passkeys: passkeys.filter((passkey) => passkey !== target),
@@ -113,18 +122,38 @@ async function removeByPrefix(
   return 0;
 }
 
-/** 删光该用户全部凭据（0 把也无害，输出统一措辞）。 */
-async function removeAll(file: string, name: string, io: PasskeyCliIo): Promise<number> {
+/** 删光该用户全部凭据（0 把也无害，输出统一措辞）；`--force` 之外一律拒绝。 */
+async function removeAll(
+  file: string,
+  name: string,
+  io: PasskeyCliIo,
+  force: boolean,
+): Promise<number> {
   const removed = await mutate(file, io, (snapshot) => {
     const user = snapshot.users.get(name);
     if (user === undefined) throw new UsersFileError(`user ${name} not found`);
     const passkeys = user.passkeys ?? [];
+    if (passkeys.length > 0 && !force) throw new LastCredentialError(name);
     snapshot.users.set(name, { ...user, passkeys: [] });
     return passkeys.length;
   });
   if (removed === undefined) return 1;
   io.out(`removed ${removed} passkeys from ${name}`);
   return 0;
+}
+
+/**
+ * 「删掉最后一把」的拒绝信号。`mutate` 把 mutator 抛出的错误统一转成 `err` 输出，
+ * 所以文案在这里就写全，调用方不需要再补一句。
+ */
+class LastCredentialError extends UsersFileError {
+  constructor(name: string) {
+    super(
+      `refusing to remove the last passkey of ${name}: ` +
+        "with passkey-only enabled this locks the account out. " +
+        "Add another passkey first, or re-run with --force",
+    );
+  }
 }
 
 /** list 的单行输出：固定字段序、英文；完整 credentialId 与公钥都不出现。 */

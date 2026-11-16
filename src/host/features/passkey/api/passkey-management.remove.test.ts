@@ -195,3 +195,66 @@ describe("passkey remove: re-authentication", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("passkey remove: passkey-only", () => {
+  it("refuses to remove the last credential even with a correct password", async () => {
+    const harness = makeManagementHarness();
+    harness.setPasswordLoginDisabled(true);
+    mount(harness);
+    const { cookie, records } = await setup(harness, 1);
+    const res = await send(harness, PASSKEY_REMOVE_PATH, {
+      cookie,
+      fields: { id: records[0]!.credentialId.slice(0, 8), password: TEST_PASSWORD },
+    });
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body)).toEqual({ error: "bad_request", reason: "last-credential" });
+    expect(harness.users.get("alice")!.passkeys).toHaveLength(1);
+  });
+
+  it("refuses all=1 even with a correct password", async () => {
+    const harness = makeManagementHarness();
+    harness.setPasswordLoginDisabled(true);
+    mount(harness);
+    const { cookie } = await setup(harness, 3);
+    const res = await send(harness, PASSKEY_REMOVE_PATH, {
+      cookie,
+      fields: { all: "1", password: TEST_PASSWORD },
+    });
+    expect(res.status).toBe(400);
+    expect(JSON.parse(res.body)).toEqual({ error: "bad_request", reason: "last-credential" });
+    expect(harness.users.get("alice")!.passkeys).toHaveLength(3);
+  });
+
+  it("still allows removing one of several credentials", async () => {
+    const harness = makeManagementHarness();
+    harness.setPasswordLoginDisabled(true);
+    mount(harness);
+    const { cookie, records } = await setup(harness, 2);
+    const res = await send(harness, PASSKEY_REMOVE_PATH, {
+      cookie,
+      fields: { id: records[0]!.credentialId.slice(0, 8) },
+    });
+    expect(res.status).toBe(200);
+    expect(harness.users.get("alice")!.passkeys).toHaveLength(1);
+  });
+
+  it("re-checks inside the lock so two concurrent removals cannot empty the list", async () => {
+    // 锁外判定用的是门禁读到的快照：两把凭据时两个并发删除各自都以为「还剩一把」。
+    // 锁内复核是唯一能挡住这条竞态的地方。
+    const harness = makeManagementHarness();
+    harness.setPasswordLoginDisabled(true);
+    mount(harness);
+    const { cookie, records } = await setup(harness, 2);
+    const first = await send(harness, PASSKEY_REMOVE_PATH, {
+      cookie,
+      fields: { id: records[0]!.credentialId.slice(0, 8) },
+    });
+    expect(first.status).toBe(200);
+    const second = await send(harness, PASSKEY_REMOVE_PATH, {
+      cookie,
+      fields: { id: records[1]!.credentialId.slice(0, 8) },
+    });
+    expect(second.status).toBe(400);
+    expect(harness.users.get("alice")!.passkeys).toHaveLength(1);
+  });
+});

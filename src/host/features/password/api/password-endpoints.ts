@@ -1,5 +1,10 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { passwordLoginPageHtml, totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import {
+  passkeyOnlyLoginPageHtml,
+  passkeyOnlyUnavailablePageHtml,
+  passwordLoginPageHtml,
+  totpChallengePageHtml,
+} from "../../../shared/login-page/index.js";
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { mutateUsersFile, type UsersSnapshot } from "../../../entities/user/index.js";
 import type { HttpHandler } from "../../../shared/guard/index.js";
@@ -118,6 +123,11 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
   /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
   logoutOrder: number;
   /**
+   * `passkey: "required"` 但 WebAuthn 配置不成立时的固定原因（`PasskeyDisabledReason`），
+   * 只用于诊断卡文案。`passwordLoginDisabled` 为 true 且 `passkey` 入口不可用时才读它。
+   */
+  passkeyDisabledReason?: string | undefined;
+  /**
    * 改密接线（§5）。缺省 → 不注册 `/auth/password`（加法式公共面：既有测试 harness
    * 的对象字面量不必改动）；index.ts 在 password 模式下**总是**注入，生产唯一路径
    * 不存在「静默不注册」的空间（反退化测试见 password-change.test.ts）。
@@ -150,7 +160,15 @@ export function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => vo
     kind: "exact",
     path: STATUS_PATH,
     handler: (req, res) =>
-      handleStatus({ ...deps, passkeyEnabled: deps.passkey?.().enabled === true }, req, res),
+      handleStatus(
+        {
+          ...deps,
+          passkeyEnabled: deps.passkey?.().enabled === true,
+          passwordLoginDisabled: deps.passwordLoginDisabled === true,
+        },
+        req,
+        res,
+      ),
   });
   if (deps.passwordChange !== undefined) {
     const change = toPasswordChangeDeps(deps, deps.passwordChange);
@@ -205,50 +223,81 @@ function handleLogin(
   res: ServerResponse,
 ): void | Promise<void> {
   if (req.method === "GET") {
-    const next = validateNext(queryOf(req).get("next") ?? "/");
-    const host = resolvePublicHost(deps.publicHost, req.headers.host);
-    // P1.1 / D24：改密后客户端跳回本页说明原因。白名单解析（只认常量键），
-    // 未知/注入值一律忽略；卡片文案永不来自请求文本。**只挂在密码卡上**：TOTP 挑战页
-    // 的下一步是输验证码，"用新密码登录"那半句在那里是错的。
-    const notice = resolveLoginNotice(queryOf(req).get("notice"));
-    // 2026-09-17 重设计：TOTP 段提供「换一个账号」回退。GET ?stage=password 显式清掉
-    // 挑战 cookie 并渲染密码页。只清 cookie、不放行任何凭据：下次提交仍需密码 + TOTP。
-    // 注意顺序：set-cookie 必须早于 writeHead（Node 在 headers sent 之后 setHeader 会抛
-    // ERR_HTTP_HEADERS_SENT，线上表现为连接被重置、客户端拿不到任何响应）。
-    const resetStage = queryOf(req).get("stage") === "password";
-    res.setHeader("cache-control", "no-store");
-    setPasskeyPermissionsPolicy(res);
-    if (resetStage) {
-      res.setHeader("set-cookie", buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure));
-    }
-    res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    if (resetStage) {
-      res.end(passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }));
-      return;
-    }
-    // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
-    // off 模式忽略 TOTP（T4）：残留/伪造 cookie 一律渲染密码页。
-    const challenge = parseChallengeValue(
-      parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
-      deps.now(),
-      deps.challengeMacKey,
-    );
-    const showTotp = challenge !== undefined && deps.totpMode !== "off";
-    res.end(
-      showTotp
-        ? totpChallengePageHtml(next, undefined, {
-            host,
-            who: challenge,
-            resetHref: loginPath(next, "password"),
-          })
-        : passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }),
-    );
+    renderLoginPage(deps, req, res);
     return;
   }
   if (req.method === "POST") {
     return handlePasswordLogin(deps, req, res);
   }
   methodNotAllowed(res, "GET, POST");
+}
+
+/**
+ * `GET /auth/login`：按策略三选一渲染。
+ *
+ * - 口令可用（默认）：`?stage=password` 清挑战 cookie 后渲染密码卡；有合法挑战 cookie 渲染
+ *   TOTP 卡；否则密码卡。
+ * - `passkey: "required"` 且 WebAuthn 可用：**恒**渲染 passkey-only 卡。`?stage=password` 与
+ *   残留挑战 cookie 都不改变结果 - 否则它们就成了绕过策略的入口。
+ * - `passkey: "required"` 但 WebAuthn 配置不成立：渲染诊断卡（issue #133 第 4 点：配置失效
+ *   不恢复口令登录，而是给出可诊断的错误）。
+ */
+function renderLoginPage(
+  deps: PasswordEndpointsDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+): void {
+  const next = validateNext(queryOf(req).get("next") ?? "/");
+  const host = resolvePublicHost(deps.publicHost, req.headers.host);
+  // P1.1 / D24：改密后客户端跳回本页说明原因。白名单解析（只认常量键），
+  // 未知/注入值一律忽略；卡片文案永不来自请求文本。**只挂在密码卡上**：TOTP 挑战页
+  // 的下一步是输验证码，"用新密码登录"那半句在那里是错的。
+  const notice = resolveLoginNotice(queryOf(req).get("notice"));
+  // 2026-09-17 重设计：TOTP 段提供「换一个账号」回退。GET ?stage=password 显式清掉
+  // 挑战 cookie 并渲染密码页。只清 cookie、不放行任何凭据：下次提交仍需密码 + TOTP。
+  // 注意顺序：set-cookie 必须早于 writeHead（Node 在 headers sent 之后 setHeader 会抛
+  // ERR_HTTP_HEADERS_SENT，线上表现为连接被重置、客户端拿不到任何响应）。
+  const resetStage = queryOf(req).get("stage") === "password";
+  res.setHeader("cache-control", "no-store");
+  setPasskeyPermissionsPolicy(res);
+  if (resetStage) {
+    res.setHeader("set-cookie", buildSetCookie(CHALLENGE_COOKIE, "", 0, deps.cookieSecure));
+  }
+  res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+  if (deps.passwordLoginDisabled === true) {
+    res.end(passkeyOnlyPageHtml(deps, next, host));
+    return;
+  }
+  if (resetStage) {
+    res.end(passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }));
+    return;
+  }
+  // M4 T6：合法挑战 cookie → 渲染 TOTP 挑战页；否则密码页。
+  // off 模式忽略 TOTP（T4）：残留/伪造 cookie 一律渲染密码页。
+  const challenge = parseChallengeValue(
+    parseCookieHeader(req.headers.cookie, CHALLENGE_COOKIE),
+    deps.now(),
+    deps.challengeMacKey,
+  );
+  const showTotp = challenge !== undefined && deps.totpMode !== "off";
+  res.end(
+    showTotp
+      ? totpChallengePageHtml(next, undefined, {
+          host,
+          who: challenge,
+          resetHref: loginPath(next, "password"),
+        })
+      : passwordLoginPageHtml(next, undefined, { host, notice, passkey: passkeyOf(deps) }),
+  );
+}
+
+/**
+ * passkey-only 策略下的登录卡：WebAuthn 可用 → 通行密钥入口；不可用 → 诊断卡。
+ * 两者都不渲染任何口令字段，`?stage=password` 与残留挑战 cookie 一律无效。
+ */
+function passkeyOnlyPageHtml(deps: PasswordEndpointsDeps, next: string, host: string): string {
+  if (passkeyOf(deps)?.enabled === true) return passkeyOnlyLoginPageHtml(next, undefined, { host });
+  return passkeyOnlyUnavailablePageHtml(deps.passkeyDisabledReason ?? "unavailable", { host });
 }
 
 /** 登录页 passkey 入口的当前值（每次渲染现取，条件 UI 开关可运行时改写）。 */

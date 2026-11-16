@@ -63,6 +63,11 @@ export const ACCOUNT_KEYS = {
   retry: "account.retry",
   adminAreaTitle: "account.adminArea.title",
   adminAreaIntro: "account.adminArea.intro",
+  /**
+   * passkey-only 提示（`passkey: "required"`，issue #133）：改密表单仍然可用，但改完不能
+   * 用它登录 - 不说明的话，用户会以为改完密码就能回到登录页。
+   */
+  passkeyOnlyNotice: "account.passkeyOnlyNotice",
 } as const;
 
 /** 契约 §2 策略规则名 → 词典键（`satisfies` 保证与契约的 `PasswordRule` 一一对应）。 */
@@ -101,6 +106,8 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.title]: "修改密码",
   [ACCOUNT_KEYS.intro]: "改密成功后，当前设备也会被登出，需要用新密码重新登录。",
   [ACCOUNT_KEYS.scope]: "这里是本实例的本地登录凭据，与 DeepSeek 云账户无关。",
+  [ACCOUNT_KEYS.passkeyOnlyNotice]:
+    "本实例要求使用通行密钥登录。密码仍可用于在这里修改凭据，但不能用来登录。",
   [ACCOUNT_KEYS.loading]: "正在确认登录状态...",
   [ACCOUNT_KEYS.loginRequired]: "请先登录后再修改密码。",
   [ACCOUNT_KEYS.current]: "当前密码",
@@ -153,6 +160,8 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
     "After the change, this device is signed out too. Sign in again with your new password.",
   [ACCOUNT_KEYS.scope]:
     "These are this instance's local sign-in credentials, not your DeepSeek account.",
+  [ACCOUNT_KEYS.passkeyOnlyNotice]:
+    "This instance requires a passkey to sign in. Your password still works for changing credentials here, but it cannot be used to sign in.",
   [ACCOUNT_KEYS.loading]: "Checking your session...",
   [ACCOUNT_KEYS.loginRequired]: "Sign in first to change your password.",
   [ACCOUNT_KEYS.current]: "Current password",

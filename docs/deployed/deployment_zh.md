@@ -67,6 +67,26 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
    非默认路径才设 `usersFile`；反代改写了 `Host` 时必须设 `publicHost` 为公网域名，见 D14）。
 3. 确认无其他行占用 `dsh-auth-gate` id（patch 栈按 id 覆盖）。
 
+### 2.1 打开 passkey-only（`passkey: "required"`）
+
+策略是实例级的、写在配置文件里，所以开关就是改文件加重启。按这个顺序做——前两步是避免把自己锁在
+门外的关键：
+
+1. 保持 `passkey: "optional"`，登录后在 设置 → 账号安全 里注册一把通行密钥，登出，然后**用这把
+   通行密钥**重新登录。再在另一台设备或另一个认证器上注册第二把；协议上只强制一把，但一把就是
+   一个单点。
+2. 确认 `/auth/status` 返回 `passkeyEnabled: true`，登录页出现通行密钥按钮。
+3. 在 profile 的 `cordis.patch.yml` 里把 `passkey` 改成 `"required"`，重启服务。
+4. 确认登录页不再渲染密码框，且提交口令返回 `403`。
+
+**谁都进不来时的恢复**：把 `passkey` 改回 `"optional"`、重启、用口令登录、注册一把可用的凭据，
+再改回 `"required"` 并重启。这是唯一的恢复路径，没有 CLI 命令，也没有 Web 开关。如果坏的是
+WebAuthn 配置本身，登录页会显示固定原因码（`public-host-missing`、`rp-id-invalid`、
+`origin-invalid` 等）且口令登录保持关闭——修配置，或者退回 `"optional"`。
+
+开启前要计划好的两个后果：管理员重置口令**不恢复访问**（重置仍会设 `must_change_password`，
+但那枚受限会话只能靠登录拿到）；切换之前签发的会话在过期前继续有效。
+
 ## 3. 启动与健康检查
 
 ```bash
