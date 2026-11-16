@@ -75,6 +75,25 @@ function rowNames(container: HTMLElement): string[] {
   );
 }
 
+/** 按可见文本找按钮。 */
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === text,
+  );
+  if (button === undefined) throw new Error(`missing button: ${text}`);
+  return button;
+}
+
+/** 展开重置表单（重设计：默认收起）。 */
+async function openReset(container: HTMLElement): Promise<void> {
+  await act(async () => {
+    buttonByText(container, t(ADMIN_KEYS.resetOpen)).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await flushMicrotasks();
+  });
+}
+
 function setValue(element: HTMLInputElement | HTMLSelectElement, value: string): void {
   const proto =
     element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype;
@@ -109,6 +128,9 @@ describe("AdminUsersBlock：列表四态（契约 §3 / A2）", () => {
     ]) {
       expect(text).toContain(t(key));
     }
+    // 重置表单默认收起：先确认入口在，再展开确认字段在。
+    expect(buttonByText(container, t(ADMIN_KEYS.resetOpen))).toBeDefined();
+    await openReset(container);
     expect(container.querySelector("select")).not.toBeNull();
   });
 
@@ -169,6 +191,7 @@ describe("AdminUsersBlock：行内容与刷新（A7 / A9 / A11）", () => {
       ),
     );
     const { container } = await render();
+    await openReset(container);
     await act(async () => {
       setValue(container.querySelector("#dsh-auth-gate-admin-target")!, "alice");
       setValue(container.querySelector("#dsh-auth-gate-admin-password")!, "NewPassw0rd!XY");
@@ -181,6 +204,13 @@ describe("AdminUsersBlock：行内容与刷新（A7 / A9 / A11）", () => {
         ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
+    // 重设计：第一次提交只进确认页，点确认才发请求。
+    await act(async () => {
+      buttonByText(container, t(ADMIN_KEYS.confirmSubmit, { name: "alice" })).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      await flushMicrotasks();
+    });
     expect(pathnames()).toContain("/auth/users/password");
     expect(pathnames().filter((path) => path === "/auth/users").length).toBeGreaterThanOrEqual(2);
   });
@@ -188,6 +218,7 @@ describe("AdminUsersBlock：行内容与刷新（A7 / A9 / A11）", () => {
   it("actorTotpEnabled 透传给表单：开启时出现动态码输入框", async () => {
     fetchMock.mockResolvedValue(jsonResponse(200, { users: USERS }));
     const { container } = await render({ actorTotpEnabled: true });
+    await openReset(container);
     expect(container.querySelector("#dsh-auth-gate-admin-code")).not.toBeNull();
   });
 

@@ -53,6 +53,16 @@ export declare const PASSKEY_KEYS: {
     readonly settingsLabel: "account.passkey.settingsLabel";
     readonly settingsSaved: "account.passkey.settingsSaved";
     readonly settingsError: "account.passkey.settingsError";
+    readonly count: "account.passkey.count";
+    readonly tableCaption: "account.passkey.tableCaption";
+    readonly emptyAction: "account.passkey.emptyAction";
+    readonly addFormTitle: "account.passkey.addFormTitle";
+    readonly removeTitle: "account.passkey.removeTitle";
+    readonly removeWarning: "account.passkey.removeWarning";
+    readonly settingsSaving: "account.passkey.settingsSaving";
+    readonly codeHintOn: "account.passkey.codeHintOn";
+    readonly codeHintOff: "account.passkey.codeHintOff";
+    readonly retry: "account.passkey.retry";
 };
 /** 中文词典。 */
 export declare const PASSKEY_DICT_ZH: Record<string, string>;

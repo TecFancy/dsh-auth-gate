@@ -10,6 +10,10 @@ export interface SettingsAccountSectionProps {
  * 「账户」设置页（`settings.section`）：未登录不给表单；已登录渲染自助改密表单，
  * 并在身份满足渲染门时（admin + 正式会话）追加管理块。`t` 缺失时降级到英文词典
  * （不显示键名），由 account-form / admin-block 承担各自的提交逻辑。
+ *
+ * 重设计（2026-11-16）的信息架构：**所有身份先看完全相同的「我的安全」自助区**
+ * （账号上下文 + 改密 + 通行密钥），管理员只在后面追加一个「实例管理」区。
+ * 不引入 tabs：管理员不是换一套页面，而是同一页面上多一段。
  */
 export declare function SettingsAccountSection({ t }: SettingsAccountSectionProps): import("react").JSX.Element;
 //# sourceMappingURL=account-section.d.ts.map

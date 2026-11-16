@@ -87,7 +87,7 @@ export const STATUS_STYLE: CSSProperties = {
 };
 
 export const ERROR_TEXT_STYLE: CSSProperties = {
-  color: "var(--dsw-alias-label-error)",
+  color: "var(--dsw-alias-state-error-primary)",
 };
 
 export const SUCCESS_TEXT_STYLE: CSSProperties = {
@@ -97,7 +97,7 @@ export const SUCCESS_TEXT_STYLE: CSSProperties = {
 export const RULES_STYLE: CSSProperties = {
   margin: 0,
   paddingLeft: 18,
-  color: "var(--dsw-alias-label-error)",
+  color: "var(--dsw-alias-state-error-primary)",
 };
 
 export const BUTTON_STYLE: CSSProperties = {

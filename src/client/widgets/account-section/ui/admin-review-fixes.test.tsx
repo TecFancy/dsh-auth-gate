@@ -72,6 +72,25 @@ async function render(): Promise<{ root: ReturnType<typeof createRoot>; containe
   return { root, container };
 }
 
+/** 按可见文本找按钮。 */
+function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
+  const button = [...container.querySelectorAll("button")].find(
+    (item) => item.textContent === text,
+  );
+  if (button === undefined) throw new Error(`missing button: ${text}`);
+  return button;
+}
+
+/** 确认页点「确认重置 {name}」：重设计后真正发请求的是这一步。 */
+async function confirmReset(container: HTMLElement, name: string): Promise<void> {
+  await act(async () => {
+    buttonByText(container, t(ADMIN_KEYS.confirmSubmit, { name })).dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
+    await flushMicrotasks();
+  });
+}
+
 /** React 受控组件：原生 setter 改值 + 派发 input/change。 */
 function setValue(element: HTMLInputElement | HTMLSelectElement, value: string): void {
   const proto =
@@ -105,7 +124,8 @@ describe("grok 实现期评审必修项回归", () => {
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(container.querySelector("#dsh-auth-gate-admin-status")?.textContent).toBe("");
-    // 对照：表单级 Enter（焦点不在下拉）仍按契约提交，证明上一条不是"整个表单失效"。
+    // 对照：表单级 Enter（焦点不在下拉）仍按契约推进，证明上一条不是"整个表单失效"。
+    // 重设计后 Enter 只推进到确认页，不发请求；点确认才发。
     const form = container.querySelector("form");
     await act(async () => {
       form?.dispatchEvent(
@@ -113,6 +133,9 @@ describe("grok 实现期评审必修项回归", () => {
       );
       await flushMicrotasks();
     });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(container.textContent).toContain(t(ADMIN_KEYS.confirmTitle, { name: "alice" }));
+    await confirmReset(container, "alice");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe("/auth/users/password");
   });
@@ -147,6 +170,8 @@ describe("reviewer 只读复审回归（R1 / R4）", () => {
         ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await flushMicrotasks();
     });
+    // 重设计：第一次提交只进确认页，点确认才发请求。
+    await confirmReset(container, "alice");
     // 只写清理、不重挂载时置 true 的旧实现：三行断言全红（提交结果被丢弃 + 按钮永久 disabled）。
     expect(container.textContent).toContain(t(ADMIN_KEYS.successRevoked));
     expect(field("password").value).toBe("");

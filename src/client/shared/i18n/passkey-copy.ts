@@ -54,6 +54,18 @@ export const PASSKEY_KEYS = {
   settingsLabel: "account.passkey.settingsLabel",
   settingsSaved: "account.passkey.settingsSaved",
   settingsError: "account.passkey.settingsError",
+  // 重设计（2026-11-16）：数量徽标、表格 caption、空态 CTA、添加区标题、删除确认、保存中。
+  count: "account.passkey.count",
+  tableCaption: "account.passkey.tableCaption",
+  emptyAction: "account.passkey.emptyAction",
+  addFormTitle: "account.passkey.addFormTitle",
+  removeTitle: "account.passkey.removeTitle",
+  removeWarning: "account.passkey.removeWarning",
+  settingsSaving: "account.passkey.settingsSaving",
+  // 状态化动态码提示（与 account 分片的 codeHintOn/Off 同文案，但键在 passkey 命名域）。
+  codeHintOn: "account.passkey.codeHintOn",
+  codeHintOff: "account.passkey.codeHintOff",
+  retry: "account.passkey.retry",
 } as const;
 
 /** 中文词典。 */
@@ -105,6 +117,16 @@ export const PASSKEY_DICT_ZH: Record<string, string> = {
   [PASSKEY_KEYS.settingsLabel]: "在登录页启用通行密钥自动填充",
   [PASSKEY_KEYS.settingsSaved]: "设置已保存。",
   [PASSKEY_KEYS.settingsError]: "设置保存失败，请稍后重试。",
+  [PASSKEY_KEYS.count]: "已注册 {count} 把",
+  [PASSKEY_KEYS.tableCaption]: "已注册的通行密钥",
+  [PASSKEY_KEYS.emptyAction]: "添加第一把通行密钥",
+  [PASSKEY_KEYS.addFormTitle]: "验证身份并添加",
+  [PASSKEY_KEYS.removeTitle]: "删除「{label}」？",
+  [PASSKEY_KEYS.removeWarning]: "这把通行密钥会立即失效，且无法恢复。",
+  [PASSKEY_KEYS.settingsSaving]: "正在保存...",
+  [PASSKEY_KEYS.codeHintOn]: "你的账号已开启两步验证，请输入 6 位动态码。",
+  [PASSKEY_KEYS.codeHintOff]: "当前未开启两步验证，此栏可留空。",
+  [PASSKEY_KEYS.retry]: "重试",
 };
 
 /** 英文词典（键集合与中文一致）。 */
@@ -161,4 +183,14 @@ export const PASSKEY_DICT_EN: Record<string, string> = {
   [PASSKEY_KEYS.settingsLabel]: "Offer passkey autofill on the sign-in page",
   [PASSKEY_KEYS.settingsSaved]: "Settings saved.",
   [PASSKEY_KEYS.settingsError]: "Could not save the setting. Please try again later.",
+  [PASSKEY_KEYS.count]: "{count} registered",
+  [PASSKEY_KEYS.tableCaption]: "Registered passkeys",
+  [PASSKEY_KEYS.emptyAction]: "Add your first passkey",
+  [PASSKEY_KEYS.addFormTitle]: "Verify your identity to add one",
+  [PASSKEY_KEYS.removeTitle]: "Remove “{label}”?",
+  [PASSKEY_KEYS.removeWarning]: "This passkey stops working immediately and cannot be restored.",
+  [PASSKEY_KEYS.settingsSaving]: "Saving...",
+  [PASSKEY_KEYS.codeHintOn]: "Two-factor is on for your account. Enter the 6-digit code.",
+  [PASSKEY_KEYS.codeHintOff]: "Two-factor is off. You can leave this field empty.",
+  [PASSKEY_KEYS.retry]: "Retry",
 };

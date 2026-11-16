@@ -40,6 +40,16 @@ export declare const ACCOUNT_KEYS: {
     readonly ruleDigit: "account.rule.digit";
     readonly ruleSpecial: "account.rule.special";
     readonly ruleSameAsOld: "account.rule.sameAsOld";
+    readonly contextLocal: "account.context.local";
+    readonly roleAdmin: "account.role.admin";
+    readonly roleUser: "account.role.user";
+    readonly totpOn: "account.totp.on";
+    readonly totpOff: "account.totp.off";
+    readonly codeHintOn: "account.codeHintOn";
+    readonly codeHintOff: "account.codeHintOff";
+    readonly retry: "account.retry";
+    readonly adminAreaTitle: "account.adminArea.title";
+    readonly adminAreaIntro: "account.adminArea.intro";
 };
 /** 规则名翻译；未知规则原样回显（不发明契约之外的文案）。 */
 export declare function ruleText(rule: string, t: AccountTranslate): string;

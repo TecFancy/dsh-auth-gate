@@ -4,9 +4,9 @@ import {
   translateFrom,
   type AccountTranslate,
 } from "../../../shared/i18n/index.ts";
-import { AccountPasswordForm } from "../../../features/change-password/index.ts";
+import { AccountContext, AccountPasswordForm } from "../../../features/change-password/index.ts";
 import { PasskeyBlock, PasskeySettingsToggle } from "../../../features/passkey/index.ts";
-import { HINT_STYLE, PANEL_STYLE } from "../../../shared/ui/index.ts";
+import { HINT_STYLE, PANEL_STYLE, TITLE_STYLE } from "../../../shared/ui/index.ts";
 import { AdminUsersBlock } from "./admin-block.tsx";
 import { ADMIN_DICT_EN } from "../../../features/admin-users/index.ts";
 import type { AccountStatusView } from "../../../entities/account/index.ts";
@@ -14,6 +14,9 @@ import { useAccountStatus } from "../../../entities/account/index.ts";
 
 /** 提示态 id：loading / 未登录共用一个 aria-live 播报位。 */
 const NOTICE_ID = "dsh-auth-gate-account-notice";
+
+/** 实例管理区的标题 id。 */
+const ADMIN_AREA_TITLE_ID = "dsh-auth-gate-admin-area-title";
 
 /** 无表单的提示态（loading / 请先登录），保留 aria-live 播报。 */
 function Notice({ text }: { text: string }) {
@@ -66,6 +69,10 @@ export interface SettingsAccountSectionProps {
  * 「账户」设置页（`settings.section`）：未登录不给表单；已登录渲染自助改密表单，
  * 并在身份满足渲染门时（admin + 正式会话）追加管理块。`t` 缺失时降级到英文词典
  * （不显示键名），由 account-form / admin-block 承担各自的提交逻辑。
+ *
+ * 重设计（2026-11-16）的信息架构：**所有身份先看完全相同的「我的安全」自助区**
+ * （账号上下文 + 改密 + 通行密钥），管理员只在后面追加一个「实例管理」区。
+ * 不引入 tabs：管理员不是换一套页面，而是同一页面上多一段。
  */
 export function SettingsAccountSection({ t }: SettingsAccountSectionProps) {
   const status = useAccountStatus();
@@ -74,20 +81,38 @@ export function SettingsAccountSection({ t }: SettingsAccountSectionProps) {
     typeof t === "function" ? t : translateFrom({ ...ACCOUNT_DICT_EN, ...ADMIN_DICT_EN });
   if (status === null) return <Notice text={translate(ACCOUNT_KEYS.loading)} />;
   if (status.authenticated !== true) return <Notice text={translate(ACCOUNT_KEYS.loginRequired)} />;
+  const admin = showsAdminBlock(status);
   return (
     <>
-      <AccountPasswordForm t={translate} />
-      {showsPasskeyBlock(status) ? <PasskeyBlock t={translate} /> : null}
-      {showsAdminBlock(status) ? (
-        <AdminUsersBlock
-          t={translate}
-          actorName={status.name}
-          // 未知（旧服务端缺字段）时**渲染**动态码框：宁可多发一个被忽略的 code，
-          // 也不能在服务端已开 TOTP 时因缺码被 401 invalid_totp（grok 回顾 #2）。
-          actorTotpEnabled={status.totpEnabled !== false}
-        />
+      <AccountContext
+        t={translate}
+        name={status.name}
+        role={status.role}
+        totpEnabled={status.totpEnabled}
+      />
+      <AccountPasswordForm t={translate} totpEnabled={status.totpEnabled} />
+      {showsPasskeyBlock(status) ? (
+        <PasskeyBlock t={translate} totpEnabled={status.totpEnabled} />
       ) : null}
-      {showsAdminBlock(status) ? <PasskeySettingsToggle t={translate} /> : null}
+      {admin ? (
+        <section
+          style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 8 }}
+          aria-labelledby={ADMIN_AREA_TITLE_ID}
+        >
+          <h2 id={ADMIN_AREA_TITLE_ID} style={TITLE_STYLE}>
+            {translate(ACCOUNT_KEYS.adminAreaTitle)}
+          </h2>
+          <p style={HINT_STYLE}>{translate(ACCOUNT_KEYS.adminAreaIntro)}</p>
+          <AdminUsersBlock
+            t={translate}
+            actorName={status.name}
+            // 未知（旧服务端缺字段）时**渲染**动态码框：宁可多发一个被忽略的 code，
+            // 也不能在服务端已开 TOTP 时因缺码被 401 invalid_totp（grok 回顾 #2）。
+            actorTotpEnabled={status.totpEnabled !== false}
+          />
+          {showsPasskeyBlock(status) ? <PasskeySettingsToggle t={translate} /> : null}
+        </section>
+      ) : null}
     </>
   );
 }
