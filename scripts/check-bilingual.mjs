@@ -302,28 +302,28 @@ function pairedLocale(rel) {
 }
 
 /**
- * The KNOWN_DRIFT entries recorded at `ref`, or null when the ref cannot be
- * read. Null means "no baseline to compare against", which is the honest answer
- * for a fixture tree or a clone that does not have the base commit; the caller
- * then skips the growth check rather than inventing a verdict.
+ * The KNOWN_DRIFT entries recorded at `ref`.
+ *
+ * Returns a Set on success. Throws when the ref cannot be read or the list
+ * cannot be found in it: a caller that asked for a baseline and did not get one
+ * must not be told the list was compared. The one case that returns null is "no
+ * baseline was asked for", which is a fixture tree, not a verdict.
  */
 function readKnownDriftAt(ref) {
-  let text;
-  try {
-    text = execFileSync("git", ["-C", ROOT, "show", `${ref}:scripts/check-bilingual.mjs`], {
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-  } catch {
-    return null;
-  }
+  const text = execFileSync("git", ["-C", ROOT, "show", `${ref}:scripts/check-bilingual.mjs`], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  });
   const start = text.indexOf("const KNOWN_DRIFT = new Set([");
-  if (start === -1) return new Set();
+  if (start === -1) {
+    throw new Error(`${ref}:scripts/check-bilingual.mjs has no KNOWN_DRIFT list`);
+  }
   const end = text.indexOf("]);", start);
-  if (end === -1) return null;
-  const body = text.slice(start, end);
+  if (end === -1) {
+    throw new Error(`${ref}:scripts/check-bilingual.mjs has an unterminated KNOWN_DRIFT list`);
+  }
   const entries = new Set();
-  for (const m of body.matchAll(/"([^"]+)"/g)) entries.add(m[1]);
+  for (const m of text.slice(start, end).matchAll(/"([^"]+)"/g)) entries.add(m[1]);
   return entries;
 }
 
@@ -870,13 +870,20 @@ async function main() {
     }
     // The list may not grow. An entry that is not in the baseline is a new
     // suppression, which is the shape this list exists to prevent.
-    const base = ARGS.base ?? "HEAD";
-    const baseline = readKnownDriftAt(base);
-    if (baseline !== null) {
+    if (ARGS.base !== undefined) {
+      let baseline;
+      try {
+        baseline = readKnownDriftAt(ARGS.base);
+      } catch (error) {
+        // A caller who named a baseline and did not get one must not be told
+        // the list was compared. This is an environment fault, not a verdict.
+        console.error(`[check-bilingual] cannot read the KNOWN_DRIFT baseline: ${error.message}`);
+        process.exit(2);
+      }
       for (const rel of KNOWN_DRIFT) {
         if (!baseline.has(rel)) {
           problems.push(
-            `${rel}: added to KNOWN_DRIFT since ${base} - the list may only shrink; fix the pair instead`,
+            `${rel}: added to KNOWN_DRIFT since ${ARGS.base} - the list may only shrink; fix the pair instead`,
           );
         }
       }

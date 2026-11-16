@@ -106,6 +106,10 @@ export const GATES = [
     scenes: ["hygiene"],
     stages: ["verify", "pre-commit"],
     selfTest: true,
+    // The KNOWN_DRIFT list is compared against the list at the base, so the
+    // gate needs the baseline the runner was given. Without it the comparison
+    // falls back to HEAD, which already contains the change under test.
+    takesBase: true,
   },
   {
     id: "notes",
@@ -187,6 +191,14 @@ export const GATES = [
     selfTest: false,
   },
   {
+    id: "build",
+    command: "node scripts/clean-lib.mjs && tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
+    npm: "build",
+    scenes: ["build"],
+    stages: ["verify"],
+    selfTest: false,
+  },
+  {
     id: "bundle",
     script: "verify-bundle.mjs",
     args: [],
@@ -258,14 +270,6 @@ export const GATES = [
     command: "vitest run --coverage",
     npm: "test:coverage",
     scenes: ["tests"],
-    stages: ["verify"],
-    selfTest: false,
-  },
-  {
-    id: "build",
-    command: "node scripts/clean-lib.mjs && tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
-    npm: "build",
-    scenes: ["build"],
     stages: ["verify"],
     selfTest: false,
   },
