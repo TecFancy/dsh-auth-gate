@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "_comment": [
+    "Word ceilings for the standing docs every agent loads. Counted with `wc -w`",
+    "semantics over the whole file; see scripts/check-doc-budgets.mjs.",
+    "",
+    "AGENTS.md is the entry point every session reads; docs/conventions.md is the",
+    "standing-rules doc it points at (split out of docs/specs/development.md).",
+    "docs/architecture.md and docs/security.md are reference docs, not standing",
+    "rules, so they are deliberately not budgeted: a doc where every row is a fact",
+    "is right to be long.",
+    "",
+    "Each ceiling is the measured size when the gate landed plus about 5% headroom.",
+    "Growth past it has to be argued for in the change that raises it, not absorbed."
+  ],
+  "docs": [
+    { "path": "AGENTS.md", "max": 735 },
+    { "path": "docs/conventions.md", "max": 2285 }
+  ]
+}

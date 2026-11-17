@@ -1,5 +1,7 @@
 # Known limitations, and the mechanisms behind them
 
+English | [中文](known-limitations_zh.md)
+
 The README keeps the short list. This page is the full one: every known limitation of the
 plugin, with the mechanism behind it and the decision record that fixed it.
 

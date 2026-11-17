@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-10-12-fsd-host-and-client
+2026-10-12-fsd-host-and-client.md: 204eeb1cce74949e5213c2149d46d7894df8b275
+2026-10-12-fsd-host-and-client.zh.md: 79c571bbe2753ad17e8a918c6ef478f91a505a87

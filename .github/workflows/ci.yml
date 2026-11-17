@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    # development is the daily working branch — broken commits there should
+    # development is the daily working branch - broken commits there should
     # fail CI immediately, not on the next merge to main.
     branches: [main, development]
   pull_request:
@@ -10,6 +10,11 @@ on:
 jobs:
   # Static/hygiene gates: fast, no build needed. Parallel purpose per job
   # (M3): failures surface in the owning job instead of a monolithic run.
+  #
+  # The gate list is not written here. `npm run gates:check` derives it from
+  # scripts/lib/gate-registry.mjs, and the runner refuses to start when that
+  # list disagrees with the npm scripts, this workflow or the hook. Adding a
+  # gate means registering it there, not editing this file.
   hygiene:
     name: hygiene (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
@@ -19,20 +24,48 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The archive seal compares against the pull request's base, so the
+          # base commit has to be in the clone.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lock:check
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run lint:no-emdash
-      - run: npm run slice:check
-      - run: npm run lint:fsd
-      - run: npm run decisions:check
-      - run: npm run docs:check
-      - run: npm run screenshots:check
+      - name: Script gates
+        # Every gate registered in scripts/lib/gate-registry.mjs: the skills
+        # mirror and front matter, links, em dashes, docs reachability, doc
+        # budgets, the note tree, note links, the archive seal, bilingual
+        # pairs, Chinese prose, slice boundaries, the lockfile registry, README
+        # parity and the screenshot list. The skills mirror check needs the
+        # `prepare` step of `npm ci`, which creates the gitignored mirror.
+        #
+        # The archive seal also compares with a trusted baseline: a pull
+        # request uses its base, a push the previous tip. A new branch has no
+        # previous tip (all-zero SHA), and then only the content check applies.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        # The condition below is POSIX shell. Windows runners default to pwsh,
+        # where `[ -z "$X" ]` is not a test, so the step needs bash explicitly.
+        shell: bash
+        run: |
+          if [ -z "$BASE_SHA" ] || [ "$BASE_SHA" = "0000000000000000000000000000000000000000" ]; then
+            npm run gates:check
+          else
+            npm run gates:check -- --base "$BASE_SHA"
+          fi
+      - name: Format
+        run: npm run format:check
+      - name: Lint
+        run: npm run lint
+      - name: FSD architecture lint
+        run: npm run lint:fsd
+      - name: Gate self-tests
+        # Pins the negative cases for the gates: those rules exist to reject
+        # things, so a change that stops rejecting them must fail here rather
+        # than in review.
+        run: npm run gates:self-test
 
   quality:
     name: quality (${{ matrix.os }})
@@ -71,7 +104,7 @@ jobs:
       - name: Verify committed lib/ matches a fresh build
         run: git diff --exit-code -- lib
       # dsh installs this package into a profile with `npm install` (devDeps
-      # omitted) — the guarded `prepare` script must not fail in that
+      # omitted) - the guarded `prepare` script must not fail in that
       # environment (husky is a devDependency and is absent there). Simulate
       # the consumer flow on a fresh clone.
       - name: Verify consumer install (npm install --omit=dev in a fresh clone)

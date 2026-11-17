@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-08-30-guard-wrap-seam
+2026-08-30-guard-wrap-seam.md: 25d5583abae5ddda79523674577d5106305842dd
+2026-08-30-guard-wrap-seam.zh.md: 0694af145c8f40955a82c189d492d798648dc885

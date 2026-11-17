@@ -1,0 +1,34 @@
+# Agent Note: Three-state TOTP config, default off
+
+Status: implemented
+Legacy ID: D7
+
+[English](2026-08-30-totp-config-off-by-default.md) | 中文
+
+## Problem
+
+TOTP 是安全加固，但升级不应该改变存量部署的行为。M3 发布的实例里用户可能已有
+`totpSecret` 字段（只是未使用），也可能没有；需要一个能把「是否启用」与
+「强制程度」分开表达的配置面。同时防枚举纪律（P9）要求所有失败路径统一 401，
+不能因为配置原因暴露「你是唯一没有 TOTP 的人」。
+
+## Decision
+
+新增配置项 `totp: "off" | "optional" | "required"`，**默认 `"off"`**。
+`off`：忽略用户的 `totpSecret`（纯密码流程，开箱行为与 M3 完全一致）；
+`optional`：有 secret 的用户走两段式，没有的走单段；
+`required`：所有用户必须两段式，无 secret 的用户登录失败（统一 401）。
+
+## Alternatives considered
+
+- **布尔开关 `totpEnabled: boolean`** — 只能表达开/关，无法表达「全员强制」
+  与「有 secret 才启用」的区别。
+- **默认 `"optional"`** — 升级即改变行为（有 secret 的用户突然要两段式），
+  违背零惊扰升级原则。
+- **按用户手工开挖（无全局开关）** — 无法做「全员强制」的基线加固。
+
+## Why
+
+默认 `off` 保证 M3 行为字节级不变，`required` 为需要高基线加固的部署提供全员强制，
+`optional` 提供渐进迁移路径（先给管理员开，再逐步推广）。三态覆盖了升级兼容、
+渐进启用、强制基线三种真实场景；默认值选择优先保护存量部署不被意外改行为。

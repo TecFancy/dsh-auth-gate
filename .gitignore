@@ -13,3 +13,7 @@ Thumbs.db
 
 # playwright-cli session artifacts
 .playwright-cli/
+
+# Generated, read-only mirror of .agents/skills (see scripts/sync-skills.mjs).
+# Integrity verified by `npm run skills:check`, not by git.
+.claude/skills/

@@ -2,7 +2,7 @@
  * passkey 登录的业务策略（不碰 HTTP 响应、不碰校验库）：断言扁平字段的解析与上限、
  * 全局凭据查找、认证器计数器回退与 `BE`/`BS` 一致性判定。
  *
- * 每条规则的理由在 `docs/plans/passkey-login-plan_zh.md` §5.6、§5.8；端点只负责把它们
+ * 每条规则的理由在 `docs/history/plans/passkey-login-plan_zh.md` §5.6、§5.8；端点只负责把它们
  * 接成 401/429/503 响应，库只负责 CBOR/COSE/签名。
  */
 import type { PasskeyRecord, UserRecord, UsersSnapshot } from "../../../entities/user/index.js";

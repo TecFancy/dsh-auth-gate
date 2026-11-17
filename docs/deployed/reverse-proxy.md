@@ -1,12 +1,14 @@
 # Reverse-proxy deployment guide
 
+English | [中文](reverse-proxy_zh.md)
+
 Deploying dsh-auth-gate in front of a **public** dsh web instance always goes
 through a reverse proxy (TLS terminator). This guide collects what we learned
 from production (2026-08-15): the Caddy setup that works, the browser-trust
 fence gotcha behind the `403`s, and the recommended "semi-shell" topology.
 
 > Companion docs: `docs/deployed/deployment.md` (Chinese, ops checklist and acceptance
-> steps) and `docs/specs/dsh-auth-plan.md` §9 M5 (the planned standalone shell).
+> steps) and `docs/history/specs/dsh-auth-plan.md` §9 M5 (the planned standalone shell).
 
 ## 1. Why a reverse proxy is required
 
@@ -44,7 +46,7 @@ same layer that authenticates. Auth alone (gate or not) never fixes the 403s.
 | -------------------------------- | -------------------------------------- | ----------------------- | ---------------------- | ---------------------------------------------------------------- |
 | Plain proxy (Caddy pass-through) | dsh-auth-gate                          | no                      | 403 on privileged APIs | works except Settings                                            |
 | **Semi-shell (recommended)**     | dsh-auth-gate                          | **yes** (2 Caddy lines) | **fully works**        | keep the login page, rate limit, revocation                      |
-| Standalone shell (M5, roadmap)   | dsh-auth-gate as its own proxy process | built-in                | fully works            | dsh runs with zero plugins; see `docs/specs/dsh-auth-plan.md` §9 |
+| Standalone shell (M5, roadmap)   | dsh-auth-gate as its own proxy process | built-in                | fully works            | dsh runs with zero plugins; see `docs/history/specs/dsh-auth-plan.md` §9 |
 
 The fence being neutralized by the rewrite is compensated by the gate: the
 session cookie is `SameSite=Lax`, so cross-site / DNS-rebinding requests never
@@ -85,7 +87,7 @@ same rules (verified: `101` with cookie, `401` without).
 Since 0.1.2-alpha, dsh web keeps a page-level launch-token gate: a fresh browser
 needs `/?token=<launchToken>` once to mint a 30-day, Host-bound session cookie.
 dsh-auth-gate bridges this after a successful login by redirecting to a
-**relative** `/?token=…` (details in `docs/implemented/impl-launch-token-bridge.md`).
+**relative** `/?token=…` (details in `docs/history/specs/impl-launch-token-bridge.md`).
 
 - **The relative redirect works in both topologies** (plain pass-through and the
   semi-shell above): the browser stays on your origin, and the minted cookie is

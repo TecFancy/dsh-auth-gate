@@ -10,7 +10,7 @@ import type { VolatileField } from "./host/shared/lib/index.js";
  * extends `PasskeyFields`，`src/index.ts` 只留下 `...passkeyConfigFields`、一次 `wirePasskey`
  * 调用，以及把 `enabled` 透传给端点接线。
  *
- * 配置语义见 `docs/plans/passkey-login-plan_zh.md` §5.2：`publicHost` 是 RP ID/origin 的
+ * 配置语义见 `docs/history/plans/passkey-login-plan_zh.md` §5.2：`publicHost` 是 RP ID/origin 的
  * 唯一锚点（绝不读请求头 `Host`）；功能配置不成立时 **fail-closed**（按 off 处理、error 日志），
  * 实例照常启动，口令 + TOTP 登录不受影响。
  */
