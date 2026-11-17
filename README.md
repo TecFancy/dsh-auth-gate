@@ -135,8 +135,10 @@ accurate. Here is what it corresponds to in the code.
   file. When the service is missing or the reference does not resolve, the gate denies
   every request instead of letting traffic through.
 - **The network capability is the plugin's own traffic**: the browser calling the
-  plugin's endpoints (sign-in, user management, password reset) and the optional
-  authenticated local proxy. Nothing is sent anywhere else.
+  plugin's endpoints (sign-in, user management, password reset), the optional
+  authenticated local proxy, and the anonymous usage ping described under
+  [Anonymous usage statistics](#anonymous-usage-statistics) - one `POST` per process per
+  24 hours, off with `telemetry: false`. Apart from that ping, nothing leaves the process.
 - **What a static scan cannot say.** It can prove a capability is present; it cannot
   prove that one is absent, and it does not read intent.
 
@@ -356,7 +358,8 @@ the previous or next window is also accepted (drift tolerance).
 
 This plugin sends one usage ping per process per 24 hours, and only after a request has already been
 let through the login gate. It answers one question: how many machines actually run the plugin, and
-on which version. No account, no server of ours, no third-party SDK.
+on which version. No account and no third-party SDK: the ping goes to a single endpoint the
+maintainer runs, and nothing else leaves the process.
 
 The accurate description is **pseudonymous data with no IP, linked by a random install id**, not
 legally anonymous data: the same id is linkable over time, so it is only used to estimate install

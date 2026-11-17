@@ -2,5 +2,5 @@
 # of the last confirmed-consistent state. Both languages carry equal
 # authority; after editing either side, bring the other along and re-record
 # with:  npm run bilingual:re-record -- .agents/notes/implemented/feature/2026-11-06-anonymous-usage-telemetry
-2026-11-06-anonymous-usage-telemetry.md: 98c15a6ef43730a799c98f2a76907c31f8995f55
-2026-11-06-anonymous-usage-telemetry.zh.md: 2ac383b9eb7eee01a2b68668119aa5a618f944d1
+2026-11-06-anonymous-usage-telemetry.md: db1cdfe8507fd2006e8ed67f90a5f8dc3694f407
+2026-11-06-anonymous-usage-telemetry.zh.md: b70ba3fd352a0914aeb70f10dcdfa38d5021d2c3
