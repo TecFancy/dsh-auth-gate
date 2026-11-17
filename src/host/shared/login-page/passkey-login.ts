@@ -1,7 +1,7 @@
 /**
  * 登录页的 passkey 入口（M6 PR2b）：按钮 + 隐藏表单 + 固定错误槽 + 渐进增强脚本。
  *
- * 设计约束（`docs/plans/passkey-login-plan_zh.md` §5.7）：
+ * 设计约束（`docs/history/plans/passkey-login-plan_zh.md` §5.7）：
  * - 无 JS 时密码登录完全不受影响：按钮与表单默认 `hidden`，由脚本在特性检测通过后显示；
  * - 登录完成走**普通表单 POST**（302/cookie/失败卡片与口令登录同形），只有取 options 这一步用 fetch；
  * - 页面上不出现任何请求文本：失败提示是编译进页面的常量，脚本只切换 `hidden`；

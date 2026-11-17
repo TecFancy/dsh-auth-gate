@@ -104,8 +104,9 @@ _读凭据的同时还能联网_。这是披露，不是判决；对本插件来
   `tokenRef`（默认 `DSH_AUTH_TOKEN`）是插件唯一会去要的引用；它不会列出、遍历或读取其他凭据。
 - **凭据服务是 harness 自己的一层**，取值顺序为 `$DSH_HOME/.credentials.yaml`（创建时权限即为
   `0600`）、进程环境变量、`.env` 文件。服务缺失或引用解析不出来时，门禁会拒绝所有请求，而不是放行。
-- **联网能力来自插件自身的流量**：浏览器请求插件自己的端点（登录、用户管理、重置口令），以及
-  可选的认证本地代理。数据不会发往其他地方。
+- **联网能力来自插件自身的流量**：浏览器请求插件自己的端点（登录、用户管理、重置口令）、可选的
+  认证本地代理，以及[匿名使用统计](#匿名使用统计)里那一次上报（每进程每 24 小时最多一次 `POST`，
+  `telemetry: false` 可关）。除这次上报外，没有别的数据离开进程。
 - **静态扫描说不了的事**：它能证明某个能力存在，证明不了某个能力不存在，也读不出意图。
 
 如果你希望实例完全不读凭据，用密码模式即可。
@@ -169,7 +170,7 @@ dsh --profile web
 
 在 dsh 0.1.2-alpha 及更高版本上（这些版本的页面带有 launch token 校验），登录会自动跨过这道校验：
 登录跳转会先经过一次相对地址 `/?token=…` 换取 dsh cookie，然后进入 `/`（细节见
-`docs/implemented/impl-launch-token-bridge_zh.md`）。
+`docs/history/specs/impl-launch-token-bridge_zh.md`）。
 
 那张 dsh cookie 是**独立的第二层**：名字取自请求的 authority（`dsh-auth-<sha256(host)>`），
 用 dsh 自己的密钥签名，有效期 30 天。本插件的门只检查自己的 `dsh_auth` 会话，所以会话有效时
@@ -284,8 +285,8 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
 ## 匿名使用统计
 
 这个插件每进程每 24 小时最多发一次使用统计，而且只在一次请求已经通过登录门之后。它只回答
-一个问题：有多少台机器真的在跑这个插件、跑的是哪个版本。没有账号，没有我们自己的服务器，也没有
-第三方 SDK。
+一个问题：有多少台机器真的在跑这个插件、跑的是哪个版本。不需要账号，也不接第三方 SDK：上报只
+发往维护者自己运行的一个端点，除此之外没有别的数据离开进程。
 
 准确的说法是**无 IP、以随机 install id 关联的伪名化数据**，不是法律意义上的匿名数据：同一个 id 在时间上
 可关联，所以它只用来估装机量和版本分布，不用于计费、安全判断，也不对外宣称精确数字。
@@ -310,7 +311,7 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
 
 安装 id 存在同一个配置条目的隐藏字段 `installId` 里，宿主提供 settings 服务时经它写回。没有这个
 服务的宿主把 id 留在进程内存里（每次重启换一个），而不是私自在磁盘上写文件；删掉这个字段就换了
-一个新的伪名化身份。理由与被否决的做法见[决策记录](docs/decisions/implemented/2026-11-06-anonymous-usage-telemetry.zh.md)。
+一个新的伪名化身份。理由与被否决的做法见[决策记录](.agents/notes/implemented/feature/2026-11-06-anonymous-usage-telemetry.zh.md)。
 
 ## 命令行工具
 
@@ -366,7 +367,7 @@ curl -s -H "Origin: https://dsh.example.com" -b jar \
 （零外链、无脚本）；提交时仍然要求当前口令，成功后清除标记并把该用户登出，之后即可正常登录。
 重置**不会**改动目标的 TOTP 密钥；重置一个仍处于禁用状态的账号也不会让它登得进来（登录路径恒拒
 禁用用户），需要先执行 `dsh-auth user enable <name>`。完整契约见
-[D25](docs/decisions/implemented/2026-09-24-admin-password-reset.zh.md)。
+[D25](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.zh.md)。
 
 ## 内置配置技能
 
@@ -538,7 +539,7 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 本仓库遵循 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework) 的工程约定：
 跨 slice 只通过 barrel 引用（Feature-Sliced Design 分层，由 Steiger 检查），以 `npm run verify` 作为门禁链，并保留决策记录（ADR）。`verify`
 依次运行 format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity / type-check /
-覆盖率 80% / build / bundle / 宿主契约；测试、构建和发版流程见 `docs/specs/development_zh.md`。
+覆盖率 80% / build / bundle / 宿主契约；测试、构建和发版流程见 `docs/conventions_zh.md`。
 
 ## 许可证
 

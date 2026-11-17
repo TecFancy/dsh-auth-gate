@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/feature/2026-09-22-public-host-identity
+2026-09-22-public-host-identity.md: 5258f688aef2cb9cbf2ac22bafaf9bf36e9f4d6b
+2026-09-22-public-host-identity.zh.md: 3d3ee8d24ce0dcb90f004e78045e54f64b0d08d0

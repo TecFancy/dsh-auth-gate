@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "files": {
+    "architecture/2026-08-30-layered-src-with-barrels.i18n.yaml": "sha256:ed96fa44da148ad2550a44b2ba732a777277f594977c1fa7fb56584407b74acd",
+    "architecture/2026-08-30-layered-src-with-barrels.md": "sha256:6b43e80286f0b5fe8b005cbe1d2b5b6b066af0cc8a7ca5c4f28980aca1d9623f",
+    "architecture/2026-08-30-layered-src-with-barrels.zh.md": "sha256:0fe5258f8ece76d8784db1e613f2bea7ad405069579516ab59b5d58e3dafb2ea",
+    "architecture/2026-09-13-http-endpoint-layer.i18n.yaml": "sha256:5921b5e611898e2e4643cbcf6c3cae9acc334d141f1a6ce5e79a446449de40b6",
+    "architecture/2026-09-13-http-endpoint-layer.md": "sha256:69d8a1ba99ade389f22e62acc4fb7b8af30c29da2bc06893feb40a64e4232416",
+    "architecture/2026-09-13-http-endpoint-layer.zh.md": "sha256:502c4b70b32504dbe3d136fef66e602ca9c095dc6100799e0b9b70f19c6d9232"
+  }
+}

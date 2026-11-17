@@ -1,46 +1,65 @@
-# docs — 文档导航
+# docs - Documentation map
 
-dsh-auth-gate 的文档按**生命周期**分层组织（2026-08-30 整理）：
+English | [中文](README_zh.md)
 
-| 目录                                                        | 内容                                                                                                                                                                                                                                                                                                                                            | 阅读时机                  |
-| ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
-| [`deployed/`](deployed/)                                    | 部署运维：deployment（验收清单 A–J、升级 5.1）、reverse-proxy（反代部署）、local-proxy（配置面本地代理）、known-limitations（README 短清单的完整版：机制 + ADR 出处）、entry-coverage-0.1.5-rc.2（0.1.5-rc.2 全部入口未认证覆盖证据，61/61 被拒）、entry-coverage-0.2.0-rc.2（0.2.0-rc.2 复跑，67/67 受守卫入口被拒；门自己的公开端点另列一组） | 部署 / 排障 / 升级时      |
-| [`specs/`](specs/)                                          | 路线图与工程：dsh-auth-plan（M0–M6 分期 + 威胁模型）、development（命令/门禁/约定/release）、src-refactor-plan（分层 src）                                                                                                                                                                                                                      | 接下阶段任务、改代码前    |
-| [`handoff/`](handoff/)                                      | 执行交接（每阶段新 session 必读）：handoff-m2 / m3 / m4（m4 含 0.11.1 修订）                                                                                                                                                                                                                                                                    | 新 session 执行对应规格前 |
-| [`implemented/`](implemented/)                              | 已交付规格与规划：impl-m1~m4（当前实现基准，m4 最新）、impl-m2-admin（P2/D25 管理面切片）、impl-launch-token-bridge（0.1.2-alpha 兼容层）、impl-client-logout、login-page-polish-plan（已落地视觉基线）、totp-fix-plan（0.11.1 修复计划，已实施）                                                                                               | 核对「当前行为依据」时    |
-| [`plans/`](plans/)                                          | 进行中规划：pr53-login-page-fix-plan（#53 移植）、passkey-login-plan（通行密钥登录可行性与方案）                                                                                                                                                                                                                                                | #53 落地时                |
-| [`decisions.md`](decisions.md) + [`decisions/`](decisions/) | 重大决策编号索引 D1–D32（双语记录，proposed / implemented / archived）                                                                                                                                                                                                                                                                          | 理解「为什么」时          |
-| [`demo/`](demo/)                                            | README 效果图（登录页 / TOTP 验证码页 / 实例 / 设置导航「账号安全」行 / 改密面板 / 用户管理块 / 重置成功态 / 通行密钥区块与带 passkey 按钮的登录页；**统一英文界面 + 浅色主题**，中英共用同一套）                                                                                                                                               | README 引用               |
-| [`reviews/`](reviews/)                                      | 外部评审记录（grok-4.6 launch-token bridge review 等）                                                                                                                                                                                                                                                                                          | 变更合入前对照            |
+This repository's documentation is organised by **kind of fact**, not by time.
+Each kind has exactly one home; the rules are in
+[`AGENTS.md`](../AGENTS.md) "Where each kind of fact lives".
 
-## 阅读路径
+## Current documentation
 
-- **部署/运维**：`deployed/deployment.md`（首次部署走 §0–§4 验收；升级走 §5 + §5.1）→ `deployed/reverse-proxy.md` → `deployed/local-proxy.md`；升级后复跑入口覆盖脚本的判据见 `deployed/entry-coverage-0.1.5-rc.2.md` §5，0.2.0-rc.2 的复跑见 `deployed/entry-coverage-0.2.0-rc.2.md`
-- **新功能开发（新 session）**：`AGENTS.md` → `implemented/impl-mN.md`（对应阶段规格）→ `handoff/handoff-mN.md`（环境事实与踩坑）→ 落地后补 `docs` 与 ADR
-- **当前实现基准**：`implemented/impl-m4.md`（含 0.11.1 修订注记块；正文为历史 M4 契约，注记优先）
-- **决策溯源**：`decisions.md` 索引 → 具体 ADR（zh/en 成对）
+| Path | Contents | When to read |
+| --- | --- | --- |
+| [`architecture.md`](architecture.md) | The shape of the source tree and its layering rules: the host and client halves, the FSD layers, the `src/protocol/` cross-half contract, the two layering gates | Before adding a slice, moving a file between layers, or writing a route literal |
+| [`security.md`](security.md) | The negative guarantees the plugin must never break: fail closed, wrap not fork, every entry guarded, the cross-site bounce, trusted proxy, session revocation, the signed challenge cookie, scrypt, the example domain, build parity - and what is deliberately not defended | Before touching the guard, the gate, session handling, or the login page |
+| [`conventions.md`](conventions.md) | Standing conventions: commands, hooks, gates, code style, commit messages, CI, releases, branch hygiene, dependency policy | Every session |
+| [`deployed/`](deployed/) | Deployment and operations: [deployment](deployed/deployment.md) (acceptance checklist A-J, upgrades), [reverse-proxy](deployed/reverse-proxy.md), [local-proxy](deployed/local-proxy.md), [known-limitations](deployed/known-limitations.md) (the full version of the README's short list) | Deploying, troubleshooting, upgrading |
+| [`decisions.md`](decisions.md) | A **compatibility table** for D1-D38, not a live index. The decisions themselves live in [`.agents/notes/`](../.agents/notes/) | When a code comment cites `D<n>` |
+| [`demo/`](demo/) | README screenshots (login page, TOTP challenge, account security, passkey block; English UI, light theme) | Referenced by the README |
+| [`design/`](design/) | Design exports (HTML plus the uploaded images) | Comparing against the visual baseline |
+| [`i18n/`](i18n/) | The [terminology table](i18n/terminology.md) and the [Chinese prose rules](i18n/prose-rules.md) | Writing or editing Chinese documentation |
 
-## 文档规范（doc governance，`npm run docs:check` 强制执行）
+## Historical documentation
 
-1. **双语成对**：除 decisions/ 用官方 `<date>-<slug>.en|zh.md` 外，一律
-   `<name>.md`（英文正文）+ `<name>_zh.md`（中文正文）成对。单语豁免仅限
-   `README.md`（导航）、`decisions.md`（索引）、`demo/`、`design/`。
-2. **命名历史例外**：`totp-fix-plan.md` 是中文、`totp-fix-plan.en.md` 是英文
-   （反转），冻结不再新增此类。
-3. **模板**：新建文档从模板起步 —— `implemented/_template(_zh).md`（实施规格）、
-   `reviews/_template(_zh).md`（评审记录）、`handoff/_template(_zh).md`（交接）、
-   `decisions/_template.(en|zh).md`（ADR）。
-4. **大小红线**：单文件 ≤ 50 KiB；超限必须切片（骨架 + `references/`）。冻结中的
-   frozen spec（`implemented/impl-m3.md`、`implemented/impl-m3_zh.md`、
-   `implemented/totp-fix-plan.en.md`）按确切路径豁免，下次大 revision 时再分，
-   不许继续膨胀。
-5. **禁止重复标题**：同一文件内同一个 H2/H3/H4 标题不得出现两次（复制粘贴事故）。
-   扫描范围是 `docs/` 下全部 `.md`（含单语豁免文件与 `demo/`、`design/`）加上仓库根
-   `README.md` / `README.zh.md`；围栏代码块（以三个反引号开头的行）内的 `#` 行不算
-   标题，H1 不在扫描范围，标题比较忽略大小写。
-6. 新文档无法满足 1-5 时先改这里的规则再提交，不让 `docs:check` 静默变红。
-7. **根 README 必须对称**：`README.md` 与 `README.zh.md` 的 `##` 段数、每段的列表项 / 围栏代码块 /
-   `###` 小节数 / 表格行（含列数）、图片集合、链接目标集合（语言后缀归一后）、以及目录锚点都必须一致，
-   由 `npm run readme:parity` 强制（已挂 `verify` 链）。截图**统一英文界面**，`docs/demo/` 下不允许
-   再出现 `*.zh.png`：插件面板原本跟随 GUI 语言，现在两版共用同一套 `*.en.png`；登录页等由插件
-   **服务端渲染**的页面本来就是英文，与语言无关。
+[`history/`](history/) is a **frozen historical area**, not current authority.
+It holds the M1-M4 executable specs, the per-milestone handoff documents, old
+plans that shipped or lost their force, external review transcripts, and the
+versioned entry-coverage evidence.
+
+The historical area may be cited as evidence, but `AGENTS.md` and the skills
+must not make it required reading for every task. Current behaviour is defined
+by the code, the tests, `architecture.md`, `security.md` and `deployed/`.
+
+## Reading paths
+
+- **A new session picking up a task**: `AGENTS.md` -> `docs/architecture.md`
+  (structure) -> `docs/security.md` (what must not break) ->
+  `docs/conventions.md` (commands and gates) -> the relevant Agent Note (why)
+- **Deploying or operating**: `deployed/deployment.md` (first deployment runs
+  the section 0-4 acceptance; upgrades run section 5 and 5.1) ->
+  `deployed/reverse-proxy.md` -> `deployed/local-proxy.md`
+- **Understanding why a decision was made**: look the number up in
+  `docs/decisions.md`, then open the Agent Note it points at
+- **Changing code**: `docs/conventions.md` "Verifying a change actually works",
+  then the tests for the slice you are touching
+
+## Documentation rules
+
+Enforced by `npm run docs:check`:
+
+1. **Reachability**: every current document must be reachable from `AGENTS.md`
+   or this page by following relative links. An orphan document fails.
+2. **Resolvable links**: relative links and `#fragment` targets must name an
+   existing file and heading.
+3. **Bilingual pairs**: unless exempt, `<name>.md` (English) pairs with
+   `<name>_zh.md` (Chinese). Exempt: this page, `decisions.md`, `demo/`,
+   `design/`, `history/`, `.agents/skills/`, `AGENTS.md`, `CLAUDE.md`.
+4. **Size red line**: a single file stays at or under 50 KiB; over the line it
+   must be sliced into a skeleton plus `references/`.
+5. **No duplicate headings**: the same H2/H3/H4 heading may not appear twice in
+   one file.
+6. **Word budgets**: `AGENTS.md` and `conventions.md` are bounded by
+   `scripts/doc-budgets.json`, so a standing document cannot only grow.
+
+When a new document cannot satisfy 1-6, change the rules here first rather than
+letting `docs:check` go quietly red.

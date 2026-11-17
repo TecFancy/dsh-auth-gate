@@ -1,11 +1,13 @@
 # dsh-auth-gate Deployment and Acceptance Checklist
 
+English | [中文](deployment_zh.md)
+
 This document describes how to deploy dsh-auth-gate (password mode, M3) to a public dsh web
 instance and complete **deployment acceptance**. Applies to: an instance already running dsh
 web (`dsh --profile web`) that needs an authentication gate.
 
-Design basis: `docs/specs/dsh-auth-plan.md` §7/§8 (absence of an upstream PR channel, defense in
-depth); specifications: `docs/implemented/impl-m2.md` (token mode), `docs/implemented/impl-m3.md` (password mode).
+Design basis: `docs/history/specs/dsh-auth-plan.md` §7/§8 (absence of an upstream PR channel, defense in
+depth); specifications: `docs/history/specs/impl-m2.md` (token mode), `docs/history/specs/impl-m3.md` (password mode).
 **Choose one of the two modes**: the text below is written for password mode (recommended, M3);
 token mode only needs to skip the "create users" step and configure `tokenRef`.
 
@@ -25,7 +27,7 @@ token mode only needs to skip the "create users" step and configure `tokenRef`.
   to pnpm). Verified: npm's default global prefix is `/usr` (cannot install without root
   privileges); use
   `npm i -g pnpm --prefix ~/.npm-global` and `export PATH="$HOME/.npm-global/bin:$PATH"`
-  (`dsh` itself is also installed in this prefix, see `docs/handoff/handoff-m2.md` §3.2).
+  (`dsh` itself is also installed in this prefix, see `docs/history/handoff/handoff-m2.md` §3.2).
 
 ---
 
@@ -198,11 +200,11 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 1. Start up (§3) — then confirm the gate actually answers: an unauthenticated probe must get 401 or 302. A fail-loud self-check means the entry did not activate, and dsh may keep running without the gate;
 2. Run acceptance groups B/D/F of the checklist (guard + session + WS);
 3. **Re-run the unauthenticated entry-coverage probe** (read-only, no credentials):
-   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits non-zero if any **guarded** entry answers 2xx without a session (the gate's own public endpoints are judged separately - they must stay reachable). Latest verified runs: [`entry-coverage-0.2.2-rc.1.md`](./entry-coverage-0.2.2-rc.1.md) — dsh
+   `node scripts/check-live-entries.mjs` (defaults to `http://127.0.0.1:3080`). It discovers every registered `exact` / `prefix` / `upgrade` / `fallback` entry in the loaded profile and exits non-zero if any **guarded** entry answers 2xx without a session (the gate's own public endpoints are judged separately - they must stay reachable). Latest verified runs: [`entry-coverage-0.2.2-rc.1.md`](../history/evidence/entry-coverage-0.2.2-rc.1.md) — dsh
    `0.2.2-rc.1`, the first host with `{ resource }` routes: `/plugins` and the SPA fallback are
    guarded, 26/26 probes rejected, and the browser-navigation probe asserts `302 -> /auth/login` —
-   plus [`entry-coverage-0.2.0-rc.2.md`](./entry-coverage-0.2.0-rc.2.md) (62 entries, 67/67) and
-   [`entry-coverage-0.1.5-rc.2.md`](./entry-coverage-0.1.5-rc.2.md). The navigation probe needs `Sec-Fetch-Mode: navigate`
+   plus [`entry-coverage-0.2.0-rc.2.md`](../history/evidence/entry-coverage-0.2.0-rc.2.md) (62 entries, 67/67) and
+   [`entry-coverage-0.1.5-rc.2.md`](../history/evidence/entry-coverage-0.1.5-rc.2.md). The navigation probe needs `Sec-Fetch-Mode: navigate`
    (`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`): without those headers the gate
    answers 401 by design, not 302.
 4. Check `boot.log` for any new error/warn;
@@ -214,7 +216,7 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
 6. **For dsh upgrades to 0.1.2-alpha and later**: dsh web adds a page-level
    launch-token gate (a fresh browser needs `/?token=` once). dsh-auth-gate
    bridges it after a successful login via a relative `/?token=…` redirect (see
-   `docs/implemented/impl-launch-token-bridge.md`). After the upgrade, run
+   `docs/history/specs/impl-launch-token-bridge.md`). After the upgrade, run
    acceptance item A with a **fresh browser** (no dsh cookie): signing in should
    land directly on the instance — no 401 token-gate wall. In `boot.log`,
    `launch-token bridge inactive` is expected only when dsh has no
@@ -260,7 +262,7 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 - [ ] Treat session logs as confidential material (protect backups/sharing equally).
 - [ ] Fold upgrade regression (§5) into the ops process; add auth-line health checks
       (`boot.log` + acceptance B/D/F) to monitoring.
-- [ ] Password hashes are scrypt (`docs/implemented/impl-m3.md` P1); the file has zero plaintext.
+- [ ] Password hashes are scrypt (`docs/history/specs/impl-m3.md` P1); the file has zero plaintext.
 - [ ] `dsh-auth user disable <name>` blocks new logins **and** revokes that user's issued sessions
       (the plugin sweeps `users.yaml` every `revokeSweepMs`, default 5000 ms; set `0` to keep the
       old M3 behavior of blocking new logins only).
@@ -286,7 +288,7 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 
 > §1–§7 of this document are the "plugin form" (the guard lives inside the dsh process). After
 > production validation on 2026-08-15, the public instance switches to the **semi-shell** variant;
-> the long-term direction is `docs/specs/dsh-auth-plan.md` §9 M5 (independent reverse-proxy shell).
+> the long-term direction is `docs/history/specs/dsh-auth-plan.md` §9 M5 (independent reverse-proxy shell).
 
 ### 8.1 Why a Shell Is Needed: The Browser-Trust Fence and Authentication Are Orthogonal
 

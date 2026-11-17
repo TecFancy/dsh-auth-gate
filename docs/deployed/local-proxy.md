@@ -1,5 +1,7 @@
 # Authenticated Local Proxy (dsh-auth-proxy) Design
 
+English | [中文](local-proxy_zh.md)
+
 > Status: reviewed and implemented (`feat/local-proxy`). Audience: maintainers and deployers.
 > Constraints: **no dsh source changes**; Phase 1 leaves the auth-gate server-side logic untouched.
 

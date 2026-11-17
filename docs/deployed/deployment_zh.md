@@ -1,10 +1,12 @@
 # dsh-auth-gate 部署与验收清单
 
+[English](deployment.md) | 中文
+
 本文档描述如何把 dsh-auth-gate（password 模式，M3）部署到一个公网 dsh web 实例，并完成
 **部署验收**。适用于：实例已跑通 dsh web（`dsh --profile web`），需要加认证门。
 
-设计依据：`docs/specs/dsh-auth-plan_zh.md` §7/§8（无上游 PR 通道的限制、纵深防御）；
-规格：`docs/implemented/impl-m2_zh.md`（token 模式）、`docs/implemented/impl-m3_zh.md`（password 模式）。
+设计依据：`docs/history/specs/dsh-auth-plan_zh.md` §7/§8（无上游 PR 通道的限制、纵深防御）；
+规格：`docs/history/specs/impl-m2_zh.md`（token 模式）、`docs/history/specs/impl-m3_zh.md`（password 模式）。
 **两个模式二选一**：下面按 password 模式（推荐，M3）编写；token 模式只需跳过
 "建用户"一步并配置 `tokenRef`。
 
@@ -20,7 +22,7 @@
 - **服务器有 Node ≥ 22.19**（与部署一致）与 pnpm（`dsh plugin` 转发 pnpm）。实测：npm 默认
   global prefix 是 `/usr`（无 root 权限装不了），用
   `npm i -g pnpm --prefix ~/.npm-global` 并 `export PATH="$HOME/.npm-global/bin:$PATH"`
-  （`dsh` 本身也装在这个 prefix，见 `docs/handoff/handoff-m2_zh.md` §3.2）。
+  （`dsh` 本身也装在这个 prefix，见 `docs/history/handoff/handoff-m2_zh.md` §3.2）。
 
 ---
 
@@ -179,11 +181,11 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
    （默认打 `http://127.0.0.1:3080`）。脚本会从已加载 profile 里发现全部已注册入口
    （`exact` / `prefix` / `upgrade` / `fallback`），只要有任一条**受守卫**入口**未带会话却答 2xx** 就以非零码退出
    （门自己的公开端点单列判定——它们必须保持可达）。
-   最近已验证运行：[`entry-coverage-0.2.2-rc.1_zh.md`](./entry-coverage-0.2.2-rc.1_zh.md) ——
+   最近已验证运行：[`entry-coverage-0.2.2-rc.1_zh.md`](../history/evidence/entry-coverage-0.2.2-rc.1_zh.md) ——
    dsh `0.2.2-rc.1`，第一条有 `{ resource }` 路由的宿主：`/plugins` 与 SPA 兜底都在门内，
    26/26 被拒，浏览器导航探针断言 `302 -> /auth/login`；另有
-   [`entry-coverage-0.2.0-rc.2_zh.md`](./entry-coverage-0.2.0-rc.2_zh.md)（62 条入口，67/67）与
-   [`entry-coverage-0.1.5-rc.2_zh.md`](./entry-coverage-0.1.5-rc.2_zh.md)。导航探针必须带 `Sec-Fetch-Mode: navigate`
+   [`entry-coverage-0.2.0-rc.2_zh.md`](../history/evidence/entry-coverage-0.2.0-rc.2_zh.md)（62 条入口，67/67）与
+   [`entry-coverage-0.1.5-rc.2_zh.md`](../history/evidence/entry-coverage-0.1.5-rc.2_zh.md)。导航探针必须带 `Sec-Fetch-Mode: navigate`
    （`curl -H 'Sec-Fetch-Mode: navigate' -H 'Sec-Fetch-Dest: document'`）：缺这两个头时门按设计返回
    401 而不是 302。
 4. 检查 `boot.log` 无新增 error/warn；
@@ -192,7 +194,7 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
    ——登录门 fail-open 消失。**先把走廊覆盖目标宿主的插件版本装好，再动宿主。**
 6. **0.1.2-alpha 起因 dsh 升级**：dsh web 新增页面级 launch-token 门（新浏览器首访需
    `/?token=`）——auth-gate 登录成功会自动桥接（相对跳转 `/?token=…`，见
-   `docs/implemented/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
+   `docs/history/specs/impl-launch-token-bridge_zh.md`）。升级后用**全新浏览器**（无 dsh
    cookie）跑一遍验收 A：登录成功即直达实例，不应撞 401 token 门；`boot.log` 里
    `launch-token bridge inactive` 只应在「dsh 无 `authenticatedUrl`」时出现（旧版
    dsh 属预期），`launch-token bridge unavailable` 出现则需排查 connection 服务。
@@ -231,7 +233,7 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] `$DSH_HOME/.credentials.yaml` 与 `auth/users.yaml` 均 `chmod 600`（dsh-auth CLI 自动 600）。
 - [ ] 会话日志视同含密材料（备份/共享同等防护）。
 - [ ] 升级回归（§5）纳入运维流程；auth 行健康检查（`boot.log` + 验收 B/D/F）纳入监控。
-- [ ] 口令哈希为 scrypt（`docs/implemented/impl-m3_zh.md` P1）；文件零明文。
+- [ ] 口令哈希为 scrypt（`docs/history/specs/impl-m3_zh.md` P1）；文件零明文。
 - [ ] `dsh-auth user disable <name>` 既拦新登录，也**吊销该用户已发的会话**（插件按 `revokeSweepMs`
       周期扫描 users.yaml，默认 5000 毫秒；设 0 = 退回 M3「只拦新登录」的旧行为）。
 - [ ] 限速内存态重启清零。同主机反代部署必须显式配置 `clientIpHeader`（`x-forwarded-for`；
@@ -251,7 +253,7 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 ## 8. 公网部署变体（2026-08-15 起，dsh.example.com 生效）：半外壳
 
 > 本文档 §1-§7 为"插件形态"（门卫进 dsh 进程）。2026-08-15 生产实证后，公网实例改用
-> **半外壳**变体；长期方向见 `docs/specs/dsh-auth-plan_zh.md` §9 M5（独立反代外壳）。
+> **半外壳**变体；长期方向见 `docs/history/specs/dsh-auth-plan_zh.md` §9 M5（独立反代外壳）。
 
 ### 8.1 为什么需要外壳：浏览器信任栅栏与认证正交
 

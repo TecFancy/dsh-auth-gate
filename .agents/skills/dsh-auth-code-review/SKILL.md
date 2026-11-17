@@ -1,6 +1,11 @@
 ---
 name: dsh-auth-code-review
-description: Use when reviewing a pull request or change in the dsh-auth repo. Orients the reviewer to this repo's standards (AGENTS.md, development.md, impl-m1.md) and to the checks that matter for a security-gate plugin: enforcement paths, disposal, real-entry-path tests, and fail-closed posture.
+description: >
+  Use when reviewing a pull request or change in the dsh-auth repo. Orients the
+  reviewer to this repo's standards (AGENTS.md, docs/conventions.md,
+  docs/security.md) and to the checks that matter for a security-gate plugin:
+  enforcement paths, disposal, real-entry-path tests, and fail-closed posture.
+origin: local
 ---
 
 # Reviewing a dsh-auth change
@@ -11,9 +16,9 @@ required behavior over style; one substantiated blocker beats a list of nits.
 
 ## Sources of truth
 
-- `AGENTS.md`, `docs/specs/development.md` (gates and conventions), `docs/specs/dsh-auth-plan.md` (threat
-  model and design), `docs/implemented/impl-m1.md` (M1 frozen decisions and verified contracts).
-- Only harness facts recorded in `docs/implemented/impl-m1.md` §2 are authoritative for the diff. Flag any
+- `AGENTS.md`, `docs/conventions.md` (gates and conventions), `docs/history/specs/dsh-auth-plan.md` (threat
+  model and design), `docs/history/specs/impl-m1.md` (M1 frozen decisions and verified contracts).
+- Only harness facts recorded in `docs/history/specs/impl-m1.md` §2 are authoritative for the diff. Flag any
   change that depends on harness internals beyond that section — unexplored internals are the
   #1 hallucination source in this repo.
 

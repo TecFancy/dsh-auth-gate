@@ -1,13 +1,15 @@
 ---
 name: dsh-auth-pre-push
 description: Use before pushing to dsh-auth or claiming checks pass on a branch. Selects the smallest tests and checks that cover the outgoing diff instead of reflexively running the full verify suite.
+origin: local
 ---
 
 # dsh-auth pre-push checks
 
-Run the narrowest relevant evidence once before a push. The hooks are intentionally narrow —
-pre-commit fixes staged format+lint, pre-push runs the full type-check — so never manually
-repeat a check a hook already runs.
+Run the narrowest relevant evidence once before a push. The hooks are intentionally narrow:
+`pre-commit` runs lint-staged and then the fast whole-tree gate set from
+`scripts/lib/gate-registry.mjs`; `pre-push` runs `npm run gates -- --base @{u}`, which derives
+the scenario set from the outgoing diff. Never manually repeat a check a hook already runs.
 
 ## Inspect the outgoing change
 

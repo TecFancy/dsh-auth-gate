@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers
+2026-08-30-totp-disposition-of-m3-leftovers.md: 3f16323542bdeb68759d7367974ae0432539b190
+2026-08-30-totp-disposition-of-m3-leftovers.zh.md: 34322adb20bdec3bced93989496cd463fb36584b
