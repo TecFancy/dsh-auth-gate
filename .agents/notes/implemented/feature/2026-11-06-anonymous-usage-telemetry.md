@@ -77,5 +77,5 @@ path off. Lazy-after-admit ties the report to actual use: a process that is star
 receives an admitted request sends nothing, and nothing runs on a timer. The payload is built from
 the deployment's configuration and the process facts only - never a user name, password hash, TOTP
 secret, session id, token, client IP, request path or host name - so the threat model of the plugin
-does not change. No dependency, no account, no server of our own, and every failure is swallowed:
-telemetry can never fail or delay an authentication decision.
+does not change. No dependency and no account, one endpoint the maintainer runs, and every failure
+is swallowed: telemetry can never fail or delay an authentication decision.

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.22.0...v0.23.0) (2026-11-17)
+
+
+### Features
+
+* **passkey:** instance-level passkey-only sign-in (`passkey: "required"`) ([#149](https://github.com/TecFancy/dsh-auth-gate/issues/149)) ([6edf554](https://github.com/TecFancy/dsh-auth-gate/commit/6edf5547bbabb7a51b274a79f73e012e093cc8e9))
+
 ## [0.22.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.21.0...v0.22.0) (2026-11-16)
 
 
