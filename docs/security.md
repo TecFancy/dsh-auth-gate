@@ -112,7 +112,19 @@ Rationale: [the example-domain note](../.agents/notes/implemented/process/2026-0
 (`git diff --exit-code -- lib`). A consumer installing from git gets a working
 package without build tooling, and nobody can hand-edit the shipped code.
 
-## 11. What is deliberately not defended
+## 11. An in-process read carrying a Peer is admitted by its caller
+
+`webServer.readResource(request, peer)` is how one part of the host reads what an
+HTTP request for the same URL would receive. The caller has already admitted the
+reader, and the `peer` is that admission. The guard must not re-authenticate such
+a read: it carries no cookie, so a browser gate can only refuse it with `401`,
+and the reader's authority is the `Peer`, not a session. The bypass gives an
+in-process caller nothing it did not have - it already runs inside the host
+process. LiveShare serves the owner's viewer page through the gate on this path.
+
+Rationale: [the peer-read note](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.md).
+
+## 12. What is deliberately not defended
 
 These are known and accepted, not oversights. Each has a note explaining the
 trade-off:
@@ -132,6 +144,7 @@ Rationale: [the M3 leftovers note](../.agents/notes/implemented/simplification/2
 | Fail closed | `src/host/shared/guard/`, `src/host/features/token/model/`, `src/host/features/password/model/` |
 | Wrap, not fork | `src/host/shared/guard/guard.ts`, `self-check.ts` |
 | Every entry guarded | `src/host/shared/guard/guard.ts`, `test/integration.*.test.ts` |
+| Caller-admitted peer reads | `src/host/shared/guard/resource.ts` |
 | Cross-site bounce | `src/host/shared/guard/cross-site-bounce.ts` |
 | Trusted proxy | `src/host/shared/http/client-ip.ts` |
 | Session revocation | `src/host/entities/session/`, `src/host/features/password/model/` |

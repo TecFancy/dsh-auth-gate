@@ -10,7 +10,11 @@ import { apply, Config, inject, name } from "../../src/index.js";
  * 官方 `/plugins` 前缀与 SPA 兜底就是这种形态；这里用同一形态的探针路由覆盖
  * 「存量 + 晚注册 + fallback + 卸载还原」四件事，避免只在 fake server 上自证。
  */
-type RealServer = WrappableServer & { readonly port: number };
+type RealServer = WrappableServer & {
+  readonly port: number;
+  /** 宿主的进程内读入口：LiveShare 的 owner 用它取 viewer 页面。 */
+  readResource(request: Request, peer?: unknown): Promise<Response>;
+};
 
 const BUNDLE = "export const x = 1;\n";
 
@@ -32,10 +36,13 @@ function registerResourceRoutes(server: RealServer): void {
       }),
   });
   server.registerFallback({
-    resource: () =>
+    resource: (_request, peer) =>
       reply("<html>spa</html>", {
         status: 200,
-        headers: { "content-type": "text/html; charset=utf-8" },
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+          "x-probe-peer": peer === undefined ? "none" : "seen",
+        },
       }),
   });
 }
@@ -180,6 +187,38 @@ describe("integration: real webserver + guard on resource routes (allow paths)",
       expect((await fetch(`${base}/manifest.webmanifest`)).status).toBe(200);
     } finally {
       await wsFiber.dispose();
+    }
+  });
+});
+
+describe("integration: in-process readResource carrying a Peer", () => {
+  it("serves a peer-carrying read while the same URL over HTTP stays denied", async () => {
+    const host = await mountHost();
+    try {
+      host.ctx.get("auth")!.gate = denyGate;
+      // 浏览器没有会话：门拒绝。
+      expect((await fetch(`${host.base}/`)).status).toBe(401);
+      // 进程内读带 peer：调用方已经放行（LiveShare owner 读 viewer 页面正是这条路）。
+      const response = await host.server.readResource(new Request("http://viewer.invalid/"), {
+        id: "peer-liveshare",
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-probe-peer")).toBe("seen");
+      expect(await response.text()).toBe("<html>spa</html>");
+    } finally {
+      await host.dispose();
+    }
+  });
+
+  it("does not mistake a peerless in-process read for an admitted one", async () => {
+    const host = await mountHost();
+    try {
+      host.ctx.get("auth")!.gate = denyGate;
+      const response = await host.server.readResource(new Request("http://viewer.invalid/"));
+      expect(response.status).toBe(401);
+      expect(response.headers.get("x-probe-peer")).toBeNull();
+    } finally {
+      await host.dispose();
     }
   });
 });
