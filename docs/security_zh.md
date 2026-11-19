@@ -81,7 +81,13 @@
 
 `lib/` 提交进仓库，CI 在全新构建与它不一致时失败（`git diff --exit-code -- lib`）。从 git 安装的消费者拿到一个不需要构建工具就能用的包，也没有人能手改发布出去的代码。
 
-## 11. 刻意不防的东西
+## 11. 带 Peer 的进程内读由调用方放行
+
+`webServer.readResource(request, peer)` 是宿主内部读取「同一 URL 经 HTTP 会收到什么」的入口。调用方已经放行这个读者，`peer` 就是那次放行。守卫不能对这样的读再认证一次：它不带 cookie，浏览器门只能回 `401`，而读者的权限来自 `Peer`，不是会话。这条旁路不会给进程内调用方任何它本来没有的东西——它已经在宿主进程里。LiveShare 能隔着门提供 owner 的 viewer 页面，靠的就是这条路径。
+
+依据：[peer 读笔记](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.zh.md)。
+
+## 12. 刻意不防的东西
 
 这些是已知且接受的，不是疏漏。每一条都有笔记解释取舍：
 
@@ -98,6 +104,7 @@
 | 失败即关闭 | `src/host/shared/guard/`、`src/host/features/token/model/`、`src/host/features/password/model/` |
 | 包装不 fork | `src/host/shared/guard/guard.ts`、`self-check.ts` |
 | 每个入口都被守卫 | `src/host/shared/guard/guard.ts`、`test/integration.*.test.ts` |
+| 调用方放行的 peer 读 | `src/host/shared/guard/resource.ts` |
 | 跨站弹回 | `src/host/shared/guard/cross-site-bounce.ts` |
 | 受信反代 | `src/host/shared/http/client-ip.ts` |
 | 会话撤销 | `src/host/entities/session/`、`src/host/features/password/model/` |
