@@ -41,11 +41,18 @@ describe("submitPassword: 401 的三种含义", () => {
   });
 
   it("keeps invalidCredentials only for a real wrong password", async () => {
-    for (const body of [{ error: "invalid_credentials" }, { error: "something_else" }, {}]) {
+    const failure = await failureOf(401, { error: "invalid_credentials" });
+    expect(failure?.message).toBe(t("account.invalidCredentials"));
+    expect(failure?.relogin).toBeUndefined();
+    expect(failure?.fields).toEqual(["current"]);
+  });
+
+  it("treats an unknown or bodyless 401 as an expired session, not a wrong password", async () => {
+    for (const body of [{ error: "something_else" }, {}, { error: "unauthorized" }]) {
       const failure = await failureOf(401, body);
-      expect(failure?.message).toBe(t("account.invalidCredentials"));
-      expect(failure?.relogin).toBeUndefined();
-      expect(failure?.fields).toEqual(["current"]);
+      expect(failure?.message).toBe(t("account.expired"));
+      expect(failure?.relogin).toBe(true);
+      expect(failure?.fields).toEqual([]);
     }
   });
 

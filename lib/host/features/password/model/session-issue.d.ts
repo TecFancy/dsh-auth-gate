@@ -25,6 +25,8 @@ export interface IssueSessionOptions {
      * 未改密的用户送回宿主）。cookie 名/属性/路径与正式会话完全一致。
      */
     restricted?: boolean;
+    /** 签发时读到的 `password_changed_at`：扫描器据此吊销用旧口令认证出来的会话。 */
+    credentialVersion?: string | undefined;
 }
 /**
  * 发会话（P14）：subject=username，每次登录新会话；成功 → 302 + set-cookie。
@@ -40,4 +42,5 @@ export declare function issueSession(deps: IssueSessionDeps, res: ServerResponse
  */
 export declare function issueLoginSession(deps: IssueSessionDeps, res: ServerResponse, store: SessionStore, username: string, next: string, user: {
     mustChangePassword?: boolean | undefined;
+    passwordChangedAt?: string | undefined;
 } | undefined, extraSetCookie?: string[]): Promise<void>;

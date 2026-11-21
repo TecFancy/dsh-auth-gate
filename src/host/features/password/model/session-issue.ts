@@ -32,6 +32,8 @@ export interface IssueSessionOptions {
    * 未改密的用户送回宿主）。cookie 名/属性/路径与正式会话完全一致。
    */
   restricted?: boolean;
+  /** 签发时读到的 `password_changed_at`：扫描器据此吊销用旧口令认证出来的会话。 */
+  credentialVersion?: string | undefined;
 }
 
 /**
@@ -50,7 +52,12 @@ export async function issueSession(
   const restricted = options.restricted === true;
   const ttlSeconds = restricted ? RESTRICTED_SESSION_TTL_SECONDS : deps.sessionTtl;
   const kind = restricted ? RESTRICTED_SESSION_KIND : "full";
-  const { token } = await store.create(username, ttlSeconds * 1000, kind);
+  const { token } = await store.create(
+    username,
+    ttlSeconds * 1000,
+    kind,
+    options.credentialVersion,
+  );
   res.setHeader("cache-control", "no-store");
   // 与 dsh authorizeIndex 的 303 同形：带 token 的跳转不给下游留 Referer。
   res.setHeader("referrer-policy", "no-referrer");
@@ -78,12 +85,15 @@ export async function issueLoginSession(
   store: SessionStore,
   username: string,
   next: string,
-  user: { mustChangePassword?: boolean | undefined } | undefined,
+  user:
+    | { mustChangePassword?: boolean | undefined; passwordChangedAt?: string | undefined }
+    | undefined,
   extraSetCookie?: string[],
 ): Promise<void> {
   await issueSession(deps, res, store, username, {
     next,
     extraSetCookie,
     restricted: user?.mustChangePassword === true,
+    credentialVersion: user?.passwordChangedAt,
   });
 }

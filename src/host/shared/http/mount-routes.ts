@@ -13,18 +13,23 @@ export interface MountedRoute {
 /** 注册一条路由并返回它的 disposer（`src/index.ts` 传入包装后的 `server.register`）。 */
 export type RouteRegister = (route: MountedRoute) => () => void;
 
-/** 逆序释放；回滚阶段吞掉单个 disposer 的异常，保证已注册的条目都摘掉后再重抛原错误。 */
+/**
+ * 逆序释放全部 disposer。回滚阶段吞掉异常（首个 register 的原始错误更值得抛），
+ * 正常卸载阶段则先摘完所有路由、最后把第一个异常抛出去：一个 disposer 抛错不能
+ * 让后面的路由留在宿主表里。
+ */
 function disposeAll(disposers: readonly (() => void)[], swallow: boolean): void {
+  let firstError: unknown;
   for (const dispose of [...disposers].reverse()) {
-    if (!swallow) {
-      dispose();
-      continue;
-    }
     try {
       dispose();
-    } catch {
-      // 回滚继续：首个 register 的原始错误才是调用方需要看到的。
+    } catch (error) {
+      if (swallow) continue;
+      firstError ??= error;
     }
+  }
+  if (firstError !== undefined) {
+    throw firstError instanceof Error ? firstError : new Error("route disposer failed");
   }
 }
 

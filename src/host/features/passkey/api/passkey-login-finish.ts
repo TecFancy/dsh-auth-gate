@@ -11,7 +11,11 @@ import {
   parseFormBody,
   setPasskeyPermissionsPolicy,
 } from "../../../shared/http/index.js";
-import type { Admission, LoginRateLimiter } from "../../../shared/rate-limit/index.js";
+import {
+  combineAdmissions,
+  type Admission,
+  type LoginRateLimiter,
+} from "../../../shared/rate-limit/index.js";
 import { clearCeremonyCookie, readCeremonyId } from "../model/ceremony-cookie.js";
 import type { CeremonyStore } from "../model/ceremony-store.js";
 import {
@@ -174,6 +178,14 @@ async function finishLogin(
     return;
   }
   const storedCounter = counters.stored(match.record);
+  // 解析出用户名后补一道账号闸：只占过 IP 的话，换 IP 就能绕开该账号的失败计数。
+  const accountGate = deps.limiter.admitAccount(match.username, "passkey");
+  if (!accountGate.admitted) {
+    sendPasskeyLocked(res, context, accountGate.retryAfterSeconds);
+    deps.logger.info("passkey login rate limited");
+    return;
+  }
+  const attempt = combineAdmissions(admission, accountGate.admission);
   const verdict = await verifyPasskeyAssertion({
     settings: deps.settings,
     match,
@@ -182,7 +194,7 @@ async function finishLogin(
     storedCounter,
   });
   if (!verdict.ok) {
-    rejectLogin(deps, res, match.username, context, verdict.reason, clearCookie, admission);
+    rejectLogin(deps, res, match.username, context, verdict.reason, clearCookie, attempt);
     return;
   }
   // 并发断言：验证期间同一凭据已被推进过 ⇒ 这一条基于过期计数器，按重放拒绝（P2 L13）。
@@ -200,7 +212,7 @@ async function finishLogin(
     return;
   }
   await completeLogin(deps, counters, res, {
-    admission,
+    admission: attempt,
     match,
     verdict,
     store,

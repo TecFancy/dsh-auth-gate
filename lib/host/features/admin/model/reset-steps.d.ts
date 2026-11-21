@@ -7,8 +7,13 @@ import type { AdminDeps, ResetInput } from "./deps.js";
 export declare function originAccepted(deps: AdminDeps, req: IncomingMessage): boolean;
 /** 会话定位：只认 cookie（M5 同口径），Bearer 不参与；store/token 无效一律 undefined。 */
 export declare function locateSession(deps: AdminDeps, req: IncomingMessage): Session | undefined;
-/** 管理桶门（key = actor subject + clientIp）：锁定 → retry-after 秒数；放行 → undefined。 */
-export declare function lockoutSeconds(deps: AdminDeps, ctx: AdminAuditContext): number | undefined;
+/**
+ * 管理桶门（key = actor subject + clientIp）：受理一次尝试并寄存句柄；
+ * 锁定/并发满 → retry-after 秒数，放行 → undefined。检查与占位同一同步段（P2）。
+ */
+export declare function admitAttempt(deps: AdminDeps, ctx: AdminAuditContext): number | undefined;
+/** 结算本次请求的受理；没有受理（门前的 deny）是空操作，重复结算由 Admission 挡住。 */
+export declare function settleAttempt(ctx: AdminAuditContext, outcome: "success" | "failure" | "abandon"): void;
 /**
  * 现读 users.yaml。失败 → 503（读失败**不计失败**，与 P1 端点同口径）；
  * 带 `ctx` 时记审计 `io`（已认证拒绝必须留痕，§5）。

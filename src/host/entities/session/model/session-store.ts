@@ -42,6 +42,12 @@ export interface Session {
    * 缺省 = `full`（旧行无此字段仍解析）。
    */
   kind?: SessionKind | undefined;
+  /**
+   * 签发时读到的 `password_changed_at`（credential version）。扫描器据此吊销"用旧口令
+   * 认证出来的会话"：签发时刻可能晚于改密时间戳（校验跨越了等待），时间戳比较漏掉的
+   * 正是这条竞态。旧行没有该字段 → 视为旧凭证。
+   */
+  credentialVersion?: string | undefined;
 }
 
 export interface IssuedSession {
@@ -66,6 +72,7 @@ const sessionRowSchema = z.object({
   // 注意：本仓库的 zod 是 v4（`z.enum`/`z.literal`），没有 `z.const`
   // （后者是 @deepseek-ai/schemastery 的 API，见 src/index.ts 的 Config）。
   kind: z.enum(["full", "password-change-only", "bootstrap"]).optional(),
+  credentialVersion: z.string().optional(),
 });
 
 /** 键 = digest（sha256 hex），不进 row；row 只存以上四字段。 */
@@ -101,7 +108,12 @@ export class SessionStore {
     this.now = options.now ?? Date.now;
   }
 
-  async create(subject: string, ttlMs: number, kind: SessionKind = "full"): Promise<IssuedSession> {
+  async create(
+    subject: string,
+    ttlMs: number,
+    kind: SessionKind = "full",
+    credentialVersion?: string,
+  ): Promise<IssuedSession> {
     const now = this.now();
     await this.pruneIfDue(now);
     const token = randomBytes(32).toString("base64url");
@@ -111,6 +123,7 @@ export class SessionStore {
       expiresAt: now + ttlMs,
       revoked: false,
       kind,
+      ...(credentialVersion === undefined ? {} : { credentialVersion }),
     };
     await this.table.put(digestToken(token), session);
     return { token, session };
@@ -140,12 +153,17 @@ export class SessionStore {
   }
 
   /**
-   * 吊销某个 subject 中 `createdAt` 早于 `createdAtBefore`（epoch ms）的会话行。
-   * 用途：口令变更（users.yaml 的 `password_changed_at`）后作废变更前签发的会话；
-   * 变更后签发的会话保留，因此重复扫描是幂等的（CLI 改密走这条路径）。
+   * 吊销某 subject 下**凭证版本不等于** `currentVersion` 的会话行（口令变更后调用）。
+   *
+   * 判定不看 `createdAt`：登录的哈希校验跨越 await，可能在改密之后才签发会话：按时间
+   * 比较会把它当成"新会话"留下。记录签发时读到的版本才能精确吊销"用旧口令认证出来的"
+   * 那一条，同时保留改密后重新登录签发的会话（版本已是最新）。旧行没有版本字段，
+   * 视为旧凭证，一并吊销。返回吊销条数。
    */
-  async revokeBySubjectBefore(subject: string, createdAtBefore: number): Promise<number> {
-    return this.deleteWhere((row) => row.subject === subject && row.createdAt < createdAtBefore);
+  async revokeByCredentialVersion(subject: string, currentVersion: string): Promise<number> {
+    return this.deleteWhere(
+      (row) => row.subject === subject && row.credentialVersion !== currentVersion,
+    );
   }
 
   /**

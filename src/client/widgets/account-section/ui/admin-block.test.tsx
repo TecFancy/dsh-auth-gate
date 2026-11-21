@@ -267,9 +267,9 @@ describe("AdminUsersBlock：刷新失败（C3）", () => {
       );
       await flushMicrotasks();
     });
-    // 刷新失败不是 no-op：旧列表撤下、给不可用提示与重试（不能让成功播报旁边挂着过期表）。
+    // 刷新失败不是 no-op：挂不可用提示与重试，但不撤掉成功播报与最后一份可用列表（P2-5）。
     expect(container.textContent).toContain(t(ADMIN_KEYS.unavailable));
-    expect(container.querySelector("table")).toBeNull();
+    expect(container.querySelector("table")).not.toBeNull();
 
     fetchMock.mockImplementation((url: string) =>
       Promise.resolve(
@@ -283,5 +283,6 @@ describe("AdminUsersBlock：刷新失败（C3）", () => {
       await flushMicrotasks();
     });
     expect(container.querySelector("table")).not.toBeNull();
+    expect(container.textContent).not.toContain(t(ADMIN_KEYS.unavailable));
   });
 });

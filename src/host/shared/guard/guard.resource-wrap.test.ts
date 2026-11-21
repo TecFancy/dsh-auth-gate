@@ -72,14 +72,15 @@ describe("wrapServer with resource routes", () => {
     expect((await fallback.resource(makeRequest("/"))).status).toBe(401);
   });
 
-  it("second wrapServer returns the same unwrap and does not re-wrap", () => {
+  it("second wrapServer returns a no-op disposer and does not re-wrap (G3)", () => {
     const server = makeResourceServer();
     const resource: ResourceHandler = () => reply("x");
     server.prefixes.set("/plugins", { kind: "prefix", path: "/plugins", resource });
     const gate: Gate = { decide: () => "deny" };
     const unwrap = wrapServer(server, () => gate, log);
     const again = wrapServer(server, () => gate, log);
-    expect(again).toBe(unwrap);
+    expect(again).not.toBe(unwrap);
+    again(); // 第二个调用方不是所有者：它的 disposer 不得拆掉守卫
     const guarded = server.prefixes.get("/plugins");
     expect(guarded?.resource).not.toBe(resource);
   });

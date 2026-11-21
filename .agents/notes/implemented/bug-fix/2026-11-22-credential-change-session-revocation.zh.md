@@ -18,11 +18,11 @@ Legacy ID: D40
 `users.yaml` 增加一个可选的每用户字段 `password_changed_at`（ISO-8601）。三条口令写入路径都通过同一个
 helper（`src/host/entities/user/model/password-change-mark.ts` 里的 `applyPasswordChange`）盖这个
 时间戳：CLI `user passwd`、自助改密、管理员重置。插件的 `DisabledSessionSweeper` 在每轮 password 模式
-的扫描里处理三种情况，用的是绝对时间戳，所以插件停机期间发生的变更也能在下次启动后的第一轮被清掉：
+的扫描里处理三种情况，比较的是绝对凭证版本（不记上次值），所以插件停机期间发生的变更也能在下次启动后的第一轮被清掉：
 
 - 被禁用的用户，全部会话都被撤销；
-- 有 `password_changed_at` 的用户，`createdAt` 早于该时刻的会话被撤销；变更之后签发的会话保留，
-  这让扫描是幂等的；
+- 有 `password_changed_at` 的用户，凭证版本更旧的会话被撤销（会话记录签发时读到的版本，所以
+  「校验跨越改密」也造不出幸存者）；变更之后用新口令登录签发的会话保留，这让扫描是幂等的；
 - 已不在 `users.yaml` 里的 subject，全部会话都被撤销。bootstrap 会话不会被会话存储枚举，内部
   `token` subject 按名字豁免。
 

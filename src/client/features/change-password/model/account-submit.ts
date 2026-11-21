@@ -81,10 +81,12 @@ function describeFailure(status: number, body: unknown, t: AccountTranslate): Fa
     if (isError(record.error, "invalid_totp")) {
       return { message: t(ACCOUNT_KEYS.invalidTotp), rules: [], fields: ["code"] };
     }
-    if (isError(record.error, "unauthorized")) {
-      return { message: t(ACCOUNT_KEYS.expired), rules: [], fields: [], relogin: true };
+    if (isError(record.error, "invalid_credentials")) {
+      return { message: t(ACCOUNT_KEYS.invalidCredentials), rules: [], fields: ["current"] };
     }
-    return { message: t(ACCOUNT_KEYS.invalidCredentials), rules: [], fields: ["current"] };
+    // `unauthorized`、无 body、代理/未来新增的 401 码：一律按会话失效处理。
+    // 绝不能落到「当前密码错误」：用户会拿着正确口令无限重试（C1/P2）。
+    return { message: t(ACCOUNT_KEYS.expired), rules: [], fields: [], relogin: true };
   }
   if (status === 400 && isError(record.error, "policy")) return describePolicy(record, t);
   if (status === 403 && isError(record.error, "bad_origin")) {

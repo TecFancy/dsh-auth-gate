@@ -58,6 +58,23 @@ describe("LoginRateLimiter admission (atomic check + reservation)", () => {
     });
   });
 
+  it("lets the first attempt through after a lock expires and keeps escalating (P1 regression)", () => {
+    const { limiter, advance } = makeLimiter();
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = limiter.admit("1.2.3.4", "alice");
+      if (!result.admitted) throw new Error("expected admission");
+      result.admission.settle("failure");
+    }
+    expect(limiter.admit("1.2.3.4", "alice")).toEqual({ admitted: false, retryAfterSeconds: 30 });
+    advance(30_001);
+    const probe = limiter.admit("1.2.3.4", "alice");
+    expect(probe.admitted).toBe(true);
+    if (!probe.admitted) return;
+    probe.admission.settle("failure");
+    // 第 6 次打击：30s × 2 = 60s（旧实现会永久 429，退避永不升级）
+    expect(limiter.admit("1.2.3.4", "alice")).toEqual({ admitted: false, retryAfterSeconds: 60 });
+  });
+
   it("caps concurrent in-flight attempts per IP without locking it", () => {
     let now = 1_000_000;
     const limiter = new LoginRateLimiter({ now: () => now, maxConcurrentPerIp: 2 });

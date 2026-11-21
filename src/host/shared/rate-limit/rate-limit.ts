@@ -1,49 +1,14 @@
-export interface RateLimitOptions {
-  /** 连续失败多少次后进入锁定。默认 5。 */
-  maxFailures?: number;
-  /** 首次锁定的基础时长（秒），此后按 2 的幂增长。默认 30。 */
-  baseDelaySeconds?: number;
-  /** 锁定上限（秒）。默认 900。 */
-  maxDelaySeconds?: number;
-  /** 失败计数衰减窗口（秒）：窗口内无新失败即清零。默认 600。 */
-  windowSeconds?: number;
-  /** 同一 IP 同时在途的登录尝试上限（并发突发保护，与失败阈值解耦）。默认 32。 */
-  maxConcurrentPerIp?: number;
-  /** 时钟（毫秒 epoch）。默认 Date.now；测试注入。 */
-  now?: () => number;
-}
-
-export type RateLimitCheck = { allowed: true } | { allowed: false; retryAfterSeconds: number };
-
-/**
- * 限速命名空间：口令、TOTP、passkey 与 token 各自计数，互不清除。
- * P1.2 之前 TOTP 与口令共用 `(ip, username)` 桶，一次正确口令就把第二因子的
- * 猜码计数清零；分域后只有完整登录成功才清对应域的账号桶。
- */
-export type RateLimitScope = "login" | "totp" | "passkey" | "token" | "password-change" | "admin";
-
-/** 一次已受理尝试的凭据；只允许结算一次（重复调用是空操作）。 */
-export interface Admission {
-  /**
-   * 结算。`account` 是受理时还不知道、结算时才确认的账号（passkey finish 从断言里才解析出
-   * 用户）：失败记到该账号桶，成功清该账号桶。口令/TOTP/token 路径受理时已知账号，不必传。
-   */
-  settle(outcome: "success" | "failure" | "abandon", account?: string): void;
-}
-
-export type AdmissionResult =
-  { admitted: true; admission: Admission } | { admitted: false; retryAfterSeconds: number };
-
-interface BucketEntry {
-  /** 窗口内连续失败数；决定是否进入锁定。 */
-  failures: number;
-  /** 累计打击数；跨锁到期保留，决定退避指数（P1.2：退避必须真的升级）。 */
-  strikes: number;
-  /** 已受理未结算的尝试。计入准入，堵住并发突发绕过（P1.3）。 */
-  inflight: number;
-  lockUntil: number;
-  lastFailureAt: number;
-}
+import {
+  acctKeyOf,
+  keyOf,
+  SCOPES,
+  type Admission,
+  type AdmissionResult,
+  type BucketEntry,
+  type RateLimitCheck,
+  type RateLimitOptions,
+  type RateLimitScope,
+} from "./types.js";
 
 const IDLE_LIMIT = 10_000;
 
@@ -67,6 +32,8 @@ export class LoginRateLimiter {
   private readonly now: () => number;
   private readonly byIp = new Map<string, BucketEntry>();
   private readonly byAccount = new Map<string, BucketEntry>();
+  /** admit 计数：prune 是 O(n)，分摊到每 64 次受理一次，避免每个请求全表扫描。 */
+  private admitsSincePrune = 0;
 
   constructor(options: RateLimitOptions = {}) {
     this.maxFailures = options.maxFailures ?? 5;
@@ -88,26 +55,77 @@ export class LoginRateLimiter {
     );
     if (wait > 0)
       return { admitted: false, retryAfterSeconds: Math.max(1, Math.ceil(wait / 1000)) };
+    const rejected = this.reserve(ipKey, acctKey);
+    if (rejected !== undefined) return rejected;
+    this.admitsSincePrune += 1;
+    if (this.admitsSincePrune >= 64) {
+      this.admitsSincePrune = 0;
+      this.prune(now);
+    }
+    return { admitted: true, admission: this.admissionFor(ipKey, acctKey) };
+  }
 
-    const ipEntry = this.entryOf(this.byIp, ipKey);
-    if (ipEntry.failures + ipEntry.inflight >= this.maxConcurrentPerIp) {
+  /**
+   * 并发闸：只看「在途」数量，不看 failures。
+   * - 结算时 failures 才增长，锁由 lockUntil 表达；把 failures 并进闸门会让锁到期后仍然
+   *   永久 429（failures 要等窗口衰减才归零），退避也就永远不升级。
+   * - 在途上限 = maxFailures 时，一次突发最多贡献 maxFailures 次猜码，随后立即锁定。
+   */
+  private reserve(ipKey: string, acctKey: string | undefined): AdmissionResult | undefined {
+    const ipEntry = this.byIp.get(ipKey);
+    if (ipEntry !== undefined && ipEntry.inflight >= this.maxConcurrentPerIp) {
       return { admitted: false, retryAfterSeconds: 1 };
     }
-    const acctEntry = acctKey === undefined ? undefined : this.entryOf(this.byAccount, acctKey);
-    if (acctEntry !== undefined && acctEntry.failures + acctEntry.inflight >= this.maxFailures) {
+    const acctEntry = acctKey === undefined ? undefined : this.byAccount.get(acctKey);
+    if (acctEntry !== undefined && acctEntry.inflight >= this.maxFailures) {
       return { admitted: false, retryAfterSeconds: 1 };
     }
-    ipEntry.inflight += 1;
-    if (acctEntry !== undefined) acctEntry.inflight += 1;
-    this.prune(now);
+    const trackedIp = ipEntry ?? this.entryOf(this.byIp, ipKey);
+    const trackedAcct =
+      acctKey === undefined ? undefined : (acctEntry ?? this.entryOf(this.byAccount, acctKey));
+    trackedIp.inflight += 1;
+    if (trackedAcct !== undefined) trackedAcct.inflight += 1;
+    return undefined;
+  }
+
+  /** 返回只允许结算一次的句柄（重复调用是空操作）。 */
+  private admissionFor(ipKey: string, acctKey: string | undefined): Admission {
     let settled = false;
+    return {
+      settle: (outcome, account) => {
+        if (settled) return;
+        settled = true;
+        this.release(ipKey, acctKey, outcome, account);
+      },
+    };
+  }
+
+  /**
+   * 只受理账号桶（不含 IP）：passkey 在解析出用户名之前只能占 IP，解析出来后再补一道
+   * 账号闸，否则换 IP 就绕开了该账号的失败计数。
+   */
+  admitAccount(account: string, scope: RateLimitScope = "login"): AdmissionResult {
+    const now = this.now();
+    const key = keyOf(scope, account);
+    const wait = this.waitOf(this.byAccount, key, now);
+    if (wait > 0) {
+      return { admitted: false, retryAfterSeconds: Math.max(1, Math.ceil(wait / 1000)) };
+    }
+    const entry = this.byAccount.get(key);
+    if (entry !== undefined && entry.inflight >= this.maxFailures) {
+      return { admitted: false, retryAfterSeconds: 1 };
+    }
+    const tracked = entry ?? this.entryOf(this.byAccount, key);
+    tracked.inflight += 1;
     return {
       admitted: true,
       admission: {
-        settle: (outcome, account) => {
-          if (settled) return;
-          settled = true;
-          this.release(ipKey, acctKey, outcome, account);
+        settle: (outcome) => {
+          const current = this.byAccount.get(key);
+          if (current !== undefined) current.inflight = Math.max(0, current.inflight - 1);
+          if (outcome === "failure") this.recordBucket(this.byAccount, key, this.now());
+          else if (outcome === "success") this.clearKey(this.byAccount, key);
+          this.dropIdle(this.byAccount, key);
         },
       },
     };
@@ -197,6 +215,8 @@ export class LoginRateLimiter {
   }
 
   private decay(entry: BucketEntry, now: number): void {
+    // 锁定中的桶永远不衰减：900s 锁配 600s 窗口时，衰减会把锁提前解掉（P2）。
+    if (entry.lockUntil > now) return;
     if (entry.lastFailureAt > 0 && now - entry.lastFailureAt > this.windowMs) {
       entry.failures = 0;
       entry.strikes = 0;
@@ -264,9 +284,10 @@ export class LoginRateLimiter {
   /** 淘汰顺序：锁定最早到期、失败最少的先走；活跃的锁定桶留在表里（P2：驱逐不可被利用）。 */
   private cap(bucket: Map<string, BucketEntry>): void {
     if (bucket.size <= IDLE_LIMIT) return;
-    // 仍在途的条目（inflight > 0）不参与淘汰：淘汰它会让释放逻辑找不到桶。
+    // 在途条目（淘汰会让释放逻辑找不到桶）与仍在锁定的条目（淘汰等于提前解封）都不参与淘汰；
+    // 若全表都是活锁，宁可暂时超出软上限，也不删任何一把锁。
     const ranked = [...bucket.entries()]
-      .filter(([, entry]) => entry.inflight === 0)
+      .filter(([, entry]) => entry.inflight === 0 && entry.lockUntil <= this.now())
       .sort(
         (a, b) =>
           a[1].lockUntil - b[1].lockUntil ||
@@ -276,22 +297,4 @@ export class LoginRateLimiter {
     const target = Math.floor(IDLE_LIMIT * 0.9);
     for (const [key] of ranked.slice(0, bucket.size - target)) bucket.delete(key);
   }
-}
-
-const SCOPES: readonly RateLimitScope[] = [
-  "login",
-  "totp",
-  "passkey",
-  "token",
-  "password-change",
-  "admin",
-];
-
-function keyOf(scope: RateLimitScope, value: string): string {
-  return `${scope}\u0000${value}`;
-}
-
-/** 从已拼好的 IP 键（`scope\u0000value`）还原同一域的账号键。 */
-function acctKeyOf(ipKey: string, account: string): string {
-  return `${ipKey.slice(0, ipKey.indexOf("\u0000"))}\u0000${account}`;
 }

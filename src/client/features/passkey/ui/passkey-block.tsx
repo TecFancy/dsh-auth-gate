@@ -81,15 +81,25 @@ function PasskeyListArea({
   }
   if (state.passkeys.length === 0) return null;
   return (
-    <PasskeyTable
-      t={t}
-      passkeys={state.passkeys}
-      removing={removing}
-      addBusy={addBusy}
-      pendingRemove={pendingRemove}
-      onRequestRemove={onRequestRemove}
-      renderConfirm={renderConfirm}
-    />
+    <>
+      {state.refreshFailed === true ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <p style={ERROR_TEXT_STYLE}>{t(PASSKEY_KEYS.unavailable)}</p>
+          <ActionButton variant="ghost" onClick={onRetry}>
+            {t(PASSKEY_KEYS.retry)}
+          </ActionButton>
+        </div>
+      ) : null}
+      <PasskeyTable
+        t={t}
+        passkeys={state.passkeys}
+        removing={removing}
+        addBusy={addBusy}
+        pendingRemove={pendingRemove}
+        onRequestRemove={onRequestRemove}
+        renderConfirm={renderConfirm}
+      />
+    </>
   );
 }
 

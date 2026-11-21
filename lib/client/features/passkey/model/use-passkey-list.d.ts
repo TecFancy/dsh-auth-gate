@@ -11,6 +11,7 @@ export type PasskeyListState = {
 } | {
     kind: "ok";
     passkeys: PasskeySummaryView[];
+    refreshFailed?: boolean;
 };
 /** 挂载后拉一次列表；`reload` 供添加/删除成功后刷新。 */
 export declare function usePasskeyList(): {

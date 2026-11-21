@@ -22,7 +22,10 @@ export interface DisabledSweeperOptions {
   log: { info(message: string): void; warn(message: string): void };
 }
 
-type WarnKind = "unreadable" | "sweep";
+type WarnKind = "unreadable" | "sweep" | "clock";
+
+/** 未来时间戳的容忍窗口：超过 now + 5min 视为时钟问题，忽略该用户的时间戳。 */
+const FUTURE_STAMP_TOLERANCE_MS = 5 * 60_000;
 
 /**
  * 用户凭证/状态变更的会话吊销器（T13 / D8 收口）：周期扫描 users.yaml，把三类失效会话
@@ -47,6 +50,7 @@ export class DisabledSessionSweeper {
   private readonly warnedAt: Record<WarnKind, number> = {
     unreadable: Number.NEGATIVE_INFINITY,
     sweep: Number.NEGATIVE_INFINITY,
+    clock: Number.NEGATIVE_INFINITY,
   };
 
   constructor(options: DisabledSweeperOptions) {
@@ -73,7 +77,9 @@ export class DisabledSessionSweeper {
     }
     if (loaded.missing) return 0;
     try {
-      const revoked = await revokeInvalidSessions(store, loaded.snapshot.users);
+      const revoked = await revokeInvalidSessions(store, loaded.snapshot.users, this.now(), (m) =>
+        this.warn("clock", m),
+      );
       if (revoked > 0) {
         this.log.info(`revoked ${revoked} session(s) of changed, disabled or removed user(s)`);
       }
@@ -113,6 +119,8 @@ export class DisabledSessionSweeper {
 async function revokeInvalidSessions(
   store: SessionStore,
   users: ReadonlyMap<string, UserRecord>,
+  now: number,
+  warnClock: (message: string) => void,
 ): Promise<number> {
   let revoked = 0;
   for (const [name, record] of users) {
@@ -121,10 +129,23 @@ async function revokeInvalidSessions(
       continue;
     }
     const changedAt = changedAtMs(record.passwordChangedAt);
-    if (changedAt !== undefined) revoked += await store.revokeBySubjectBefore(name, changedAt);
+    if (changedAt === undefined) continue;
+    if (changedAt > now + FUTURE_STAMP_TOLERANCE_MS) {
+      // 未来时间戳（时钟漂移 / 手改文件）按 now 封顶会变成"每轮都吊销新会话"的自伤开关，
+      // 因此直接忽略并告警：宁可这一轮不吊销，也不要永久锁死该用户。
+      warnClock(
+        `password_changed_at for ${name} is in the future; ignoring it until the clock catches up`,
+      );
+      continue;
+    }
+    // 凭证版本比较（而不是 createdAt 比较）：登录的哈希校验跨越 await，改密后才签发会话
+    // 也会"看起来更新"，时间比较会漏掉它；签发时记录的版本才能精确吊销旧口令认证的会话。
+    revoked += await store.revokeByCredentialVersion(name, record.passwordChangedAt!);
   }
   for (const subject of store.subjects()) {
-    if (users.has(subject) || INTERNAL_SESSION_SUBJECTS.has(subject)) continue;
+    // 先看 users.yaml：真实用户（哪怕名字是 `token`）永远不是"内部 subject"。
+    if (users.has(subject)) continue;
+    if (INTERNAL_SESSION_SUBJECTS.has(subject)) continue;
     revoked += await store.revokeBySubject(subject);
   }
   return revoked;

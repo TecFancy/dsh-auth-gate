@@ -91,12 +91,19 @@ change; those paths also record `password_changed_at` as a restart backstop.
 
 `dsh-auth user passwd` runs as a separate process with no session-store access:
 it records the same timestamp, and the plugin's session sweeper revokes every
-session created before it on the next pass — at most `revokeSweepMs` (default
-5 s) later, and also after a plugin restart. A disabled user's sessions stop
+session **issued under an older credential version** on the next pass — at most
+`revokeSweepMs` (default 5 s) later, and also after a plugin restart. Sessions
+carry the `password_changed_at` value their sign-in observed, so a login whose
+hash check began before the change and finished after it is still revoked;
+comparing issuance time alone would keep it alive. A disabled user's sessions stop
 working within the same sweep interval. A user deleted from `users.yaml` loses
 every session on that same sweep (bootstrap sessions and the internal `token`
 subject are exempt), and `dsh-auth user add` enforces the same password policy as
-the web write paths, so the CLI cannot create a weak initial password.
+the web write paths, so the CLI cannot create a weak initial password. The sweep
+is the whole mechanism, so a deployment that sets `revokeSweepMs: 0` disables it:
+the CLI path then revokes nothing, and only the web paths revoke immediately. The
+CLI prints that caveat; changing the password from the account page is the
+immediate option.
 
 Rationale: [the self-service change note](../.agents/notes/implemented/feature/2026-09-23-self-service-password-change.md),
 [the password policy note](../.agents/notes/implemented/architecture/2026-09-23-password-policy-and-users-lock.md).

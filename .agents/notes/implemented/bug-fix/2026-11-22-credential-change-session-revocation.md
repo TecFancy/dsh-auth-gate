@@ -22,12 +22,14 @@ password policy the web write paths enforce.
 paths stamp it through one helper, `applyPasswordChange` in
 `src/host/entities/user/model/password-change-mark.ts`: CLI `user passwd`, the self-service change,
 and an admin reset. The plugin's `DisabledSessionSweeper` handles three cases on every password-mode
-pass, using absolute timestamps so a change made while the plugin was down is still caught on the
+pass, comparing absolute credential versions so a change made while the plugin was down is still caught on the
 next start:
 
 - a disabled user loses every session;
-- a user with `password_changed_at` loses the sessions whose `createdAt` is older than it;
-  sessions issued after the change survive, which makes the sweep idempotent;
+- a user with `password_changed_at` loses every session whose recorded credential version is
+  older; sessions store the stamp observed at sign-in, so a verification that straddled the change
+  cannot mint a survivor, while sessions issued after the change survive, which keeps the sweep
+  idempotent;
 - a subject no longer present in `users.yaml` loses every session. Bootstrap sessions are not
   enumerated by the store, and the internal `token` subject is exempt by name.
 

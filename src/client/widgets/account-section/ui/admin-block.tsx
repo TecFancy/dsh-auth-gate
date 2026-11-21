@@ -42,7 +42,7 @@ type UsersState =
   | { kind: "denied" }
   | { kind: "unauthorized" }
   | { kind: "failure" }
-  | { kind: "ok"; users: AdminUserRow[] };
+  | { kind: "ok"; users: AdminUserRow[]; refreshFailed?: boolean };
 
 /**
  * 挂载后拉一次列表（契约 §3.4：非 admin 根本不会挂载本组件，这里不判断角色）；
@@ -59,10 +59,20 @@ function useAdminUsers(): { state: UsersState; reload: () => void } {
       .then((result) => {
         if (!live || result.kind === "aborted") return;
         if (result.kind === "ok") setState({ kind: "ok", users: result.users });
-        else setState({ kind: result.kind });
+        else if (result.kind === "denied" || result.kind === "unauthorized") {
+          setState({ kind: result.kind });
+        } else {
+          // 刷新失败：保留上一份可用列表与成功播报，只在旁边挂一条错误（C3）。
+          setState((previous) =>
+            previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+          );
+        }
       })
       .catch(() => {
-        if (live) setState({ kind: "failure" });
+        if (!live) return;
+        setState((previous) =>
+          previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+        );
       });
     return () => {
       live = false;
@@ -183,6 +193,14 @@ function AdminBody({
   const targets = state.users.filter((user) => user.name !== actorName);
   return (
     <>
+      {state.refreshFailed === true ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <AdminNotice text={t(ADMIN_KEYS.unavailable)} error />
+          <ActionButton variant="ghost" onClick={onRetry}>
+            {t(ADMIN_KEYS.retry)}
+          </ActionButton>
+        </div>
+      ) : null}
       <AdminUsersTable t={t} users={state.users} actorName={actorName} />
       {targets.length === 0 ? (
         <p id={ADMIN_STATUS_ID} style={HINT_STYLE}>

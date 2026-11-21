@@ -117,6 +117,8 @@ export function makeReq(options: {
 
 export interface UserRec {
   passwordHash: string;
+  /** 最近一次口令变更（L5 凭证版本）：登录签发的会话要带它。 */
+  passwordChangedAt?: string;
   totpSecret?: string;
   disabled: boolean;
   /** P2 ④：登录门标记（YAML `must_change_password`）；缺省 = false（旧行兼容）。 */

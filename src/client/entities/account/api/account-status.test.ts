@@ -125,6 +125,28 @@ describe("requestAccountStatus (shared probe)", () => {
     await expect(requestAccountStatus()).resolves.toEqual({ kind: "failure" });
   });
 
+  it("maps a malformed 200 body to a probe failure, not to an unauthenticated view", async () => {
+    for (const body of [{}, { authenticated: "yes" }, null]) {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: () => Promise.resolve(body) }),
+      );
+      await expect(requestAccountStatus()).resolves.toEqual({ kind: "failure" });
+    }
+  });
+
+  it("maps an unparseable 200 body to a probe failure", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.reject(new SyntaxError("not json")),
+      }),
+    );
+    await expect(requestAccountStatus()).resolves.toEqual({ kind: "failure" });
+  });
+
   it("maps 401 to an ok, unauthenticated view (session gone, not a probe failure)", async () => {
     vi.stubGlobal(
       "fetch",

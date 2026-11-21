@@ -221,13 +221,14 @@ describe("PasskeyBlock: 删除（C6 结构 / C3 重拉失败）", () => {
     setValue(container, "password", "pw");
     await click(buttonByText(container, t(PASSKEY_KEYS.removeConfirm)));
 
-    // 刷新失败不能是 no-op：旧列表撤下，给不可用提示 + 可用的重试。
+    // 刷新失败不能是 no-op：成功播报与最后一份列表保留，旁边挂不可用提示 + 可用的重试。
     expect(container.textContent).toContain(t(PASSKEY_KEYS.successRemove));
     expect(container.textContent).toContain(t(PASSKEY_KEYS.unavailable));
-    expect(container.querySelector("table")).toBeNull();
+    expect(container.querySelector("table")).not.toBeNull();
 
     await click(buttonByText(container, t(PASSKEY_KEYS.retry)));
     expect(container.querySelector("table")).not.toBeNull();
+    expect(container.textContent).not.toContain(t(PASSKEY_KEYS.unavailable));
     cleanup(root, container);
   });
 });

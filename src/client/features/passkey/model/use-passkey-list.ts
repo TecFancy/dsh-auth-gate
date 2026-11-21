@@ -14,7 +14,7 @@ export type PasskeyListState =
   | { kind: "unauthorized" }
   | { kind: "forbidden" }
   | { kind: "failure" }
-  | { kind: "ok"; passkeys: PasskeySummaryView[] };
+  | { kind: "ok"; passkeys: PasskeySummaryView[]; refreshFailed?: boolean };
 
 /** 挂载后拉一次列表；`reload` 供添加/删除成功后刷新。 */
 export function usePasskeyList(): { state: PasskeyListState; reload: () => void } {
@@ -27,10 +27,20 @@ export function usePasskeyList(): { state: PasskeyListState; reload: () => void 
       .then((result) => {
         if (!live || result.kind === "aborted") return;
         if (result.kind === "ok") setState({ kind: "ok", passkeys: result.passkeys });
-        else setState({ kind: result.kind });
+        else if (result.kind === "unauthorized" || result.kind === "forbidden") {
+          setState({ kind: result.kind });
+        } else {
+          // 刷新失败：保留最后一份可用列表与成功播报，只在旁边挂错误（C3/P2）。
+          setState((previous) =>
+            previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+          );
+        }
       })
       .catch(() => {
-        if (live) setState({ kind: "failure" });
+        if (!live) return;
+        setState((previous) =>
+          previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+        );
       });
     return () => {
       live = false;

@@ -1,74 +1,13 @@
-import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import { describe, expect, it, vi } from "vitest";
-import { SessionStore, type Session } from "../../../entities/session/index.js";
-import type { UserRecord, UsersLoadResult } from "../../../entities/user/index.js";
+import { SessionStore } from "../../../entities/session/index.js";
 import { DisabledSessionSweeper } from "./disabled-sweeper.js";
-
-class MemTable implements KvTable<string, Session> {
-  private readonly map = new Map<string, Session>();
-
-  get size(): number {
-    return this.map.size;
-  }
-
-  get(key: string): Session | undefined {
-    return this.map.get(key);
-  }
-
-  entries(): IterableIterator<[string, Session]> {
-    return this.map.entries();
-  }
-
-  keys(): IterableIterator<string> {
-    return this.map.keys();
-  }
-
-  put(key: string, value: Session): Promise<void> {
-    this.map.set(key, value);
-    return Promise.resolve();
-  }
-
-  delete(key: string): Promise<boolean> {
-    return Promise.resolve(this.map.delete(key));
-  }
-
-  deleteMany(keys: readonly string[]): Promise<number> {
-    let removed = 0;
-    for (const key of keys) if (this.map.delete(key)) removed += 1;
-    return Promise.resolve(removed);
-  }
-
-  update(key: string, fn: (current: Session) => Session): Promise<Session> {
-    const current = this.map.get(key);
-    if (current === undefined) throw new Error("missing-key");
-    const next = fn(current);
-    this.map.set(key, next);
-    return Promise.resolve(next);
-  }
-}
-
-function snapshot(entries: [string, boolean][]): UsersLoadResult {
-  return {
-    missing: false,
-    snapshot: {
-      users: new Map(entries.map(([name, disabled]) => [name, { passwordHash: "hash", disabled }])),
-    },
-  };
-}
-
-/** 按字段覆盖构造快照（L5 的 passwordChangedAt、L12 的删号用例）。 */
-function usersOf(entries: [string, Partial<UserRecord>][]): UsersLoadResult {
-  return {
-    missing: false,
-    snapshot: {
-      users: new Map(
-        entries.map(([name, extra]) => [name, { passwordHash: "hash", disabled: false, ...extra }]),
-      ),
-    },
-  };
-}
-
-const silentLog = { info: (): void => undefined, warn: (): void => undefined };
+import {
+  MemTable,
+  silentLog,
+  snapshot,
+  usersOf,
+} from "../../../../../test/disabled-sweeper-harness.js";
+import type { UsersLoadResult } from "../../../entities/user/index.js";
 
 describe("DisabledSessionSweeper.sweep", () => {
   it("revokes sessions of disabled users and keeps active users signed in", async () => {
@@ -154,28 +93,64 @@ describe("DisabledSessionSweeper.sweep", () => {
 });
 
 describe("DisabledSessionSweeper.sweep: password_changed_at (L5)", () => {
-  it("revokes sessions created before the change and keeps later ones", async () => {
+  it("revokes sessions issued under the old credential version and keeps newer ones", async () => {
     const table = new MemTable();
     let now = 1_000_000;
     const store = new SessionStore(table, { now: () => now });
-    const before = await store.create("alice", 60_000_000); // createdAt 1_000_000
+    const stamp = new Date(1_500_000).toISOString();
+    const before = await store.create("alice", 60_000_000); // 旧口令签发，无版本
     now = 2_000_000;
-    const after = await store.create("alice", 60_000_000); // createdAt 2_000_000
+    const after = await store.create("alice", 60_000_000, "full", stamp); // 新口令签发
     const sweeper = new DisabledSessionSweeper({
       sessions: () => store,
-      loadUsers: () =>
-        Promise.resolve(
-          usersOf([["alice", { passwordChangedAt: new Date(1_500_000).toISOString() }]]),
-        ),
+      loadUsers: () => Promise.resolve(usersOf([["alice", { passwordChangedAt: stamp }]])),
       log: silentLog,
     });
 
     expect(await sweeper.sweep()).toBe(1);
     expect(store.getByToken(before.token)).toBeUndefined();
     expect(store.getByToken(after.token)?.subject).toBe("alice");
-    // 绝对时间规则：重复扫描幂等，不会误杀改密后登录的新会话。
+    // 重复扫描幂等：版本一致的会话不会被反复误杀。
     expect(await sweeper.sweep()).toBe(0);
     expect(store.getByToken(after.token)?.subject).toBe("alice");
+  });
+
+  it("revokes a session even when it was issued after the stamp (verification race)", async () => {
+    const table = new MemTable();
+    const now = 2_000_000;
+    const store = new SessionStore(table, { now: () => now });
+    const stamp = new Date(1_500_000).toISOString();
+    // 哈希校验跨越了改密：签发时刻晚于时间戳，但手里读到的还是旧记录。
+    const raced = await store.create("alice", 60_000_000, "full", undefined);
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => store,
+      loadUsers: () => Promise.resolve(usersOf([["alice", { passwordChangedAt: stamp }]])),
+      log: silentLog,
+    });
+    expect(await sweeper.sweep()).toBe(1);
+    expect(store.getByToken(raced.token)).toBeUndefined();
+  });
+
+  it("ignores a far-future stamp instead of repeatedly revoking new sessions", async () => {
+    const table = new MemTable();
+    const now = 1_000_000;
+    const store = new SessionStore(table, { now: () => now });
+    const session = await store.create("alice", 60_000_000);
+    const warn = vi.fn();
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => store,
+      now: () => now,
+      loadUsers: () =>
+        Promise.resolve(
+          usersOf([["alice", { passwordChangedAt: new Date(9_000_000).toISOString() }]]),
+        ),
+      log: { ...silentLog, warn },
+    });
+
+    // 远超 now + 5min：忽略，绝不每轮吊销新会话（否则等于永久锁死该用户）
+    expect(await sweeper.sweep()).toBe(0);
+    expect(store.getByToken(session.token)?.subject).toBe("alice");
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("in the future"));
   });
 
   it("ignores an unparseable timestamp instead of revoking on it", async () => {

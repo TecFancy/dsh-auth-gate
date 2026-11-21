@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { type UsersLoadResult, type UsersSnapshot } from "../../../entities/user/index.js";
-import { type LoginRateLimiter } from "../../../shared/rate-limit/index.js";
+import { type Admission, type LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 export interface PasswordChangeDeps {
     sessions: () => SessionStore | undefined;
@@ -40,6 +40,16 @@ export interface PasswordChangeDeps {
         info(m: unknown): void;
         warn(m: unknown): void;
     };
+}
+/** 每次请求的日志安全上下文：错误消息里出现任一请求明文即整段打码。 */
+export interface ChangeContext {
+    ip: string;
+    subject: string;
+    /** 现口令明文：只用于锁内复核（A6），绝不入日志。 */
+    current: string;
+    secrets: readonly string[];
+    /** 本次尝试的受理句柄（P2：check→await→record 之间不再留并发窗口）。 */
+    admission: Admission;
 }
 /**
  * `/auth/password`（P1 §1 + P2 §1/§6）。GET 走 SSR 自足页；POST 处理顺序冻结：

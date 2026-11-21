@@ -11,10 +11,11 @@ import {
   hashOr503,
   loadUsersOr503,
   locateSession,
-  lockoutSeconds,
+  admitAttempt,
   originAccepted,
   resetTarget,
   revokeTarget,
+  settleAttempt,
   writeReset,
 } from "../model/reset-steps.js";
 import { projectUsers } from "../model/users-list.js";
@@ -107,21 +108,25 @@ export async function handleResetPassword(
   const code = formField<AdminResetRequest>(params, "code");
   // 打码白名单：日志里出现这两个明文即替换（§5），贯穿到 hash/写盘/吊销的错误出口。
   const secrets = [password, code];
-  const actor = await authorizeReset(deps, req, res, ctx, session, secrets);
-  if (actor === undefined) return;
-  const input: ResetInput = { actor, password, code, secrets };
-  if ((await resetTarget(deps, res, ctx, input)) === undefined) return;
+  try {
+    const actor = await authorizeReset(deps, req, res, ctx, session, secrets);
+    if (actor === undefined) return;
+    const input: ResetInput = { actor, password, code, secrets };
+    if ((await resetTarget(deps, res, ctx, input)) === undefined) return;
 
-  const hashed = await hashOr503(deps, res, ctx, input);
-  if (hashed === undefined) return;
-  if (!(await writeReset(deps, res, ctx, hashed, input.secrets))) return;
+    const hashed = await hashOr503(deps, res, ctx, input);
+    if (hashed === undefined) return;
+    if (!(await writeReset(deps, res, ctx, hashed, input.secrets))) return;
 
-  // 写盘已成功：吊销失败仍 200（§2 / D22），审计同一条成功事件带 sessionsRevoked:false。
-  const sessionsRevoked = await revokeTarget(deps, ctx, input.secrets);
-  deps.clearRateBuckets(ctx.target);
-  deps.limiter.recordSuccess(ctx.clientIp, ctx.actor);
-  auditSuccess(deps.logger, ctx, sessionsRevoked);
-  sendJson(res, 200, { ok: true, sessionsRevoked });
+    // 写盘已成功：吊销失败仍 200（§2 / D22），审计同一条成功事件带 sessionsRevoked:false。
+    const sessionsRevoked = await revokeTarget(deps, ctx, input.secrets);
+    deps.clearRateBuckets(ctx.target);
+    settleAttempt(ctx, "success");
+    auditSuccess(deps.logger, ctx, sessionsRevoked);
+    sendJson(res, 200, { ok: true, sessionsRevoked });
+  } finally {
+    settleAttempt(ctx, "abandon"); // 已结算时是空操作；503/异常只释放占位
+  }
 }
 
 /**
@@ -150,7 +155,7 @@ async function authorizeReset(
     deny(deps, res, ctx, "forbidden", 403, { error: "forbidden" });
     return undefined;
   }
-  const lockout = lockoutSeconds(deps, ctx);
+  const lockout = admitAttempt(deps, ctx);
   if (lockout !== undefined) {
     res.setHeader("retry-after", String(lockout));
     deny(deps, res, ctx, "rate_limited", 429, { error: "locked", retryAfter: lockout });

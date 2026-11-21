@@ -66,7 +66,7 @@ describe("dsh-auth user passwd", () => {
     expect(h.out).toHaveLength(2);
     expect(h.out[0]).toBe("user alice password changed");
     // L5：CLI 够不到会话表，必须逐字告知「吊销发生在下一轮扫描」，不得暗示立即生效。
-    expect(h.out[1]).toContain("revoked by the running plugin on its next sweep");
+    expect(h.out[1]).toContain("old sessions are revoked on the plugin's next sweep");
     expect(h.out[1]).toContain("5000 ms");
     const hash = await hashOf(file, "alice");
     await expect(verifyPassword(NEW_PASSWORD, hash)).resolves.toBe(true);

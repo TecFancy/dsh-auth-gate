@@ -11,6 +11,7 @@ import {
   type AdminAuditLogger,
   type AdminDenyReason,
 } from "../model/audit.js";
+import { settleAttempt } from "../model/reset-steps.js";
 
 /**
  * 响应与拒绝出口。只依赖 logger + limiter 两样（AdminDeps 天然满足），
@@ -52,7 +53,7 @@ export function deny(
   sendJson(res, status, body);
 }
 
-/** 限流门**之后**的拒绝：额外计失败（§6「失败也计入本桶」，沿用 P1 口径）。 */
+/** 限流门**之后**的拒绝：结算受理为失败（§6「失败也计入本桶」，沿用 P1 口径）。 */
 export function fail(
   deps: DenyDeps,
   res: ServerResponse,
@@ -61,7 +62,7 @@ export function fail(
   status: number,
   body: AdminResetErrorBody,
 ): void {
-  deps.limiter.recordFailure(ctx.clientIp, ctx.actor);
+  settleAttempt(ctx, "failure");
   deny(deps, res, ctx, reason, status, body);
 }
 

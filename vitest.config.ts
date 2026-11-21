@@ -44,6 +44,12 @@ export default defineConfig({
           functions: 95,
           lines: 95,
         },
+        // Login admission, lockout escalation, scope isolation (P1 regression surface).
+        "src/host/shared/rate-limit/**": {
+          branches: 87,
+          functions: 94,
+          lines: 92,
+        },
         // Password verification, change flow, TOTP stage.
         "src/host/features/password/**": {
           branches: 93,

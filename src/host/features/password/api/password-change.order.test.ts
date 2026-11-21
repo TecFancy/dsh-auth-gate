@@ -86,7 +86,8 @@ describe("rate limit and store invariants", () => {
     const verify = vi.fn(() => Promise.resolve(true));
     const limiter = new LoginRateLimiter();
     const { deps } = makeHarness({ limiter, verify });
-    for (let attempt = 0; attempt < 5; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     const res = await send(deps, { body: GOOD_BODY });
     expect(res.status).toBe(429);
     expect(verify).not.toHaveBeenCalled();
@@ -98,18 +99,20 @@ describe("rate limit and store invariants", () => {
       limiter,
       mutateUsers: () => Promise.reject(new Error("users file is locked")),
     });
-    for (let attempt = 0; attempt < 4; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 4; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     await send(deps, { body: GOOD_BODY }); // 写盘失败计第 5 次失败
-    expect(limiter.check("127.0.0.1", "alice").allowed).toBe(false);
+    expect(limiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(false);
   });
 
   it("clears the bucket on success (the user is not locked out by their own change)", async () => {
     const limiter = new LoginRateLimiter();
     const { deps } = makeHarness({ limiter });
-    for (let attempt = 0; attempt < 4; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 4; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     await send(deps, { body: GOOD_BODY }); // recordSuccess 清桶
-    limiter.recordFailure("127.0.0.1", "alice"); // 若未清桶这里就是第 5 次 → 锁定
-    expect(limiter.check("127.0.0.1", "alice").allowed).toBe(true);
+    limiter.recordFailure("127.0.0.1", "alice", "password-change"); // 若未清桶这里就是第 5 次 → 锁定
+    expect(limiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(true);
   });
 
   it("does not touch the store on a policy rejection", async () => {

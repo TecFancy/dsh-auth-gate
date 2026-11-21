@@ -173,7 +173,8 @@ describe("wrapServer: 幂等与还原", () => {
 
     const unwrap1 = wrapServer(server, () => gate, log);
     const unwrap2 = wrapServer(server, () => gate, log);
-    expect(unwrap1).toBe(unwrap2);
+    expect(unwrap2).not.toBe(unwrap1);
+    unwrap2(); // 第二次 wrap 的 disposer 是空操作，守卫仍由第一次负责
 
     unwrap1();
     expect(server.exact.get("/e")).toBe(originalRoute);
@@ -184,7 +185,7 @@ describe("wrapServer: 幂等与还原", () => {
     expect(unwrap3).not.toBe(unwrap1);
   });
 
-  it("warns on a second wrap instead of silently disarming the owner (G3)", () => {
+  it("second wrap returns a no-op disposer, warns, and cannot disarm the owner (G3)", () => {
     const server = makeFakeServer();
     const warnings: unknown[] = [];
     const logging: GuardLog = { error: () => undefined, warn: (message) => warnings.push(message) };
@@ -192,7 +193,17 @@ describe("wrapServer: 幂等与还原", () => {
 
     const first = wrapServer(server, () => gate, logging);
     const second = wrapServer(server, () => gate, logging);
-    expect(second).toBe(first);
+    expect(second).not.toBe(first);
+    second();
+    // 守卫仍在：第二次 wrap 的 disposer 是空操作，之后注册的路由照样被守卫
+    const disposeProbe = server.register({
+      kind: "exact",
+      path: "/after-second",
+      handler: () => undefined,
+    });
+    expect(isGuarded(server.exact.get("/after-second")?.handler)).toBe(true);
+    disposeProbe();
+    first();
     expect(warnings).toHaveLength(1);
     expect(String(warnings[0])).toContain("already guarded");
   });

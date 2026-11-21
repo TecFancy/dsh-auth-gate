@@ -41,11 +41,39 @@ jobs:
           release-type: node
           token: ${{ secrets.GITHUB_TOKEN }}
 
+  # Resolve the ref once: verify and publish must check out the *same* commit.
+  # Without this, a moving branch between the two jobs could publish a tree the
+  # gates never saw (P2: release SHA pinning).
+  resolve:
+    needs: release-please
+    if: >-
+      (needs.release-please.result == 'success' &&
+      needs.release-please.outputs.release_created == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_ref != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      sha: ${{ steps.ref.outputs.sha }}
+    steps:
+      - name: Resolve the ref to a commit SHA
+        id: ref
+        shell: bash
+        env:
+          PUBLISH_REF: ${{ inputs.publish_ref }}
+        run: |
+          ref="${PUBLISH_REF:-${GITHUB_SHA}}"
+          sha="$(git ls-remote "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" "$ref" | awk '{print $1}' | head -n 1)"
+          if [ -z "$sha" ]; then
+            echo "::error::cannot resolve $ref to a commit"
+            exit 1
+          fi
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
   # The artifact that reaches npm must be the one the gates accepted. This job
   # runs the same full gate chain CI runs on main, at the exact commit being
   # published, so a release workflow can never publish an unverified tree.
   verify:
-    needs: release-please
+    needs: [release-please, resolve]
     # Same two entry points as publish: release-please just cut a release, or
     # an operator named an existing tag to (re)publish.
     if: >-
@@ -57,7 +85,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ inputs.publish_ref || github.ref }}
+          ref: ${{ needs.resolve.outputs.sha }}
       # Node 22, the version CI tests and the committed lib/ is verified
       # against. Publishing itself needs Node 24 (npm >= 11.5.1 for Trusted
       # Publishing), which is why the publish job pins that separately.
@@ -83,7 +111,7 @@ jobs:
           fi
 
   publish:
-    needs: [release-please, verify]
+    needs: [release-please, resolve, verify]
     if: >-
       (needs.release-please.result == 'success' &&
       needs.release-please.outputs.release_created == 'true') ||
@@ -100,7 +128,7 @@ jobs:
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
-          ref: ${{ inputs.publish_ref || github.ref }}
+          ref: ${{ needs.resolve.outputs.sha }}
       # No `registry-url` here on purpose. It makes setup-node write
       # `//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}` into .npmrc; with
       # no token that expands to an empty string, npm reads it as "auth is

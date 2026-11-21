@@ -102,6 +102,9 @@ async function probe(signal: AbortSignal): Promise<AccountStatusResult> {
     if (!res.ok) return { kind: "failure" };
     const body = await readJsonSafe(res);
     if (signal.aborted) return { kind: "aborted" };
+    // 200 也要验证形状：非 JSON 或缺少布尔 `authenticated` 说明这是坏响应（代理页、未来格式），
+    // 不能塌缩成「未登录」：那会把 5xx/损坏响应伪装成正常登出（P2）。
+    if (!isRecord(body) || typeof body["authenticated"] !== "boolean") return { kind: "failure" };
     return { kind: "ok", status: parseAccountStatus(body) };
   } catch {
     return signal.aborted ? { kind: "aborted" } : { kind: "failure" };

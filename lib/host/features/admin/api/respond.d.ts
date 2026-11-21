@@ -18,7 +18,7 @@ export declare function sendJson(res: ServerResponse, status: number, body: Admi
 export declare function sendText(res: ServerResponse, status: number, body: string): void;
 /** 拒绝：审计 + JSON 响应（不碰限速桶）。 */
 export declare function deny(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: AdminResetErrorBody): void;
-/** 限流门**之后**的拒绝：额外计失败（§6「失败也计入本桶」，沿用 P1 口径）。 */
+/** 限流门**之后**的拒绝：结算受理为失败（§6「失败也计入本桶」，沿用 P1 口径）。 */
 export declare function fail(deps: DenyDeps, res: ServerResponse, ctx: AdminAuditContext, reason: AdminDenyReason, status: number, body: AdminResetErrorBody): void;
 /** 415/413（复用既有 form-body 语义；413 先写 `connection: close`）；无 status 的异常向上抛。 */
 export declare function respondFormError(res: ServerResponse, error: unknown): void;

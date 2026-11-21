@@ -1,44 +1,4 @@
-export interface RateLimitOptions {
-    /** 连续失败多少次后进入锁定。默认 5。 */
-    maxFailures?: number;
-    /** 首次锁定的基础时长（秒），此后按 2 的幂增长。默认 30。 */
-    baseDelaySeconds?: number;
-    /** 锁定上限（秒）。默认 900。 */
-    maxDelaySeconds?: number;
-    /** 失败计数衰减窗口（秒）：窗口内无新失败即清零。默认 600。 */
-    windowSeconds?: number;
-    /** 同一 IP 同时在途的登录尝试上限（并发突发保护，与失败阈值解耦）。默认 32。 */
-    maxConcurrentPerIp?: number;
-    /** 时钟（毫秒 epoch）。默认 Date.now；测试注入。 */
-    now?: () => number;
-}
-export type RateLimitCheck = {
-    allowed: true;
-} | {
-    allowed: false;
-    retryAfterSeconds: number;
-};
-/**
- * 限速命名空间：口令、TOTP、passkey 与 token 各自计数，互不清除。
- * P1.2 之前 TOTP 与口令共用 `(ip, username)` 桶，一次正确口令就把第二因子的
- * 猜码计数清零；分域后只有完整登录成功才清对应域的账号桶。
- */
-export type RateLimitScope = "login" | "totp" | "passkey" | "token" | "password-change" | "admin";
-/** 一次已受理尝试的凭据；只允许结算一次（重复调用是空操作）。 */
-export interface Admission {
-    /**
-     * 结算。`account` 是受理时还不知道、结算时才确认的账号（passkey finish 从断言里才解析出
-     * 用户）：失败记到该账号桶，成功清该账号桶。口令/TOTP/token 路径受理时已知账号，不必传。
-     */
-    settle(outcome: "success" | "failure" | "abandon", account?: string): void;
-}
-export type AdmissionResult = {
-    admitted: true;
-    admission: Admission;
-} | {
-    admitted: false;
-    retryAfterSeconds: number;
-};
+import { type AdmissionResult, type RateLimitCheck, type RateLimitOptions, type RateLimitScope } from "./types.js";
 /**
  * 登录限速器（P10）：IP + 账号双桶、分域计数、失败指数退避、窗口衰减、条目上限。
  *
@@ -58,9 +18,25 @@ export declare class LoginRateLimiter {
     private readonly now;
     private readonly byIp;
     private readonly byAccount;
+    /** admit 计数：prune 是 O(n)，分摊到每 64 次受理一次，避免每个请求全表扫描。 */
+    private admitsSincePrune;
     constructor(options?: RateLimitOptions);
     /** 受理一次尝试：检查锁定 + 并发占位，返回结算句柄（登录路径用这个）。 */
     admit(ip: string, account: string | undefined, scope?: RateLimitScope): AdmissionResult;
+    /**
+     * 并发闸：只看「在途」数量，不看 failures。
+     * - 结算时 failures 才增长，锁由 lockUntil 表达；把 failures 并进闸门会让锁到期后仍然
+     *   永久 429（failures 要等窗口衰减才归零），退避也就永远不升级。
+     * - 在途上限 = maxFailures 时，一次突发最多贡献 maxFailures 次猜码，随后立即锁定。
+     */
+    private reserve;
+    /** 返回只允许结算一次的句柄（重复调用是空操作）。 */
+    private admissionFor;
+    /**
+     * 只受理账号桶（不含 IP）：passkey 在解析出用户名之前只能占 IP，解析出来后再补一道
+     * 账号闸，否则换 IP 就绕开了该账号的失败计数。
+     */
+    admitAccount(account: string, scope?: RateLimitScope): AdmissionResult;
     check(ip: string, account: string | undefined, scope?: RateLimitScope): RateLimitCheck;
     recordFailure(ip: string, account: string | undefined, scope?: RateLimitScope): void;
     /**

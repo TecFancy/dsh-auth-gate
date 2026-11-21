@@ -3,10 +3,11 @@
  * Explicit export list: register new exports here.
  */
 export { LoginRateLimiter } from "./rate-limit.js";
+export { combineAdmissions } from "./types.js";
 export type {
   Admission,
   AdmissionResult,
   RateLimitCheck,
   RateLimitOptions,
   RateLimitScope,
-} from "./rate-limit.js";
+} from "./types.js";

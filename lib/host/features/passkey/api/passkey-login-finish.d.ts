@@ -6,7 +6,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionStore } from "../../../entities/session/index.js";
 import type { UserRecord, UsersLoadResult } from "../../../entities/user/index.js";
-import type { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
+import { type LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import type { CeremonyStore } from "../model/ceremony-store.js";
 import { PasskeyCounterStore, type PasskeyLoginSettings } from "../model/passkey-login.js";
 /** finish 端点需要的依赖子集（`PasskeyLoginDeps` 在此基础上只多一个 `register`）。 */

@@ -59,9 +59,11 @@
 
 通过 Web 面改密（自助改密或管理员重置）会撤销该用户的全部会话，包括执行改密的那一个；这两条路径同时记录 `password_changed_at`，作为重启后的兜底。
 
-`dsh-auth user passwd` 是独立进程，够不到会话存储：它记录同一个时间戳，插件的会话扫描器在下一轮扫描时吊销该用户时间戳之前创建的全部会话——最多 `revokeSweepMs`（默认 5 秒）之后，插件重启后同样生效。被禁用的用户，会话在同一扫描周期内失效。从 `users.yaml` 删除的用户会在同一轮
+`dsh-auth user passwd` 是独立进程，够不到会话存储：它记录同一个时间戳，插件的会话扫描器在下一轮扫描时吊销**凭证版本更旧**的全部会话——最多 `revokeSweepMs`（默认 5 秒）之后，插件重启后同样生效。会话记录签发时读到的 `password_changed_at`，因此「哈希校验在改密前开始、改密后才签发出会话」的那一条也会被吊销；只比签发时间会把它留下。被禁用的用户，会话在同一扫描周期内失效。从 `users.yaml` 删除的用户会在同一轮
 扫描里失去全部会话（bootstrap 会话与内部 `token` subject 豁免）；`dsh-auth user add` 也执行与
-Web 写入路径相同的口令策略，CLI 造不出弱口令初始账号。
+Web 写入路径相同的口令策略，CLI 造不出弱口令初始账号。整条机制都靠这轮扫描，所以把
+`revokeSweepMs` 设为 `0` 等于关掉它：CLI 路径不再吊销任何会话，只剩 Web 路径立即生效。CLI 会把
+这个前提打在提示里；要立即生效，从账号页改密。
 
 依据：[自助改密笔记](../.agents/notes/implemented/feature/2026-09-23-self-service-password-change.zh.md)、[口令策略笔记](../.agents/notes/implemented/architecture/2026-09-23-password-policy-and-users-lock.zh.md)。
 

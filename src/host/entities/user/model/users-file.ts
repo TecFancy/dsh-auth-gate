@@ -24,7 +24,7 @@ export const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
  * 预留用户名（大小写不敏感）：内部身份占用这些名字（引导会话 subject 等），
  * 新用户不得使用。已存在的历史同名用户仍可登录/改密（`loadUsersFile` 只用 `USERNAME_RE`）。
  */
-export const RESERVED_USERNAMES: ReadonlySet<string> = new Set(["bootstrap"]);
+export const RESERVED_USERNAMES: ReadonlySet<string> = new Set(["bootstrap", "token"]);
 
 /**
  * **新建**用户名的统一校验：格式（`USERNAME_RE`）+ 非预留名（大小写不敏感）。

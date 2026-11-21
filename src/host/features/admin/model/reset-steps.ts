@@ -8,6 +8,7 @@ import { checkRequestOrigin, parseCookieHeader } from "../../../shared/http/inde
 import type { OriginCheckRequest } from "../../../shared/http/index.js";
 import type { UserRecord, UsersSnapshot } from "../../../entities/user/index.js";
 import type { Session } from "../../../entities/session/index.js";
+import type { Admission } from "../../../shared/rate-limit/index.js";
 import { auditDenied, type AdminAuditContext } from "./audit.js";
 import type { AdminDeps, ResetInput } from "./deps.js";
 import { deny, fail, safeMessage, sendText } from "../api/respond.js";
@@ -37,10 +38,29 @@ export function locateSession(deps: AdminDeps, req: IncomingMessage): Session | 
   return store.getByToken(token);
 }
 
-/** 管理桶门（key = actor subject + clientIp）：锁定 → retry-after 秒数；放行 → undefined。 */
-export function lockoutSeconds(deps: AdminDeps, ctx: AdminAuditContext): number | undefined {
-  const check = deps.limiter.check(ctx.clientIp, ctx.actor);
-  return check.allowed ? undefined : check.retryAfterSeconds;
+/**
+ * 受理句柄按审计上下文寄存（WeakMap，不写进 ctx：审计事件的键集合是冻结契约，
+ * 多一个 `admission` 键会让"10 键恒定"失败）。门通过后 fail()/成功/finally 各自结算。
+ */
+const admissions = new WeakMap<AdminAuditContext, Admission>();
+
+/**
+ * 管理桶门（key = actor subject + clientIp）：受理一次尝试并寄存句柄；
+ * 锁定/并发满 → retry-after 秒数，放行 → undefined。检查与占位同一同步段（P2）。
+ */
+export function admitAttempt(deps: AdminDeps, ctx: AdminAuditContext): number | undefined {
+  const admitted = deps.limiter.admit(ctx.clientIp, ctx.actor, "admin");
+  if (!admitted.admitted) return admitted.retryAfterSeconds;
+  admissions.set(ctx, admitted.admission);
+  return undefined;
+}
+
+/** 结算本次请求的受理；没有受理（门前的 deny）是空操作，重复结算由 Admission 挡住。 */
+export function settleAttempt(
+  ctx: AdminAuditContext,
+  outcome: "success" | "failure" | "abandon",
+): void {
+  admissions.get(ctx)?.settle(outcome);
 }
 
 /**
@@ -225,7 +245,7 @@ function ioFailure(
   error: unknown,
   secrets: readonly string[],
 ): undefined {
-  deps.limiter.recordFailure(ctx.clientIp, ctx.actor);
+  settleAttempt(ctx, "failure");
   deps.logger.error(`admin password reset failed: ${safeMessage(error, secrets)}`);
   auditDenied(deps.logger, ctx, "io");
   sendText(res, 503, "password reset unavailable");

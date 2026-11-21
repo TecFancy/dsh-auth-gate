@@ -159,18 +159,19 @@ describe("SessionStore", () => {
 });
 
 describe("SessionStore prune and revocation extensions (L5/L9/L12)", () => {
-  it("revokes only sessions created before the cutoff (passwordChangedAt rule)", async () => {
+  it("revokes sessions whose credential version is stale (passwordChangedAt rule)", async () => {
     const table = new MemTable();
     let now = 1_000_000;
     const store = new SessionStore(table, { now: () => now });
+    const stamp = new Date(1_500_000).toISOString();
     const old = await store.create("alice", 60_000_000);
     now = 2_000_000;
-    const fresh = await store.create("alice", 60_000_000);
+    const fresh = await store.create("alice", 60_000_000, "full", stamp);
 
-    expect(await store.revokeBySubjectBefore("alice", 1_500_000)).toBe(1);
+    expect(await store.revokeByCredentialVersion("alice", stamp)).toBe(1);
     expect(store.getByToken(old.token)).toBeUndefined();
     expect(store.getByToken(fresh.token)?.subject).toBe("alice");
-    expect(await store.revokeBySubjectBefore("alice", 1_500_000)).toBe(0);
+    expect(await store.revokeByCredentialVersion("alice", stamp)).toBe(0);
   });
 
   it("lists distinct non-bootstrap subjects for the deleted-user sweep", async () => {

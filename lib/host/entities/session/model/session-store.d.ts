@@ -26,6 +26,12 @@ export interface Session {
      * 缺省 = `full`（旧行无此字段仍解析）。
      */
     kind?: SessionKind | undefined;
+    /**
+     * 签发时读到的 `password_changed_at`（credential version）。扫描器据此吊销"用旧口令
+     * 认证出来的会话"：签发时刻可能晚于改密时间戳（校验跨越了等待），时间戳比较漏掉的
+     * 正是这条竞态。旧行没有该字段 → 视为旧凭证。
+     */
+    credentialVersion?: string | undefined;
 }
 export interface IssuedSession {
     token: string;
@@ -47,6 +53,7 @@ export declare const sessionDomainSpec: {
             expiresAt: number;
             revoked: boolean;
             kind?: "full" | "password-change-only" | "bootstrap" | undefined;
+            credentialVersion?: string | undefined;
         }>;
     };
 };
@@ -67,7 +74,7 @@ export declare class SessionStore {
     /** 上次清扫时刻；`-Infinity` = 还没扫过（首次 create 必扫）。 */
     private lastPruneAt;
     constructor(table: KvTable<string, Session>, options?: SessionStoreOptions);
-    create(subject: string, ttlMs: number, kind?: SessionKind): Promise<IssuedSession>;
+    create(subject: string, ttlMs: number, kind?: SessionKind, credentialVersion?: string): Promise<IssuedSession>;
     /** 同步内存读 + 校验；有效则返回行（不修改），否则 undefined。 */
     getByToken(token: string): Session | undefined;
     /** 吊销 = 删除行（登出语义，写盘）；不存在返回 false。 */
@@ -79,11 +86,14 @@ export declare class SessionStore {
      */
     revokeBySubject(subject: string): Promise<number>;
     /**
-     * 吊销某个 subject 中 `createdAt` 早于 `createdAtBefore`（epoch ms）的会话行。
-     * 用途：口令变更（users.yaml 的 `password_changed_at`）后作废变更前签发的会话；
-     * 变更后签发的会话保留，因此重复扫描是幂等的（CLI 改密走这条路径）。
+     * 吊销某 subject 下**凭证版本不等于** `currentVersion` 的会话行（口令变更后调用）。
+     *
+     * 判定不看 `createdAt`：登录的哈希校验跨越 await，可能在改密之后才签发会话：按时间
+     * 比较会把它当成"新会话"留下。记录签发时读到的版本才能精确吊销"用旧口令认证出来的"
+     * 那一条，同时保留改密后重新登录签发的会话（版本已是最新）。旧行没有版本字段，
+     * 视为旧凭证，一并吊销。返回吊销条数。
      */
-    revokeBySubjectBefore(subject: string, createdAtBefore: number): Promise<number>;
+    revokeByCredentialVersion(subject: string, currentVersion: string): Promise<number>;
     /**
      * 吊销某个类别的**全部**会话行，返回吊销条数（写盘）。
      * 用途：首次配置向导成功后关掉引导窗口（`bootstrap` 会话一律失效）。
