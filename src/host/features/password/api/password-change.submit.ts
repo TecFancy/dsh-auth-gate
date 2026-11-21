@@ -174,7 +174,7 @@ async function writeNewHash(
         throw new Error(`users file changed concurrently: ${ctx.subject}`);
       }
       // L5：落新哈希 + passwordChangedAt（供扫描器在「立即吊销失败 / 插件随后重启」时兜底：
-      // 它吊销 `createdAt < passwordChangedAt` 的会话，变更后签发的会话不受影响）。
+      // 它吊销"凭证版本旧于当前时间戳"的会话，变更后重新登录签发的会话不受影响）。
       Object.assign(record, applyPasswordChange(record, hashed, deps.now()));
       // B1（§10）：自助改密成功即清 must_change_password（P2 登录门不再立刻拦一次）。
       // 写盘侧对 false 不落盘，删除即「无该字段」；CLI `user passwd` 有意不清（运维重置通道）。

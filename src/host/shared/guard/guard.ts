@@ -239,7 +239,6 @@ export function wrapServer(
     // 所有权只属于第一次 wrap：第二个调用方拿到的 disposer 必须是空操作，
     // 否则它卸载时会替第一个调用方拆掉守卫（G3：幂等 ≠ 共享所有权）。
     log.warn?.("wrapServer: server is already guarded; second wrap is a no-op (returns a no-op)");
-    void existing;
     return () => undefined;
   }
 

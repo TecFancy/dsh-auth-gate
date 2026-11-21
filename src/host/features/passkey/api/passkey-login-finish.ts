@@ -25,16 +25,12 @@ import {
   type PasskeyCredentialMatch,
   type PasskeyLoginSettings,
 } from "../model/passkey-login.js";
-import {
-  runDummyVerification,
-  verifyPasskeyAssertion,
-  type AssertionVerdict,
-} from "./passkey-assertion-verify.js";
+import { runDummyVerification, verifyPasskeyAssertion } from "./passkey-assertion-verify.js";
+import { completeLogin, rejectLogin } from "./passkey-login-complete.js";
 import {
   challengeOf,
   failureContext,
   loadUsersOr503,
-  sendPasskeyFailure,
   sendPasskeyLocked,
   sendPasskeyUnavailable,
   type PasskeyFailureContext,
@@ -186,83 +182,73 @@ async function finishLogin(
     return;
   }
   const attempt = combineAdmissions(admission, accountGate.admission);
-  const verdict = await verifyPasskeyAssertion({
-    settings: deps.settings,
+  await verifyAndComplete(deps, counters, res, {
+    attempt,
     match,
     assertion,
     challenge: challengeOf(ceremony),
     storedCounter,
-  });
-  if (!verdict.ok) {
-    rejectLogin(deps, res, match.username, context, verdict.reason, clearCookie, attempt);
-    return;
-  }
-  // 并发断言：验证期间同一凭据已被推进过 ⇒ 这一条基于过期计数器，按重放拒绝（P2 L13）。
-  // 判定与下面的 advance 之间没有 await，Node 单线程下是原子的。
-  if (!counters.isCurrent(match.record, storedCounter)) {
-    rejectLogin(
-      deps,
-      res,
-      match.username,
-      context,
-      "counter advanced concurrently",
-      clearCookie,
-      admission,
-    );
-    return;
-  }
-  await completeLogin(deps, counters, res, {
-    admission: attempt,
-    match,
-    verdict,
     store,
-    next: context.next,
+    context,
     clearCookie,
   });
 }
 
-/** 成功路径：推进进程内计数器 → 清失败桶 → 注入 issueSession（受限语义由注入实现继承）。 */
-async function completeLogin(
+/** 验签 + 并发计数器复核 + 签发；`finally` 兜底释放账号占位（验证抛错也不泄漏）。 */
+async function verifyAndComplete(
   deps: PasskeyLoginFinishDeps,
   counters: PasskeyCounterStore,
   res: ServerResponse,
   input: {
-    readonly admission: Admission;
+    readonly attempt: Admission;
     readonly match: PasskeyCredentialMatch;
-    readonly verdict: Extract<AssertionVerdict, { ok: true }>;
+    readonly assertion: NonNullable<ReturnType<typeof readPasskeyAssertion>>;
+    readonly challenge: string;
+    readonly storedCounter: number;
     readonly store: SessionStore;
-    readonly next: string;
+    readonly context: PasskeyFailureContext;
     readonly clearCookie: string;
   },
 ): Promise<void> {
-  const { admission, match, verdict, store, next, clearCookie } = input;
-  if (verdict.warn !== undefined) {
-    deps.logger.warn(
-      `passkey login: counter regression allowed for ${match.username} ` +
-        `(credential ${match.record.credentialId.slice(0, 8)})`,
-    );
+  const { attempt, match, assertion, challenge, storedCounter, store, context, clearCookie } =
+    input;
+  try {
+    const verdict = await verifyPasskeyAssertion({
+      settings: deps.settings,
+      match,
+      assertion,
+      challenge,
+      storedCounter,
+    });
+    if (!verdict.ok) {
+      rejectLogin(deps, res, match.username, context, verdict.reason, clearCookie, attempt);
+      return;
+    }
+    // 并发断言：验证期间同一凭据已被推进过 ⇒ 这一条基于过期计数器，按重放拒绝（P2 L13）。
+    // 判定与下面的 advance 之间没有 await，Node 单线程下是原子的。
+    if (!counters.isCurrent(match.record, storedCounter)) {
+      rejectLogin(
+        deps,
+        res,
+        match.username,
+        context,
+        "counter advanced concurrently",
+        clearCookie,
+        attempt,
+      );
+      return;
+    }
+    await completeLogin(deps, counters, res, {
+      admission: attempt,
+      match,
+      verdict,
+      store,
+      next: context.next,
+      clearCookie,
+    });
+  } finally {
+    attempt.settle("abandon"); // 已结算时是空操作；验证抛错也释放账号占位
   }
-  counters.advance(match.record, verdict.newCounter);
-  admission.settle("success", match.username);
-  await deps.issueSession(res, store, match.username, next, match.user, [clearCookie]);
-  deps.logger.info(
-    `passkey login succeeded: ${match.username} (credential ${match.record.credentialId.slice(0, 8)})`,
-  );
-}
-
-/** 统一拒绝：计失败（已知用户按用户名桶，未知/伪凭据只按 IP）+ 401 卡片。 */
-function rejectLogin(
-  deps: PasskeyLoginFinishDeps,
-  res: ServerResponse,
-  username: string | undefined,
-  context: PasskeyFailureContext,
-  reason: string,
-  clearCookie: string,
-  admission: Admission,
-): void {
-  admission.settle("failure", username);
-  deps.logger.warn(`passkey login rejected: ${reason}`);
-  sendPasskeyFailure(res, context, clearCookie);
 }
 
 /** 415/413 响应（与口令登录同形：413 先写 `connection: close`）；无 status 的异常向上抛。 */

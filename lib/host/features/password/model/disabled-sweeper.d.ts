@@ -23,7 +23,7 @@ export interface DisabledSweeperOptions {
  * 行删掉，使 CLI（独立进程，够不到会话表）改的东西对**已在线**的浏览器也生效：
  *
  * - `disabled: true` 的用户：全部会话；
- * - `password_changed_at` 已落的用户：`createdAt` 早于该时刻的会话（口令变更前签发）；
+ * - `password_changed_at` 已落的用户：凭证版本旧于该值的会话（旧口令认证出来的）；
  * - 已从 users.yaml 删除的用户：该 subject 的全部会话（内部 subject 除外）。
  *
  * 为什么是周期扫描而不是门内检查：门（`PasswordGate.decide`）按 P12 冻结为同步、

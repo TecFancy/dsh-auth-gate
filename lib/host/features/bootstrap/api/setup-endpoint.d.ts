@@ -21,16 +21,21 @@ export interface SetupEndpointDeps {
     usersPath: string;
     /** token 模式：服务端自己生成并保存访问令牌（没有 body 参数）。 */
     saveToken: () => Promise<SetupTokenOutcome>;
-    /** password 模式：建第一个管理员；策略由实现方判定。 */
-    createAdmin: (username: string, password: string) => Promise<"ok" | "conflict" | "invalid" | "failed">;
+    /** password 模式：建第一个管理员；策略由实现方判定。成功时带回建号写下的凭证版本。 */
+    createAdmin: (username: string, password: string) => Promise<CreateAdminResult>;
     /** 向导完成的正式会话（写 Set-Cookie）：token 模式 subject=token，password 模式=用户名。 */
-    issueFullSession: (subject: string, res: ServerResponse) => Promise<void>;
+    issueFullSession: (subject: string, res: ServerResponse, credentialVersion?: string) => Promise<void>;
     logger: {
         info(message: unknown): void;
         warn(message: unknown): void;
         error(message: unknown): void;
     };
 }
+/** `createAdmin` 的结果：成功必须带回新管理员写下的 `password_changed_at`。 */
+export type CreateAdminResult = "conflict" | "invalid" | "failed" | {
+    outcome: "ok";
+    credentialVersion: string;
+};
 export interface SetupHandlers {
     get: HttpHandler;
     post: HttpHandler;

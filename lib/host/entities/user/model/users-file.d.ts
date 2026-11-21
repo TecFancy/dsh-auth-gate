@@ -29,7 +29,7 @@ export interface UserRecord {
     mustChangePassword?: boolean;
     /**
      * 最近一次口令变更的时间（ISO-8601，含毫秒）；YAML 键 `password_changed_at`。
-     * **可选**：老文件没有该键。会话扫描器据此吊销 `createdAt < passwordChangedAt`
+     * **可选**：老文件没有该键。会话扫描器据此吊销凭证版本更旧的会话（签发时记录该值）
      * 的会话行，使 CLI（独立进程、够不到会话存储）改的口令也在下一轮扫描生效。
      */
     passwordChangedAt?: string;

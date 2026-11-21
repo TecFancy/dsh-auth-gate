@@ -131,26 +131,22 @@ describe("DisabledSessionSweeper.sweep: password_changed_at (L5)", () => {
     expect(store.getByToken(raced.token)).toBeUndefined();
   });
 
-  it("ignores a far-future stamp instead of repeatedly revoking new sessions", async () => {
+  it("revokes old-version sessions even when the stamp is in the future", async () => {
     const table = new MemTable();
     const now = 1_000_000;
     const store = new SessionStore(table, { now: () => now });
-    const session = await store.create("alice", 60_000_000);
-    const warn = vi.fn();
+    const stamp = new Date(9_000_000).toISOString();
+    const stale = await store.create("alice", 60_000_000);
+    const current = await store.create("alice", 60_000_000, "full", stamp);
     const sweeper = new DisabledSessionSweeper({
       sessions: () => store,
-      now: () => now,
-      loadUsers: () =>
-        Promise.resolve(
-          usersOf([["alice", { passwordChangedAt: new Date(9_000_000).toISOString() }]]),
-        ),
-      log: { ...silentLog, warn },
+      // 版本比较下未来戳不再有自伤风险：新会话带着同一个未来版本，不会被反复误杀。
+      loadUsers: () => Promise.resolve(usersOf([["alice", { passwordChangedAt: stamp }]])),
+      log: silentLog,
     });
-
-    // 远超 now + 5min：忽略，绝不每轮吊销新会话（否则等于永久锁死该用户）
-    expect(await sweeper.sweep()).toBe(0);
-    expect(store.getByToken(session.token)?.subject).toBe("alice");
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining("in the future"));
+    expect(await sweeper.sweep()).toBe(1);
+    expect(store.getByToken(stale.token)).toBeUndefined();
+    expect(store.getByToken(current.token)?.subject).toBe("alice");
   });
 
   it("ignores an unparseable timestamp instead of revoking on it", async () => {
@@ -167,11 +163,12 @@ describe("DisabledSessionSweeper.sweep: password_changed_at (L5)", () => {
 });
 
 describe("DisabledSessionSweeper.sweep: deleted users (L12)", () => {
-  it("revokes sessions of subjects no longer in users.yaml, exempting internal subjects", async () => {
+  it("revokes orphan subjects, keeping users and bootstrap sessions", async () => {
     const store = new SessionStore(new MemTable());
     const alice = await store.create("alice", 60_000);
     const ghost = await store.create("ghost", 60_000);
     const bootstrap = await store.create("@bootstrap", 60_000, "bootstrap");
+    // `token` 只是 token 模式的会话主体：password 模式里残留的行属于孤儿，一并清掉。
     const token = await store.create("token", 60_000);
     const sweeper = new DisabledSessionSweeper({
       sessions: () => store,
@@ -179,11 +176,11 @@ describe("DisabledSessionSweeper.sweep: deleted users (L12)", () => {
       log: silentLog,
     });
 
-    expect(await sweeper.sweep()).toBe(1);
+    expect(await sweeper.sweep()).toBe(2);
     expect(store.getByToken(alice.token)?.subject).toBe("alice");
     expect(store.getByToken(ghost.token)).toBeUndefined();
     expect(store.getByToken(bootstrap.token)?.subject).toBe("@bootstrap");
-    expect(store.getByToken(token.token)?.subject).toBe("token");
+    expect(store.getByToken(token.token)).toBeUndefined();
   });
 });
 

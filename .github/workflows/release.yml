@@ -61,10 +61,23 @@ jobs:
         env:
           PUBLISH_REF: ${{ inputs.publish_ref }}
         run: |
-          ref="${PUBLISH_REF:-${GITHUB_SHA}}"
-          sha="$(git ls-remote "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git" "$ref" | awk '{print $1}' | head -n 1)"
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          sha=""
+          if [ -z "$PUBLISH_REF" ]; then
+            # Normal release run: the push that release-please acted on is the commit to ship.
+            sha="$GITHUB_SHA"
+          elif printf '%s' "$PUBLISH_REF" | grep -Eq '^[0-9a-f]{40}$'; then
+            sha="$PUBLISH_REF"
+          else
+            # Tag: prefer the peeled commit (`^{}`) so an annotated tag does not resolve to the
+            # tag object; fall back to a branch/any ref of the same name, then to the tag object.
+            for ref in "refs/tags/${PUBLISH_REF}^{}" "refs/tags/${PUBLISH_REF}" "refs/heads/${PUBLISH_REF}"; do
+              sha="$(git ls-remote "$url" "$ref" | awk '{print $1}' | head -n 1)"
+              if [ -n "$sha" ]; then break; fi
+            done
+          fi
           if [ -z "$sha" ]; then
-            echo "::error::cannot resolve $ref to a commit"
+            echo "::error::cannot resolve ${PUBLISH_REF:-$GITHUB_SHA} to a commit"
             exit 1
           fi
           echo "sha=$sha" >> "$GITHUB_OUTPUT"

@@ -131,6 +131,8 @@ describe("POST /auth/setup (password mode)", () => {
     expect(res.headers["cache-control"]).toBe("no-store");
     expect(res.headers["referrer-policy"]).toBe("no-referrer");
     expect(harness.issued).toEqual(["alice"]);
+    // 建号时写下的版本要传给签发：否则首轮扫描会把向导建的会话当旧凭证吊掉。
+    expect(harness.issuedVersions).toEqual(["2026-11-22T00:00:00.000Z"]);
     expect(harness.store.getByToken(cookieToken(cookie))).toBeUndefined();
   });
 
@@ -140,7 +142,7 @@ describe("POST /auth/setup (password mode)", () => {
       mode: "password",
       createAdmin: () => {
         created += 1;
-        return Promise.resolve("ok");
+        return Promise.resolve({ outcome: "ok", credentialVersion: "2026-11-22T00:00:00.000Z" });
       },
     });
     const res = await postSetupForm(harness, {

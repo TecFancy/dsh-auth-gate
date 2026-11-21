@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { combineAdmissions } from "./types.js";
 import { LoginRateLimiter } from "./rate-limit.js";
 
 function makeLimiter(options: ConstructorParameters<typeof LoginRateLimiter>[0] = {}): {
@@ -73,6 +74,44 @@ describe("LoginRateLimiter admission (atomic check + reservation)", () => {
     probe.admission.settle("failure");
     // 第 6 次打击：30s × 2 = 60s（旧实现会永久 429，退避永不升级）
     expect(limiter.admit("1.2.3.4", "alice")).toEqual({ admitted: false, retryAfterSeconds: 60 });
+  });
+});
+
+describe("LoginRateLimiter admission accounting", () => {
+  it("a failure settled through a combined admission counts once (P1: no double strike)", () => {
+    const { limiter } = makeLimiter();
+    // 模拟 passkey：先占 IP，再占账号，合并后结算一次失败。
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const ip = limiter.admit("1.2.3.4", undefined, "passkey");
+      const acct = limiter.admitAccount("alice", "passkey");
+      if (!ip.admitted || !acct.admitted) throw new Error("expected admission");
+      combineAdmissions(ip.admission, acct.admission).settle("failure");
+    }
+    // 4 次失败后仍未锁（若一次失败记两笔，第 3 次就锁了）
+    expect(limiter.check("1.2.3.4", "alice", "passkey")).toEqual({ allowed: true });
+    const ip = limiter.admit("1.2.3.4", undefined, "passkey");
+    const acct = limiter.admitAccount("alice", "passkey");
+    if (!ip.admitted || !acct.admitted) throw new Error("expected admission");
+    combineAdmissions(ip.admission, acct.admission).settle("failure");
+    expect(limiter.check("1.2.3.4", "alice", "passkey")).toEqual({
+      allowed: false,
+      retryAfterSeconds: 30,
+    });
+  });
+
+  it("account admission settle is idempotent", () => {
+    const { limiter } = makeLimiter();
+    const acct = limiter.admitAccount("alice", "passkey");
+    if (!acct.admitted) throw new Error("expected admission");
+    acct.admission.settle("failure");
+    acct.admission.settle("failure");
+    // 只记一次：再失败 4 次才到 5
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const next = limiter.admitAccount("alice", "passkey");
+      if (!next.admitted) throw new Error("expected admission");
+      next.admission.settle("failure");
+    }
+    expect(limiter.check("0.0.0.0", "alice", "passkey")).toEqual({ allowed: true });
   });
 
   it("caps concurrent in-flight attempts per IP without locking it", () => {

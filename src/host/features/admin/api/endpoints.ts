@@ -122,6 +122,8 @@ export async function handleResetPassword(
     const sessionsRevoked = await revokeTarget(deps, ctx, input.secrets);
     deps.clearRateBuckets(ctx.target);
     settleAttempt(ctx, "success");
+    // 已认证面成功同清 IP 桶（与改密一致）：不要把操作人锁在自己的管理表单外面。
+    deps.limiter.recordSuccess(ctx.clientIp, ctx.actor, "admin");
     auditSuccess(deps.logger, ctx, sessionsRevoked);
     sendJson(res, 200, { ok: true, sessionsRevoked });
   } finally {

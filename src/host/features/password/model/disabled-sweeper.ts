@@ -7,9 +7,6 @@ export const DEFAULT_REVOKE_SWEEP_MS = 5_000;
 /** 同一类告警的最小间隔（毫秒）：故障持续时每分钟一条，既可见也不刷屏。 */
 export const WARN_INTERVAL_MS = 60_000;
 
-/** 不是 users.yaml 用户的内部会话 subject：孤儿扫描不得吊销（`token` = token 模式的会话主体）。 */
-const INTERNAL_SESSION_SUBJECTS: ReadonlySet<string> = new Set(["token"]);
-
 export interface DisabledSweeperOptions {
   /** 会话访问器（与门同形：每次现取；undefined = 会话通道不可用）。 */
   sessions: () => SessionStore | undefined;
@@ -22,17 +19,14 @@ export interface DisabledSweeperOptions {
   log: { info(message: string): void; warn(message: string): void };
 }
 
-type WarnKind = "unreadable" | "sweep" | "clock";
-
-/** 未来时间戳的容忍窗口：超过 now + 5min 视为时钟问题，忽略该用户的时间戳。 */
-const FUTURE_STAMP_TOLERANCE_MS = 5 * 60_000;
+type WarnKind = "unreadable" | "sweep";
 
 /**
  * 用户凭证/状态变更的会话吊销器（T13 / D8 收口）：周期扫描 users.yaml，把三类失效会话
  * 行删掉，使 CLI（独立进程，够不到会话表）改的东西对**已在线**的浏览器也生效：
  *
  * - `disabled: true` 的用户：全部会话；
- * - `password_changed_at` 已落的用户：`createdAt` 早于该时刻的会话（口令变更前签发）；
+ * - `password_changed_at` 已落的用户：凭证版本旧于该值的会话（旧口令认证出来的）；
  * - 已从 users.yaml 删除的用户：该 subject 的全部会话（内部 subject 除外）。
  *
  * 为什么是周期扫描而不是门内检查：门（`PasswordGate.decide`）按 P12 冻结为同步、
@@ -50,7 +44,6 @@ export class DisabledSessionSweeper {
   private readonly warnedAt: Record<WarnKind, number> = {
     unreadable: Number.NEGATIVE_INFINITY,
     sweep: Number.NEGATIVE_INFINITY,
-    clock: Number.NEGATIVE_INFINITY,
   };
 
   constructor(options: DisabledSweeperOptions) {
@@ -77,9 +70,7 @@ export class DisabledSessionSweeper {
     }
     if (loaded.missing) return 0;
     try {
-      const revoked = await revokeInvalidSessions(store, loaded.snapshot.users, this.now(), (m) =>
-        this.warn("clock", m),
-      );
+      const revoked = await revokeInvalidSessions(store, loaded.snapshot.users);
       if (revoked > 0) {
         this.log.info(`revoked ${revoked} session(s) of changed, disabled or removed user(s)`);
       }
@@ -119,8 +110,6 @@ export class DisabledSessionSweeper {
 async function revokeInvalidSessions(
   store: SessionStore,
   users: ReadonlyMap<string, UserRecord>,
-  now: number,
-  warnClock: (message: string) => void,
 ): Promise<number> {
   let revoked = 0;
   for (const [name, record] of users) {
@@ -130,22 +119,13 @@ async function revokeInvalidSessions(
     }
     const changedAt = changedAtMs(record.passwordChangedAt);
     if (changedAt === undefined) continue;
-    if (changedAt > now + FUTURE_STAMP_TOLERANCE_MS) {
-      // 未来时间戳（时钟漂移 / 手改文件）按 now 封顶会变成"每轮都吊销新会话"的自伤开关，
-      // 因此直接忽略并告警：宁可这一轮不吊销，也不要永久锁死该用户。
-      warnClock(
-        `password_changed_at for ${name} is in the future; ignoring it until the clock catches up`,
-      );
-      continue;
-    }
     // 凭证版本比较（而不是 createdAt 比较）：登录的哈希校验跨越 await，改密后才签发会话
     // 也会"看起来更新"，时间比较会漏掉它；签发时记录的版本才能精确吊销旧口令认证的会话。
     revoked += await store.revokeByCredentialVersion(name, record.passwordChangedAt!);
   }
   for (const subject of store.subjects()) {
-    // 先看 users.yaml：真实用户（哪怕名字是 `token`）永远不是"内部 subject"。
+    // 只看 users.yaml：被删的用户（哪怕名字是 `token`）的残留会话都要清。
     if (users.has(subject)) continue;
-    if (INTERNAL_SESSION_SUBJECTS.has(subject)) continue;
     revoked += await store.revokeBySubject(subject);
   }
   return revoked;

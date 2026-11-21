@@ -77,8 +77,10 @@ export class LoginRateLimiter {
       return { admitted: false, retryAfterSeconds: 1 };
     }
     const acctEntry = acctKey === undefined ? undefined : this.byAccount.get(acctKey);
-    if (acctEntry !== undefined && acctEntry.inflight >= this.maxFailures) {
-      return { admitted: false, retryAfterSeconds: 1 };
+    if (acctEntry !== undefined) {
+      // 锁到期后只放 1 条探测（突发并发不能一次贡献 maxFailures 次猜码）。
+      const cap = acctEntry.failures >= this.maxFailures ? 1 : this.maxFailures;
+      if (acctEntry.inflight >= cap) return { admitted: false, retryAfterSeconds: 1 };
     }
     const trackedIp = ipEntry ?? this.entryOf(this.byIp, ipKey);
     const trackedAcct =
@@ -112,15 +114,20 @@ export class LoginRateLimiter {
       return { admitted: false, retryAfterSeconds: Math.max(1, Math.ceil(wait / 1000)) };
     }
     const entry = this.byAccount.get(key);
-    if (entry !== undefined && entry.inflight >= this.maxFailures) {
+    // 锁到期后的第一次尝试最多放 1 条（不是 maxFailures 条）：突发探测只能算一次猜码。
+    const cap = entry !== undefined && entry.failures >= this.maxFailures ? 1 : this.maxFailures;
+    if (entry !== undefined && entry.inflight >= cap) {
       return { admitted: false, retryAfterSeconds: 1 };
     }
     const tracked = entry ?? this.entryOf(this.byAccount, key);
     tracked.inflight += 1;
+    let settled = false;
     return {
       admitted: true,
       admission: {
         settle: (outcome) => {
+          if (settled) return;
+          settled = true;
           const current = this.byAccount.get(key);
           if (current !== undefined) current.inflight = Math.max(0, current.inflight - 1);
           if (outcome === "failure") this.recordBucket(this.byAccount, key, this.now());

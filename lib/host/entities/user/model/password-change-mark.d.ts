@@ -6,5 +6,10 @@ import type { UserRecord } from "./users-file.js";
  */
 /** 变更时刻 → 落盘用的 ISO 串（epoch ms 或 `Date`；缺省 = 现在）。 */
 export declare function changedAtIso(at?: number | Date): string;
-/** 返回改过口令的新记录（不改入参）；调用方决定是否写回快照。 */
+/**
+ * 返回改过口令的新记录（不改入参）；调用方决定是否写回快照。
+ *
+ * 版本必须严格单调（P2）：同一毫秒内两次改密若拿到相同 ISO 串，两次之间签发的会话会在
+ * 第二次改密后继续通过版本比较。因此新时间戳至少比旧值大 1ms。
+ */
 export declare function applyPasswordChange(user: UserRecord, passwordHash: string, changedAt?: number | Date): UserRecord;

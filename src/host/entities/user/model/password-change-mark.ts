@@ -11,11 +11,20 @@ export function changedAtIso(at: number | Date = Date.now()): string {
   return (at instanceof Date ? at : new Date(at)).toISOString();
 }
 
-/** 返回改过口令的新记录（不改入参）；调用方决定是否写回快照。 */
+/**
+ * 返回改过口令的新记录（不改入参）；调用方决定是否写回快照。
+ *
+ * 版本必须严格单调（P2）：同一毫秒内两次改密若拿到相同 ISO 串，两次之间签发的会话会在
+ * 第二次改密后继续通过版本比较。因此新时间戳至少比旧值大 1ms。
+ */
 export function applyPasswordChange(
   user: UserRecord,
   passwordHash: string,
   changedAt: number | Date = Date.now(),
 ): UserRecord {
-  return { ...user, passwordHash, passwordChangedAt: changedAtIso(changedAt) };
+  const requested = changedAt instanceof Date ? changedAt.getTime() : changedAt;
+  const previous =
+    user.passwordChangedAt === undefined ? undefined : Date.parse(user.passwordChangedAt);
+  const floor = previous === undefined || Number.isNaN(previous) ? requested : previous + 1;
+  return { ...user, passwordHash, passwordChangedAt: changedAtIso(Math.max(requested, floor)) };
 }

@@ -75,8 +75,10 @@ export const SCOPES: readonly RateLimitScope[] = [
  */
 export function combineAdmissions(primary: Admission, secondary: Admission): Admission {
   return {
-    settle: (outcome, account) => {
-      primary.settle(outcome, account);
+    settle: (outcome) => {
+      // account 只交给 secondary：primary 在受理时没有账号，传 account 会让它在释放时
+      // 再记一次账号桶，等于每次失败计两次（P2）。
+      primary.settle(outcome);
       secondary.settle(outcome);
     },
   };

@@ -1,0 +1,55 @@
+/**
+ * passkey 登录的"结算"半边：验签后的签发与统一拒绝。从 `passkey-login-finish.ts` 拆出，
+ * 守住单文件行数上限；调用方负责受理与占位释放。
+ */
+import type { ServerResponse } from "node:http";
+import type { SessionStore } from "../../../entities/session/index.js";
+import type { Admission } from "../../../shared/rate-limit/index.js";
+import { sendPasskeyFailure, type PasskeyFailureContext } from "./passkey-login-failures.js";
+import type { PasskeyCounterStore, PasskeyCredentialMatch } from "../model/passkey-login.js";
+import type { AssertionVerdict } from "./passkey-assertion-verify.js";
+import type { PasskeyLoginFinishDeps } from "./passkey-login-finish.js";
+
+/** 成功路径：推进进程内计数器 → 清失败桶 → 注入 issueSession（受限语义由注入实现继承）。 */
+export async function completeLogin(
+  deps: PasskeyLoginFinishDeps,
+  counters: PasskeyCounterStore,
+  res: ServerResponse,
+  input: {
+    readonly admission: Admission;
+    readonly match: PasskeyCredentialMatch;
+    readonly verdict: Extract<AssertionVerdict, { ok: true }>;
+    readonly store: SessionStore;
+    readonly next: string;
+    readonly clearCookie: string;
+  },
+): Promise<void> {
+  const { admission, match, verdict, store, next, clearCookie } = input;
+  if (verdict.warn !== undefined) {
+    deps.logger.warn(
+      `passkey login: counter regression allowed for ${match.username} ` +
+        `(credential ${match.record.credentialId.slice(0, 8)})`,
+    );
+  }
+  counters.advance(match.record, verdict.newCounter);
+  admission.settle("success", match.username);
+  await deps.issueSession(res, store, match.username, next, match.user, [clearCookie]);
+  deps.logger.info(
+    `passkey login succeeded: ${match.username} (credential ${match.record.credentialId.slice(0, 8)})`,
+  );
+}
+
+/** 统一拒绝：计失败（已知用户按用户名桶，未知/伪凭据只按 IP）+ 401 卡片。 */
+export function rejectLogin(
+  deps: PasskeyLoginFinishDeps,
+  res: ServerResponse,
+  username: string | undefined,
+  context: PasskeyFailureContext,
+  reason: string,
+  clearCookie: string,
+  admission: Admission,
+): void {
+  admission.settle("failure", username);
+  deps.logger.warn(`passkey login rejected: ${reason}`);
+  sendPasskeyFailure(res, context, clearCookie);
+}

@@ -33,13 +33,14 @@ export interface SetupEndpointDeps {
   usersPath: string;
   /** token 模式：服务端自己生成并保存访问令牌（没有 body 参数）。 */
   saveToken: () => Promise<SetupTokenOutcome>;
-  /** password 模式：建第一个管理员；策略由实现方判定。 */
-  createAdmin: (
-    username: string,
-    password: string,
-  ) => Promise<"ok" | "conflict" | "invalid" | "failed">;
+  /** password 模式：建第一个管理员；策略由实现方判定。成功时带回建号写下的凭证版本。 */
+  createAdmin: (username: string, password: string) => Promise<CreateAdminResult>;
   /** 向导完成的正式会话（写 Set-Cookie）：token 模式 subject=token，password 模式=用户名。 */
-  issueFullSession: (subject: string, res: ServerResponse) => Promise<void>;
+  issueFullSession: (
+    subject: string,
+    res: ServerResponse,
+    credentialVersion?: string,
+  ) => Promise<void>;
   logger: {
     info(message: unknown): void;
     warn(message: unknown): void;
@@ -48,6 +49,10 @@ export interface SetupEndpointDeps {
 }
 
 const UNTRUSTED_ORIGIN = "untrusted origin";
+
+/** `createAdmin` 的结果：成功必须带回新管理员写下的 `password_changed_at`。 */
+export type CreateAdminResult =
+  "conflict" | "invalid" | "failed" | { outcome: "ok"; credentialVersion: string };
 const ALREADY_CONFIGURED = "already configured";
 const UNAUTHORIZED = "unauthorized";
 const SAVE_FAILED =
@@ -181,7 +186,7 @@ async function completePasswordSetup(
     return;
   }
   await revokeBootstrapSessions(deps);
-  await deps.issueFullSession(form.username, res);
+  await deps.issueFullSession(form.username, res, outcome.credentialVersion);
   deps.logger.info("setup complete: administrator created");
   redirectTo(res, CONTINUE_PATH);
 }

@@ -121,6 +121,14 @@ function PasskeyBody({
     return (
       <div style={EMPTY_STATE_STYLE}>
         <p style={HINT_STYLE}>{t(PASSKEY_KEYS.empty)}</p>
+        {state.refreshFailed === true ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <p style={ERROR_TEXT_STYLE}>{t(PASSKEY_KEYS.unavailable)}</p>
+            <ActionButton variant="ghost" onClick={onRetry}>
+              {t(PASSKEY_KEYS.retry)}
+            </ActionButton>
+          </div>
+        ) : null}
       </div>
     );
   }
