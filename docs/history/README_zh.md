@@ -52,6 +52,7 @@
 - [grok46-launch-token-bridge-review](reviews/grok46-launch-token-bridge-review.md)
 - [grok46-d21-token-failure-card-review](reviews/grok46-d21-token-failure-card-review.md)
 - [kimi-k3.1-passkey-review](reviews/kimi-k3.1-passkey-review.md)
+- [claude-code-0.23-full-repo-review](reviews/claude-code-0.23-full-repo-review.md) - 四个 Claude Code agent 评审 0.23：守卫、认证流程、客户端、工程体系（11 条 P1，无 P0）
 
 ### evidence
 
