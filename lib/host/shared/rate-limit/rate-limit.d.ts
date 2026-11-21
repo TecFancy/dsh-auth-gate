@@ -24,10 +24,11 @@ export declare class LoginRateLimiter {
     /** 受理一次尝试：检查锁定 + 并发占位，返回结算句柄（登录路径用这个）。 */
     admit(ip: string, account: string | undefined, scope?: RateLimitScope): AdmissionResult;
     /**
-     * 并发闸：只看「在途」数量，不看 failures。
-     * - 结算时 failures 才增长，锁由 lockUntil 表达；把 failures 并进闸门会让锁到期后仍然
-     *   永久 429（failures 要等窗口衰减才归零），退避也就永远不升级。
-     * - 在途上限 = maxFailures 时，一次突发最多贡献 maxFailures 次猜码，随后立即锁定。
+     * 并发闸：以「在途」数量为准，failures 只决定在途上限（锁到期后 1 条，平时 maxFailures）。
+     * - 结算时 failures 才增长，锁由 lockUntil 表达；把 failures 直接并进闸门会让锁到期后
+     *   仍然永久 429（failures 要等窗口衰减才归零），退避也就永远不升级。
+     * - 在途上限 = maxFailures 时，一次突发最多贡献 maxFailures 次猜码，随后立即锁定；
+     *   锁到期后只放 1 条探测，避免"锁一到期就再来一波"。
      */
     private reserve;
     /** 返回只允许结算一次的句柄（重复调用是空操作）。 */

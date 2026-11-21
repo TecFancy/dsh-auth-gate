@@ -1,12 +1,14 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { CreateAdminResult,
+import {
   makeBootstrapEndpoint,
   makeConfiguredProbe,
   makeContinueEndpoint,
   makeSetupHandlers,
   type ConfiguredProbe,
-  type SetupTokenOutcome } from "./host/features/bootstrap/index.js";
+  type CreateAdminResult,
+  type SetupTokenOutcome,
+} from "./host/features/bootstrap/index.js";
 import { randomBytes } from "node:crypto";
 import type { WrappableServer } from "./host/shared/guard/index.js";
 import type { LaunchTokenBridge } from "./host/shared/http/index.js";

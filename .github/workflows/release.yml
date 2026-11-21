@@ -66,12 +66,11 @@ jobs:
           if [ -z "$PUBLISH_REF" ]; then
             # Normal release run: the push that release-please acted on is the commit to ship.
             sha="$GITHUB_SHA"
-          elif printf '%s' "$PUBLISH_REF" | grep -Eq '^[0-9a-f]{40}$'; then
-            sha="$PUBLISH_REF"
           else
-            # Tag: prefer the peeled commit (`^{}`) so an annotated tag does not resolve to the
-            # tag object; fall back to a branch/any ref of the same name, then to the tag object.
-            for ref in "refs/tags/${PUBLISH_REF}^{}" "refs/tags/${PUBLISH_REF}" "refs/heads/${PUBLISH_REF}"; do
+            # Manual re-publish takes an existing *tag* only: a raw SHA or branch could name a
+            # commit that is not on main, and publishing it would bypass the release path.
+            # Peel first (`^{}`) so an annotated tag resolves to its commit, not the tag object.
+            for ref in "refs/tags/${PUBLISH_REF}^{}" "refs/tags/${PUBLISH_REF}"; do
               sha="$(git ls-remote "$url" "$ref" | awk '{print $1}' | head -n 1)"
               if [ -n "$sha" ]; then break; fi
             done

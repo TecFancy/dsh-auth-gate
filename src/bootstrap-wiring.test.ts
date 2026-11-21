@@ -130,6 +130,11 @@ describe("makeBootstrapWiring: password mode", () => {
     // L5 同一套语义：建号即一次口令变更（供会话扫描器兜底）。
     expect(typeof record?.passwordChangedAt).toBe("string");
     expect(Number.isNaN(Date.parse(record?.passwordChangedAt ?? ""))).toBe(false);
+    // 向导签发的正式会话必须带同一个版本，否则首轮扫描会把它当旧凭证吊掉（P1）。
+    const sessionToken = res.headers["set-cookie"]?.match(/dsh_auth=([^;]+)/)?.[1];
+    expect(harness.store.getByToken(sessionToken ?? "")?.credentialVersion).toBe(
+      record?.passwordChangedAt,
+    );
     expect(harness.wiring.markedConfigured.value).toBe(true);
   });
 
