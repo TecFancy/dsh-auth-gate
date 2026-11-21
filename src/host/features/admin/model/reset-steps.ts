@@ -1,5 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { USERNAME_RE, checkPasswordPolicy } from "../../../entities/user/index.js";
+import {
+  applyPasswordChange,
+  USERNAME_RE,
+  checkPasswordPolicy,
+} from "../../../entities/user/index.js";
 import { checkRequestOrigin, parseCookieHeader } from "../../../shared/http/index.js";
 import type { OriginCheckRequest } from "../../../shared/http/index.js";
 import type { UserRecord, UsersSnapshot } from "../../../entities/user/index.js";
@@ -161,8 +165,9 @@ export class ActorNotAdminError extends Error {
 
 /**
  * 锁内 RMW（唯一变更入口）：**先复核 actor 仍是 admin 且未禁用**（TOCTOU，grok #5），
- * 再设 `must_change_password: true` + 新哈希。`totpSecret` / `role` / `disabled` 一律不动（验收 8）；
- * 只改这两个字段，last-admin 判定不会误触发。目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
+ * 再设 `must_change_password: true` + 新哈希 + `password_changed_at`。`totpSecret` / `role` /
+ * `disabled` 一律不动（验收 8）；只改这三个字段，last-admin 判定不会误触发。
+ * 目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
  */
 export async function writeReset(
   deps: AdminDeps,
@@ -182,8 +187,9 @@ export async function writeReset(
       if (record === undefined) {
         throw new Error(`target not found in users snapshot: ${ctx.target}`);
       }
-      record.passwordHash = hashed;
       record.mustChangePassword = true;
+      // L5：落重置时刻，供插件扫描器在「立即吊销失败 / 插件随后重启」时兜底吊销旧会话。
+      Object.assign(record, applyPasswordChange(record, hashed, deps.now()));
     });
     return true;
   } catch (error) {

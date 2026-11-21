@@ -62,7 +62,19 @@ const RULES = [
   { re: /^lib\//, scenes: ["hygiene", "build"] },
   { re: /^scripts\//, scenes: ["hygiene", "types"], selfTests: true },
   {
-    re: /^(.*\.config\.(js|mjs|ts)$|aliases\.json|tsconfig.*\.json$)/,
+    // Build and test configuration. A change here can invalidate the emitted
+    // artifact (`tsconfig*.json`, `tsdown.config.ts`), the type graph, or the
+    // test/coverage contract (`vitest.config.ts`), so it owes the build and
+    // the tests on top of the static checks. Before this rule these paths ran
+    // `hygiene + types` only, which is why editing `vitest.config.ts` locally
+    // never ran a test.
+    re: /^(.*\.config\.ts$|tsconfig.*\.json$)/,
+    scenes: ["hygiene", "types", "tests", "build"],
+  },
+  {
+    // Remaining configuration (eslint, prettier, commitlint, lint-staged,
+    // steiger, aliases): no build output or test behaviour depends on them.
+    re: /^(.*\.config\.(js|mjs)$|aliases\.json$)/,
     scenes: ["hygiene", "types"],
   },
   { re: /^(package\.json|package-lock\.json|\.npmrc)$/, scenes: ["verify"] },
@@ -653,6 +665,22 @@ async function selfTest() {
   expect(
     scenesFor(["package.json"]).scenes.join(",") === "verify",
     "a dependency change falls back to the full set",
+  );
+  expect(
+    scenesFor(["vitest.config.ts"]).scenes.join(",") === "hygiene,types,tests,build",
+    "a test-config change owes the build and the tests",
+  );
+  expect(
+    scenesFor(["tsconfig.build.json"]).scenes.join(",") === "hygiene,types,tests,build",
+    "a tsconfig change owes the build and the tests",
+  );
+  expect(
+    scenesFor(["tsdown.config.ts"]).scenes.join(",") === "hygiene,types,tests,build",
+    "a build-config change owes the build and the tests",
+  );
+  expect(
+    scenesFor(["eslint.config.js"]).scenes.join(",") === "hygiene,types",
+    "a lint-config change stays at the static checks",
   );
   expect(
     scenesFor(["something-unknown.xyz"]).scenes.join(",") === "verify",

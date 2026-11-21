@@ -7,7 +7,7 @@
  * 重设计：这个表单一年用一次，常驻展开会占掉约 300px 首屏（评审：低频表单不该和
  * 主任务抢空间）。现在由父组件按需挂载，展开时聚焦名称框，取消后焦点回触发按钮。
  */
-import { useEffect, useRef, type FormEvent } from "react";
+import { useEffect, useRef, type FormEvent, type KeyboardEvent } from "react";
 import { PASSKEY_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
   ActionButton,
@@ -21,18 +21,15 @@ import {
   SECTION_HEADING_STYLE,
   TITLE_STYLE,
 } from "../../../shared/ui/index.ts";
-import type { PasskeyField, PasskeyFormValues } from "../model/passkey-form.ts";
-
-/** 字段 id（与 use-passkey-actions 的 `addFieldId` 同形）。 */
-function fieldId(field: PasskeyField): string {
-  return `dsh-auth-gate-passkey-${field}`;
-}
+import {
+  PASSKEY_STATUS_ID,
+  passkeyFieldId,
+  type PasskeyField,
+  type PasskeyFormValues,
+} from "../model/passkey-form.ts";
 
 /** 动态码提示 id。 */
 const CODE_HINT_ID = "dsh-auth-gate-passkey-code-hint";
-
-/** 状态播报位 id（与列表共用同一个 passkey 状态位）。 */
-const STATUS_ID = "dsh-auth-gate-passkey-status";
 
 /** 行式输入（与改密表单同形）。 */
 function AddField({
@@ -58,8 +55,8 @@ function AddField({
   inputMode?: "numeric" | undefined;
   onChange: (value: string) => void;
 }) {
-  const id = fieldId(field);
-  const described = [invalid ? STATUS_ID : undefined, hintId].filter(
+  const id = passkeyFieldId(field);
+  const described = [invalid ? PASSKEY_STATUS_ID : undefined, hintId].filter(
     (item): item is string => item !== undefined,
   );
   return (
@@ -109,20 +106,20 @@ function AddFields({
   return (
     <div>
       <div style={FIELD_ROW_STYLE}>
-        <label htmlFor={fieldId("label")} style={FIELD_LABEL_STYLE}>
+        <label htmlFor={passkeyFieldId("label")} style={FIELD_LABEL_STYLE}>
           {t(PASSKEY_KEYS.label)}
         </label>
         <div style={FIELD_CONTROL_STYLE}>
           <input
             ref={labelRef}
-            id={fieldId("label")}
+            id={passkeyFieldId("label")}
             name="label"
             type="text"
             autoComplete="off"
             placeholder={t(PASSKEY_KEYS.labelPlaceholder)}
             value={values.label}
             aria-invalid={isInvalid("label") ? "true" : undefined}
-            aria-describedby={isInvalid("label") ? STATUS_ID : undefined}
+            aria-describedby={isInvalid("label") ? PASSKEY_STATUS_ID : undefined}
             style={isInvalid("label") ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
             onChange={(event) => onChange("label", event.target.value)}
           />
@@ -180,6 +177,7 @@ export function PasskeyAddForm({
   onCancel,
 }: PasskeyAddFormProps) {
   const labelRef = useRef<HTMLInputElement | null>(null);
+  const composing = useRef(false);
 
   // 展开即聚焦名称框：键盘用户不用自己找。
   useEffect(() => {
@@ -193,6 +191,14 @@ export function PasskeyAddForm({
       : t(totpEnabled ? PASSKEY_KEYS.codeHintOn : PASSKEY_KEYS.codeHintOff);
   const submit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault();
+    if (composing.current) return;
+    void onSubmit();
+  };
+  /** IME 组合期的 Enter 是「确认候选词」，不是提交（C6）。 */
+  const keyDown = (event: KeyboardEvent<HTMLFormElement>): void => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (composing.current || event.nativeEvent.isComposing === true) return;
     void onSubmit();
   };
   return (
@@ -201,6 +207,13 @@ export function PasskeyAddForm({
       noValidate
       aria-busy={busy}
       onSubmit={submit}
+      onKeyDown={keyDown}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      onCompositionEnd={() => {
+        composing.current = false;
+      }}
     >
       <div style={SECTION_HEADING_STYLE}>
         <h4 style={TITLE_STYLE}>{t(PASSKEY_KEYS.addFormTitle)}</h4>

@@ -206,3 +206,39 @@ describe("reviewer 只读复审回归（R1 / R4）", () => {
     unmount();
   });
 });
+
+describe("C4：失败焦点在阶段稳定后才落", () => {
+  it("focuses the first invalid field after the confirm page hands back to editing", async () => {
+    fetchMock.mockImplementation((url: string) =>
+      String(url) === "/auth/users/password"
+        ? Promise.resolve(jsonResponse(400, { error: "policy", rules: ["minLength"] }))
+        : Promise.resolve(jsonResponse(404, {})),
+    );
+    const { container } = await render();
+    await act(async () => {
+      setValue(container.querySelector<HTMLSelectElement>("#dsh-auth-gate-admin-target")!, "alice");
+      setValue(
+        container.querySelector<HTMLInputElement>("#dsh-auth-gate-admin-password")!,
+        "NewPassw0rd!XY",
+      );
+      setValue(
+        container.querySelector<HTMLInputElement>("#dsh-auth-gate-admin-confirm")!,
+        "NewPassw0rd!XY",
+      );
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      container
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+    expect(container.textContent).toContain(t(ADMIN_KEYS.confirmTitle, { name: "alice" }));
+
+    await confirmReset(container, "alice");
+    // 回到编辑页 + 失败文案落位；焦点必须在重新渲染出来的口令框上（确认页在时它不在文档里）。
+    expect(container.textContent).toContain(t(ADMIN_KEYS.policyIntro));
+    expect(container.querySelector("#dsh-auth-gate-admin-status")?.textContent).not.toBe("");
+    expect(document.activeElement).toBe(container.querySelector("#dsh-auth-gate-admin-password"));
+  });
+});

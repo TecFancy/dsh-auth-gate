@@ -75,4 +75,3 @@ export interface PasswordLoginDeps {
  * 不吞不带 `status` 的流异常。
  */
 export declare function handlePasswordLogin(deps: PasswordLoginDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=password-login.d.ts.map

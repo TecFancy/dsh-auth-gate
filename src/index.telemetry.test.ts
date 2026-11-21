@@ -54,7 +54,10 @@ function makeCtx(server: WrappableServer, settings: unknown): Context {
       if (serviceName === "webServer") return server;
       if (serviceName === "settings") return settings;
       if (serviceName === "credentials") {
-        return { resolve: () => Promise.resolve({ value: "good-token", source: "test" }) };
+        return {
+          resolve: () =>
+            Promise.resolve({ value: "good-token-0123456789abcdef0123456", source: "test" }),
+        };
       }
       return undefined;
     },
@@ -80,6 +83,7 @@ function cfg(overrides: Partial<AuthConfig> = {}): AuthConfig {
     sessionTtl: 604800,
     cookieName: "dsh_auth",
     tokenRef: "DSH_AUTH_TOKEN",
+    tokenMinLength: 32,
     cookieSecure: true,
     usersFile: "",
     publicHost: "",
@@ -104,7 +108,7 @@ function makeReq(): IncomingMessage {
   return {
     url: "/probe",
     method: "GET",
-    headers: { authorization: "Bearer good-token" },
+    headers: { authorization: "Bearer good-token-0123456789abcdef0123456" },
   } as unknown as IncomingMessage;
 }
 

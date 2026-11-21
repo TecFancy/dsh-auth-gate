@@ -23,12 +23,13 @@ function req(headers: Record<string, string>, method = "GET", url = "/"): Incomi
   return { method, url, headers } as unknown as IncomingMessage;
 }
 
-function fakeSocket(): { socket: Duplex; state: { written: string; destroyed: boolean } } {
-  const state = { written: "", destroyed: false };
+function fakeSocket(): { socket: Duplex; state: { ended: string; destroyed: boolean } } {
+  const state = { ended: "", destroyed: false };
   const socket = {
-    write: (data: string): void => {
-      state.written = String(data);
+    end: (data?: string): void => {
+      state.ended = data ?? "";
     },
+    on: (): void => undefined,
     destroy: (): void => {
       state.destroyed = true;
     },
@@ -126,8 +127,8 @@ describe("受限会话的宿主可达性（验收 23/24，生产渲染路径）"
     );
     const { socket, state } = fakeSocket();
     await upgrade(req({ cookie }, "GET", "/api/events.host"), socket, Buffer.alloc(0));
-    expect(state.written).toMatch(/^HTTP\/1\.1 401 Unauthorized/);
-    expect(state.destroyed).toBe(true);
+    expect(state.ended).toMatch(/^HTTP\/1\.1 401 Unauthorized/);
+    expect(state.destroyed).toBe(false);
     expect(upgraded).toBe(false);
   });
 });
@@ -165,7 +166,8 @@ describe("受限会话：wrapServer 全入口类（验收 23）", () => {
     await server.upgrades
       .get("/api/events.host")!
       .handler(req({ cookie }, "GET", "/api/events.host"), socket, Buffer.alloc(0));
-    expect(state.destroyed).toBe(true);
+    expect(state.ended).toMatch(/^HTTP\/1\.1 401 Unauthorized/);
+    expect(state.destroyed).toBe(false);
     expect(reached).toBe(0);
   });
 });

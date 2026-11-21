@@ -259,7 +259,8 @@ export const GATES = [
   },
   {
     id: "type-check",
-    command: "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    command:
+      "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.scripts.json",
     npm: "type-check",
     scenes: ["types"],
     stages: ["verify"],

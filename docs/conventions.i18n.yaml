@@ -2,5 +2,5 @@
 # of the last confirmed-consistent state. Both languages carry equal
 # authority; after editing either side, bring the other along and re-record
 # with:  npm run bilingual:re-record -- docs/conventions
-conventions.md: 7cab82fd580e950a2d7d1af0e6096e5c99c37f61
-conventions_zh.md: 9864cdff8d415c9d7ab52bedf1f91ffa26329c8c
+conventions.md: a6b21d7bd3ffd5ba4a35347cebb9b1db1dda2244
+conventions_zh.md: 51dc8c3f58ccd5f3598bc3a82113432ecdc4e254

@@ -12,4 +12,3 @@ export declare function buildCookie(name: string, value: string, maxAgeSeconds: 
  * 值不去引号（token 无引号）。纯函数，供 gate 与 auth 端点共用。
  */
 export declare function parseCookieHeader(header: string | undefined, name: string): string | undefined;
-//# sourceMappingURL=cookie.d.ts.map

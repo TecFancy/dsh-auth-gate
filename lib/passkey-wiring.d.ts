@@ -130,4 +130,3 @@ export interface PasskeyRouteWiringInput {
  * 限速与口令登录**分开**：passkey 失败不会把口令登录的锁定桶打满，反之亦然。
  */
 export declare function makePasskeyWiring(input: PasskeyRouteWiringInput): () => void;
-//# sourceMappingURL=passkey-wiring.d.ts.map

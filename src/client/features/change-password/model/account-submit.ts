@@ -1,6 +1,8 @@
 import {
   encodeForm,
+  isRecord,
   PASSWORD_PATH,
+  readJsonSafe,
   type PasswordChangeErrorBody,
   type PasswordChangeRequest,
   type Unchecked,
@@ -17,15 +19,18 @@ export type FormValues = Record<FieldName, string>;
 
 export const EMPTY_VALUES: FormValues = { current: "", password: "", confirm: "", code: "" };
 
-/** 失败视图：消息 + 逐条策略规则 + 需要标红的字段。 */
+/**
+ * 失败视图：消息 + 逐条策略规则 + 需要标红的字段。
+ *
+ * `relogin` 表示「当前口令未必错，是会话没了」：客户端据此渲染「重新登录」入口，
+ * 而不是把用户钉在口令框上反复试（C1）。
+ */
 export interface FailureView {
   message: string;
   rules: string[];
   fields: FieldName[];
+  relogin?: boolean | undefined;
 }
-
-/** 契约 §1 的 JSON 失败体（形状在跨半边契约 D31；503 是 text/plain，走空体 + 状态码兜底）。 */
-type FailureBody = Unchecked<PasswordChangeErrorBody>;
 
 /** 错误码比较：码的字面量受契约约束，写错码编译不过；值本身仍是未校验的 `unknown`。 */
 function isError(value: unknown, code: PasswordChangeErrorBody["error"]): boolean {
@@ -46,41 +51,51 @@ export function validate(values: FormValues, t: AccountTranslate): FailureView |
   return null;
 }
 
-/** 读失败体；解析失败返回空体，映射只看状态码。 */
-async function readFailureBody(res: Response): Promise<FailureBody> {
-  try {
-    const body: unknown = await res.json();
-    return typeof body === "object" && body !== null ? body : {};
-  } catch {
-    return {};
-  }
+/** 400 `policy`：`rules` 只收字符串，未知规则名原样回显（不发明契约之外的文案）。 */
+function describePolicy(
+  record: Unchecked<PasswordChangeErrorBody>,
+  t: AccountTranslate,
+): FailureView {
+  const rules = Array.isArray(record.rules)
+    ? record.rules.filter((rule): rule is string => typeof rule === "string")
+    : [];
+  return {
+    message: t(ACCOUNT_KEYS.policyIntro),
+    rules: rules.map((rule) => ruleText(rule, t)),
+    fields: ["password"],
+  };
 }
 
-/** 严格按契约 §1 响应矩阵映射，不自造错误码。 */
-function describeFailure(status: number, body: FailureBody, t: AccountTranslate): FailureView {
+/**
+ * 严格按契约 §1 响应矩阵映射，不自造错误码。
+ *
+ * 401 的两种「凭据错」要分开：`invalid_totp` 指向动态码，`invalid_credentials` 才是
+ * 当前口令错；`unauthorized` 是会话失效，给「重新登录」而不是把口令框标红。
+ * 403 只认 `bad_origin`（跨源提交被拒），其余 4xx 与 text/plain 响应走 generic。
+ */
+function describeFailure(status: number, body: unknown, t: AccountTranslate): FailureView {
+  const record: Unchecked<PasswordChangeErrorBody> = isRecord<PasswordChangeErrorBody>(body)
+    ? body
+    : {};
   if (status === 401) {
-    return isError(body.error, "invalid_totp")
-      ? { message: t(ACCOUNT_KEYS.invalidTotp), rules: [], fields: ["code"] }
-      : { message: t(ACCOUNT_KEYS.invalidCredentials), rules: [], fields: ["current"] };
+    if (isError(record.error, "invalid_totp")) {
+      return { message: t(ACCOUNT_KEYS.invalidTotp), rules: [], fields: ["code"] };
+    }
+    if (isError(record.error, "unauthorized")) {
+      return { message: t(ACCOUNT_KEYS.expired), rules: [], fields: [], relogin: true };
+    }
+    return { message: t(ACCOUNT_KEYS.invalidCredentials), rules: [], fields: ["current"] };
   }
-  if (status === 400 && isError(body.error, "policy")) {
-    const rules = Array.isArray(body.rules)
-      ? body.rules.filter((rule): rule is string => typeof rule === "string")
-      : [];
-    return {
-      message: t(ACCOUNT_KEYS.policyIntro),
-      rules: rules.map((rule) => ruleText(rule, t)),
-      fields: ["password"],
-    };
+  if (status === 400 && isError(record.error, "policy")) return describePolicy(record, t);
+  if (status === 403 && isError(record.error, "bad_origin")) {
+    return { message: t(ACCOUNT_KEYS.badOrigin), rules: [], fields: [] };
   }
   if (status === 429) {
-    return typeof body.retryAfter === "number"
-      ? { message: t(ACCOUNT_KEYS.locked, { seconds: body.retryAfter }), rules: [], fields: [] }
+    return typeof record.retryAfter === "number"
+      ? { message: t(ACCOUNT_KEYS.locked, { seconds: record.retryAfter }), rules: [], fields: [] }
       : { message: t(ACCOUNT_KEYS.lockedPlain), rules: [], fields: [] };
   }
-  if (status === 503) {
-    return { message: t(ACCOUNT_KEYS.unavailable), rules: [], fields: [] };
-  }
+  if (status === 503) return { message: t(ACCOUNT_KEYS.unavailable), rules: [], fields: [] };
   return { message: t(ACCOUNT_KEYS.generic), rules: [], fields: [] };
 }
 
@@ -113,7 +128,7 @@ export async function submitPassword(
   const res = await postPassword(values, signal);
   if (signal.aborted) return { kind: "aborted" };
   if (res.ok) return { kind: "ok" };
-  const body = await readFailureBody(res);
+  const body = await readJsonSafe(res);
   if (signal.aborted) return { kind: "aborted" };
   return { kind: "failure", failure: describeFailure(res.status, body, t) };
 }

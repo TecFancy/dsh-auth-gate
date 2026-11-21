@@ -16,6 +16,12 @@ export type PasskeyReauthValues = Pick<PasskeyFormValues, "password" | "code">;
 export declare const EMPTY_PASSKEY_REAUTH: PasskeyReauthValues;
 /** 名称长度上限（与 host 侧 `label` ≤ 64 字符的校验一致）。 */
 export declare const PASSKEY_LABEL_MAX = 64;
+/** 状态播报位 id：aria-live 落点，也是错误字段 `aria-describedby` 与焦点兜底的落点。 */
+export declare const PASSKEY_STATUS_ID = "dsh-auth-gate-passkey-status";
+/** 添加表单的字段 id（label htmlFor / aria 关联 / 失败聚焦共用）。 */
+export declare function passkeyFieldId(field: PasskeyField): string;
+/** 删除确认区的字段 id（与添加表单分开，避免同 id 冲突）。 */
+export declare function passkeyReauthFieldId(field: "password" | "code"): string;
 /** 失败视图：已翻译消息 + 需标红的字段。 */
 export interface PasskeyFailureView {
     message: string;
@@ -84,4 +90,3 @@ export declare function validatePasskeyReauth(values: PasskeyReauthValues, t: Ac
 export declare function describePasskeyFailure(status: number, body: unknown, t: AccountTranslate): PasskeyFailureView;
 /** 401 且错误码是 `invalid_totp` 时把焦点指向验证码框（口令正确、码错）。 */
 export declare function isInvalidTotp(status: number, body: unknown): boolean;
-//# sourceMappingURL=passkey-form.d.ts.map

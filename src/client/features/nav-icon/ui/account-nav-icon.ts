@@ -108,7 +108,8 @@ function syncRow(button: Element): boolean {
     button.insertBefore(glyph, host);
   }
   for (const svg of directSvgs(button)) {
-    if (svg !== glyph) svg.style.display = "none";
+    // 已经藏好的不重复写 style：避免自己的写入再触发一轮 style 属性观察。
+    if (svg !== glyph && svg.style.display !== "none") svg.style.display = "none";
   }
   return true;
 }
@@ -149,8 +150,9 @@ function restoreRows(doc: Document): void {
  * （设置浮层按需挂载，且宿主随时可能重渲染导航行）。
  *
  * 观察 childList（节点进出）+ `style` 属性：宿主把行内图标换成新节点、或在这颗 svg 上重写
- * 内联样式，都要能把齿轮重新藏回去。属性只过滤 `style`，且回调里对非按钮祖先直接早退，
- * 所以动画/流式输出带来的样式变更只是一次很便宜的 `closest()`。
+ * 内联样式，都要能把齿轮重新藏回去。`style` 过滤后仍然很吵（React 给任意元素写 style 都会
+ * 触发），所以属性回调只处理 **svg 元素**：只有宿主图标上的内联样式与我们有关，其余元素
+ * （动画、流式输出的文本容器）直接早退，连 `closest()` 都不跑。
  *
  * `doc === undefined`（node 单测环境没有 DOM）时是 no-op。返回的 disposer 断开观察器并把
  * 受影响的行恢复原样（宿主齿轮回来、我们的图标摘掉）；重复调用 install 会各自装一个观察器，
@@ -161,6 +163,11 @@ export function installAccountNavIcon(doc: Document | undefined): () => void {
   syncRowsIn(doc);
   const observer = new MutationObserver((records) => {
     for (const record of records) {
+      if (record.type === "attributes") {
+        // 非 svg 的 style 变化与我们无关：这是整棵树里最频繁的一类变更，直接跳过。
+        if (record.target instanceof SVGElement) syncOwner(record.target);
+        continue;
+      }
       if (record.target.nodeType === 1) syncOwner(record.target as Element);
       for (const node of record.addedNodes) {
         if (node.nodeType === 1) syncAdded(node as Element);

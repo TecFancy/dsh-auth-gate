@@ -2,13 +2,13 @@
 
 English | [中文](deployment_zh.md)
 
-This document describes how to deploy dsh-auth-gate (password mode, M3) to a public dsh web
+This document describes how to deploy dsh-auth-gate (password mode) to a public dsh web
 instance and complete **deployment acceptance**. Applies to: an instance already running dsh
 web (`dsh --profile web`) that needs an authentication gate.
 
 Design basis: `docs/history/specs/dsh-auth-plan.md` §7/§8 (absence of an upstream PR channel, defense in
 depth); specifications: `docs/history/specs/impl-m2.md` (token mode), `docs/history/specs/impl-m3.md` (password mode).
-**Choose one of the two modes**: the text below is written for password mode (recommended, M3);
+**Choose one of the two modes**: the text below is written for password mode (recommended);
 token mode only needs to skip the "create users" step and configure `tokenRef`.
 
 ---
@@ -49,8 +49,8 @@ dsh plugin --profile web add dsh-auth-gate   # forwards to pnpm, resolved from p
   directory, so `dsh-auth` resolves exclusively from
   `$DSH_HOME/profiles/web/node_modules/.bin`. §2 shows the correct invocation.
 - Upgrade: re-run the same command (pnpm pulls the new version).
-- Uninstall: `dsh plugin --profile web remove dsh-auth-gate` (since 0.4.1 the bundle
-  declaration makes `dsh plugin add` register the mount in `dsh.profile.bundles`, so
+- Uninstall: `dsh plugin --profile web remove dsh-auth-gate` (the bundle declaration makes
+  `dsh plugin add` register the mount in `dsh.profile.bundles`, so
   `remove` also drops it; a leftover `- id: dsh-auth-gate` config override in
   `$DSH_HOME/cordis.patch.yml` becomes a no-op with a boot warning and can be deleted).
 
@@ -76,11 +76,14 @@ dsh plugin --profile web add dsh-auth-gate   # forwards to pnpm, resolved from p
    administrator is refused. All CLI writes go through the same lock file and
    compare-and-swap as the plugin, so they are safe to run while the instance is up.
 2. **Config override**: copy the repo's `deploy/cordis.patch.yml` to
-   `$DSH_HOME/cordis.patch.yml` — since 0.4.1 the template is a pure config
-   override (no `insert`; the mount itself is registered by `dsh plugin add` via
-   the `dsh.bundle` manifest). Adjust as needed (`cookieSecure` must match the
+   `$DSH_HOME/cordis.patch.yml` — the template is a pure config override (no
+   `insert`; the mount itself is registered by `dsh plugin add` via the
+   `dsh.bundle` manifest). Adjust as needed (`cookieSecure` must match the
    TLS environment; only set `usersFile` for a non-default path; set `publicHost`
-   to your public domain whenever the reverse proxy rewrites `Host`, see D14).
+   to your public domain whenever the reverse proxy rewrites `Host`, see
+   [the public-host note](../../.agents/notes/implemented/feature/2026-09-22-public-host-identity.md)).
+   In token mode `tokenMinLength` (default and minimum 32) sets the shortest accepted
+   shared token: generate the token with a CSPRNG and never use a human-chosen phrase.
 3. Confirm no other line occupies the `dsh-auth-gate` id (the patch stack overrides by id).
 
 ### 2.1 Turning on passkey-only (`passkey: "required"`)
@@ -119,7 +122,7 @@ open another connection to check `pgrep` and the port. To stop:
 `pkill -f "[d]sh --profile web"` — the bracket trick prevents self-kill; kill and startup are in
 two separate connections.)
 
-Startup self-check (M1): if the four categories of entry points are not fully covered, the plugin
+Startup self-check: if the four categories of entry points are not fully covered, the plugin
 **fails loud** and reports `guard self-check failed`. Since dsh 0.1.6 that does **not** stop the
 process: the startup audit treats only seven required ids as fatal, so the plugin entry stays
 inactive while the host keeps serving with no login gate. A running process therefore does not
@@ -173,9 +176,9 @@ curl -s -i -d "username=admin&password=<password>" http://127.0.0.1:3081/auth/lo
 
 # I. Browser path (optional, requires an https environment): incognito window → visit → 302 to /auth/login →
 #    login → enter the instance; a prominent "Sign out / 退出登录" button sits inside the Settings panel
-#    (Settings → General, bottom; client half, 0.6.5+), or visit /auth/logout?next=/ via URL to log out.
+#    (Settings → General, bottom), or visit /auth/logout?next=/ via URL to log out.
 
-# J. Self-service password change (password mode only; D22). Run last: it changes the password.
+# J. Self-service password change (password mode only). Run last: it changes the password.
 curl -s -i -b jar -X POST http://127.0.0.1:3081/auth/password \
   -d "current=<password>&password=<new-password>&code=<totp-code-if-enabled>" | head -3   # 200 {"ok":true} + set-cookie clearing
 curl -s -o /dev/null -w "%{http_code}\n" -b jar http://127.0.0.1:3081/__dsh_api           # 401: every session of that user is revoked, including the one used here
@@ -223,26 +226,68 @@ The guard wrapper depends on `webServer`'s non-contractual internal structures (
    `authenticatedUrl` (older dsh); `launch-token bridge unavailable` warrants
    connection-service troubleshooting.
 
-### 5.1 Upgrading dsh-auth-gate (0.11.0 → 0.11.1, TOTP hardening)
-
-Real-world bumps (verified on `web-test`, 2026-08-30):
+### 5.1 Upgrading dsh-auth-gate (0.23.x corridor)
 
 1. **Fresh releases are blocked by pnpm's `minimumReleaseAge`** — a plain
    `pnpm up dsh-auth-gate` may silently do nothing. Pin the version explicitly and use the
    pnpm major that matches the profile's `node_modules` (the profile declares
    `packageManager: pnpm@11.22.0`; the system pnpm 9.x fails on store mismatch):
    ```sh
-   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.11.1
+   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.23.1
    # verify: grep '"version"' "$DSH_HOME/profiles/<profile>/node_modules/dsh-auth-gate/package.json"
    ```
-2. **Restarting invalidates in-flight TOTP challenges** (HMAC-signed challenge cookie,
-   process-keyed, ADR D10): users on the code page must re-enter their password
-   (window ≤ 5 minutes). The legacy plaintext cookie format also stops working after
-   upgrade — treated as "no challenge", users simply see the password page.
-3. After upgrade, run at least: `dsh-auth user list` sanity, then the TOTP acceptance
-   round — password stage → challenge cookie (3-part signed value) → code page → correct
-   code → session; wrong code → 401 with the challenge-page error slot; `/auth/status`
-   with the session cookie → `authenticated: true`.
+   Substitute the current `0.23.x` release; the command shape is a pinned exact version,
+   not a range.
+2. **Plan the restart.** The new version starts with fresh process state: in-flight TOTP
+   challenges (the HMAC-signed challenge cookie is keyed to the process that issued it) and
+   passkey ceremonies (in-process map) are dropped, so users on a code page or mid-enrolment
+   retry once; the login rate limiter and the TOTP replay guard reset. Persisted sessions
+   survive, so a signed-in browser stays signed in (§8.3).
+3. **`users.yaml` needs no rewrite, but back it up first.** It stays `version: 1`; the newer
+   per-user keys (`passkeyUserHandle`, `passkeys`, `password_changed_at`) are optional, and
+   an older file loads with their defaults. Copy `users.yaml` and `users.yaml.bak` before the
+   bump and follow §5.2. Do not downgrade the plugin after the new keys are written: the
+   user-file schema is strict.
+4. **After the upgrade, run** `dsh-auth user list`, one password sign-in, one TOTP round
+   (password stage → challenge cookie → code page → session; a wrong code answers `401`),
+   one passkey sign-in when `passkey` is enabled, and one admin password reset.
+
+### 5.2 Backing up `users.yaml`
+
+`$DSH_HOME/auth/users.yaml` is the only state a password-mode deployment must preserve: a
+small YAML file, `version: 1`, one record per user, mode `0600`. The token-mode secret lives
+in `$DSH_HOME/.credentials.yaml` and needs the same handling.
+
+```yaml
+version: 1
+users:
+  admin:
+    passwordHash: <scrypt value; parameters are stored beside the hash>
+    role: admin # omitted means "user"
+    # Optional per-user keys, all omitted until used:
+    # disabled, must_change_password, totpSecret, password_changed_at,
+    # passkeyUserHandle, passkeys[]
+```
+
+Every mutation (CLI, self-service change, admin reset, passkey enrolment) copies the previous
+file to `users.yaml.bak` (also `0600`) and then atomically replaces `users.yaml` under a lock,
+so a failed write or a failed upgrade leaves the previous file usable. The first write on a
+fresh instance has nothing to copy, so no `.bak` exists yet.
+
+**Back up:** copy both `users.yaml` and `users.yaml.bak` off the host and keep the copies
+`0600`. The session store (`$DSH_HOME/storages/dsh_auth_sessions.json`) is derived state:
+backing it up is optional, and deleting it signs everyone out.
+
+**Restore:** stop dsh, copy the saved file over `$DSH_HOME/auth/users.yaml` (mode `0600`),
+restart, then check `dsh-auth user list` and one sign-in. To undo a single bad write, prefer
+the `.bak` sitting next to the live file.
+
+**Migration across releases:** the loader accepts files written by earlier releases -
+`role`, `must_change_password`, `password_changed_at`, `passkeyUserHandle` and `passkeys`
+are optional and defaulted - and the first write adds the keys the running release uses.
+Losing the `.bak` is not fatal: an administrator can rebuild the file with
+`dsh-auth user add`, but password hashes cannot be recovered, so every user would have to
+set a new password.
 
 ## 6. Troubleshooting
 
@@ -262,23 +307,23 @@ Real-world bumps (verified on `web-test`, 2026-08-30):
 - [ ] Treat session logs as confidential material (protect backups/sharing equally).
 - [ ] Fold upgrade regression (§5) into the ops process; add auth-line health checks
       (`boot.log` + acceptance B/D/F) to monitoring.
-- [ ] Password hashes are scrypt (`docs/history/specs/impl-m3.md` P1); the file has zero plaintext.
+- [ ] Password hashes are scrypt (`docs/history/specs/impl-m3.md`); the file has zero plaintext.
 - [ ] `dsh-auth user disable <name>` blocks new logins **and** revokes that user's issued sessions
       (the plugin sweeps `users.yaml` every `revokeSweepMs`, default 5000 ms; set `0` to keep the
-      old M3 behavior of blocking new logins only).
+      old behavior of blocking new logins only).
 - [ ] Rate limiting is in-memory and cleared on restart. Behind a reverse proxy on the same host,
       configure `clientIpHeader` (`x-forwarded-for`; `cf-connecting-ip` when Cloudflare is the
       edge); without it every client shares one bucket and five mistyped passwords lock out the
       whole instance (issue #74). Only peers inside `trustedProxyCidrs` (loopback by default) may
       supply that header, and the proxy must overwrite it rather than pass a client value through.
-      The self-service password change (D22) has its own, separate rate-limit bucket but derives the
+      The self-service password change has its own, separate rate-limit bucket but derives the
       client address the same way, so it needs the same `clientIpHeader` setup: without a trusted
       proxy client-IP header, every client on that host also shares one password-change bucket.
 - [ ] The panel's user-management block and the password-change endpoints reject any authenticated
       POST whose `Origin` does not match the instance, so production must configure `publicHost`
       (with the scheme, `https://host`, when TLS terminates at the reverse proxy): with
       `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, and a script call without
-      an `Origin` gets `403` (requirement added by D25, the admin surface).
+      an `Origin` gets `403` (the admin surface requirement).
 - [ ] Enable TOTP for every administrator (`dsh-auth user totp enable <name>`): with TOTP off, a
       stolen admin cookie alone is enough to reset other users' passwords, and the panel does not
       warn about that. Re-authentication is conditional by design, and auditing is then the only

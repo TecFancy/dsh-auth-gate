@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /**
- * check-live-entries.mjs — 「升级后必跑」的入口覆盖回归（只读、无第三方依赖）。
+ * check-live-entries.mjs - 「升级后必跑」的入口覆盖回归（只读、无第三方依赖）。
  *
  * 背景：`src/host/shared/guard/self-check.ts` 的 `assertGuarded()` 只检查"包装标记在不在"，
  * 不发真实请求。宿主 webServer 的路由表有四类入口（exact / prefix / upgrade /
  * fallback），标记在 ≠ 真的拦得住。本脚本用**未认证的真实请求**逐一验证。
  *
  * 两段式：
- *   1. 静态发现 — 扫描宿主依赖树里所有提到 `webServer` 的 JS 模块，解析
+ *   1. 静态发现 - 扫描宿主依赖树里所有提到 `webServer` 的 JS 模块，解析
  *      `register({ kind, path })` / `registerUpgrade({ path })` /
  *      `registerFallback(handler)` 调用点（含 `const route = {...}` 间接与
  *      `captureLegacy(path, {...})` 包装形态），得到入口清单 + 来源包。
- *   2. 未认证实打 — 每个入口发一条**不带任何凭证**的探测请求：
+ *   2. 未认证实打 - 每个入口发一条**不带任何凭证**的探测请求：
  *        exact / prefix → HTTP GET，期望非 2xx（门返回 401；302 登录页也算通过）
  *        navigation     → 带 Sec-Fetch-* 的导航请求，期望**恰好** 302 → /auth/login
  *        upgrade        → node:net 手写 WebSocket 握手，期望非 101（门返回 401）
@@ -85,7 +85,7 @@ const SUPPLEMENTS = [
   },
   // 下面 4 条是门自己注册的入口：静态发现刻意不认它们（注册走 `register: (route)
   // => server.register(route)` 包装，receiver 不叫 webServer），但它们**确实**占着
-  // 宿主的 exact/prefix 表，且被门白名单放行——必须单独证明"公开是可控的"。
+  // 宿主的 exact/prefix 表，且被门白名单放行--必须单独证明"公开是可控的"。
   {
     group: "public",
     kind: "public",
@@ -713,7 +713,7 @@ function judge(kind, probe) {
 
 /**
  * 判定"设计上公开"的入口：必须真的可达（无错误、非 5xx），且不得被门自己拦成 401
- * ——白名单失效会让登录页也进不去。404/405 属端点自身语义，通过。
+ * --白名单失效会让登录页也进不去。404/405 属端点自身语义，通过。
  */
 function judgePublic(probe) {
   if (probe.error !== undefined) return "FAIL";

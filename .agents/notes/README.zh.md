@@ -226,7 +226,7 @@ criteria` 或 `## Plan`），结论活在 `Status:` 行。只有头部块、`## 
 归档按路径编码为 `archived/{分类}/yyyy-mm-dd-话题标题.md`；`implemented`
 故意缺席，因为只有 implemented 笔记能进归档。一次归档改动要：整组搬走英文
 /中文/伴生文件三件套、保留 `Status: implemented`、在两份语言文件里紧挨状态
-行下方插入同一行 `Archived: YYYY-MM-DD`、重录伴生文件、用 `npm run notes:seal -- --write` 封存新文件、修好或删掉入链。这
+行下方插入同一行 `Archived: YYYY-MM-DD`、重录伴生文件、用 `npm run archives:check -- --write` 封存新文件、修好或删掉入链。这
 是归档期间唯一允许的内容改动。
 
 `Archived:` 日期是笔记被归档的那一天，它**不能早于文件名里的日期**，后者是话题
@@ -235,7 +235,7 @@ criteria` 或 `## Plan`），结论活在 `Status:` 行。只有头部块、`## 
 
 一旦封存，归档三件套就永久冻结。不要编辑、翻译、重排、更新、移动或删除它，
 也不要把它当作当前行为的权威。在这里，冻结由机器强制：每个归档文件都由 `archived/manifest.json` 里的 SHA-256
-封存，`check-archived-seal.mjs`（`npm run notes:seal`）会拒绝被编辑、删除、移动
+封存，`check-archives.mjs`（`npm run archives:check`）会拒绝被编辑、删除、移动
 或未封存的文件，也会拒绝丢失或改动了基线提交里已有条目的清单。`check-notes.mjs`
 仍校验其形状，`check-bilingual.mjs` 仍维持其 sidecar 一致；`check-note-links.mjs`
 不读取归档笔记里的出链，因为封存的笔记无法修复。活动正文仍可在有意引用历史时链入

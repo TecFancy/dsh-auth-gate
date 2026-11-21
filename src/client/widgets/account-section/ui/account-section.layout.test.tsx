@@ -9,9 +9,11 @@ import { SettingsAccountSection } from "./account-section.tsx";
 // account-redirect.test.ts 钉住，跨侧常量一致性由 integration.p11-pins.test.ts 的 source-pin 钉住。
 const redirectApi = vi.hoisted(() => ({
   redirectToLogin: vi.fn(),
+  redirectToSignIn: vi.fn(),
 }));
 vi.mock("../../../features/change-password/lib/account-redirect.ts", () => ({
   LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
+  SIGN_IN_URL: "/auth/login?next=%2F",
   ...redirectApi,
 }));
 

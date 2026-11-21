@@ -3,6 +3,7 @@
  * 判断每个入口是否已经过守卫。单独一个模块是为了让 `guard.ts` 与 `resource.ts`
  * 共享它而不形成循环依赖。
  */
+import type { WrappableRoute, WrappableUpgradeRoute } from "./guard.js";
 
 /** 挂在被包装 handler/resource 函数上的守卫标记。全局 symbol 保证跨模块实例一致。 */
 export const GUARDED: unique symbol = Symbol.for("dsh-auth.guarded");
@@ -17,4 +18,12 @@ interface GuardedFn {
  */
 export function isGuarded(target: unknown): boolean {
   return typeof target === "function" && (target as GuardedFn)[GUARDED] === true;
+}
+
+/**
+ * 路由条目上实际携带守卫标记的那个函数：HTTP 路由可能是 handler 或 0.2.2 的
+ * `{ resource }`；upgrade 只有 handler。包装回滚与启动自检共用同一判定，避免两处漂移。
+ */
+export function routeTarget(route: WrappableRoute | WrappableUpgradeRoute): unknown {
+  return "resource" in route && route.resource !== undefined ? route.resource : route.handler;
 }

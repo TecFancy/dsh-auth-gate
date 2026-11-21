@@ -31,7 +31,7 @@ describe("dsh-auth user enable", () => {
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-cli-enable-"));
     file = path.join(dir, "users.yaml");
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo(["Cli-Password-Ok!23"]);
     await main(["user", "add", "alice", "--password-stdin", "--disabled", "--file", file], io);
     await main(["user", "role", "alice", "admin", "--file", file], makeIo().io);
   });

@@ -3,4 +3,3 @@
  * the outcome of loading `users.yaml`, so it needs this one type and nothing else.
  */
 export type { UsersLoadResult } from "../model/users-file.js";
-//# sourceMappingURL=session.d.ts.map

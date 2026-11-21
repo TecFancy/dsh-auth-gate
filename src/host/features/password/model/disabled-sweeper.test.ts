@@ -1,7 +1,7 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import { describe, expect, it, vi } from "vitest";
 import { SessionStore, type Session } from "../../../entities/session/index.js";
-import type { UsersLoadResult } from "../../../entities/user/index.js";
+import type { UserRecord, UsersLoadResult } from "../../../entities/user/index.js";
 import { DisabledSessionSweeper } from "./disabled-sweeper.js";
 
 class MemTable implements KvTable<string, Session> {
@@ -52,6 +52,18 @@ function snapshot(entries: [string, boolean][]): UsersLoadResult {
     missing: false,
     snapshot: {
       users: new Map(entries.map(([name, disabled]) => [name, { passwordHash: "hash", disabled }])),
+    },
+  };
+}
+
+/** 按字段覆盖构造快照（L5 的 passwordChangedAt、L12 的删号用例）。 */
+function usersOf(entries: [string, Partial<UserRecord>][]): UsersLoadResult {
+  return {
+    missing: false,
+    snapshot: {
+      users: new Map(
+        entries.map(([name, extra]) => [name, { passwordHash: "hash", disabled: false, ...extra }]),
+      ),
     },
   };
 }
@@ -138,6 +150,87 @@ describe("DisabledSessionSweeper.sweep", () => {
     expect(await sweeper.sweep()).toBe(0);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(calls).toBe(2);
+  });
+});
+
+describe("DisabledSessionSweeper.sweep: password_changed_at (L5)", () => {
+  it("revokes sessions created before the change and keeps later ones", async () => {
+    const table = new MemTable();
+    let now = 1_000_000;
+    const store = new SessionStore(table, { now: () => now });
+    const before = await store.create("alice", 60_000_000); // createdAt 1_000_000
+    now = 2_000_000;
+    const after = await store.create("alice", 60_000_000); // createdAt 2_000_000
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => store,
+      loadUsers: () =>
+        Promise.resolve(
+          usersOf([["alice", { passwordChangedAt: new Date(1_500_000).toISOString() }]]),
+        ),
+      log: silentLog,
+    });
+
+    expect(await sweeper.sweep()).toBe(1);
+    expect(store.getByToken(before.token)).toBeUndefined();
+    expect(store.getByToken(after.token)?.subject).toBe("alice");
+    // 绝对时间规则：重复扫描幂等，不会误杀改密后登录的新会话。
+    expect(await sweeper.sweep()).toBe(0);
+    expect(store.getByToken(after.token)?.subject).toBe("alice");
+  });
+
+  it("ignores an unparseable timestamp instead of revoking on it", async () => {
+    const store = new SessionStore(new MemTable());
+    const issued = await store.create("alice", 60_000);
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => store,
+      loadUsers: () => Promise.resolve(usersOf([["alice", { passwordChangedAt: "not-a-date" }]])),
+      log: silentLog,
+    });
+    expect(await sweeper.sweep()).toBe(0);
+    expect(store.getByToken(issued.token)?.subject).toBe("alice");
+  });
+});
+
+describe("DisabledSessionSweeper.sweep: deleted users (L12)", () => {
+  it("revokes sessions of subjects no longer in users.yaml, exempting internal subjects", async () => {
+    const store = new SessionStore(new MemTable());
+    const alice = await store.create("alice", 60_000);
+    const ghost = await store.create("ghost", 60_000);
+    const bootstrap = await store.create("@bootstrap", 60_000, "bootstrap");
+    const token = await store.create("token", 60_000);
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => store,
+      loadUsers: () => Promise.resolve(usersOf([["alice", {}]])),
+      log: silentLog,
+    });
+
+    expect(await sweeper.sweep()).toBe(1);
+    expect(store.getByToken(alice.token)?.subject).toBe("alice");
+    expect(store.getByToken(ghost.token)).toBeUndefined();
+    expect(store.getByToken(bootstrap.token)?.subject).toBe("@bootstrap");
+    expect(store.getByToken(token.token)?.subject).toBe("token");
+  });
+});
+
+describe("DisabledSessionSweeper logging rate limit (L12)", () => {
+  it("re-warns at most once per interval instead of once per process", async () => {
+    let now = 1_000_000;
+    const warn = vi.fn();
+    const sweeper = new DisabledSessionSweeper({
+      sessions: () => new SessionStore(new MemTable()),
+      loadUsers: () => Promise.reject(new Error("insecure permissions")),
+      now: () => now,
+      log: { info: (): void => undefined, warn },
+    });
+
+    expect(await sweeper.sweep()).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1);
+    now += 30_000;
+    expect(await sweeper.sweep()).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(1); // 限速窗口内保持安静
+    now += 31_000;
+    expect(await sweeper.sweep()).toBe(0);
+    expect(warn).toHaveBeenCalledTimes(2); // 超过 60s 再报一次
   });
 });
 

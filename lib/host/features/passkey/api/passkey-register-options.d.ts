@@ -8,4 +8,3 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PasskeyManagementDeps } from "./passkey-management-deps.js";
 /** 注册 begin：门禁 → 再认证 → label 校验 → options + ceremony cookie。 */
 export declare function handleRegisterOptions(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=passkey-register-options.d.ts.map

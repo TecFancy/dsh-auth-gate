@@ -5,4 +5,3 @@
  */
 export declare function isSafeRelativeTarget(target: string): boolean;
 export declare function validateNext(next: string): string;
-//# sourceMappingURL=auth-common.d.ts.map

@@ -22,6 +22,8 @@ export { resolvePublicHost } from "./host.js";
 export { cidrContains, normalizeIp, parseCidr } from "./ip-address.js";
 export type { CidrNetwork } from "./ip-address.js";
 export { resolvePostLoginLocation } from "./login-redirect.js";
+export { mountRoutes } from "./mount-routes.js";
+export type { MountedRoute, RouteRegister } from "./mount-routes.js";
 export type { LaunchTokenBridge } from "./login-redirect.js";
 export { PASSKEY_PERMISSIONS_POLICY, setPasskeyPermissionsPolicy } from "./permissions-policy.js";
 export { checkRequestOrigin } from "./origin.js";

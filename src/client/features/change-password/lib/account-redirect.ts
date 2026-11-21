@@ -1,4 +1,4 @@
-import { PASSWORD_CHANGED_LOGIN_URL } from "../../../shared/api/index.ts";
+import { loginPath, PASSWORD_CHANGED_LOGIN_URL } from "../../../shared/api/index.ts";
 
 /**
  * 改密成功后的去向（P1.1 / D24；D24.1 起改为**立即**跳转）。
@@ -16,9 +16,22 @@ import { PASSWORD_CHANGED_LOGIN_URL } from "../../../shared/api/index.ts";
  */
 export const LOGIN_REDIRECT_URL = PASSWORD_CHANGED_LOGIN_URL;
 
+/**
+ * 会话失效（401 `unauthorized`）后的登录页：**不带** notice 键。
+ *
+ * 与改密成功不同，这里没有服务端写下的原因可解释；带错键会让登录卡片显示
+ * 「密码已改，请重新登录」，与用户的实际经历不符。
+ */
+export const SIGN_IN_URL = loginPath("/");
+
 /** 跳到登录页；`nav` 只为测试注入（缺省走真实 `window.location.replace`）。 */
 export function redirectToLogin(nav: (url: string) => void = defaultReplace): void {
   nav(LOGIN_REDIRECT_URL);
+}
+
+/** 会话失效后跳到登录页（无 notice 键）；`nav` 只为测试注入。 */
+export function redirectToSignIn(nav: (url: string) => void = defaultReplace): void {
+  nav(SIGN_IN_URL);
 }
 
 /**

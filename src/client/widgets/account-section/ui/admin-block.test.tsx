@@ -234,3 +234,54 @@ describe("AdminUsersBlock：行内容与刷新（A7 / A9 / A11）", () => {
     expect(signal?.aborted).toBe(true);
   });
 });
+
+describe("AdminUsersBlock：刷新失败（C3）", () => {
+  it("surfaces a failed refresh after a successful reset and lets retry recover (C3)", async () => {
+    let userFetches = 0;
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/auth/users/password") {
+        return Promise.resolve(jsonResponse(200, { ok: true, sessionsRevoked: true }));
+      }
+      userFetches += 1;
+      return Promise.resolve(
+        userFetches === 1 ? jsonResponse(200, { users: USERS }) : jsonResponse(503, {}),
+      );
+    });
+    const { container } = await render();
+    await openReset(container);
+    await act(async () => {
+      setValue(container.querySelector("#dsh-auth-gate-admin-target")!, "alice");
+      setValue(container.querySelector("#dsh-auth-gate-admin-password")!, "NewPassw0rd!XY");
+      setValue(container.querySelector("#dsh-auth-gate-admin-confirm")!, "NewPassw0rd!XY");
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      container
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+    await act(async () => {
+      buttonByText(container, t(ADMIN_KEYS.confirmSubmit, { name: "alice" })).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      await flushMicrotasks();
+    });
+    // 刷新失败不是 no-op：旧列表撤下、给不可用提示与重试（不能让成功播报旁边挂着过期表）。
+    expect(container.textContent).toContain(t(ADMIN_KEYS.unavailable));
+    expect(container.querySelector("table")).toBeNull();
+
+    fetchMock.mockImplementation((url: string) =>
+      Promise.resolve(
+        url === "/auth/users" ? jsonResponse(200, { users: USERS }) : jsonResponse(404, {}),
+      ),
+    );
+    await act(async () => {
+      buttonByText(container, t(ADMIN_KEYS.retry)).dispatchEvent(
+        new MouseEvent("click", { bubbles: true }),
+      );
+      await flushMicrotasks();
+    });
+    expect(container.querySelector("table")).not.toBeNull();
+  });
+});

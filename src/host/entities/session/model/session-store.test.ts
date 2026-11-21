@@ -10,6 +10,9 @@ import {
 
 class MemTable implements KvTable<string, Session> {
   private readonly map = new Map<string, Session>();
+  /** 逐条删除与批量删除的调用记录（钉住「先收集键、再单批删除」的 L9 修复）。 */
+  readonly deleteCalls: string[] = [];
+  readonly deleteManyCalls: string[][] = [];
 
   get size(): number {
     return this.map.size;
@@ -33,10 +36,12 @@ class MemTable implements KvTable<string, Session> {
   }
 
   delete(key: string): Promise<boolean> {
+    this.deleteCalls.push(key);
     return Promise.resolve(this.map.delete(key));
   }
 
   deleteMany(keys: readonly string[]): Promise<number> {
+    this.deleteManyCalls.push([...keys]);
     let removed = 0;
     for (const key of keys) if (this.map.delete(key)) removed += 1;
     return Promise.resolve(removed);
@@ -150,6 +155,65 @@ describe("SessionStore", () => {
     const issued = await store.create("bootstrap", 60_000, "bootstrap");
     expect(table.get(digestToken(issued.token))?.kind).toBe("bootstrap");
     expect(issued.session.kind).toBe("bootstrap");
+  });
+});
+
+describe("SessionStore prune and revocation extensions (L5/L9/L12)", () => {
+  it("revokes only sessions created before the cutoff (passwordChangedAt rule)", async () => {
+    const table = new MemTable();
+    let now = 1_000_000;
+    const store = new SessionStore(table, { now: () => now });
+    const old = await store.create("alice", 60_000_000);
+    now = 2_000_000;
+    const fresh = await store.create("alice", 60_000_000);
+
+    expect(await store.revokeBySubjectBefore("alice", 1_500_000)).toBe(1);
+    expect(store.getByToken(old.token)).toBeUndefined();
+    expect(store.getByToken(fresh.token)?.subject).toBe("alice");
+    expect(await store.revokeBySubjectBefore("alice", 1_500_000)).toBe(0);
+  });
+
+  it("lists distinct non-bootstrap subjects for the deleted-user sweep", async () => {
+    const store = new SessionStore(new MemTable());
+    await store.create("alice", 60_000);
+    await store.create("alice", 60_000);
+    await store.create("bob", 60_000);
+    // G12：引导会话的 subject 哨兵是 "@bootstrap"，kind 仍是 bootstrap。
+    await store.create("@bootstrap", 60_000, "bootstrap");
+    // 引导会话不属于 users.yaml 用户：孤儿扫描不能把它当「已删除用户」吊销。
+    expect(new Set(store.subjects())).toEqual(new Set(["alice", "bob"]));
+  });
+
+  it("prunes expired rows once per interval on create, in one batch (L9)", async () => {
+    const table = new MemTable();
+    let now = 1_000_000;
+    const store = new SessionStore(table, { pruneIntervalMs: 60_000, now: () => now });
+    const stale = await store.create("stale", 1_000); // expiresAt = 1_001_000
+
+    now = 1_001_500; // 已过期，但距上次清扫只有 1.5s < 60s
+    await store.create("fresh", 60_000);
+    expect(table.get(digestToken(stale.token))).toBeDefined();
+
+    now = 1_120_000; // 距上次清扫 120s ≥ 60s → 本轮 create 触发清扫
+    await store.create("fresh2", 60_000);
+    expect(table.get(digestToken(stale.token))).toBeUndefined();
+  });
+
+  it("collects expired keys before deleting them (no delete-while-iterating)", async () => {
+    const table = new MemTable();
+    const store = new SessionStore(table);
+    const first = await store.create("first", 60_000);
+    const second = await store.create("second", 60_000);
+    const past = Date.now() - 1_000;
+    await table.put(digestToken(first.token), { ...first.session, expiresAt: past });
+    await table.put(digestToken(second.token), { ...second.session, expiresAt: past });
+
+    expect(await store.pruneExpired()).toBe(2);
+    expect(table.deleteCalls).toEqual([]);
+    expect(table.deleteManyCalls).toHaveLength(1);
+    expect(new Set(table.deleteManyCalls[0] ?? [])).toEqual(
+      new Set([digestToken(first.token), digestToken(second.token)]),
+    );
   });
 });
 

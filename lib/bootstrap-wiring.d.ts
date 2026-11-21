@@ -51,4 +51,3 @@ export interface BootstrapWiring {
  * 甚至让向导覆盖掉已存在的 DSH_AUTH_TOKEN。这里用严格读取器，失败一律上抛成 `unknown`。
  */
 export declare function makeBootstrapWiring(input: BootstrapWiringInput): BootstrapWiring;
-//# sourceMappingURL=bootstrap-wiring.d.ts.map

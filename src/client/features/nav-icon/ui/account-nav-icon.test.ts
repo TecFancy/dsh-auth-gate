@@ -152,6 +152,21 @@ describe("installAccountNavIcon: lifecycle", () => {
     expect(glyphsIn(row.button)).toHaveLength(1);
   });
 
+  it("ignores style churn on non-icon elements (only svg attribute changes are inspected)", async () => {
+    install();
+    const row = makeRow(ZH_LABEL);
+    document.body.appendChild(row.button);
+    await settle();
+    // 整棵树里最频繁的变更（非 svg 的 style 写入）必须是无害的噪音。
+    row.label.style.color = "blue";
+    const unrelated = document.createElement("div");
+    document.body.appendChild(unrelated);
+    unrelated.style.color = "red";
+    await settle();
+    expect(glyphsIn(row.button)).toHaveLength(1);
+    expect(row.icon.style.display).toBe("none");
+  });
+
   it("stops reacting after dispose", async () => {
     install();
     dispose?.();

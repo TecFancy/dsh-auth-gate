@@ -52,4 +52,3 @@ export interface PasswordChangeDeps {
  * 得到 403 而不是假 401。
  */
 export declare function handlePasswordChange(deps: PasswordChangeDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=password-change.d.ts.map

@@ -25,4 +25,3 @@ export declare function registerPasskey(values: PasskeyFormValues, signal: Abort
  * `PasskeyFormValues`：删除不该能读到添加表单的 label（评审 F6）。
  */
 export declare function removePasskey(idPrefix: string, values: PasskeyReauthValues, signal: AbortSignal, t: AccountTranslate): Promise<PasskeyMutationResult>;
-//# sourceMappingURL=passkey-mutate.d.ts.map

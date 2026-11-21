@@ -23,4 +23,3 @@ export interface ActionButtonProps extends ButtonHTMLAttributes<HTMLButtonElemen
  * `type` 默认 `button`：表单里的提交按钮必须显式写 `type="submit"`，避免误触发表单。
  */
 export declare const ActionButton: import("react").ForwardRefExoticComponent<ActionButtonProps & import("react").RefAttributes<HTMLButtonElement>>;
-//# sourceMappingURL=action-button.d.ts.map

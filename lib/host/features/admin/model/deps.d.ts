@@ -47,4 +47,3 @@ export interface ResetInput {
     /** 打码白名单：[password, code]。日志侧只允许出现替换后的占位符（§5）。 */
     secrets: readonly string[];
 }
-//# sourceMappingURL=deps.d.ts.map

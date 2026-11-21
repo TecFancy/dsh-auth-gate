@@ -91,6 +91,16 @@ function buttonByText(container: HTMLElement, text: string): HTMLButtonElement {
   return button;
 }
 
+function setValue(container: HTMLElement, name: string, value: string): void {
+  const input = container.querySelector<HTMLInputElement>(`input[name="${name}"]`);
+  if (input === null) throw new Error(`missing input[name=${name}]`);
+  const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+  act(() => {
+    descriptor?.set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+}
+
 async function click(element: HTMLElement): Promise<void> {
   await act(async () => {
     element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -124,6 +134,13 @@ describe("PasskeyBlock: 列表", () => {
     expect(container.textContent).toContain(t(PASSKEY_KEYS.neverUsed));
     expect(container.textContent).toContain(t(PASSKEY_KEYS.backupEligible));
     expect(container.textContent).toContain("internal");
+    cleanup(root, container);
+  });
+
+  it("gives the aria-live status node a tabIndex so focus can land there (C6)", async () => {
+    mockList(200, { passkeys: [SUMMARY] });
+    const { root, container } = await render();
+    expect(container.querySelector('[role="status"]')?.getAttribute("tabindex")).toBe("-1");
     cleanup(root, container);
   });
 
@@ -210,6 +227,29 @@ describe("PasskeyBlock: 添加表单默认收起", () => {
     await openAddForm(container);
     expect(container.querySelector("form")).not.toBeNull();
     expect(container.textContent).toContain(t(PASSKEY_KEYS.addFormTitle));
+    cleanup(root, container);
+  });
+
+  it("disables the remove action while an add is in flight (C6: one write at a time, visible)", async () => {
+    const pendingOptions = new Promise<Response>(() => undefined);
+    fetchMock.mockImplementation((url: string) => {
+      if (url === "/auth/passkey") {
+        return Promise.resolve(jsonResponse(200, { passkeys: [SUMMARY] }));
+      }
+      if (url === "/auth/passkey/register/options") return pendingOptions;
+      return Promise.resolve(jsonResponse(200, {}));
+    });
+    const { root, container } = await render();
+    await openAddForm(container);
+    setValue(container, "label", "MacBook");
+    setValue(container, "password", "pw");
+    await act(async () => {
+      container
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+    expect(buttonByText(container, t(PASSKEY_KEYS.remove)).disabled).toBe(true);
     cleanup(root, container);
   });
 

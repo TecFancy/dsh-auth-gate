@@ -1,6 +1,7 @@
 import type { KvTable } from "@deepseek-ai/dsh-storage-domain";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
+import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import type { HttpHandler } from "../../../shared/guard/index.js";
 import { AUTH_PATH_PREFIX } from "../../../shared/protocol/index.js";
 import { registerAuthEndpoints, type AuthEndpointsDeps } from "./auth-endpoints.js";
@@ -141,6 +142,8 @@ function makeHarness(options?: {
       sessionTtl: options?.sessionTtl ?? 604800,
       logoutOrder: options?.logoutOrder ?? 1000,
       validateToken: (token) => Promise.resolve(token === "good-token"),
+      limiter: new LoginRateLimiter(),
+      clientIp: () => "203.0.113.7",
       logger: {
         error: (message) => logs.push({ level: "error", message }),
         info: (message) => logs.push({ level: "info", message }),
@@ -174,6 +177,21 @@ describe("registerAuthEndpoints", () => {
     const dispose = registerAuthEndpoints(harness.deps);
     dispose();
     expect(harness.routes).toEqual([]);
+  });
+
+  it("rolls back the partial registration when a later register throws (G1)", () => {
+    const harness = makeHarness();
+    const mounted: string[] = [];
+    harness.deps.register = (route) => {
+      if (mounted.length === 2) throw new Error(`duplicate route: ${route.path}`);
+      mounted.push(route.path);
+      return () => {
+        mounted.splice(mounted.indexOf(route.path), 1);
+      };
+    };
+    expect(() => registerAuthEndpoints(harness.deps)).toThrow("duplicate route");
+    // 第三条抛错：前两条已经注册的必须按逆序摘掉，不能留下指向已卸载插件的路由。
+    expect(mounted).toEqual([]);
   });
 });
 

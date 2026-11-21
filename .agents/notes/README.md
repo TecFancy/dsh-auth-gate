@@ -280,7 +280,7 @@ The archive is path-encoded as `archived/{class}/yyyy-mm-dd-topic-title.md`;
 it. An archival change moves the complete English/Chinese/sidecar triplet,
 retains `Status: implemented`, inserts the same `Archived: YYYY-MM-DD` line
 immediately below that status in both language files, re-records the sidecar,
-seals the new files with `npm run notes:seal -- --write`, and repairs or deletes
+seals the new files with `npm run archives:check -- --write`, and repairs or deletes
 inbound links. These are the only permitted content changes during archival.
 
 The `Archived:` date is the day the note was archived, and it cannot precede the
@@ -292,7 +292,7 @@ Once sealed, every archived triplet is permanently frozen. Do not edit,
 translate, reformat, update, move, or delete it, and do not treat it as
 authority for current behavior. Freezing is machine-enforced: every archived
 file is sealed by a SHA-256 in `archived/manifest.json`, and
-`check-archived-seal.mjs` (`npm run notes:seal`) fails on an edited, deleted,
+`check-archives.mjs` (`npm run archives:check`) fails on an edited, deleted,
 moved or unsealed file, and on a manifest that lost or changed an entry already
 committed at the baseline. `check-notes.mjs` still checks their shape and
 `check-bilingual.mjs` keeps their sidecars honest; `check-note-links.mjs` does

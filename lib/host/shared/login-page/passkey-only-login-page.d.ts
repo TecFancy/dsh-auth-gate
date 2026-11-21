@@ -20,4 +20,3 @@ export declare function passkeyOnlyUnavailablePageHtml(reason: string, options?:
  * `error` 只由调用方传本文件的常量（失败页复用同一张卡）。
  */
 export declare function passkeyOnlyLoginPageHtml(next: string, error?: string, options?: LoginPageOptions): string;
-//# sourceMappingURL=passkey-only-login-page.d.ts.map

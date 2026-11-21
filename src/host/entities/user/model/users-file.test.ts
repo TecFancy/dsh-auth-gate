@@ -182,7 +182,6 @@ describe("writeUsersFile role / mustChangePassword", () => {
   beforeEach(() => {
     file = path.join(dir, "sub", "users.yaml");
   });
-
   it("persists admin and must_change_password, leaving defaults unwritten", async () => {
     await writeUsersFile(file, {
       users: new Map([["alice", { ...user("h2"), role: "admin", mustChangePassword: true }]]),

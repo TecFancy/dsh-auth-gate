@@ -43,6 +43,23 @@ describe("makeAdminRoutes（冻结接口）", () => {
     expect(harness.audits()[0]).toMatchObject({ reason: "forbidden", actor: "admin" });
     expect(harness.hashCalls).toEqual([]);
   });
+
+  it("bootstrap / 未来新增的会话类别 → 403（G12 allow-list），不进入写盘", async () => {
+    const harness = makeHarness();
+    const routes = makeAdminRoutes(harness.deps);
+    const bootstrap = await harness.store.create("admin", 60_000, "bootstrap");
+    const res = makeRes();
+    await routes.resetPassword(
+      makeReq({
+        body: form({ target: "alice", password: NEW_PASSWORD }),
+        cookie: `dsh_auth=${bootstrap.token}`,
+        ...SAME_ORIGIN,
+      }),
+      res.res,
+    );
+    expect(res.status).toBe(403);
+    expect(harness.hashCalls).toEqual([]);
+  });
 });
 
 describe("body 流异常（无 status）", () => {

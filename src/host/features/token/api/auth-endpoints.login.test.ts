@@ -33,6 +33,21 @@ describe("POST /auth/login: success and rejection", () => {
     expect(harness.logs).toContainEqual({ level: "info", message: "session issued" });
   });
 
+  it("rate-limits repeated bad tokens (P1: token mode had no limiter)", async () => {
+    const harness = makeHarness();
+    registerAuthEndpoints(harness.deps);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const res = makeRes();
+      await handlerOf(harness, "exact", "/auth/login")(loginReq("token=nope"), res.res);
+      expect(res.status).toBe(401);
+    }
+    const locked = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(loginReq("token=nope"), locked.res);
+    expect(locked.status).toBe(429);
+    expect(locked.headers["retry-after"]).toBe("30");
+    expect(harness.table.size).toBe(0);
+  });
+
   it("omits Secure in the cookie when cookieSecure=false", async () => {
     const harness = makeHarness({ cookieSecure: false });
     registerAuthEndpoints(harness.deps);

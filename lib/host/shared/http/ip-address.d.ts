@@ -14,4 +14,3 @@ export declare function normalizeIp(raw: string | undefined): string;
 export declare function parseCidr(raw: string | undefined): CidrNetwork | undefined;
 /** `address` 是否落在 `network` 内（地址族不同直接 false；`address` 先归一化）。 */
 export declare function cidrContains(network: CidrNetwork, address: string): boolean;
-//# sourceMappingURL=ip-address.d.ts.map

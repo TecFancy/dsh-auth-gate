@@ -6,6 +6,9 @@ const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 /** TOTP 时间步长（秒，RFC 6238 默认 30）。 */
 const TOTP_STEP_SECONDS = 30;
 
+/** 验证窗口（±steps）；防重放的保留窗口与之绑定，改这里两侧一起变。 */
+export const TOTP_WINDOW_STEPS = 1;
+
 /** 验证码位数（RFC 6238 默认 6）。 */
 const TOTP_DIGITS = 6;
 
@@ -93,7 +96,7 @@ export function verifyTotpCode(
   secretB32: string,
   code: string,
   nowMs: number,
-  window = 1,
+  window = TOTP_WINDOW_STEPS,
 ): number | undefined {
   if (code.length !== TOTP_DIGITS) return undefined;
   let secret: Uint8Array;

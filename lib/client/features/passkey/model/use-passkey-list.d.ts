@@ -17,4 +17,3 @@ export declare function usePasskeyList(): {
     state: PasskeyListState;
     reload: () => void;
 };
-//# sourceMappingURL=use-passkey-list.d.ts.map

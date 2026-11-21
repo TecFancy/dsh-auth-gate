@@ -32,4 +32,3 @@ export declare function submitAdminReset(values: AdminResetValues, options: {
     signal: AbortSignal;
     actorTotpEnabled: boolean;
 }, t: AdminTranslate): Promise<AdminResetResult>;
-//# sourceMappingURL=admin-api.d.ts.map

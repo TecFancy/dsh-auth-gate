@@ -29,4 +29,3 @@ export interface PasskeyActions {
  * 用户取消系统验证器（AbortError/NotAllowedError）静默回退：不显示错误、恢复按钮。
  */
 export declare function usePasskeyActions(t: AccountTranslate, onChanged: () => void): PasskeyActions;
-//# sourceMappingURL=use-passkey-actions.d.ts.map

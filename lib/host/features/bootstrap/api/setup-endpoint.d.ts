@@ -45,4 +45,3 @@ export interface SetupHandlers {
  * 同一条纪律。向导完成后先吊销全部 bootstrap 会话，再给当前响应签发正式会话。
  */
 export declare function makeSetupHandlers(deps: SetupEndpointDeps): SetupHandlers;
-//# sourceMappingURL=setup-endpoint.d.ts.map

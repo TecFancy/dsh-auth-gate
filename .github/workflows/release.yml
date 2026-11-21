@@ -12,32 +12,84 @@ on:
         required: false
         type: string
 
+# Least privilege at the workflow level. release-please widens it for its own
+# job; the publish job grants itself the OIDC token Trusted Publishing needs.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
+
+# One release at a time, and never cancelled: a run that is cancelled
+# mid-publish can leave npm with an artifact whose version can never be
+# republished. Serialising is enough - a release that never needs to run will
+# not queue for long.
+concurrency:
+  group: release-${{ github.workflow }}
+  cancel-in-progress: false
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
     steps:
-      - uses: googleapis/release-please-action@v4
+      - uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
         id: release
         with:
           release-type: node
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  publish:
+  # The artifact that reaches npm must be the one the gates accepted. This job
+  # runs the same full gate chain CI runs on main, at the exact commit being
+  # published, so a release workflow can never publish an unverified tree.
+  verify:
     needs: release-please
-    # Two ways in: release-please just cut a release, or an operator named an
-    # existing tag to (re)publish - the recovery path when a publish failed
-    # after the tag already existed.
+    # Same two entry points as publish: release-please just cut a release, or
+    # an operator named an existing tag to (re)publish.
     if: >-
       (needs.release-please.result == 'success' &&
       needs.release-please.outputs.release_created == 'true') ||
       (github.event_name == 'workflow_dispatch' && inputs.publish_ref != '')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          ref: ${{ inputs.publish_ref || github.ref }}
+      # Node 22, the version CI tests and the committed lib/ is verified
+      # against. Publishing itself needs Node 24 (npm >= 11.5.1 for Trusted
+      # Publishing), which is why the publish job pins that separately.
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Every registered gate plus the gate self-tests, derived from
+      # scripts/lib/gate-registry.mjs (the same set CI runs).
+      - run: npm run verify
+      # `npm run verify` ends with a build; the committed lib/ must still equal
+      # that fresh build, and no build output may be untracked.
+      - name: Verify built lib/ matches the committed artifact
+        shell: bash
+        run: |
+          git diff --exit-code -- lib
+          dirty="$(git status --porcelain -- lib)"
+          if [ -n "$dirty" ]; then
+            echo "::error::lib/ is not a clean build of the tree being published; these paths are untracked or modified:"
+            printf '%s\n' "$dirty"
+            exit 1
+          fi
+
+  publish:
+    needs: [release-please, verify]
+    if: >-
+      (needs.release-please.result == 'success' &&
+      needs.release-please.outputs.release_created == 'true') ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_ref != '')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     # npm Trusted Publishing (OIDC): npm exchanges this job's GitHub-signed
     # identity for a short-lived publish token, so no NPM_TOKEN secret exists.
     # The trust is registered on npmjs.com against this exact repo and the
@@ -46,7 +98,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           ref: ${{ inputs.publish_ref || github.ref }}
       # No `registry-url` here on purpose. It makes setup-node write
@@ -55,7 +107,7 @@ jobs:
       # already configured" and never starts the OIDC exchange, failing with
       # ENEEDAUTH (actions/setup-node#1551). registry.npmjs.org is npm's
       # default anyway, and the repo .npmrc pins it.
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
           package-manager-cache: false
@@ -74,6 +126,20 @@ jobs:
         env:
           INPUTS_PUBLISH_REF: ${{ inputs.publish_ref }}
       - run: npm ci
+      # `prepack` rebuilds lib/ during `npm publish`. Build once here first so
+      # the published tree is proven to be exactly the committed artifact:
+      # a publish cannot be quietly replaced after the fact.
+      - run: npm run build
+      - name: Verify built lib/ matches the committed artifact before publishing
+        shell: bash
+        run: |
+          git diff --exit-code -- lib
+          dirty="$(git status --porcelain -- lib)"
+          if [ -n "$dirty" ]; then
+            echo "::error::lib/ is not a clean build of the tag being published; these paths are untracked or modified:"
+            printf '%s\n' "$dirty"
+            exit 1
+          fi
       # No NODE_AUTH_TOKEN and no --provenance: a trusted publish attests
       # automatically.
       - run: npm publish

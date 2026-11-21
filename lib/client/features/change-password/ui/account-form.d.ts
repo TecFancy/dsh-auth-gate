@@ -14,4 +14,3 @@ export interface AccountPasswordFormProps {
 }
 /** 已登录时的自助改密表单（成功后立即跳登录页；成功态面板只是兜底）。 */
 export declare function AccountPasswordForm({ t, totpEnabled }: AccountPasswordFormProps): import("react").JSX.Element;
-//# sourceMappingURL=account-form.d.ts.map

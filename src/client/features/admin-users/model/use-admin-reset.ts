@@ -9,7 +9,12 @@
  */
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { AdminTranslate } from "../lib/admin-copy.ts";
-import { useFormHandlers, useResetEditing, useResetSubmit } from "./admin-reset-hooks.ts";
+import {
+  focusFailure,
+  useFormHandlers,
+  useResetEditing,
+  useResetSubmit,
+} from "./admin-reset-hooks.ts";
 import {
   EMPTY_ADMIN_RESET,
   type AdminFailureView,
@@ -80,6 +85,13 @@ export function useAdminReset({
       abort.current?.abort();
     };
   }, []);
+
+  // C4：失败焦点必须等阶段落回 editing、编辑区重新渲染**之后**再落；在请求返回处立刻
+  // focus 会落空（那时确认页还占着 DOM，字段根本不在文档里）。
+  useEffect(() => {
+    if (stage !== "editing" || failure === null) return;
+    focusFailure(failure);
+  }, [stage, failure]);
 
   const editing = useResetEditing({
     values,

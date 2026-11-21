@@ -9,9 +9,11 @@ import { SettingsAccountSection } from "./account-section.tsx";
 // account-redirect.test.ts 钉住，跨侧常量一致性由 integration.p11-pins.test.ts 的 source-pin 钉住。
 const redirectApi = vi.hoisted(() => ({
   redirectToLogin: vi.fn(),
+  redirectToSignIn: vi.fn(),
 }));
 vi.mock("../../../features/change-password/lib/account-redirect.ts", () => ({
   LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
+  SIGN_IN_URL: "/auth/login?next=%2F",
   ...redirectApi,
 }));
 
@@ -192,11 +194,13 @@ describe("SettingsAccountSection gate", () => {
     cleanup(root, container);
   });
 
-  it("treats a failed session probe as unauthenticated", async () => {
+  it("does not collapse a failed session probe into 'sign in first' (C9)", async () => {
     routeFetch(() => Promise.reject(new Error("network")));
     const { root, container } = await render({ t: zh });
     expect(container.querySelector("form")).toBeNull();
-    expect(container.querySelector('[role="status"]')?.textContent).toContain("请先登录");
+    // 网络失败是「暂时不可用 + 重试」，不是「未登录」：两者用不同的播报位文案。
+    expect(container.querySelector('[role="status"]')?.textContent).toContain("服务暂时不可用");
+    expect(container.textContent).not.toContain("请先登录");
     cleanup(root, container);
   });
 

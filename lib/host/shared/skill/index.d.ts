@@ -4,4 +4,3 @@
  */
 export { bundledSkillDir, installSkill, SKILL_NAME, userSkillDir } from "./skill-install.js";
 export type { InstallSkillOptions, InstallSkillResult } from "./skill-install.js";
-//# sourceMappingURL=index.d.ts.map

@@ -24,11 +24,12 @@ in first.
 
 ## Contents
 
+- [Quick start](#quick-start)
+- [First run](#first-run)
+- [Requirements](#requirements)
 - [What it does](#what-it-does)
 - [What it does not do](#what-it-does-not-do)
 - [The market's credentials badge](#the-markets-credentials-badge)
-- [Quick start](#quick-start)
-- [First run](#first-run)
 - [See it in action](#see-it-in-action)
 - [Configuration](#configuration)
 - [Anonymous usage statistics](#anonymous-usage-statistics)
@@ -38,10 +39,86 @@ in first.
 - [Troubleshooting](#troubleshooting)
 - [Deployment](#deployment)
 - [Authenticated local proxy (optional)](#authenticated-local-proxy-optional)
-- [Requirements](#requirements)
 - [Notes & limitations](#notes--limitations)
 - [Development](#development)
 - [License](#license)
+
+## Quick start
+
+Install the plugin, restart dsh, and open the link dsh prints on startup. A fresh
+install has nothing configured yet, so that link goes straight into the first-run
+wizard: getting in needs no shell command and no configuration edit.
+
+```sh
+# 1. Install the plugin from npm into your dsh profile. The package declares a
+#    `dsh.bundle` manifest, so `dsh plugin add` also registers the mount
+#    (dsh.profile.bundles) automatically:
+dsh plugin --profile web add dsh-auth-gate
+
+# 2. Restart dsh, then open the URL it prints at startup
+#    (http://<host>:<port>/?token=<launch token>).
+dsh --profile web
+```
+
+The wizard offers what the current mode allows: `token` mode, the shipped default,
+generates and saves the shared access token, and `password` mode creates the first
+administrator. The new token is shown once on the result page, and one click continues
+into dsh. From the next visit on that launch link is just a URL again: sign in on the
+login page with the token or the password you just set. Everything else (more users,
+TOTP, changing `mode`) still happens in the shell: see [First run](#first-run),
+[Configuration](#configuration) and [Command-line tool](#command-line-tool).
+
+## First run
+
+Whether the launch link opens the wizard is decided on every request, from one
+question: is this instance configured?
+
+- **The default is `mode: "token"`.** With no `DSH_AUTH_TOKEN`, an unconfigured
+  token-mode instance rejects everyone, so the launch link is the only way in. Only a
+  successful read that returns nothing counts as unconfigured; a missing credentials
+  service or a throwing read is treated like a configured instance and opens no wizard.
+  `password` mode follows the same rule while `users.yaml` is missing or holds no users.
+- **What `?token=` means.** It is dsh's own launch token, printed at startup and valid
+  only for the lifetime of that dsh process. The plugin takes it as proof that you can
+  read the server console, then issues a bootstrap session: at most one hour, and it
+  can open nothing but the plugin's own `/auth/*` pages.
+- **What the wizard can change.** It generates and saves the shared token (token mode)
+  or creates the first administrator (password mode), and the window closes as soon as
+  one of the two exists. It cannot change `mode`, `totp`, `cookieSecure`, `sessionTtl`
+  or `proxy`: edit `$DSH_HOME/cordis.patch.yml` and restart dsh for those.
+- **What happens to the launch URL afterwards.** It stops admitting you, in two hops: the
+  gate first bounces the request to `/auth/bootstrap?token=...`, that endpoint finds the
+  instance configured, and it answers `302 /auth/login?next=%2F`. Neither hop sets a
+  cookie and nothing is let through, so the launch token is not a second key.
+- **How to open the wizard again.** Remove the saved token (or leave `users.yaml` with
+  no users) and restart dsh. If a credentials service hands back a cached value, that
+  restart is what makes it see the change.
+
+## Requirements
+
+- Node ≥ 22.19 and pnpm on the server.
+- dsh `0.1.x`, `0.2.x` and every later line (declared as `engines.dsh: ^0.1.0-rc.6 ||
+^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`). The three caret alternatives record the
+  host lines that were verified; the `>=0.2.0-rc.1` floor keeps every host from the current
+  `next` line onwards compatible, including future `0.3.x` and `1.x`. A declaration that lags
+  a new host line costs more than it protects, because an incompatible bundle is skipped and
+  the login gate then disappears silently. Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
+  order), plus `0.1.7-alpha.1`, `0.2.0-rc.2` and `0.2.2-rc.1` (isolated instances);
+  the full test suite runs on the `0.2.2-rc.1` host packages, and the integration
+  suite exercises their `resource` routes (the `/plugins` prefix and the SPA fallback)
+  against the real webserver. The `0.1.6-*`
+  prereleases are not enumerated because no plugin version was verified against
+  them (stable `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the
+  host's own `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis`
+  copies — both are peer dependencies, never bundled — so a profile booted from
+  the dsh base bundle already provides them. dsh `0.2.0-rc.2` (already on the `next` line) refuses to install, and at boot silently
+  skips, plugins whose `@deepseek-ai/dsh*` peer ranges do not cover the running host
+  version; that check reads peers only - `engines.dsh` is not consulted - and a plugin
+  declaring no such peer is not checked at all. The floor is therefore declared in
+  **both** `engines.dsh` and the storage-domain peer.
+- The dsh `web` profile running (`dsh --profile web`).
+- If `cookieSecure` is `true`, your site must be served over https (browsers
+  refuse secure cookies on plain http).
 
 ## What it does
 
@@ -106,11 +183,13 @@ mechanisms is in `docs/deployed/known-limitations.md`):
 - **Not server-level security.** Keep the OS user locked down and the config files
   private (`auth/users.yaml` and `.credentials.yaml` are created `0600`); this plugin
   guards dsh's **web** surface only.
-- **Not every way of changing a password evicts sessions.** `dsh-auth user disable`
+- **The CLI's password change evicts sessions with a delay.** `dsh-auth user disable`
   blocks future logins and revokes the sessions that user was issued (within
   `revokeSweepMs`, 5 s by default); the Settings panel's self-service change revokes every
-  session of that user, and so does an administrator's reset of someone else's password;
-  the CLI's `dsh-auth user passwd` only rewrites the stored hash.
+  session of that user, and so does an administrator's reset of someone else's password.
+  The CLI's `dsh-auth user passwd` runs as a separate process: it records the change and
+  the plugin's session sweeper revokes that user's earlier sessions within the same
+  interval (or on the next plugin restart).
 - **Not a replacement for HTTPS.** With `cookieSecure: true` you must serve the site
   over https.
 - **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
@@ -144,57 +223,6 @@ accurate. Here is what it corresponds to in the code.
 
 If you would rather run an instance that never reads a credential, use password mode.
 
-## Quick start
-
-Install the plugin, restart dsh, and open the link dsh prints on startup. A fresh
-install has nothing configured yet, so that link goes straight into the first-run
-wizard: getting in needs no shell command and no configuration edit.
-
-```sh
-# 1. Install the plugin from npm into your dsh profile.
-#    Since 0.4.1 the package declares a `dsh.bundle` manifest, so `dsh plugin add`
-#    also registers the mount (dsh.profile.bundles) automatically:
-dsh plugin --profile web add dsh-auth-gate
-
-# 2. Restart dsh, then open the URL it prints at startup
-#    (http://<host>:<port>/?token=<launch token>).
-dsh --profile web
-```
-
-The wizard offers what the current mode allows: `token` mode, the shipped default,
-generates and saves the shared access token, and `password` mode creates the first
-administrator. The new token is shown once on the result page, and one click continues
-into dsh. From the next visit on that launch link is just a URL again: sign in on the
-login page with the token or the password you just set. Everything else (more users,
-TOTP, changing `mode`) still happens in the shell: see [First run](#first-run),
-[Configuration](#configuration) and [Command-line tool](#command-line-tool).
-
-## First run
-
-Whether the launch link opens the wizard is decided on every request, from one
-question: is this instance configured?
-
-- **The default is `mode: "token"`.** With no `DSH_AUTH_TOKEN`, an unconfigured
-  token-mode instance rejects everyone, so the launch link is the only way in. Only a
-  successful read that returns nothing counts as unconfigured; a missing credentials
-  service or a throwing read is treated like a configured instance and opens no wizard.
-  `password` mode follows the same rule while `users.yaml` is missing or holds no users.
-- **What `?token=` means.** It is dsh's own launch token, printed at startup and valid
-  only for the lifetime of that dsh process. The plugin takes it as proof that you can
-  read the server console, then issues a bootstrap session: at most one hour, and it
-  can open nothing but the plugin's own `/auth/*` pages.
-- **What the wizard can change.** It generates and saves the shared token (token mode)
-  or creates the first administrator (password mode), and the window closes as soon as
-  one of the two exists. It cannot change `mode`, `totp`, `cookieSecure`, `sessionTtl`
-  or `proxy`: edit `$DSH_HOME/cordis.patch.yml` and restart dsh for those.
-- **What happens to the launch URL afterwards.** It stops admitting you, in two hops: the
-  gate first bounces the request to `/auth/bootstrap?token=...`, that endpoint finds the
-  instance configured, and it answers `302 /auth/login?next=%2F`. Neither hop sets a
-  cookie and nothing is let through, so the launch token is not a second key.
-- **How to open the wizard again.** Remove the saved token (or leave `users.yaml` with
-  no users) and restart dsh. If a credentials service hands back a cached value, that
-  restart is what makes it see the change.
-
 ## See it in action
 
 Every screenshot below uses the **English UI**, and both READMEs share the same set of
@@ -215,9 +243,9 @@ After signing in, they land on your instance:
 
 ![dsh instance](docs/demo/dashboard.en.png)
 
-On dsh 0.1.2-alpha+ (which guards pages with a launch token), signing in
-auto-bridges the token gate: the login redirect takes a short relative
-`/?token=…` hop that sets the dsh cookie, then lands on `/` (details in
+On dsh versions that guard pages with a launch token (0.1.2-alpha and later),
+signing in auto-bridges the token gate: the login redirect takes a short
+relative `/?token=…` hop that sets the dsh cookie, then lands on `/` (details in
 `docs/history/specs/impl-launch-token-bridge.md`).
 
 That dsh cookie is a **second, independent layer**: it is named after the request
@@ -225,11 +253,11 @@ authority (`dsh-auth-<sha256(host)>`), signed with dsh's own secret, and lasts 3
 The plugin's gate only checks its own `dsh_auth` session, so a valid session can still
 meet dsh's `401 dsh web authentication required` — after a reverse proxy starts or stops
 rewriting `Host`, after a domain or port change, when the dsh cookie expires, or after
-site data is cleared. The guard now asks dsh's documented `connection.requestRejection`
-seam after admitting a top-level navigation to `/`, and when dsh answers `401` it replies
+site data is cleared. After admitting a top-level navigation to `/`, the guard asks dsh's
+documented `connection.requestRejection` seam, and when dsh answers `401` it replies
 `302 /?token=…` to mint a fresh cookie. A one-shot marker cookie keeps that to a single
 extra hop, so a rebridge that cannot succeed leaves dsh's own 401 in place instead of
-looping (D37).
+looping ([the rebridge note](.agents/notes/implemented/bug-fix/2026-11-16-host-cookie-rebridge.md)).
 
 A prominent **Sign out / 退出登录** button sits inside the **Settings panel**
 (the Settings → General page, below the last preference row). It's a centered,
@@ -248,8 +276,7 @@ per-section icon option yet (`settings.section` carries only `id`/`order`/`label
 and nav icons come from the host's hard-coded `navIcon(id)`, which falls back to
 the default gear for third-party sections), so a **temporary DOM stopgap** replaces
 our own row and nothing else (if it cannot find the row it silently falls back to
-the gear). Once dsh offers an `icon` option, the stopgap and its code are removed
-(see ADR D24.1 for the migration conditions).
+the gear). Once dsh offers an `icon` option, the stopgap and its code are removed.
 
 ![Account security row in the settings nav](docs/demo/account-nav-icon.en.png)
 
@@ -334,9 +361,10 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
 | `sessionTtl`            | `604800`                     | How long a login lasts (seconds) before you must sign in again                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `cookieName`            | `dsh_auth`                   | Name of the session cookie (rarely needs changing)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `tokenRef`              | `"DSH_AUTH_TOKEN"`           | Token mode only: which environment variable holds the shared secret                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `tokenMinLength`        | `32`                         | Token mode only: minimum accepted length (characters) of the stored shared token. The schema rejects values below 32; a stored token shorter than the floor never authenticates and is logged once per process. Length floor, not an entropy estimate                                                                                                                                                                                                                                                                                                                                                                                     |
 | `cookieSecure`          | `true`                       | Set to `false` only if you are testing over plain http                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | `usersFile`             | `""`                         | Password mode: where your user list lives. Defaults to `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| `publicHost`            | `""`                         | Host rendered in the login page identity block (the anti-phishing "which instance is this" line). Empty = use the request `Host` header. Set it when a reverse proxy rewrites `Host` (e.g. Caddy `header_up Host 127.0.0.1:3080`), otherwise the card shows a loopback address instead of your public domain. With D25 it also lets the admin and password-change endpoints validate an `Origin` header: with `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, so production deployments should set it, and write it with the scheme (`https://host`) when TLS terminates at a reverse proxy                            |
+| `publicHost`            | `""`                         | Host rendered in the login page identity block (the anti-phishing "which instance is this" line). Empty = use the request `Host` header. Set it when a reverse proxy rewrites `Host` (e.g. Caddy `header_up Host 127.0.0.1:3080`), otherwise the card shows a loopback address instead of your public domain. It also lets the admin and password-change endpoints validate an `Origin` header: with `publicHost` empty they accept only `Sec-Fetch-Site: same-origin`, so production deployments should set it, and write it with the scheme (`https://host`) when TLS terminates at a reverse proxy                                     |
 | `revokeSweepMs`         | `5000`                       | Password mode: how fast (ms) a user disabled with `dsh-auth user disable` loses **already issued** sessions. `0` = never sweep (disabling only blocks new logins)                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `clientIpHeader`        | `""`                         | Header carrying the real client address for rate limiting (`x-forwarded-for`, or `cf-connecting-ip` behind Cloudflare). Empty = read no header at all. Only read when the request's peer is inside `trustedProxyCidrs`; without it a same-host reverse proxy makes every client share one lockout bucket (issue #74)                                                                                                                                                                                                                                                                                                                      |
 | `trustedProxyCidrs`     | `["127.0.0.0/8", "::1/128"]` | Which peers may supply `clientIpHeader` (default: loopback only; a peer without an address, i.e. a Unix socket, counts as local). Invalid entries are dropped with an error log and trust narrows to loopback, an explicit `[]` means "trust nobody", and `0.0.0.0/0` / `::/0` are always rejected                                                                                                                                                                                                                                                                                                                                        |
@@ -348,6 +376,17 @@ in `deploy/cordis.patch.yml`). The override targets the mounted row by id
 | `passkeyEnforceCounter` | `false`                      | Reject authenticator counter regressions. Default only warns (synced passkeys stay at 0; a regression is a signal, not proof); `true` rejects only for device-bound credentials (`be=false && bs=false`)                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | `passkeyConditionalUi`  | `false`                      | Offer passkeys in the login page's autofill (conditional UI). Off by default; an administrator can enable it from Account security, effective immediately and written back through the host settings service. This is the one passkey field the settings page can write, so it is declared `.volatile()`; `passkey` itself is deployment-level and stays config-file only                                                                                                                                                                                                                                                                 |
 | `telemetry`             | `true`                       | Anonymous usage statistics: at most one ping per process per 24 hours, and only after a request passed the gate. `false` sends nothing at all. What is sent is listed in [Anonymous usage statistics](#anonymous-usage-statistics)                                                                                                                                                                                                                                                                                                                                                                                                        |
+
+**Generate the shared token; do not choose it.** In token mode `tokenMinLength`
+(default and minimum 32) is the shortest accepted shared token: a stored token
+shorter than the floor is rejected by the login endpoint and by the bearer-token
+guard, logged once per process, and never authenticates; cookie sessions issued before
+the token got shorter keep working until their TTL. The check is length only,
+not an entropy estimate, so generate the value with a CSPRNG - `openssl rand
+-base64 32`, or the setup wizard's built-in random token - never a human-chosen
+phrase. A token that does not resolve at all still keeps the gate closed, and a
+non-empty but too-short token still counts as configured, so the first-run wizard
+does not reopen for it: replace or remove the value and restart.
 
 To enable TOTP for a user, run `dsh-auth user totp enable <name>` and add the
 printed secret (or scan the `otpauth://` URI) into an authenticator app (Google
@@ -413,10 +452,19 @@ dsh-auth passkey rm admin --all             # remove every passkey of that user
 `dsh plugin add` the binary lives inside the profile and must be called through it -
 see [Quick start](#quick-start).
 
-`dsh-auth user passwd` only rewrites the stored hash: it does **not** revoke that user's
-live sessions. Use the Settings panel change when sessions must be evicted right away;
-`dsh-auth user disable` also blocks future logins, but the sessions already issued are
-dropped by the periodic sweep (`revokeSweepMs`, ~5 s by default).
+`dsh-auth user passwd` runs as a separate process with no session-store access: it
+records the change and the plugin's session sweeper revokes that user's earlier sessions
+within `revokeSweepMs` (~5 s by default), or on the next plugin restart. A web-surface
+change (the Settings panel, an admin reset) revokes them immediately; `dsh-auth user
+disable` also blocks future logins and revokes the issued sessions within the same sweep
+interval.
+
+- **Back up the user list.** `$DSH_HOME/auth/users.yaml` is the only state a password-mode
+  deployment must preserve (`version: 1`, one record per user, mode `0600`); before each
+  write the previous copy is kept as `users.yaml.bak` (also `0600`). Back up both files;
+  the deployment guide's [backup, restore and migration
+  section](docs/deployed/deployment.md) covers the restore procedure and how an upgrade
+  changes the file.
 
 ## Admin tools: list users and reset a password
 
@@ -454,7 +502,7 @@ still requires the current password, and success clears the mark and signs the u
 can sign in normally. A reset does **not** touch the target's TOTP secret, and resetting a
 disabled account does not let it sign in: the login path rejects disabled users, so run
 `dsh-auth user enable <name>` first. The full contract is in
-[D25](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.md).
+[the admin reset note](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.md).
 
 ## Bundled configuration skill
 
@@ -563,8 +611,7 @@ configured one the login page is the correct destination.
   and why auth alone doesn't fix them), and the recommended semi-shell
   topology.
 - [`docs/deployed/deployment.md`](docs/deployed/deployment.md) — ops checklist, acceptance steps
-  (A–I) and troubleshooting. Chinese version:
-  [`docs/deployed/deployment_zh.md`](docs/deployed/deployment_zh.md).
+  (A–J), backup and restore, and troubleshooting.
 
 ## Authenticated local proxy (optional)
 
@@ -580,8 +627,7 @@ configured one the login page is the correct destination.
 > After the semi-shell fixed the server-side `/api` fence, dsh's **client** still requires
 > "page origin must be loopback"; the local proxy provides a loopback page entry on the user's
 > machine, used together with auth-gate so remote config editing stays authenticated
-> end-to-end, without touching dsh sources. Full design: [docs/deployed/local-proxy.md](docs/deployed/local-proxy.md)
-> (Chinese: [docs/deployed/local-proxy_zh.md](docs/deployed/local-proxy_zh.md)).
+> end-to-end, without touching dsh sources. Full design: [docs/deployed/local-proxy.md](docs/deployed/local-proxy.md).
 
 - Zero-dependency Node bin (`dsh-auth-proxy`): strictly bound to `127.0.0.1`, stateless
   pass-through for pages/API, `events.mux`/`events.host` WebSocket tunneling, and
@@ -601,36 +647,10 @@ dsh-auth-proxy --listen 127.0.0.1:8443 --target https://your-domain.example --ma
 
 systemd example: `deploy/systemd/dsh-auth-proxy.service.example`.
 
-## Requirements
-
-- Node ≥ 22.19 and pnpm on the server.
-- dsh `0.1.x`, `0.2.x` and every later line (declared as `engines.dsh: ^0.1.0-rc.6 ||
-^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`). The three caret alternatives record the
-  host lines that were verified; the `>=0.2.0-rc.1` floor keeps every host from the current
-  `next` line onwards compatible, including future `0.3.x` and `1.x`. A declaration that lags
-  a new host line costs more than it protects, because an incompatible bundle is skipped and
-  the login gate then disappears silently. Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
-  order), plus `0.1.7-alpha.1`, `0.2.0-rc.2` and `0.2.2-rc.1` (isolated instances);
-  the full test suite runs on the `0.2.2-rc.1` host packages, and the integration
-  suite exercises their `resource` routes (the `/plugins` prefix and the SPA fallback)
-  against the real webserver. The `0.1.6-*`
-  prereleases are not enumerated because no plugin version was verified against
-  them (stable `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the
-  host's own `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis`
-  copies — both are peer dependencies, never bundled — so a profile booted from
-  the dsh base bundle already provides them. dsh `0.2.0-rc.2` (already on the `next` line) refuses to install, and at boot silently
-  skips, plugins whose `@deepseek-ai/dsh*` peer ranges do not cover the running host
-  version; that check reads peers only - `engines.dsh` is not consulted - and a plugin
-  declaring no such peer is not checked at all. The floor is therefore declared in
-  **both** `engines.dsh` and the storage-domain peer (D28).
-- The dsh `web` profile running (`dsh --profile web`).
-- If `cookieSecure` is `true`, your site must be served over https (browsers
-  refuse secure cookies on plain http).
-
 ## Notes & limitations
 
-The short list; the full version, including the mechanisms and the ADRs behind them,
-is in `docs/deployed/known-limitations.md`.
+The short list; the full version, including the mechanisms and the decision records
+behind them, is in `docs/deployed/known-limitations.md`.
 
 - Disabling a user only stops **new** logins; sessions already issued are revoked by the
   periodic sweep (`revokeSweepMs`, 5 s by default - with `0` they stay valid until they
@@ -665,8 +685,9 @@ is in `docs/deployed/known-limitations.md`.
 Built on the engineering conventions of
 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework): barrel-only
 cross-slice imports (Feature-Sliced Design layers, checked by Steiger), the `npm run verify` gate chain, and decision records. `verify`
-runs format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity /
-type-check / coverage 80% / build / bundle / host contract; tests, build and the release flow are
+runs format / lint / no-emdash / slice / fsd / lock / notes / docs / readme-parity /
+type-check / coverage (80% global plus per-path security floors) / build / bundle / host contract;
+tests, build and the release flow are
 documented in `docs/conventions.md`.
 
 ## License

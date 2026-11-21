@@ -1,10 +1,7 @@
 /**
- * passkey 登录 finish 端点（隐藏表单 POST）的实现：限速 → 会话存储检查 → **先删后验**地
- * 消费 ceremony → 字段校验 → 全局凭据查找（未命中做等量工作）→ 库验签 + 业务策略 →
- * 注入 `issueSession` 签发 302。
- *
- * 401 恒为同一张登录卡片 + 同一常量文案；原因码只进日志，绝不回显断言内容。会话的
- * 受限/正式分支由注入的 `issueSession` 决定，这里不重复实现。
+ * passkey 登录 finish 端点：受理（限速占位）→ 存储检查 → **先删后验**地消费 ceremony →
+ * 字段校验 → 凭据查找（未命中做等量工作）→ 验签 + 策略 → 注入 `issueSession` 签发 302。
+ * 401 恒为同一张卡片与常量文案；原因码只进日志。受限/正式会话由注入实现决定。
  */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { SessionStore } from "../../../entities/session/index.js";
@@ -12,13 +9,11 @@ import type { UserRecord, UsersLoadResult } from "../../../entities/user/index.j
 import {
   methodNotAllowed,
   parseFormBody,
-  resolvePublicHost,
   setPasskeyPermissionsPolicy,
-  validateNext,
 } from "../../../shared/http/index.js";
-import type { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
+import type { Admission, LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { clearCeremonyCookie, readCeremonyId } from "../model/ceremony-cookie.js";
-import type { CeremonyRecord, CeremonyStore } from "../model/ceremony-store.js";
+import type { CeremonyStore } from "../model/ceremony-store.js";
 import {
   findPasskeyCredential,
   PasskeyCounterStore,
@@ -32,6 +27,8 @@ import {
   type AssertionVerdict,
 } from "./passkey-assertion-verify.js";
 import {
+  challengeOf,
+  failureContext,
   loadUsersOr503,
   sendPasskeyFailure,
   sendPasskeyLocked,
@@ -73,9 +70,9 @@ export interface PasskeyLoginFinishDeps {
 interface LoginRequest {
   readonly params: URLSearchParams;
   readonly store: SessionStore;
-  readonly ip: string;
   readonly context: PasskeyFailureContext;
   readonly loaded: UsersLoadResult;
+  readonly admission: Admission;
 }
 
 /**
@@ -101,13 +98,29 @@ export async function handlePasskeyLogin(
     return;
   }
   const ip = deps.clientIp(req);
-  const context = failureContext(deps, req, params);
-  const lockout = deps.limiter.check(ip, undefined);
-  if (!lockout.allowed) {
-    sendPasskeyLocked(res, context, lockout.retryAfterSeconds);
+  const context = failureContext(deps.publicHost, req, params, deps.passwordLoginDisabled);
+  // 受理即占位（P1.3）：并发的断言尝试不能全部先看到「未锁定」。
+  const admitted = deps.limiter.admit(ip, undefined, "passkey");
+  if (!admitted.admitted) {
+    sendPasskeyLocked(res, context, admitted.retryAfterSeconds);
     deps.logger.info("passkey login rate limited");
     return;
   }
+  try {
+    await runLogin(deps, counters, req, res, { params, context, admission: admitted.admission });
+  } finally {
+    admitted.admission.settle("abandon"); // 已结算时是空操作
+  }
+}
+
+/** 受理之后的存储检查与 ceremony 消费；503 出口不结算失败（不烧在途 ceremony）。 */
+async function runLogin(
+  deps: PasskeyLoginFinishDeps,
+  counters: PasskeyCounterStore,
+  req: IncomingMessage,
+  res: ServerResponse,
+  input: { params: URLSearchParams; context: PasskeyFailureContext; admission: Admission },
+): Promise<void> {
   // 503 在 consume 之前：会话层/用户存储未就绪不得烧掉用户的在途 ceremony（可原样重试）。
   const store = deps.sessions();
   if (store === undefined) {
@@ -118,7 +131,7 @@ export async function handlePasskeyLogin(
   // 用户快照也在 consume 之前读：瞬时读盘失败不该把 ceremony 烧掉（§5.6）。
   const loaded = await loadUsersOr503(deps, res);
   if (loaded === undefined) return;
-  await finishLogin(deps, counters, req, res, { params, store, ip, context, loaded });
+  await finishLogin(deps, counters, req, res, { ...input, store, loaded });
 }
 
 /** 消费 ceremony 并校验断言（先删后验：重放与并发只剩第一次能看到记录）。 */
@@ -129,16 +142,24 @@ async function finishLogin(
   res: ServerResponse,
   input: LoginRequest,
 ): Promise<void> {
-  const { params, store, ip, context, loaded } = input;
+  const { params, store, context, loaded, admission } = input;
   const ceremony = deps.ceremony.consume(readCeremonyId(req.headers.cookie) ?? "");
   const clearCookie = clearCeremonyCookie(deps.cookieSecure);
   if (ceremony?.kind !== "login") {
-    rejectLogin(deps, res, ip, undefined, context, "ceremony missing or expired", clearCookie);
+    rejectLogin(
+      deps,
+      res,
+      undefined,
+      context,
+      "ceremony missing or expired",
+      clearCookie,
+      admission,
+    );
     return;
   }
   const assertion = readPasskeyAssertion(params);
   if (assertion === undefined) {
-    rejectLogin(deps, res, ip, undefined, context, "malformed assertion", clearCookie);
+    rejectLogin(deps, res, undefined, context, "malformed assertion", clearCookie, admission);
     return;
   }
   const match = findPasskeyCredential(loaded.snapshot, assertion.id);
@@ -149,25 +170,40 @@ async function finishLogin(
       challenge: challengeOf(ceremony),
     });
     const reason = match === undefined ? "unknown credential" : "disabled user";
-    rejectLogin(deps, res, ip, match?.username, context, reason, clearCookie);
+    rejectLogin(deps, res, match?.username, context, reason, clearCookie, admission);
     return;
   }
+  const storedCounter = counters.stored(match.record);
   const verdict = await verifyPasskeyAssertion({
     settings: deps.settings,
     match,
     assertion,
     challenge: challengeOf(ceremony),
-    storedCounter: counters.stored(match.record),
+    storedCounter,
   });
   if (!verdict.ok) {
-    rejectLogin(deps, res, ip, match.username, context, verdict.reason, clearCookie);
+    rejectLogin(deps, res, match.username, context, verdict.reason, clearCookie, admission);
+    return;
+  }
+  // 并发断言：验证期间同一凭据已被推进过 ⇒ 这一条基于过期计数器，按重放拒绝（P2 L13）。
+  // 判定与下面的 advance 之间没有 await，Node 单线程下是原子的。
+  if (!counters.isCurrent(match.record, storedCounter)) {
+    rejectLogin(
+      deps,
+      res,
+      match.username,
+      context,
+      "counter advanced concurrently",
+      clearCookie,
+      admission,
+    );
     return;
   }
   await completeLogin(deps, counters, res, {
+    admission,
     match,
     verdict,
     store,
-    ip,
     next: context.next,
     clearCookie,
   });
@@ -179,15 +215,15 @@ async function completeLogin(
   counters: PasskeyCounterStore,
   res: ServerResponse,
   input: {
+    readonly admission: Admission;
     readonly match: PasskeyCredentialMatch;
     readonly verdict: Extract<AssertionVerdict, { ok: true }>;
     readonly store: SessionStore;
-    readonly ip: string;
     readonly next: string;
     readonly clearCookie: string;
   },
 ): Promise<void> {
-  const { match, verdict, store, ip, next, clearCookie } = input;
+  const { admission, match, verdict, store, next, clearCookie } = input;
   if (verdict.warn !== undefined) {
     deps.logger.warn(
       `passkey login: counter regression allowed for ${match.username} ` +
@@ -195,7 +231,7 @@ async function completeLogin(
     );
   }
   counters.advance(match.record, verdict.newCounter);
-  deps.limiter.recordSuccess(ip, match.username);
+  admission.settle("success", match.username);
   await deps.issueSession(res, store, match.username, next, match.user, [clearCookie]);
   deps.logger.info(
     `passkey login succeeded: ${match.username} (credential ${match.record.credentialId.slice(0, 8)})`,
@@ -206,33 +242,15 @@ async function completeLogin(
 function rejectLogin(
   deps: PasskeyLoginFinishDeps,
   res: ServerResponse,
-  ip: string,
   username: string | undefined,
   context: PasskeyFailureContext,
   reason: string,
   clearCookie: string,
+  admission: Admission,
 ): void {
-  deps.limiter.recordFailure(ip, username);
+  admission.settle("failure", username);
   deps.logger.warn(`passkey login rejected: ${reason}`);
   sendPasskeyFailure(res, context, clearCookie);
-}
-
-/** 失败页上下文：反钓鱼 host 来自配置（回退请求头 Host）+ 消毒后的 next。 */
-function failureContext(
-  deps: PasskeyLoginFinishDeps,
-  req: IncomingMessage,
-  params: URLSearchParams,
-): PasskeyFailureContext {
-  return {
-    host: resolvePublicHost(deps.publicHost, req.headers.host),
-    next: validateNext(params.get("next") ?? "/"),
-    passwordLoginDisabled: deps.passwordLoginDisabled === true,
-  };
-}
-
-/** ceremony 的 32 字节 challenge → 库要的 base64url（与 options 响应里的值逐字一致）。 */
-function challengeOf(ceremony: CeremonyRecord): string {
-  return Buffer.from(ceremony.challenge).toString("base64url");
 }
 
 /** 415/413 响应（与口令登录同形：413 先写 `connection: close`）；无 status 的异常向上抛。 */

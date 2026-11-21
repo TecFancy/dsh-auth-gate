@@ -64,7 +64,7 @@ export function parseBudgets(raw) {
   try {
     data = JSON.parse(raw);
   } catch (error) {
-    throw new Error(`${MANIFEST_REL} is not valid JSON: ${error.message}`);
+    throw new Error(`${MANIFEST_REL} is not valid JSON: ${error.message}`, { cause: error });
   }
   if (data === null || typeof data !== "object" || data.version !== 1) {
     throw new Error(`${MANIFEST_REL} must be an object with "version": 1`);

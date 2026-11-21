@@ -31,4 +31,3 @@ export interface AuthRouteWiring {
 }
 /** 挂载 passkey 与口令/token 两组端点（各自 `ctx.effect`，随 fiber 释放）。 */
 export declare function mountAuthRoutes(ctx: Context, input: AuthRouteWiring): void;
-//# sourceMappingURL=auth-routes.d.ts.map

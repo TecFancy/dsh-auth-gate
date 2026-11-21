@@ -20,4 +20,3 @@ export interface PasskeyFlags {
  * 删光等于锁死账号。HTTP 端点那边能读到配置，因此只在 `required` 时拒绝。
  */
 export declare function handlePasskeyCli(file: string, sub: string | undefined, name: string | undefined, flags: PasskeyFlags, io: PasskeyCliIo): Promise<number>;
-//# sourceMappingURL=cli.d.ts.map

@@ -36,10 +36,10 @@ export declare class ActorNotAdminError extends Error {
 }
 /**
  * 锁内 RMW（唯一变更入口）：**先复核 actor 仍是 admin 且未禁用**（TOCTOU，grok #5），
- * 再设 `must_change_password: true` + 新哈希。`totpSecret` / `role` / `disabled` 一律不动（验收 8）；
- * 只改这两个字段，last-admin 判定不会误触发。目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
+ * 再设 `must_change_password: true` + 新哈希 + `password_changed_at`。`totpSecret` / `role` /
+ * `disabled` 一律不动（验收 8）；只改这三个字段，last-admin 判定不会误触发。
+ * 目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
  */
 export declare function writeReset(deps: AdminDeps, res: ServerResponse, ctx: AdminAuditContext, hashed: string, secrets?: readonly string[]): Promise<boolean>;
 /** 撤销目标全部会话（`self` 已挡掉 ⇒ 天然不含 actor）；注入方保证不抛，这里仍兜底。 */
 export declare function revokeTarget(deps: AdminDeps, ctx: AdminAuditContext, secrets?: readonly string[]): Promise<boolean>;
-//# sourceMappingURL=reset-steps.d.ts.map

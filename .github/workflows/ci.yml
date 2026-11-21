@@ -7,6 +7,17 @@ on:
     branches: [main, development]
   pull_request:
 
+# Least privilege: CI only reads the repository. No job widens it.
+permissions:
+  contents: read
+
+# A newer push to the same ref supersedes the older run: the old run cannot
+# say anything true about the branch anymore, and holding a runner for it only
+# delays the answer.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # Static/hygiene gates: fast, no build needed. Parallel purpose per job
   # (M3): failures surface in the owning job instead of a monolithic run.
@@ -18,17 +29,18 @@ jobs:
   hygiene:
     name: hygiene (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           # The archive seal compares against the pull request's base, so the
           # base commit has to be in the clone.
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -70,13 +82,14 @@ jobs:
   quality:
     name: quality (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -87,13 +100,14 @@ jobs:
   build:
     name: build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
           cache: npm
@@ -102,7 +116,22 @@ jobs:
       - run: npm run bundle:check
       - run: npm run host:check
       - name: Verify committed lib/ matches a fresh build
-        run: git diff --exit-code -- lib
+        # `git diff` compares against the index, so a build output the author
+        # never `git add`ed is invisible to it. `git status --porcelain` also
+        # lists untracked files; either shape means the committed artifact is
+        # not a clean build of this tree.
+        #
+        # `shell: bash` because the check needs the POSIX test builtin; the
+        # windows runner would otherwise substitute pwsh.
+        shell: bash
+        run: |
+          git diff --exit-code -- lib
+          dirty="$(git status --porcelain -- lib)"
+          if [ -n "$dirty" ]; then
+            echo "::error::lib/ is not a clean build of the checked-out tree; these paths are untracked or modified:"
+            printf '%s\n' "$dirty"
+            exit 1
+          fi
       # dsh installs this package into a profile with `npm install` (devDeps
       # omitted) - the guarded `prepare` script must not fail in that
       # environment (husky is a devDependency and is absent there). Simulate

@@ -50,10 +50,23 @@ export declare const sessionDomainSpec: {
         }>;
     };
 };
+/** 缺省过期行清扫间隔（毫秒）：`create` 至多每 60s 触发一次全表扫描。 */
+export declare const DEFAULT_PRUNE_INTERVAL_MS = 60000;
+/** 会话存储的可选项（时钟注入供测试钉住清扫节奏）。 */
+export interface SessionStoreOptions {
+    /** 过期行清扫的最小间隔（毫秒）；缺省 `DEFAULT_PRUNE_INTERVAL_MS`。 */
+    pruneIntervalMs?: number;
+    /** 时钟（epoch ms）；缺省 `Date.now`。 */
+    now?: () => number;
+}
 /** 对一张 KvTable 编程的会话存储；domain 的 open/close 由 index.ts 接线。 */
 export declare class SessionStore {
     private readonly table;
-    constructor(table: KvTable<string, Session>);
+    private readonly pruneIntervalMs;
+    private readonly now;
+    /** 上次清扫时刻；`-Infinity` = 还没扫过（首次 create 必扫）。 */
+    private lastPruneAt;
+    constructor(table: KvTable<string, Session>, options?: SessionStoreOptions);
     create(subject: string, ttlMs: number, kind?: SessionKind): Promise<IssuedSession>;
     /** 同步内存读 + 校验；有效则返回行（不修改），否则 undefined。 */
     getByToken(token: string): Session | undefined;
@@ -66,12 +79,26 @@ export declare class SessionStore {
      */
     revokeBySubject(subject: string): Promise<number>;
     /**
+     * 吊销某个 subject 中 `createdAt` 早于 `createdAtBefore`（epoch ms）的会话行。
+     * 用途：口令变更（users.yaml 的 `password_changed_at`）后作废变更前签发的会话；
+     * 变更后签发的会话保留，因此重复扫描是幂等的（CLI 改密走这条路径）。
+     */
+    revokeBySubjectBefore(subject: string, createdAtBefore: number): Promise<number>;
+    /**
      * 吊销某个类别的**全部**会话行，返回吊销条数（写盘）。
      * 用途：首次配置向导成功后关掉引导窗口（`bootstrap` 会话一律失效）。
      * 行内没有类别索引，故按 row.kind 全表扫描（与 `revokeBySubject` 同款理由）。
      */
     revokeByKind(kind: SessionKind): Promise<number>;
+    /**
+     * 出现过**非引导**会话的 subject 去重集合（无序）。供扫描器找出已从 users.yaml
+     * 删除的用户的残留会话；bootstrap 引导会话不属于任何用户，故按 kind 排除。
+     */
+    subjects(): string[];
     /** 全表扫描删除过期行，返回删除数。 */
     pruneExpired(now?: number): Promise<number>;
+    /** 距上次清扫不足 `pruneIntervalMs` → 0；否则记下本次时刻并清扫（并发 create 只有一个真扫）。 */
+    private pruneIfDue;
+    /** 先收集键再单批删除：不在迭代中删除，且整批只占一个写槽。 */
+    private deleteWhere;
 }
-//# sourceMappingURL=session-store.d.ts.map

@@ -63,7 +63,11 @@ describe("dsh-auth user passwd", () => {
     const code = await main(["user", "passwd", "alice", "--file", file], h.io);
     expect(code).toBe(0);
     expect(h.err).toEqual([]);
-    expect(h.out).toEqual(["user alice password changed"]);
+    expect(h.out).toHaveLength(2);
+    expect(h.out[0]).toBe("user alice password changed");
+    // L5：CLI 够不到会话表，必须逐字告知「吊销发生在下一轮扫描」，不得暗示立即生效。
+    expect(h.out[1]).toContain("revoked by the running plugin on its next sweep");
+    expect(h.out[1]).toContain("5000 ms");
     const hash = await hashOf(file, "alice");
     await expect(verifyPassword(NEW_PASSWORD, hash)).resolves.toBe(true);
     await expect(verifyPassword(OLD_PASSWORD, hash)).resolves.toBe(false);
@@ -149,6 +153,17 @@ describe("dsh-auth user passwd - new password policy", () => {
     expect(h.err.join("\n")).toContain("password rejected");
     expect(h.err.join("\n")).toContain("minLength");
     await expect(verifyPassword(OLD_PASSWORD, await hashOf(file, "alice"))).resolves.toBe(true);
+  });
+
+  it("records a new passwordChangedAt so the sweeper can revoke old sessions (L5)", async () => {
+    const before = (await loadUsersFile(file)).snapshot.users.get("alice")?.passwordChangedAt;
+    expect(Number.isFinite(Date.parse(before ?? ""))).toBe(true);
+    const h = makeIo([NEW_PASSWORD, NEW_PASSWORD]);
+    expect(await main(["user", "passwd", "alice", "--file", file], h.io)).toBe(0);
+    const after = (await loadUsersFile(file)).snapshot.users.get("alice")?.passwordChangedAt;
+    expect(Number.isFinite(Date.parse(after ?? ""))).toBe(true);
+    expect(Date.parse(after ?? "")).toBeGreaterThanOrEqual(Date.parse(before ?? ""));
+    expect(after).not.toBe(before);
   });
 
   it("rejects the current password via the sameAsOld rule", async () => {

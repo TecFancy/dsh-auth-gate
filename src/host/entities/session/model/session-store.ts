@@ -76,18 +76,35 @@ export const sessionDomainSpec = defineDomain({
   tables: { sessions: domainTable(sessionRowSchema) },
 });
 
+/** 缺省过期行清扫间隔（毫秒）：`create` 至多每 60s 触发一次全表扫描。 */
+export const DEFAULT_PRUNE_INTERVAL_MS = 60_000;
+
+/** 会话存储的可选项（时钟注入供测试钉住清扫节奏）。 */
+export interface SessionStoreOptions {
+  /** 过期行清扫的最小间隔（毫秒）；缺省 `DEFAULT_PRUNE_INTERVAL_MS`。 */
+  pruneIntervalMs?: number;
+  /** 时钟（epoch ms）；缺省 `Date.now`。 */
+  now?: () => number;
+}
+
 /** 对一张 KvTable 编程的会话存储；domain 的 open/close 由 index.ts 接线。 */
 export class SessionStore {
   private readonly table: KvTable<string, Session>;
+  private readonly pruneIntervalMs: number;
+  private readonly now: () => number;
+  /** 上次清扫时刻；`-Infinity` = 还没扫过（首次 create 必扫）。 */
+  private lastPruneAt = Number.NEGATIVE_INFINITY;
 
-  constructor(table: KvTable<string, Session>) {
+  constructor(table: KvTable<string, Session>, options: SessionStoreOptions = {}) {
     this.table = table;
+    this.pruneIntervalMs = options.pruneIntervalMs ?? DEFAULT_PRUNE_INTERVAL_MS;
+    this.now = options.now ?? Date.now;
   }
 
   async create(subject: string, ttlMs: number, kind: SessionKind = "full"): Promise<IssuedSession> {
-    await this.pruneExpired();
+    const now = this.now();
+    await this.pruneIfDue(now);
     const token = randomBytes(32).toString("base64url");
-    const now = Date.now();
     const session: Session = {
       subject,
       createdAt: now,
@@ -102,7 +119,7 @@ export class SessionStore {
   /** 同步内存读 + 校验；有效则返回行（不修改），否则 undefined。 */
   getByToken(token: string): Session | undefined {
     const row = this.table.get(digestToken(token));
-    if (row === undefined || row.revoked || row.expiresAt <= Date.now()) {
+    if (row === undefined || row.revoked || row.expiresAt <= this.now()) {
       return undefined;
     }
     return row;
@@ -119,13 +136,16 @@ export class SessionStore {
    * 行内没有主体索引，故按 row.subject 全表扫描（会话量级为单机用户数，成本可忽略）。
    */
   async revokeBySubject(subject: string): Promise<number> {
-    let count = 0;
-    for (const [key, row] of this.table.entries()) {
-      if (row.subject !== subject) continue;
-      await this.table.delete(key);
-      count += 1;
-    }
-    return count;
+    return this.deleteWhere((row) => row.subject === subject);
+  }
+
+  /**
+   * 吊销某个 subject 中 `createdAt` 早于 `createdAtBefore`（epoch ms）的会话行。
+   * 用途：口令变更（users.yaml 的 `password_changed_at`）后作废变更前签发的会话；
+   * 变更后签发的会话保留，因此重复扫描是幂等的（CLI 改密走这条路径）。
+   */
+  async revokeBySubjectBefore(subject: string, createdAtBefore: number): Promise<number> {
+    return this.deleteWhere((row) => row.subject === subject && row.createdAt < createdAtBefore);
   }
 
   /**
@@ -134,24 +154,41 @@ export class SessionStore {
    * 行内没有类别索引，故按 row.kind 全表扫描（与 `revokeBySubject` 同款理由）。
    */
   async revokeByKind(kind: SessionKind): Promise<number> {
-    let count = 0;
-    for (const [key, row] of this.table.entries()) {
-      if (row.kind !== kind) continue;
-      await this.table.delete(key);
-      count += 1;
+    return this.deleteWhere((row) => row.kind === kind);
+  }
+
+  /**
+   * 出现过**非引导**会话的 subject 去重集合（无序）。供扫描器找出已从 users.yaml
+   * 删除的用户的残留会话；bootstrap 引导会话不属于任何用户，故按 kind 排除。
+   */
+  subjects(): string[] {
+    const seen = new Set<string>();
+    for (const [, row] of this.table.entries()) {
+      if (row.kind === BOOTSTRAP_SESSION_KIND) continue;
+      seen.add(row.subject);
     }
-    return count;
+    return [...seen];
   }
 
   /** 全表扫描删除过期行，返回删除数。 */
-  async pruneExpired(now: number = Date.now()): Promise<number> {
-    let count = 0;
+  async pruneExpired(now: number = this.now()): Promise<number> {
+    return this.deleteWhere((row) => row.expiresAt <= now);
+  }
+
+  /** 距上次清扫不足 `pruneIntervalMs` → 0；否则记下本次时刻并清扫（并发 create 只有一个真扫）。 */
+  private async pruneIfDue(now: number): Promise<number> {
+    if (now - this.lastPruneAt < this.pruneIntervalMs) return 0;
+    this.lastPruneAt = now;
+    return this.pruneExpired(now);
+  }
+
+  /** 先收集键再单批删除：不在迭代中删除，且整批只占一个写槽。 */
+  private async deleteWhere(predicate: (row: Session) => boolean): Promise<number> {
+    const keys: string[] = [];
     for (const [key, row] of this.table.entries()) {
-      if (row.expiresAt <= now) {
-        await this.table.delete(key);
-        count += 1;
-      }
+      if (predicate(row)) keys.push(key);
     }
-    return count;
+    if (keys.length === 0) return 0;
+    return this.table.deleteMany(keys);
   }
 }

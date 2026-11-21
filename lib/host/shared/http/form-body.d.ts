@@ -6,6 +6,10 @@ export declare const FORM_BODY_LIMIT: number;
  * 超限 → `{ status: 413 }`（M19：不调用 `req.destroy()`）。两者都是带 `status`
  * 字段的 Error；**不带 `status` 的流异常（abort 等）不捕获，向上抛**（webserver
  * 统一 warn + 400，与守卫纪律一致）。
+ *
+ * 超限在读到第一块越界数据时就抛，不继续吸收剩余请求体。调用方写 413（并加
+ * `connection: close`）即可让客户端读到状态：真实 `http.createServer` 连接上的
+ * 回归测试见 `form-body.test.ts`（G13），不存在「连接先被重置」的路径。
  */
 export declare function parseFormBody(req: IncomingMessage): Promise<URLSearchParams>;
 /**
@@ -13,4 +17,3 @@ export declare function parseFormBody(req: IncomingMessage): Promise<URLSearchPa
  * 必须显式给出：字段名受它约束，写错名字编译不过，host 与 client 认的是同一组键。
  */
 export declare function formField<T extends object>(params: URLSearchParams, name: keyof T & string): string;
-//# sourceMappingURL=form-body.d.ts.map

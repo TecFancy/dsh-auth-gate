@@ -41,4 +41,3 @@ export declare function issueSession(deps: IssueSessionDeps, res: ServerResponse
 export declare function issueLoginSession(deps: IssueSessionDeps, res: ServerResponse, store: SessionStore, username: string, next: string, user: {
     mustChangePassword?: boolean | undefined;
 } | undefined, extraSetCookie?: string[]): Promise<void>;
-//# sourceMappingURL=session-issue.d.ts.map

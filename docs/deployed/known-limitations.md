@@ -5,8 +5,14 @@ English | [中文](known-limitations_zh.md)
 The README keeps the short list. This page is the full one: every known limitation of the
 plugin, with the mechanism behind it and the decision record that fixed it.
 
-- Disabling a user only stops **new** logins; already-signed-in sessions stay
-  valid until they expire.
+- Disabling a user stops **new** logins, and the plugin's periodic sweep revokes the
+  sessions already issued within `revokeSweepMs` (default 5 s); with `0` they stay valid
+  until they expire.
+- **A CLI password change evicts sessions with a delay.** `dsh-auth user passwd` runs as a
+  separate process with no session-store access: it records `password_changed_at` and the
+  plugin's session sweeper revokes that user's earlier sessions within `revokeSweepMs`
+  (default 5 s), or on the next plugin restart. The web surfaces (Settings self-service
+  change, an administrator's reset) revoke immediately.
 - **Passkey deployment prerequisites**: the RP ID is derived from `publicHost` and must be a domain (no IP,
   no port), and browsers only expose WebAuthn over HTTPS (or `http://localhost`). Plain-http intranet
   addresses, a direct `http://127.0.0.1:3080`, and the `dsh-auth-proxy` local proxy (`http://127.0.0.1:8443`)

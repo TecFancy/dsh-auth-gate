@@ -29,4 +29,3 @@ export declare function errorMessage(error: unknown): string;
  * 日志铁律不依赖被注入依赖的自觉（hash/mutate/revoke 都可能把入参回显进 message）。
  */
 export declare function safeMessage(error: unknown, secrets: readonly string[]): string;
-//# sourceMappingURL=respond.d.ts.map

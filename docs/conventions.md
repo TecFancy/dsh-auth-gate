@@ -15,14 +15,14 @@ links to.
 
 | Task           | Command                                                                                                                                                                                                                                                                    |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`)                                                                                                                                                                                                                     |
+| Type-check     | `npm run type-check` (`tsc -p tsconfig.json --noEmit`, the client project, and the `checkJs` script channel in `tsconfig.scripts.json`)                                                                                                                                                                                                                     |
 | Lint           | `npm run lint` (flat ESLint, type-checked)                                                                                                                                                                                                                                 |
 | FSD layering   | `npm run lint:fsd` (Steiger over `src/host` and `src/client`; layer order, same-layer isolation, public API, naming)                                                                                                                                                       |
 | Format         | `npm run format` / `npm run format:check`                                                                                                                                                                                                                                  |
 | Tests          | `npm run test` (Vitest, `vitest run`)                                                                                                                                                                                                                                      |
 | Watch tests    | `npm run test:watch`                                                                                                                                                                                                                                                       |
-| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements)                                                                                                                                                                                                      |
-| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations + source maps)                                                                                                                                                             |
+| Coverage       | `npm run test:coverage` (v8, 80% branches/functions/lines/statements, plus per-path floors on the security-critical slices — guard, session, password (`vitest.config.ts`))                                                                                                                                                                                                      |
+| Build          | `npm run build` (empties `lib/` first, then tsc emit + client bundle; LF newlines, declarations only: the tarball ships `lib/` without `src/`, so no source or declaration maps)                                                                                                                                                             |
 | Scenario gates | `npm run gates` (auto-detects the change surface; pre-push runs this)                                                                                                                                                                                                      |
 | Full gate      | `npm run verify` (the gate runner over every registered gate, plus the gate self-tests; the full set is CI, not every local run) |
 | Host contract  | `npm run host:check` (self-test, then: package name = Loader row = client registration id = host `name`; manifest targets exist; client `require`s are seeded host modules; no route literal outside `src/protocol/`, every protocol path registered, README routes exist) |
@@ -59,8 +59,9 @@ Run tests by name: `npm run test -- -t "guard"`
   a working package without build tooling on the server;
 - `npm pack`/`npm publish` ship exactly the same tree (`prepack` rebuilds
   first);
-- CI verifies parity: `git diff --exit-code -- lib` after a fresh build fails
-  the job when someone commits a stale artifact.
+- CI verifies parity after a fresh build: `git diff --exit-code -- lib` fails on a
+  committed stale artifact, and `git status --porcelain -- lib` also fails on
+  untracked build output, which `git diff` cannot see.
 
 `tsconfig.build.json` pins `newLine: "lf"` so the emitted artifact is
 byte-stable across Windows/Linux builders.
@@ -120,7 +121,9 @@ format check, lint, no-emdash, slice boundaries, FSD layering (Steiger), decisio
 coverage tests, build, bundle check, host contract check, then two parity gates:
 
 1. **Committed artifact parity**: `git diff --exit-code -- lib` after the fresh
-   build — the committed `lib/` must equal a clean build.
+   build — the committed `lib/` must equal a clean build — and
+   `git status --porcelain -- lib` catches untracked build output that `git diff`
+   cannot see.
 2. **Consumer install simulation**: fresh clone + `npm install --omit=dev` —
    the guarded `prepare` script (husky is a devDependency) must not fail, the
    same environment `dsh plugin add <git-url>` runs in.
@@ -139,6 +142,10 @@ Versioning is fully automated from conventional commits on `main`
 - When the release PR is merged, the Release workflow (`release.yml`) also
   publishes to npm (`dsh-auth-gate`, MIT-licensed); consumers can additionally
   install from git or a local tarball (`npm pack`).
+
+**Publishing is verified.** A `verify` job runs the same `npm run verify` chain as CI at the
+published commit, and `publish` rebuilds `lib/` and re-checks parity before `npm publish`, so a
+release cannot ship an unverified or drifted tree.
 
 **npm authentication is Trusted Publishing (OIDC), not a token.** The `publish`
 job holds `id-token: write` and no `NPM_TOKEN` secret exists. npm exchanges the
@@ -253,5 +260,5 @@ re-litigate, gets an Agent Note in `.agents/notes/`. The rules live in
   `npm run notes:links` enforces the links; `npm run bilingual:check` keeps the
   pair honest.
 
-The legacy numbered ADRs (D1-D38) were migrated into this tree; each note keeps
+The legacy numbered ADRs (D1-D40) were migrated into this tree; each note keeps
 its `Legacy ID: D<n>` line so a code comment citing `D31` still resolves.

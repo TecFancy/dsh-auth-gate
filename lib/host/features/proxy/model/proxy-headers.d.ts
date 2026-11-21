@@ -38,4 +38,3 @@ export declare function filterUpgradeResponseHeaders(headers: Record<string, str
  * Safari 兜底；HttpOnly/SameSite/Path/Max-Age 原样保留）。
  */
 export declare function rewriteSetCookie(values: string[]): string[];
-//# sourceMappingURL=proxy-headers.d.ts.map

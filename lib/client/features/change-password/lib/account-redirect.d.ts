@@ -13,6 +13,14 @@
  * 是同一个常量，不再靠两侧各写字面量再用源码文本比对钉住。
  */
 export declare const LOGIN_REDIRECT_URL = "/auth/login?next=%2F&notice=password-changed";
+/**
+ * 会话失效（401 `unauthorized`）后的登录页：**不带** notice 键。
+ *
+ * 与改密成功不同，这里没有服务端写下的原因可解释；带错键会让登录卡片显示
+ * 「密码已改，请重新登录」，与用户的实际经历不符。
+ */
+export declare const SIGN_IN_URL: string;
 /** 跳到登录页；`nav` 只为测试注入（缺省走真实 `window.location.replace`）。 */
 export declare function redirectToLogin(nav?: (url: string) => void): void;
-//# sourceMappingURL=account-redirect.d.ts.map
+/** 会话失效后跳到登录页（无 notice 键）；`nav` 只为测试注入。 */
+export declare function redirectToSignIn(nav?: (url: string) => void): void;

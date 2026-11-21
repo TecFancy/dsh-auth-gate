@@ -14,4 +14,3 @@ export declare function handlePasskeyList(deps: PasskeyManagementDeps, req: Inco
  * 再认证只在 `all=1` 或「删后该用户凭据数为 0」时要求；普通单删只凭会话。
  */
 export declare function handlePasskeyRemove(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=passkey-manage-endpoints.d.ts.map

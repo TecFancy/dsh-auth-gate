@@ -5,6 +5,8 @@
 export {
   compareNames,
   defaultUsersFilePath,
+  errorMessage,
+  isValidUsername,
   loadUsersFile,
   mutateUsersFile,
   USERNAME_RE,
@@ -12,6 +14,7 @@ export {
   writeUsersFile,
 } from "./model/users-file.js";
 export type { UserRecord, UserRole, UsersLoadResult, UsersSnapshot } from "./model/users-file.js";
+export { applyPasswordChange, changedAtIso } from "./model/password-change-mark.js";
 export { MAX_PASSKEYS_PER_USER, validatePasskeyStore } from "./model/passkey-record.js";
 export type { PasskeyRecord } from "./model/passkey-record.js";
 export {

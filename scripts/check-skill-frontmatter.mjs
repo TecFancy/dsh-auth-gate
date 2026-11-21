@@ -192,6 +192,7 @@ function parseFrontMatter(text) {
         /at line (\d+)/,
         (_, n) => `at front matter line ${Number(n) + 1}`,
       )}`,
+      { cause: error },
     );
   }
   if (fields === null || fields === undefined) {

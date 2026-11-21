@@ -61,6 +61,15 @@ function logoutRegisters(h: ReturnType<typeof makeApplyHarness>): unknown[][] {
   );
 }
 
+/** 通用 status 探针响应：默认 logoutOrder 1000（与 host Config 一致，不触发重注册）。 */
+function defaultStatus(): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ authenticated: false, logoutOrder: 1000 }),
+  } as unknown as Response;
+}
+
 describe("apply", () => {
   const fetchMock = vi.fn();
 
@@ -72,11 +81,6 @@ describe("apply", () => {
     vi.unstubAllGlobals();
     fetchMock.mockReset();
   });
-
-  /** 通用 status 探针响应：默认 logoutOrder 1000（与 host Config 一致，不触发重注册）。 */
-  function defaultStatus(): unknown {
-    return { json: () => Promise.resolve({ authenticated: false, logoutOrder: 1000 }) };
-  }
 
   it("registers zh/en logout dicts and adds the CTA to the settings General item slot", async () => {
     fetchMock.mockResolvedValue(defaultStatus());
@@ -110,6 +114,8 @@ describe("apply", () => {
 
   it("re-registers the CTA with the host-configured logoutOrder when it differs from the default", async () => {
     fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
       json: () => Promise.resolve({ authenticated: true, logoutOrder: 5000 }),
     });
     const h = makeApplyHarness();
@@ -137,6 +143,8 @@ describe("apply", () => {
 
   it("keeps a single default-order registration when the probe returns a non-numeric order", async () => {
     fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
       json: () => Promise.resolve({ authenticated: true, logoutOrder: "late" }),
     });
     const h = makeApplyHarness();
@@ -146,6 +154,19 @@ describe("apply", () => {
     expect(logoutRegisters(h)).toHaveLength(1);
   });
 });
+
+/** /auth/status 返回给定 authenticated 值。 */
+function statusResponse(authenticated: boolean): Response {
+  return {
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve({ authenticated }),
+  } as unknown as Response;
+}
+
+function enT(): () => string {
+  return () => "Sign out";
+}
 
 describe("SettingsLogoutAction (settings General CTA)", () => {
   const fetchMock = vi.fn();
@@ -158,15 +179,6 @@ describe("SettingsLogoutAction (settings General CTA)", () => {
     vi.unstubAllGlobals();
     fetchMock.mockReset();
   });
-
-  /** /auth/status 返回给定 authenticated 值。 */
-  function statusResponse(authenticated: boolean): unknown {
-    return { json: () => Promise.resolve({ authenticated }) };
-  }
-
-  function enT(): () => string {
-    return () => "Sign out";
-  }
 
   it("renders a prominent logout CTA (post form + 16px icon + en text) when authenticated", async () => {
     fetchMock.mockResolvedValue(statusResponse(true));

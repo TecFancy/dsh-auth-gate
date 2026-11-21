@@ -1,5 +1,5 @@
 import { type AccountTranslate } from "../../../shared/i18n/index.ts";
-import type { PasskeyField, PasskeyFormValues } from "../model/passkey-form.ts";
+import { type PasskeyField, type PasskeyFormValues } from "../model/passkey-form.ts";
 export interface PasskeyAddFormProps {
     t: AccountTranslate;
     values: PasskeyFormValues;
@@ -15,4 +15,3 @@ export interface PasskeyAddFormProps {
 }
 /** 添加表单：提交由父组件的状态机接管（校验、双锁、abort 都在那里）。 */
 export declare function PasskeyAddForm({ t, values, invalid, busy, totpEnabled, onChange, onSubmit, onCancel, }: PasskeyAddFormProps): import("react").JSX.Element;
-//# sourceMappingURL=passkey-add-form.d.ts.map

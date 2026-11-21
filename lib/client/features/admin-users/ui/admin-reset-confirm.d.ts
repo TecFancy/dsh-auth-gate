@@ -12,4 +12,3 @@ export interface AdminResetConfirmProps {
 }
 /** 确认页：目标 + 后果 + 返回修改 / 确认重置。 */
 export declare function AdminResetConfirm({ t, target, actorName, busy, onBack, onConfirm, }: AdminResetConfirmProps): import("react").JSX.Element;
-//# sourceMappingURL=admin-reset-confirm.d.ts.map

@@ -12,4 +12,3 @@ interface SkillCommandCtx {
  */
 export declare function installSkillCommand(ctx: SkillCommandCtx): Promise<number>;
 export {};
-//# sourceMappingURL=cli-skill.d.ts.map

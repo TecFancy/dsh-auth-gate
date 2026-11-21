@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
 import {
   ERROR_TEXT_STYLE,
@@ -86,7 +87,12 @@ export function AdminTextField({
   );
 }
 
-/** 状态区：失败消息 + 已翻译规则列表 + 就地成功/警告文案（契约 §3.8 / A8）。 */
+/**
+ * 状态区：失败消息 + 已翻译规则列表 + 就地成功/警告文案（契约 §3.8 / A8）。
+ *
+ * 播报位先渲染空、再由 effect 填内容（C4）：这块会和编辑区一起重新挂载（确认页 → 编辑页），
+ * 节点插入时就带着内容的话，aria-live 不会触发播报。
+ */
 export function AdminStatus({
   failure,
   success,
@@ -94,25 +100,36 @@ export function AdminStatus({
   failure: AdminFailureView | null;
   success: AdminSuccessView | null;
 }) {
-  const warning = success?.warning === true;
+  const [shown, setShown] = useState<{
+    failure: AdminFailureView | null;
+    success: AdminSuccessView | null;
+  }>({ failure: null, success: null });
+  useEffect(() => {
+    setShown({ failure, success });
+  }, [failure, success]);
+  const currentFailure = shown.failure;
+  const currentSuccess = shown.success;
+  const warning = currentSuccess?.warning === true;
   return (
     <>
       <div id={ADMIN_STATUS_ID} role="status" aria-live="polite" tabIndex={-1} style={STATUS_STYLE}>
-        {failure === null ? null : <span style={ERROR_TEXT_STYLE}>{failure.message}</span>}
-        {failure === null || failure.rules.length === 0 ? null : (
+        {currentFailure === null ? null : (
+          <span style={ERROR_TEXT_STYLE}>{currentFailure.message}</span>
+        )}
+        {currentFailure === null || currentFailure.rules.length === 0 ? null : (
           <ul style={RULES_STYLE}>
-            {failure.rules.map((rule) => (
+            {currentFailure.rules.map((rule) => (
               <li key={rule}>{rule}</li>
             ))}
           </ul>
         )}
-        {success === null || warning ? null : (
-          <span style={SUCCESS_TEXT_STYLE}>{success.text}</span>
+        {currentSuccess === null || warning ? null : (
+          <span style={SUCCESS_TEXT_STYLE}>{currentSuccess.text}</span>
         )}
       </div>
-      {warning && success !== null ? (
+      {warning && currentSuccess !== null ? (
         <p role="alert" aria-live="assertive" style={ERROR_TEXT_STYLE}>
-          {success.text}
+          {currentSuccess.text}
         </p>
       ) : null}
     </>

@@ -8,9 +8,12 @@ import { handlePasskeyCli, type PasskeyFlags } from "./host/features/passkey/ind
 import { handleUserTotp } from "./host/features/totp/index.js";
 import { installSkillCommand } from "./cli-skill.js";
 import {
+  applyPasswordChange,
   checkPasswordPolicy,
   compareNames,
   defaultUsersFilePath,
+  errorMessage,
+  isValidUsername,
   loadUsersFile,
   mutateUsersFile,
   USERNAME_RE,
@@ -41,6 +44,14 @@ type Mutator = (snapshot: UsersSnapshot) => void | Promise<void>;
 
 /** TOTP 用户改密告警（P1 §7；文案沿用现有英文 CLI 风格）。 */
 const TOTP_WARNING = "warning: this user has TOTP; codes are unchanged, but sessions must re-login";
+
+/**
+ * CLI 改密后的会话吊销说明：CLI 是独立进程，够不到运行中插件的会话表，
+ * 只能落 `password_changed_at`，由插件扫描器在下一轮扫描（默认 `revokeSweepMs` = 5000 ms）生效；
+ * 插件停机时则在下一次启动后的首轮扫描生效。逐字告知操作员，不隐含「立即吊销」。
+ */
+const REVOKE_WARNING =
+  "note: sessions issued before this change are revoked by the running plugin on its next sweep (revokeSweepMs, default every 5000 ms; on the next start if the plugin is stopped)";
 
 const defaultIo: CliIo = {
   out: (line) => process.stdout.write(`${line}\n`),
@@ -142,11 +153,6 @@ function passkeyFlags(argv: string[]): PasskeyFlags {
   };
 }
 
-/** 明文 `--password` 一律拒绝（P1 §7：口令只走 stdin/交互输入）。 */
-function isPasswordFlag(token: string): boolean {
-  return token === "--password" || token.startsWith("--password=");
-}
-
 /** 锁内变更 + 统一错误出口；mutator 抛错 → 报错并返回 false（不落盘）。 */
 async function mutate(ctx: CliCtx, run: Mutator): Promise<boolean> {
   try {
@@ -168,7 +174,8 @@ async function edit(ctx: CliCtx, name: string, apply: Patch): Promise<boolean> {
 }
 
 async function addUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
-  if (name === undefined || !USERNAME_RE.test(name) || !ctx.argv.includes("--password-stdin")) {
+  // 新建用户名走同一校验（格式 + 预留名，G12）；`user passwd/role/disable` 仍只认格式。
+  if (name === undefined || !isValidUsername(name) || !ctx.argv.includes("--password-stdin")) {
     return usage(ctx.io);
   }
   const [password = ""] = await ctx.io.readLines(1);
@@ -176,11 +183,18 @@ async function addUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
     ctx.io.err("empty password");
     return 1;
   }
+  // 与登录/自助改密同一套策略：`user add` 是唯一能绕过策略造出口令的入口（L8）。
+  const policy = await checkPasswordPolicy(password);
+  if (!policy.ok) {
+    ctx.io.err(`password rejected: ${policy.rules.join(", ")}`);
+    return 1;
+  }
   const record: UserRecord = {
     passwordHash: await hashPassword(password),
     disabled: ctx.argv.includes("--disabled"),
     role: ctx.argv.includes("--admin") ? "admin" : "user",
     mustChangePassword: false,
+    passwordChangedAt: new Date().toISOString(),
   };
   const added = await mutate(ctx, (snapshot) => {
     if (snapshot.users.has(name)) throw new UsersFileError(`user ${name} already exists`);
@@ -194,7 +208,8 @@ async function addUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
 /** `user passwd <name>`：piped 一次会话读两行 / TTY 隐藏回显两次；策略 + hash + 锁内写盘（P1 §7）。 */
 async function passwdUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
   if (name === undefined || !USERNAME_RE.test(name)) return usage(ctx.io);
-  if (ctx.argv.some(isPasswordFlag)) {
+  // 明文 `--password` 一律拒绝（P1 §7：口令只走 stdin/交互输入）。
+  if (ctx.argv.some((arg) => arg === "--password" || arg.startsWith("--password="))) {
     ctx.io.err("refusing --password: use --password-stdin or an interactive prompt");
     return 1;
   }
@@ -213,9 +228,14 @@ async function passwdUser(ctx: CliCtx, name: Maybe<string>): Promise<number> {
   const hash = await hashPassword(password);
   // 有意不清 must_change_password（对比自助改密 POST /auth/password 会清）：CLI 是运维重置
   // 通道，`user passwd` 只换口令；「管理员重置 → 强制下次改密」的语义留给 P2（契约 §10）。
-  if (!(await edit(ctx, name, (current) => ({ ...current, passwordHash: hash })))) return 1;
+  // 落 passwordChangedAt（L5）：CLI 够不到会话存储，由插件扫描器在下一轮扫描吊销旧会话。
+  const changedAt = Date.now();
+  if (!(await edit(ctx, name, (current) => applyPasswordChange(current, hash, changedAt)))) {
+    return 1;
+  }
   ctx.io.out(`user ${name} password changed`);
   if (user.totpSecret !== undefined) ctx.io.out(TOTP_WARNING);
+  ctx.io.out(REVOKE_WARNING);
   return 0;
 }
 
@@ -239,8 +259,8 @@ async function findUser(ctx: CliCtx, name: string): Promise<Maybe<UserRecord>> {
 
 /** 读新口令 + 确认：piped 走一次 readLines(2)，TTY 走注入的 io.readSecret 两次。 */
 async function readNewPassword(ctx: CliCtx, fromStdin: boolean): Promise<Maybe<string>> {
-  const tty = !fromStdin && process.stdin.isTTY === true;
   const secret = ctx.io.readSecret ?? readSecretFromTty;
+  const tty = !fromStdin && process.stdin.isTTY === true;
   const [password = "", confirmation = ""] = tty
     ? [await secret("New password: "), await secret("Confirm new password: ")]
     : await ctx.io.readLines(2);
@@ -285,15 +305,10 @@ async function setDisabledUser(
   name: Maybe<string>,
   disabled: boolean,
 ): Promise<number> {
-  if (name === undefined) return usage(ctx.io);
+  if (name === undefined || !USERNAME_RE.test(name)) return usage(ctx.io);
   if (!(await edit(ctx, name, (user) => ({ ...user, disabled })))) return 1;
   ctx.io.out(`user ${name} ${disabled ? "disabled" : "enabled"}`);
   return 0;
-}
-
-function errorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return String(error);
 }
 
 // 入口判定必须走真实路径：pnpm/git 安装的 node_modules 是符号链接，argv[1]

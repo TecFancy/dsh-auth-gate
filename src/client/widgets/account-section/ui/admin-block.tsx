@@ -46,7 +46,8 @@ type UsersState =
 
 /**
  * 挂载后拉一次列表（契约 §3.4：非 admin 根本不会挂载本组件，这里不判断角色）；
- * `reload` 供 A7 成功后静默刷新徽标：刷新失败**不改行**（首拉才降级），同一 abort 规则。
+ * `reload` 供 A7 成功后重拉徽标。刷新失败也落到 failure 态（C3）：静默保留旧数据会让
+ * 「成功」播报与过期列表同屏，重试按钮也无事可做。同一 abort 规则。
  */
 function useAdminUsers(): { state: UsersState; reload: () => void } {
   const [state, setState] = useState<UsersState>({ kind: "loading" });
@@ -54,15 +55,14 @@ function useAdminUsers(): { state: UsersState; reload: () => void } {
   useEffect(() => {
     const controller = new AbortController();
     let live = true;
-    const first = attempt === 0;
     void fetchAdminUsers(controller.signal)
       .then((result) => {
         if (!live || result.kind === "aborted") return;
         if (result.kind === "ok") setState({ kind: "ok", users: result.users });
-        else if (first) setState({ kind: result.kind });
+        else setState({ kind: result.kind });
       })
       .catch(() => {
-        if (live && first) setState({ kind: "failure" });
+        if (live) setState({ kind: "failure" });
       });
     return () => {
       live = false;
@@ -257,12 +257,7 @@ export function AdminUsersBlock({ t, actorName, actorTotpEnabled }: AdminUsersBl
         </h3>
         <div style={SECTION_ACTIONS_STYLE}>
           {canReset && !resetting ? (
-            <ActionButton
-              ref={resetTriggerRef}
-              variant="ghost"
-              aria-expanded={false}
-              onClick={() => setResetting(true)}
-            >
+            <ActionButton ref={resetTriggerRef} variant="ghost" onClick={() => setResetting(true)}>
               {t(ADMIN_KEYS.resetOpen)}
             </ActionButton>
           ) : null}

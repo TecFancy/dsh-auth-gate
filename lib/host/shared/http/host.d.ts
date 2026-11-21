@@ -13,4 +13,3 @@
  * 注意：本函数只决定**展示文本**，不参与任何鉴权判定。
  */
 export declare function resolvePublicHost(publicHost: string | undefined, requestHost: string | undefined): string;
-//# sourceMappingURL=host.d.ts.map

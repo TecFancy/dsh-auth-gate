@@ -56,13 +56,37 @@ function mountSlot(h: ReturnType<typeof makeHarness>, key: string): void {
   for (const [slot, callback] of h.injectCalls) if (slot === key) callback();
 }
 
+/** 触发槽位注入并拿回它的 disposer（等价于宿主卸载该槽位）。 */
+function slotDisposer(h: ReturnType<typeof makeHarness>, key: string): () => void {
+  const entry = h.injectCalls.find(([slot]) => slot === key);
+  if (entry === undefined) throw new Error(`missing slot injection: ${key}`);
+  return entry[1]();
+}
+
+/** `/auth/status` 的最小响应形（探针会检查 res.ok 再解析 JSON）。 */
+function statusResponse(body: unknown): Response {
+  return { ok: true, status: 200, json: () => Promise.resolve(body) } as unknown as Response;
+}
+
+/** 挂起中的响应：由测试决定何时放行。 */
+function deferred(): { promise: Promise<Response>; release: (response: Response) => void } {
+  let release: (response: Response) => void = () => undefined;
+  const promise = new Promise<Response>((resolve) => {
+    release = (response) => resolve(response);
+  });
+  return { promise, release };
+}
+
+/** 让整条探针微任务链跑完。 */
+async function flushMicrotasks(): Promise<void> {
+  for (let index = 0; index < 10; index += 1) await Promise.resolve();
+}
+
 const fetchMock = vi.fn();
 
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
-  fetchMock.mockResolvedValue({
-    json: () => Promise.resolve({ authenticated: false, logoutOrder: 1000 }),
-  });
+  fetchMock.mockResolvedValue(statusResponse({ authenticated: false, logoutOrder: 1000 }));
 });
 
 afterEach(() => {
@@ -146,5 +170,47 @@ describe("apply registration", () => {
       expect(enDict[key]?.length).toBeGreaterThan(0);
       expect(enDict[key]).not.toBe(zhDict[key]);
     }
+  });
+});
+
+describe("logout-order probe (C2)", () => {
+  it("keeps the default order and aborts the probe when the item is disposed early (C2)", async () => {
+    const pending = deferred();
+    fetchMock.mockReturnValue(pending.promise);
+    const h = makeHarness();
+    apply(h.ctx);
+    const dispose = slotDisposer(h, "settings.general.item");
+    expect(h.registers).toHaveLength(1);
+    const signal = (fetchMock.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined)?.signal;
+    expect(signal?.aborted).toBe(false);
+
+    dispose();
+    expect(signal?.aborted).toBe(true); // 卸载即 abort：迟到响应不再占一个没人释放的注册
+    pending.release(statusResponse({ authenticated: true, logoutOrder: 5000 }));
+    await flushMicrotasks();
+    expect(h.registers).toHaveLength(1);
+  });
+
+  it("keeps the default order when the probe response is not ok (C2)", async () => {
+    fetchMock.mockResolvedValue({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ authenticated: true, logoutOrder: 5000 }),
+    });
+    const h = makeHarness();
+    apply(h.ctx);
+    mountSlot(h, "settings.general.item");
+    await flushMicrotasks();
+    expect(h.registers).toHaveLength(1);
+    expect(h.registers[0]!.opts.order ?? 0).toBe(1000);
+  });
+
+  it("ignores an order that is not an integer after whitelist parsing", async () => {
+    fetchMock.mockResolvedValue(statusResponse({ authenticated: true, logoutOrder: 1000.5 }));
+    const h = makeHarness();
+    apply(h.ctx);
+    mountSlot(h, "settings.general.item");
+    await flushMicrotasks();
+    expect(h.registers).toHaveLength(1);
   });
 });

@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { HttpHandler } from "../src/host/shared/guard/index.js";
 import type { AuthEndpointsDeps } from "../src/host/features/token/api/auth-endpoints.js";
 import { SessionStore, type Session } from "../src/host/entities/session/index.js";
+import { LoginRateLimiter } from "../src/host/shared/rate-limit/index.js";
 
 export class MemTable implements KvTable<string, Session> {
   private readonly map = new Map<string, Session>();
@@ -139,6 +140,8 @@ export function makeHarness(options?: {
       sessionTtl: options?.sessionTtl ?? 604800,
       logoutOrder: options?.logoutOrder ?? 1000,
       validateToken: (token) => Promise.resolve(token === "good-token"),
+      limiter: new LoginRateLimiter(),
+      clientIp: () => "203.0.113.7",
       logger: {
         error: (message) => logs.push({ level: "error", message }),
         info: (message) => logs.push({ level: "info", message }),

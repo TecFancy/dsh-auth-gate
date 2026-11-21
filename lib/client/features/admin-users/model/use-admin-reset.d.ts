@@ -52,4 +52,3 @@ export interface UseAdminResetOptions {
 }
 /** 重置状态机：编辑 → 确认 → 提交，双锁 + abort + 卸载保护。 */
 export declare function useAdminReset({ t, actorTotpEnabled, onReset, }: UseAdminResetOptions): AdminResetController;
-//# sourceMappingURL=use-admin-reset.d.ts.map

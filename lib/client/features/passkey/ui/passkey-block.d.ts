@@ -12,4 +12,3 @@ export interface PasskeyBlockProps {
  * 列表与删除仍可用。
  */
 export declare function PasskeyBlock({ t, totpEnabled }: PasskeyBlockProps): import("react").JSX.Element;
-//# sourceMappingURL=passkey-block.d.ts.map

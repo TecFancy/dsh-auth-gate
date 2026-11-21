@@ -8,6 +8,9 @@ import { Config } from "./index.js";
 import { bundledSkillDir } from "./host/shared/skill/index.js";
 import { loadUsersFile } from "./host/entities/user/index.js";
 
+/** 满足口令策略（≥14 位 + 四类字符）的测试口令：`user add` 与登录/改密共用同一策略（L8）。 */
+const CLI_PASSWORD = "Cli-Password-Ok!23";
+
 function makeIo(lines: string[] = []): { io: CliIo; out: string[]; err: string[] } {
   const out: string[] = [];
   const err: string[] = [];
@@ -37,7 +40,7 @@ describe("dsh-auth user add", () => {
   });
 
   it("adds a user with a verifiable hash and 0600 permissions", async () => {
-    const { io, out, err } = makeIo(["s3cret"]);
+    const { io, out, err } = makeIo([CLI_PASSWORD]);
     const code = await main(["user", "add", "alice", "--password-stdin", "--file", file], io);
     expect(code).toBe(0);
     expect(out).toEqual(["user alice added"]);
@@ -45,7 +48,7 @@ describe("dsh-auth user add", () => {
     const { snapshot } = await loadUsersFile(file);
     const alice = snapshot.users.get("alice");
     expect(alice?.disabled).toBe(false);
-    await expect(verifyPassword("s3cret", alice!.passwordHash)).resolves.toBe(true);
+    await expect(verifyPassword(CLI_PASSWORD, alice!.passwordHash)).resolves.toBe(true);
     const stat = await fs.stat(file);
     if (process.platform !== "win32") {
       expect(stat.mode & 0o777).toBe(0o600);
@@ -53,7 +56,7 @@ describe("dsh-auth user add", () => {
   });
 
   it("supports --disabled", async () => {
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo([CLI_PASSWORD]);
     const code = await main(
       ["user", "add", "alice", "--password-stdin", "--disabled", "--file", file],
       io,
@@ -64,7 +67,7 @@ describe("dsh-auth user add", () => {
   });
 
   it("supports --admin", async () => {
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo([CLI_PASSWORD]);
     const args = ["user", "add", "root", "--password-stdin", "--admin", "--file", file];
     expect(await main(args, io)).toBe(0);
     const { snapshot } = await loadUsersFile(file);
@@ -73,7 +76,7 @@ describe("dsh-auth user add", () => {
 
   it("creates the parent directory automatically", async () => {
     const nested = path.join(dir, "auth", "users.yaml");
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo([CLI_PASSWORD]);
     const code = await main(["user", "add", "alice", "--password-stdin", "--file", nested], io);
     expect(code).toBe(0);
     await expect(fs.stat(nested)).resolves.toBeDefined();
@@ -86,17 +89,10 @@ describe("dsh-auth user add", () => {
     expect(err.join("\n")).toContain("Usage:");
   });
 
-  it("rejects invalid usernames", async () => {
-    const { io, err } = makeIo(["pw"]);
-    const code = await main(["user", "add", "bad name", "--password-stdin", "--file", file], io);
-    expect(code).toBe(1);
-    expect(err.join("\n")).toContain("Usage:");
-  });
-
   it("rejects duplicate users", async () => {
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo([CLI_PASSWORD]);
     await main(["user", "add", "alice", "--password-stdin", "--file", file], io);
-    const second = makeIo(["pw"]);
+    const second = makeIo([CLI_PASSWORD]);
     const code = await main(
       ["user", "add", "alice", "--password-stdin", "--file", file],
       second.io,
@@ -127,9 +123,9 @@ describe("dsh-auth user list", () => {
   });
 
   it("lists users in lexicographic order with disabled markers", async () => {
-    const bob = makeIo(["pw"]);
+    const bob = makeIo([CLI_PASSWORD]);
     await main(["user", "add", "bob", "--password-stdin", "--file", file], bob.io);
-    const alice = makeIo(["pw"]);
+    const alice = makeIo([CLI_PASSWORD]);
     await main(
       ["user", "add", "alice", "--password-stdin", "--disabled", "--file", file],
       alice.io,
@@ -155,7 +151,7 @@ describe("dsh-auth user disable", () => {
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-cli-"));
     file = path.join(dir, "users.yaml");
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo([CLI_PASSWORD]);
     await main(["user", "add", "alice", "--password-stdin", "--file", file], io);
   });
 

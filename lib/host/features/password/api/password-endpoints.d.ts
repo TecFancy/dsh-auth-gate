@@ -1,6 +1,7 @@
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type UsersSnapshot } from "../../../entities/user/index.js";
 import type { HttpHandler } from "../../../shared/guard/index.js";
+import { type RouteRegister } from "../../../shared/http/index.js";
 import { type PasswordLoginDeps } from "../model/password-login.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 /** 改密端点的接线（§5）：写盘 / 哈希 / 独立限速桶 / 防重放 / 撤销会话，由 index.ts 注入。 */
@@ -44,11 +45,7 @@ export interface AdminRouteSet {
 }
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
     /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
-    register(route: {
-        kind: "exact" | "prefix";
-        path: string;
-        handler: HttpHandler;
-    }): () => void;
+    register: RouteRegister;
     /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
     logoutOrder: number;
     /**
@@ -73,4 +70,3 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
  * `req.method` 分发。
  */
 export declare function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => void;
-//# sourceMappingURL=password-endpoints.d.ts.map

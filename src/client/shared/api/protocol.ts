@@ -4,6 +4,8 @@
  */
 export {
   LOGOUT_URL,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
   PASSKEY_LOGIN_PATH,
   PASSKEY_OPTIONS_PATH,
   PASSKEY_PATH,
@@ -16,6 +18,7 @@ export {
   STATUS_PATH,
   USERS_PASSWORD_PATH,
   USERS_PATH,
+  loginPath,
 } from "../../../protocol/index.ts";
 export type {
   AdminResetErrorBody,

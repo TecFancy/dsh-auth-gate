@@ -11,4 +11,3 @@
 export interface VolatileField<T> {
     get(): T;
 }
-//# sourceMappingURL=volatile-field.d.ts.map

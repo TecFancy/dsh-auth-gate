@@ -31,6 +31,7 @@ function cfg(mode: "token" | "password", usersFile = ""): AuthConfig {
     sessionTtl: 604800,
     cookieName: "dsh_auth",
     tokenRef: "DSH_AUTH_TOKEN",
+    tokenMinLength: 32,
     cookieSecure: true,
     usersFile,
     publicHost: "",

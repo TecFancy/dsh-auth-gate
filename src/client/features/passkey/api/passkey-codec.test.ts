@@ -133,3 +133,56 @@ describe("isCancelled", () => {
     expect(isCancelled(null)).toBe(false);
   });
 });
+
+/**
+ * C8：options 是线上数据，逐字段白名单解析。非法的可选值一律**丢弃**（不下发），
+ * 不用 `as` 把 JSON 形状硬压成 DOM 类型。
+ */
+describe("toCreationOptions: whitelist parsing", () => {
+  it("drops illegal optional values instead of passing them through", () => {
+    const publicKey = toCreationOptions({
+      challenge: "AQID",
+      rp: { name: "RP" },
+      user: { id: "BAUG", name: "alice", displayName: "Alice" },
+      pubKeyCredParams: [
+        { type: "public-key", alg: -7 },
+        { type: "public-key", alg: "7" },
+        { type: "other", alg: 1 },
+      ],
+      timeout: "60000",
+      excludeCredentials: [
+        { type: "public-key", id: "BwgJ", transports: ["internal", "evil", 42] },
+        { type: "public-key" },
+        "junk",
+      ],
+      authenticatorSelection: {
+        residentKey: "sometimes",
+        authenticatorAttachment: "nope",
+        requireResidentKey: "yes",
+        userVerification: "required",
+      },
+      attestation: "whatever",
+      extensions: { credProps: true, appid: "https://evil.example" },
+    });
+    expect(publicKey).toBeDefined();
+    expect(publicKey!.pubKeyCredParams).toEqual([{ type: "public-key", alg: -7 }]);
+    expect(publicKey!.timeout).toBeUndefined();
+    expect(publicKey!.excludeCredentials).toHaveLength(1);
+    expect(publicKey!.excludeCredentials![0]!.transports).toEqual(["internal"]);
+    expect(publicKey!.authenticatorSelection).toEqual({ userVerification: "required" });
+    expect(publicKey!.attestation).toBeUndefined();
+    // 只白名单 credProps：不认识的扩展不随 options 下发。
+    expect(publicKey!.extensions).toEqual({ credProps: true });
+  });
+
+  it("rejects options whose required fields are all illegal", () => {
+    expect(
+      toCreationOptions({
+        challenge: "AQID",
+        rp: { name: "RP" },
+        user: { id: "BAUG", name: "alice", displayName: "Alice" },
+        pubKeyCredParams: [{ type: "other", alg: 1 }],
+      }),
+    ).toBeUndefined();
+  });
+});

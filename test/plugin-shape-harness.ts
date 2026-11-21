@@ -20,12 +20,13 @@ export const INSTALL_ID = { get: () => "" };
 /** `passkeyConditionalUi` 同样是 volatile 盒子（设置页要写回它）。 */
 export const CONDITIONAL_UI = { get: () => false };
 
-/** 与 `Config({})` 的默认值逐字段对齐的配置对象。 */
-export const cfg = (): AuthConfig => ({
+/** 与 `Config({})` 的默认值逐字段对齐的配置对象（overrides 用于单字段偏离默认值的用例）。 */
+export const cfg = (overrides: Partial<AuthConfig> = {}): AuthConfig => ({
   mode: "token",
   sessionTtl: 604800,
   cookieName: "dsh_auth",
   tokenRef: "DSH_AUTH_TOKEN",
+  tokenMinLength: 32,
   cookieSecure: true,
   usersFile: "",
   publicHost: "",
@@ -42,6 +43,7 @@ export const cfg = (): AuthConfig => ({
   passkeyConditionalUi: CONDITIONAL_UI,
   telemetry: true,
   installId: INSTALL_ID,
+  ...overrides,
 });
 
 /** 可观察的假 webServer（exact / prefix / upgrade / fallback 四类入口）。 */

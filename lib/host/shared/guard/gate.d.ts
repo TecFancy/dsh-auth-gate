@@ -52,4 +52,3 @@ export interface Gate {
 export type AdmitHook = () => void;
 /** M1 惰性门：恒放行。M2 用 token/密码门整体替换。 */
 export declare const noopGate: Gate;
-//# sourceMappingURL=gate.d.ts.map

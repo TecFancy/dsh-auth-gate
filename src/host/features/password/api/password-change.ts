@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import {
+  applyPasswordChange,
   checkPasswordPolicy,
   type UserRecord,
   type UsersLoadResult,
@@ -60,9 +61,6 @@ export interface PasswordChangeDeps {
   logger: { error(m: unknown): void; info(m: unknown): void; warn(m: unknown): void };
 }
 
-/** 失败日志常量串（不反射请求内容，§1 审计要求）。 */
-const REJECTED = "password change rejected";
-
 /** 文件缺失告警只触发一次（插件单实例，等价进程级一次，P7）。 */
 let warnedMissing = false;
 
@@ -107,7 +105,10 @@ export async function handlePasswordChange(
   }
   if (!originAccepted(deps, req, res)) return;
 
-  const { current, password: newPassword, code } = requestOf(params);
+  // 请求字段**不 trim 不截断**：口令按原始码点判定。
+  const current = formField<PasswordChangeRequest>(params, "current");
+  const newPassword = formField<PasswordChangeRequest>(params, "password");
+  const code = formField<PasswordChangeRequest>(params, "code");
   const subject = locateSession(deps, req)?.subject;
   if (subject === undefined) {
     sendJson(res, 401, { error: "unauthorized" });
@@ -166,15 +167,6 @@ export async function handlePasswordChange(
   deps.logger.info("password changed");
 }
 
-/** 请求字段（**不 trim 不截断**：口令按原始码点判定）。 */
-function requestOf(params: URLSearchParams): Omit<PasswordChangeRequest, "nav"> {
-  return {
-    current: formField<PasswordChangeRequest>(params, "current"),
-    password: formField<PasswordChangeRequest>(params, "password"),
-    code: formField<PasswordChangeRequest>(params, "code"),
-  };
-}
-
 /**
  * P2 §6：Origin / Sec-Fetch-Site 同源校验（fail-closed）；拒绝 → 403 JSON，不计限速。
  * `checkRequestOrigin` 按结构读 `headers` / `socket`，直接透传 `req` 即可。
@@ -190,12 +182,17 @@ function originAccepted(
   return false;
 }
 
-/** 会话定位：只认 cookie（M5），Bearer 不参与；store/token 无效一律 undefined。 */
+/**
+ * 会话定位：只认 cookie（M5），Bearer 不参与；store/token 无效或类别不在白名单 → undefined。
+ * 白名单（G12 allow-list）只放行正式会话与「只能改密」的受限会话；bootstrap 会话与
+ * 将来新增的 kind 默认都不许改密。旧行没有 `kind`，会话层语义按 full 处理。
+ */
 function locateSession(deps: PasswordChangeDeps, req: IncomingMessage): Session | undefined {
   const store = deps.sessions();
   const token = parseCookieHeader(req.headers.cookie, deps.cookieName);
   if (store === undefined || token === undefined || token === "") return undefined;
-  return store.getByToken(token);
+  const session = store.getByToken(token);
+  return ["full", "password-change-only"].includes(session?.kind ?? "full") ? session : undefined;
 }
 
 /** D19：注入的解析器（受信反代 IP 头）优先，缺省回退 socket 地址。 */
@@ -242,7 +239,7 @@ function reject(
   body: Parameters<typeof sendJson>[2],
 ): void {
   deps.limiter.recordFailure(ctx.ip, ctx.subject);
-  deps.logger.info(REJECTED);
+  deps.logger.info("password change rejected");
   sendJson(res, status, body);
 }
 
@@ -306,7 +303,9 @@ async function writeNewHash(
       if (!(await deps.verify(ctx.current, record.passwordHash))) {
         throw new Error(`users file changed concurrently: ${ctx.subject}`);
       }
-      record.passwordHash = hashed;
+      // L5：落新哈希 + passwordChangedAt（供扫描器在「立即吊销失败 / 插件随后重启」时兜底：
+      // 它吊销 `createdAt < passwordChangedAt` 的会话，变更后签发的会话不受影响）。
+      Object.assign(record, applyPasswordChange(record, hashed, deps.now()));
       // B1（§10）：自助改密成功即清 must_change_password（P2 登录门不再立刻拦一次）。
       // 写盘侧对 false 不落盘，删除即「无该字段」；CLI `user passwd` 有意不清（运维重置通道）。
       if (record.mustChangePassword === true) delete record.mustChangePassword;

@@ -1,3 +1,5 @@
+/** 验证窗口（±steps）；防重放的保留窗口与之绑定，改这里两侧一起变。 */
+export declare const TOTP_WINDOW_STEPS = 1;
 /**
  * base32 编码（RFC 4648，无填充，大写）。20 随机字节 → 32 字符。
  * 位操作在 JS number 内进行（工作区 ≤ 12 比特，安全）。
@@ -15,4 +17,3 @@ export declare function totpCodeAt(secretB32: string, counter: number): string;
  * 恒时：仅 timingSafeEqual（等长 ASCII buffer），无 `===` 快路径。
  */
 export declare function verifyTotpCode(secretB32: string, code: string, nowMs: number, window?: number): number | undefined;
-//# sourceMappingURL=totp.d.ts.map

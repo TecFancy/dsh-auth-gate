@@ -1,8 +1,21 @@
 import type { UserRole } from "../../../shared/protocol/index.js";
 import { renameWithRetry } from "./atomic-write.js";
 import type { PasskeyRecord } from "./passkey-record.js";
+import { UsersFileError, errorMessage } from "./users-file-error.js";
+export { errorMessage, UsersFileError };
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export declare const USERNAME_RE: RegExp;
+/**
+ * 预留用户名（大小写不敏感）：内部身份占用这些名字（引导会话 subject 等），
+ * 新用户不得使用。已存在的历史同名用户仍可登录/改密（`loadUsersFile` 只用 `USERNAME_RE`）。
+ */
+export declare const RESERVED_USERNAMES: ReadonlySet<string>;
+/**
+ * **新建**用户名的统一校验：格式（`USERNAME_RE`）+ 非预留名（大小写不敏感）。
+ * 创建路径（CLI `user add`、引导向导建首个管理员、`mutateUsersFile` 新增记录）共用；
+ * 维护已有用户的路径继续用 `USERNAME_RE`，避免把历史同名用户锁在门外。
+ */
+export declare function isValidUsername(name: string): boolean;
 /** 用户角色（契约 §3.1，定义在跨半边契约 D31）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
 export type { UserRole };
 export interface UserRecord {
@@ -14,6 +27,12 @@ export interface UserRecord {
     role?: UserRole;
     /** P1 新增；**可选**（loader 读时补 `false`）；YAML 键 `must_change_password`，`false` 不落盘。 */
     mustChangePassword?: boolean;
+    /**
+     * 最近一次口令变更的时间（ISO-8601，含毫秒）；YAML 键 `password_changed_at`。
+     * **可选**：老文件没有该键。会话扫描器据此吊销 `createdAt < passwordChangedAt`
+     * 的会话行，使 CLI（独立进程、够不到会话存储）改的口令也在下一轮扫描生效。
+     */
+    passwordChangedAt?: string;
     /** base64url（解码 16–64 字节），首次注册时生成；不得含 username/邮箱等 PII。 */
     passkeyUserHandle?: string;
     /** 该用户的通行密钥；**可选**（loader 读时补 `[]`）；写盘时空数组不落盘。 */
@@ -26,9 +45,6 @@ export interface UsersSnapshot {
 export interface UsersLoadResult {
     snapshot: UsersSnapshot;
     missing: boolean;
-}
-/** users 文件不可用（语法/schema/权限/锁/CAS）。message 面向操作员，可落日志。 */
-export declare class UsersFileError extends Error {
 }
 /** P6：DSH_HOME env → `~/.dsh` 兜底，拼 `auth/users.yaml`。CLI 与插件共享。 */
 export declare function defaultUsersFilePath(): string;
@@ -51,4 +67,3 @@ export declare function mutateUsersFile<T>(filePath: string, mutator: (snapshot:
     staleMs?: number;
     attempts?: number;
 }): Promise<T>;
-//# sourceMappingURL=users-file.d.ts.map

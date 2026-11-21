@@ -1,6 +1,6 @@
 ---
 name: dsh-auth-gate-config
-description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
+description: Use when the user asks about dsh-auth-gate configuration - supported options (mode/totp/sessionTtl/cookieName/tokenRef/tokenMinLength/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId), how to configure them, the dsh-auth CLI (user add/passwd/role/list/disable/enable/totp, skill install), the password policy (14+ chars, four character classes, not the old password), the Settings account-security block (self-service change, admin reset), login trouble, the first-run setup wizard, rate limiting, or the logout button. Ships with the dsh-auth-gate package; install with `dsh-auth skill install`. / 用户询问 dsh-auth-gate 配置（mode/totp/sessionTtl/cookieName/tokenRef/tokenMinLength/cookieSecure/usersFile/publicHost/revokeSweepMs/clientIpHeader/trustedProxyCidrs/logoutOrder/passkey/passkeyRpName/passkeyRpId/passkeyOrigins/passkeyEnforceCounter/passkeyConditionalUi/telemetry/installId）、dsh-auth CLI（user add/passwd/role/list/disable/enable/totp、skill install）、口令策略（14 位起、四类字符、不得同旧）、设置面板账号安全块（自助改密、管理员重置）、登录故障、首次配置向导、限速或退出按钮时使用。随 dsh-auth-gate 包发布；用 `dsh-auth skill install` 安装。
 # 低频查询技能：不让模型自动发现/调用（避免常驻技能目录稀释注意力），
 # 用户显式打开技能面板调用（user-invocable 默认 true，UI 显示 "user-only"）。
 disable-model-invocation: true
@@ -49,6 +49,7 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
     sessionTtl: 604800 # session TTL in seconds / 会话秒数
     cookieName: dsh_auth # session cookie name / 会话 cookie 名
     tokenRef: DSH_AUTH_TOKEN # token-mode credential reference (env var name) / token 模式的凭证引用（环境变量名）
+    tokenMinLength: 32 # token mode: minimum accepted length (characters) of the stored shared token; default and minimum 32, length-only, not an entropy estimate / 仅 token 模式：已存共享 token 可接受的最短长度（字符数）；默认值也是最小值 32，只看长度，不做熵估计
     logoutOrder: 1000 # logout button slot order in Settings > General (larger = further down) / 退出按钮在 设置→通用设置 槽位顺序（越大越靠底）
     passkey: "off" # "off"(default) | "optional" | "required" - passkey sign-in for password mode; "required" = passkey-only (password cannot start a session). Needs publicHost + HTTPS. Deployment-level: NOT volatile, so it cannot be set from the Settings page - edit this file / 通行密钥登录开关（password 模式；依赖 publicHost 与 HTTPS）。"required" = 只允许通行密钥（口令不能建立会话）。部署级开关，**不是** volatile 字段，设置页改不了，只能改配置文件
     passkeyRpName: "DeepSeek Harness" # RP display name in the passkey prompt / 通行密钥弹窗里的 RP 展示名
@@ -91,6 +92,16 @@ Override by `id` in `$DSH_HOME/cordis.patch.yml`:
 - Token mode needs no user file; put the shared secret in `.credentials.yaml`
   (`DSH_AUTH_TOKEN`). / 改为 token 模式时不用建用户文件，把共享秘密放进
   `.credentials.yaml`（`DSH_AUTH_TOKEN`）。
+- **Generate the shared token.** In token mode `tokenMinLength` (default and minimum 32) is the
+  shortest accepted length of the stored token; the check is length-only, not an entropy estimate.
+  A stored token shorter than the floor never authenticates (the login endpoint and the guard deny
+  it) and is logged once per process. Generate it with a CSPRNG - `openssl rand -base64 32`, or
+  the setup wizard's random token - never a human-chosen phrase. / **要生成共享 token。** token
+  模式下 `tokenMinLength`（默认值也是最小值 32）是已存 token 可接受的最短长度；这个检查只看
+  长度，不做熵估计。比下界更短的已存 token 永远不会通过认证（登录端点与守卫都会拒绝），并每进程
+  只记一次日志；在 token 变短之前签发的 cookie 会话仍有效到 TTL 到期；非空但过短的 token
+  仍算已配置，首次配置向导不会为它重新打开。用 CSPRNG
+  生成——`openssl rand -base64 32`，或用向导生成的随机 token——绝不要用人手编的短语。
 - `users.yaml` / `.credentials.yaml` must be `0600`. / 均 0600。
 - Token mode then hands the browser dsh's own launch token after a successful sign-in (a `302` to `/?token=...`, needs dsh >= 0.1.2-alpha), so you never paste `?token=` by hand; on older hosts the login keeps its plain redirect. / token 模式登录成功后会把 dsh 的 launch token 交给浏览器（`302` 到 `/?token=...`，需 dsh >= 0.1.2-alpha），不用手动粘 `?token=`；旧版宿主退回普通跳转。
 - First run needs no shell: an **unconfigured** instance (the credential read succeeds and returns nothing, or `users.yaml` has zero users) turns dsh's launch URL into a one-time bootstrap session: `/auth/bootstrap` validates the token, the browser lands on `/auth/setup`, and the wizard either generates and saves the shared token or creates the first administrator. The window closes as soon as one of those exists, so the same launch URL then goes to `/auth/bootstrap`, which finds the instance configured and answers `302 /auth/login?next=%2F` with no cookie; that is expected, not a lost credential. Remove the token or the last user and restart dsh to get the wizard back. The wizard cannot change `mode`/`totp`/`cookieSecure`/`sessionTtl`/`proxy`, which need `$DSH_HOME/cordis.patch.yml` plus a restart. / 首次运行不用开 shell：**未配置**的实例（凭据读取成功但为空，或 `users.yaml` 零用户）会把 dsh 的启动链接换成一次性 bootstrap 会话，`/auth/bootstrap` 校验令牌后浏览器落到 `/auth/setup`，向导在那里生成并保存共享令牌，或创建第一个管理员。两者之一出现后窗口关闭，同一条启动链接改成先到 `/auth/bootstrap`、再回 `302 /auth/login?next=%2F`，全程不下发 cookie；这是预期，不是凭据丢了。要重开向导，删掉令牌或最后一个用户再重启 dsh。向导改不了 `mode`/`totp`/`cookieSecure`/`sessionTtl`/`proxy`，这些得改 `$DSH_HOME/cordis.patch.yml` 再重启。

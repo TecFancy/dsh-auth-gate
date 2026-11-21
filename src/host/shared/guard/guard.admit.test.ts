@@ -37,7 +37,12 @@ function makeRes(): ServerResponse {
 }
 
 function makeSocket(): Duplex {
-  return { write: () => undefined, destroy: () => undefined } as unknown as Duplex;
+  return {
+    write: () => undefined,
+    end: () => undefined,
+    on: () => undefined,
+    destroy: () => undefined,
+  } as unknown as Duplex;
 }
 
 function makeServer(): WrappableServer {

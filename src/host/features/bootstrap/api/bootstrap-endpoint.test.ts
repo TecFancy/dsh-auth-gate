@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SessionStore } from "../../../entities/session/index.js";
+import { USERNAME_RE } from "../../../entities/user/index.js";
 import { fakeReq, makeRes, MemTable, probeOf } from "../../../../../test/bootstrap-harness.js";
 import { makeBootstrapEndpoint, type BootstrapEndpointDeps } from "./bootstrap-endpoint.js";
 import type { ConfiguredState } from "../model/probe.js";
@@ -55,7 +56,11 @@ describe("GET /auth/bootstrap", () => {
     expect(cookie).toContain("SameSite=Lax");
     // secure=false（测试/HTTP 开发）时不能带 Secure，否则 cookie 落不了地。
     expect(cookie).not.toContain("Secure");
-    expect(store.getByToken(cookieValue(cookie))?.kind).toBe("bootstrap");
+    const session = store.getByToken(cookieValue(cookie));
+    expect(session?.kind).toBe("bootstrap");
+    // G12：subject 是 `@` 开头的哨兵值，不可能与真实用户重名（用户名规则不允许）。
+    expect(session?.subject).toBe("@bootstrap");
+    expect(USERNAME_RE.test(session?.subject ?? "")).toBe(false);
     // 响应里绝不出现 launch token（Location 指向站点内路径，不是带 token 的 URL）。
     expect(JSON.stringify(res.headers)).not.toContain("launch-token");
     expect(res.body).toBe("");

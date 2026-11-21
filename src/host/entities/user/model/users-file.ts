@@ -1,12 +1,10 @@
-import { randomBytes } from "node:crypto";
 import { promises as fs } from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { parse as parseYaml, stringify } from "yaml";
 import { z } from "zod";
 import { dshHomeDir } from "../../../shared/lib/index.js";
 import type { UserRole } from "../../../shared/protocol/index.js";
-import { delay, isCode, renameWithRetry } from "./atomic-write.js";
+import { isCode, renameWithRetry, writeFileAtomic } from "./atomic-write.js";
 import type { PasskeyRecord } from "./passkey-record.js";
 import {
   passkeyFieldsSchema,
@@ -14,9 +12,28 @@ import {
   validatePasskeyStore,
   writePasskeyFields,
 } from "./passkey-record.js";
+import { UsersFileError, errorMessage } from "./users-file-error.js";
+import { acquireLock, releaseLock } from "./users-file-lock.js";
+
+export { errorMessage, UsersFileError };
 
 /** 用户名约束（P5）：字母/数字开头，可含 `._-`，总长 ≤ 64。匹配大小写敏感。 */
 export const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+
+/**
+ * 预留用户名（大小写不敏感）：内部身份占用这些名字（引导会话 subject 等），
+ * 新用户不得使用。已存在的历史同名用户仍可登录/改密（`loadUsersFile` 只用 `USERNAME_RE`）。
+ */
+export const RESERVED_USERNAMES: ReadonlySet<string> = new Set(["bootstrap"]);
+
+/**
+ * **新建**用户名的统一校验：格式（`USERNAME_RE`）+ 非预留名（大小写不敏感）。
+ * 创建路径（CLI `user add`、引导向导建首个管理员、`mutateUsersFile` 新增记录）共用；
+ * 维护已有用户的路径继续用 `USERNAME_RE`，避免把历史同名用户锁在门外。
+ */
+export function isValidUsername(name: string): boolean {
+  return USERNAME_RE.test(name) && !RESERVED_USERNAMES.has(name.toLowerCase());
+}
 
 /** 用户角色（契约 §3.1，定义在跨半边契约 D31）：`admin` 是唯一提权档位；YAML 缺省 `user`。 */
 export type { UserRole };
@@ -30,6 +47,12 @@ export interface UserRecord {
   role?: UserRole;
   /** P1 新增；**可选**（loader 读时补 `false`）；YAML 键 `must_change_password`，`false` 不落盘。 */
   mustChangePassword?: boolean;
+  /**
+   * 最近一次口令变更的时间（ISO-8601，含毫秒）；YAML 键 `password_changed_at`。
+   * **可选**：老文件没有该键。会话扫描器据此吊销 `createdAt < passwordChangedAt`
+   * 的会话行，使 CLI（独立进程、够不到会话存储）改的口令也在下一轮扫描生效。
+   */
+  passwordChangedAt?: string;
   /** base64url（解码 16–64 字节），首次注册时生成；不得含 username/邮箱等 PII。 */
   passkeyUserHandle?: string;
   /** 该用户的通行密钥；**可选**（loader 读时补 `[]`）；写盘时空数组不落盘。 */
@@ -46,8 +69,10 @@ export interface UsersLoadResult {
   missing: boolean;
 }
 
-/** users 文件不可用（语法/schema/权限/锁/CAS）。message 面向操作员，可落日志。 */
-export class UsersFileError extends Error {}
+/** `password_changed_at`：可被 `Date.parse` 解析的 ISO 时间串（写侧恒为 `toISOString()`）。 */
+const passwordChangedAtSchema = z
+  .string()
+  .refine((value) => !Number.isNaN(Date.parse(value)), "expected an ISO-8601 timestamp");
 
 const userRecordSchema = z
   .object({
@@ -56,6 +81,7 @@ const userRecordSchema = z
     disabled: z.boolean().optional(),
     role: z.enum(["user", "admin"]).optional(),
     must_change_password: z.boolean().optional(),
+    password_changed_at: passwordChangedAtSchema.optional(),
     ...passkeyFieldsSchema,
   })
   .strict();
@@ -70,6 +96,21 @@ const usersFileSchema = z
 /** P6：DSH_HOME env → `~/.dsh` 兜底，拼 `auth/users.yaml`。CLI 与插件共享。 */
 export function defaultUsersFilePath(): string {
   return path.join(dshHomeDir(), "auth", "users.yaml");
+}
+
+/** schema 解析结果 → 内存记录：补缺省值；可选字段缺省时不写键（保持「不落盘」语义）。 */
+function toUserRecord(record: z.infer<typeof userRecordSchema>): UserRecord {
+  return {
+    passwordHash: record.passwordHash,
+    ...(record.totpSecret === undefined ? {} : { totpSecret: record.totpSecret }),
+    disabled: record.disabled ?? false,
+    role: record.role ?? "user",
+    mustChangePassword: record.must_change_password ?? false,
+    ...(record.password_changed_at === undefined
+      ? {}
+      : { passwordChangedAt: record.password_changed_at }),
+    ...readPasskeyFields(record),
+  };
 }
 
 /** 每次登录现读（P7）。ENOENT → `{ snapshot: 空, missing: true }`（不抛）。 */
@@ -105,14 +146,7 @@ export async function loadUsersFile(filePath: string): Promise<UsersLoadResult> 
     if (!USERNAME_RE.test(name)) {
       throw new UsersFileError(`invalid users file: invalid username: ${name}`);
     }
-    users.set(name, {
-      passwordHash: record.passwordHash,
-      ...(record.totpSecret === undefined ? {} : { totpSecret: record.totpSecret }),
-      disabled: record.disabled ?? false,
-      role: record.role ?? "user",
-      mustChangePassword: record.must_change_password ?? false,
-      ...readPasskeyFields(record),
-    });
+    users.set(name, toUserRecord(record));
   }
   const passkeyProblem = validatePasskeyStore(users);
   if (passkeyProblem !== undefined) {
@@ -141,20 +175,20 @@ export async function writeUsersFile(filePath: string, snapshot: UsersSnapshot):
       ...(record.disabled ? { disabled: true } : {}),
       ...(record.role === "admin" ? { role: "admin" } : {}),
       ...(record.mustChangePassword ? { must_change_password: true } : {}),
+      ...(record.passwordChangedAt === undefined
+        ? {}
+        : { password_changed_at: record.passwordChangedAt }),
       ...writePasskeyFields(record),
     };
   }
   const text = stringify({ version: 1, users });
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(`${filePath}.tmp`, text, { mode: 0o600 });
-  await renameWithRetry(`${filePath}.tmp`, filePath);
+  // 唯一 tmp + fsync(文件) + rename + fsync(目录)：见 `atomic-write.ts`。
+  await writeFileAtomic(filePath, text, { mode: 0o600 });
 }
 
 /** 原子替换原语对测试暴露；实现见 `atomic-write.ts`。 */
 export { renameWithRetry };
-
-/** 锁冲突退避间隔（毫秒）。 */
-const LOCK_RETRY_MS = 25;
 
 /** 锁内变更函数：就地改 snapshot（返回值原样透传）。 */
 type Mutator<T> = (snapshot: UsersSnapshot) => T | Promise<T>;
@@ -181,9 +215,7 @@ export async function mutateUsersFile<T>(
   try {
     return await runMutation(filePath, mutator, attempts);
   } finally {
-    // compare-and-unlink：本进程的锁若已被判 stale 并被新持有者接手，绝不删别人的锁（§10 A8'）。
-    const lock = await readLock(lockPath);
-    if (lock?.token === token) await fs.rm(lockPath, { force: true }).catch(() => undefined);
+    await releaseLock(lockPath, token);
   }
 }
 
@@ -193,8 +225,15 @@ async function runMutation<T>(filePath: string, mutator: Mutator<T>, attempts: n
     // 指纹先于读：读之后落地的外部写入会让下面的 CAS 复核失败。
     const before = await fileStamp(filePath);
     const snapshot = (await loadUsersFile(filePath)).snapshot;
+    const namesBefore = new Set(snapshot.users.keys());
     const adminsBefore = countActiveAdmins(snapshot);
     const result = await mutator(snapshot);
+    // 新建记录走统一校验：格式 + 预留名（G12）；维护已有用户的路径不受影响。
+    for (const name of snapshot.users.keys()) {
+      if (!namesBefore.has(name) && !isValidUsername(name)) {
+        throw new UsersFileError(`invalid username: ${name}`);
+      }
+    }
     const after = await fileStamp(filePath);
     if (before?.mtimeMs !== after?.mtimeMs || before?.size !== after?.size) {
       if (attempt >= attempts) {
@@ -213,69 +252,6 @@ async function runMutation<T>(filePath: string, mutator: Mutator<T>, attempts: n
     await backupUsersFile(filePath);
     await writeUsersFile(filePath, snapshot);
     return result;
-  }
-}
-
-/**
- * 取锁（契约 §3.2-1）：`users.yaml.lock` 独立文件 `wx` 独占创建并写 `{pid,host,token,startedAt}`。
- * EEXIST → 陈旧（payload 不可读 / mtime 超 staleMs / 持有 pid 已死）则夺锁重试，否则退避至 timeoutMs。
- * 返回本次持有者的 token，供释放时 compare-and-unlink。
- */
-async function acquireLock(lockPath: string, timeoutMs: number, staleMs: number): Promise<string> {
-  const deadline = Date.now() + timeoutMs;
-  for (;;) {
-    const token = await createLock(lockPath);
-    if (token !== undefined) return token;
-    if (await stealStaleLock(lockPath, staleMs)) continue;
-    if (Date.now() >= deadline) {
-      throw new UsersFileError("users file is locked by another process");
-    }
-    await delay(LOCK_RETRY_MS);
-  }
-}
-
-/** `wx` 独占创建并写入持有者信息（token = 随机 16 字节 hex）；EEXIST → undefined（别人持锁）。 */
-async function createLock(lockPath: string): Promise<string | undefined> {
-  const token = randomBytes(16).toString("hex");
-  const owner = { pid: process.pid, host: os.hostname(), token, startedAt: Date.now() };
-  try {
-    await fs.writeFile(lockPath, JSON.stringify(owner), { flag: "wx", mode: 0o600 });
-    return token;
-  } catch (error) {
-    if (isCode(error, "EEXIST")) return undefined;
-    throw new UsersFileError(`cannot lock users file: ${errorMessage(error)}`);
-  }
-}
-
-/** 读锁文件；不存在 / 0 字节 / 损坏 → undefined（夺取侧按 stale 处理，释放侧不删，契约 §10 A8'）。 */
-async function readLock(lockPath: string): Promise<{ pid: number; token: string } | undefined> {
-  try {
-    const parsed: unknown = JSON.parse(await fs.readFile(lockPath, "utf8"));
-    const { pid, token } = (parsed ?? {}) as { pid?: unknown; token?: unknown };
-    if (typeof pid !== "number" || typeof token !== "string" || token === "") return undefined;
-    return { pid, token };
-  } catch {
-    return undefined;
-  }
-}
-
-/** 锁是否可夺：payload 不可读（0 字节/损坏）、mtime 超期、或持有 pid 已死。 */
-async function stealStaleLock(lockPath: string, staleMs: number): Promise<boolean> {
-  const stat = await fs.stat(lockPath).catch(() => undefined);
-  const lock = await readLock(lockPath);
-  const fresh = stat !== undefined && Date.now() - stat.mtimeMs <= staleMs;
-  if (lock !== undefined && fresh && !isPidDead(lock.pid)) return false;
-  await fs.rm(lockPath, { force: true }).catch(() => undefined);
-  return true;
-}
-
-/** `process.kill(pid, 0)` 抛 ESRCH 即进程已死；EPERM（他人进程）视为活着。 */
-function isPidDead(pid: number): boolean {
-  try {
-    process.kill(pid, 0);
-    return false;
-  } catch (error) {
-    return isCode(error, "ESRCH");
   }
 }
 
@@ -301,8 +277,4 @@ async function backupUsersFile(filePath: string): Promise<void> {
 
 function isEnoent(error: unknown): boolean {
   return isCode(error, "ENOENT");
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

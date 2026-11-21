@@ -31,4 +31,3 @@ export interface InstallSkillOptions {
 }
 /** 幂等安装：缺失/强制时整目录复制（fs.cp recursive），否则跳过。 */
 export declare function installSkill(options: InstallSkillOptions): Promise<InstallSkillResult>;
-//# sourceMappingURL=skill-install.d.ts.map

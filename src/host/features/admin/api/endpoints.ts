@@ -27,6 +27,15 @@ export function makeAdminRoutes(deps: AdminDeps): AdminRoutes {
   };
 }
 
+/**
+ * 管理面只收正式会话（G12 allow-list）：`full` 或缺省 `kind` 的旧行。受限会话
+ * （`password-change-only`）与 bootstrap 会话一律 403；将来新增的 session kind 默认被拒，
+ * 不需要在每处补一个 `!==`。
+ */
+function isFullSession(session: Session): boolean {
+  return session.kind === undefined || session.kind === "full";
+}
+
 /** `GET /auth/users`：405 → 401 → 403（非 admin / 受限会话）→ 200 列表。**不产生审计**（§5 噪声）。 */
 export function handleUsers(
   deps: AdminDeps,
@@ -54,7 +63,7 @@ async function listUsers(deps: AdminDeps, res: ServerResponse, session: Session)
     sendJson(res, 403, { error: "forbidden" });
     return;
   }
-  if (session.kind === "password-change-only") {
+  if (!isFullSession(session)) {
     sendJson(res, 403, { error: "forbidden" });
     return;
   }
@@ -137,7 +146,7 @@ async function authorizeReset(
   }
   const actor = await adminActor(deps, res, ctx, secrets);
   if (actor === undefined) return undefined;
-  if (session.kind === "password-change-only") {
+  if (!isFullSession(session)) {
     deny(deps, res, ctx, "forbidden", 403, { error: "forbidden" });
     return undefined;
   }

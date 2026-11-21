@@ -11,4 +11,3 @@ import type { ServerResponse } from "node:http";
 export declare const PASSKEY_PERMISSIONS_POLICY = "publickey-credentials-get=(self), publickey-credentials-create=(self)";
 /** 在响应头阶段下发 `Permissions-Policy`；必须在 `writeHead` 之前调用。 */
 export declare function setPasskeyPermissionsPolicy(res: ServerResponse): void;
-//# sourceMappingURL=permissions-policy.d.ts.map

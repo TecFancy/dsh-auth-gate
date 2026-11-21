@@ -71,4 +71,3 @@ export declare class CeremonyStore {
     /** 删除全部过期记录（`expiresAt <= now`）。 */
     private prune;
 }
-//# sourceMappingURL=ceremony-store.d.ts.map

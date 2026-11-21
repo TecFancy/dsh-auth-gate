@@ -28,4 +28,3 @@ export declare class PasswordGate implements Gate {
     /** 会话解析：cookie → Bearer；store 不可用 / 无凭证 / 已吊销 / 已过期 → undefined。 */
     private sessionOf;
 }
-//# sourceMappingURL=password-gate.d.ts.map

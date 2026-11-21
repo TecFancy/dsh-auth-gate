@@ -3,8 +3,12 @@
   "compilerOptions": {
     "noEmit": false,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
+    // The package ships `lib/` only, never `src/`: a `.js.map` or `.d.ts.map`
+    // would point at sources the consumer does not have. Leaving them out keeps
+    // the compiler's 300 map files out of the committed artifact and the published
+    // tarball (the client bundle's own map comes from tsdown separately).
+    "declarationMap": false,
+    "sourceMap": false,
     "newLine": "lf",
     "outDir": "lib",
     "rootDir": "src"

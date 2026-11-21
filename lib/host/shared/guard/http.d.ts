@@ -1,5 +1,5 @@
 import type { ServerResponse } from "node:http";
-import type { GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import type { GateDecision, GateDeny, GuardKind, GuardRequest } from "./gate.js";
 /**
  * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
  * **禁止**用 `Accept` 子串匹配（面板 fetch 的 Accept 很杂，会假绿）；两个头都缺 →
@@ -63,8 +63,12 @@ export declare function rebridgeReply(location: string, setCookie?: string): Gua
  * 完整 URL 作为 Referer 送进登录页请求（进而进访问日志），绕开 `token=` 脱敏。
  */
 export declare function denyReply(req: GuardRequest, decision?: GateDeny): GuardReply;
+/**
+ * bootstrap 会话被拒时的宿主路径（G11）：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。
+ * token 门与 password 门共用这一份，避免两处各写一遍后语义漂移。
+ */
+export declare function denyBootstrap(req: GuardRequest): GateDecision;
 /** 把拒绝模型写进 node:http 响应。`body === null`（302）时只结束响应。 */
 export declare function writeGuardReply(res: ServerResponse, reply: GuardReply): void;
 /** 把拒绝模型转成 Fetch `Response`，供 resource 路由的守卫写回。 */
 export declare function guardReplyToResponse(reply: GuardReply): Response;
-//# sourceMappingURL=http.d.ts.map
