@@ -31,7 +31,7 @@ export const TEST_TOTP_SECRET = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
 
 /** 一条注册到假 server 的 exact 路由。 */
 export interface ManagementRoute {
-  readonly kind: "exact";
+  readonly kind: "exact" | "prefix";
   readonly path: string;
   readonly handler: HttpHandler;
 }

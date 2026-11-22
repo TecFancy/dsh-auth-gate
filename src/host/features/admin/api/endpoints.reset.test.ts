@@ -43,6 +43,8 @@ describe("重置成功：写盘语义（验收 8）", () => {
     expect(bob?.totpSecret).toBe("BOB-SECRET");
     expect(bob?.role).toBe("admin");
     expect(bob?.disabled).toBe(true);
+    // L5：重置落 password_changed_at（harness 时钟固定为 1_700_000_000_000），供扫描器兜底。
+    expect(bob?.passwordChangedAt).toBe(new Date(1_700_000_000_000).toISOString());
   });
 
   it("响应头 no-store + pragma + json；成功只发一条审计", async () => {

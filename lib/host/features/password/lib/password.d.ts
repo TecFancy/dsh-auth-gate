@@ -15,4 +15,3 @@ export declare function hashPassword(password: string): Promise<string>;
  * 格式/参数非法 → false，不抛（派生异常同样归为 false）。
  */
 export declare function verifyPassword(password: string, stored: string): Promise<boolean>;
-//# sourceMappingURL=password.d.ts.map

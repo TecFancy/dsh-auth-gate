@@ -7,4 +7,3 @@ import type { AdminFailureView } from "../model/admin-reset.ts";
  * 含缺 `error` 的 403/404/429）一律 generic。
  */
 export declare function describeAdminFailure(status: number, body: unknown, t: AdminTranslate): AdminFailureView;
-//# sourceMappingURL=admin-failure.d.ts.map

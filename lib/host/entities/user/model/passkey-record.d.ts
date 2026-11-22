@@ -116,4 +116,3 @@ export declare function writePasskeyFields(record: PasskeyFields): PasskeyFields
  * 返回首个问题（operator 文案，调用方加 `invalid users file: ` 前缀），全通过返回 `undefined`。
  */
 export declare function validatePasskeyStore(users: Iterable<readonly [string, PasskeyFields]>): string | undefined;
-//# sourceMappingURL=passkey-record.d.ts.map

@@ -6,11 +6,12 @@
  */
 import {
   encodeForm,
+  isRecord,
   PASSKEY_SETTINGS_PATH,
+  readJsonSafe,
   type PasskeySettingsRequest,
 } from "../../../shared/api/index.ts";
 import type { PasskeySettingsResult } from "../model/passkey-form.ts";
-import { isRecord, readJsonSafe } from "./passkey-http.ts";
 
 const SETTINGS_TARGET = PASSKEY_SETTINGS_PATH;
 

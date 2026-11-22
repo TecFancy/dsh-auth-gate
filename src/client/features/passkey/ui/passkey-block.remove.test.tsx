@@ -192,3 +192,43 @@ describe("PasskeyBlock: 删除", () => {
     cleanup(root, container);
   });
 });
+
+describe("PasskeyBlock: 删除（C6 结构 / C3 重拉失败）", () => {
+  it("renders the remove form outside the row header, in its own cell (C6)", async () => {
+    mockList(200, { passkeys: [SUMMARY] });
+    const { root, container } = await render();
+    await click(buttonByText(container, t(PASSKEY_KEYS.remove)));
+    const form = container.querySelector("form");
+    expect(form).not.toBeNull();
+    expect(form?.closest("th")).toBeNull();
+    expect(form?.closest("td")).not.toBeNull();
+    cleanup(root, container);
+  });
+
+  it("surfaces a failed list reload after a successful removal and lets retry recover (C3)", async () => {
+    let listFetches = 0;
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      requests.push([url, init]);
+      if (url === "/auth/passkey/remove") return Promise.resolve(jsonResponse(200, {}));
+      listFetches += 1;
+      // 第 1 次（挂载）成功，第 2 次（删除后重拉）失败，第 3 次（重试）恢复。
+      return Promise.resolve(
+        listFetches === 2 ? jsonResponse(503, {}) : jsonResponse(200, { passkeys: [SUMMARY] }),
+      );
+    });
+    const { root, container } = await render();
+    await click(buttonByText(container, t(PASSKEY_KEYS.remove)));
+    setValue(container, "password", "pw");
+    await click(buttonByText(container, t(PASSKEY_KEYS.removeConfirm)));
+
+    // 刷新失败不能是 no-op：成功播报与最后一份列表保留，旁边挂不可用提示 + 可用的重试。
+    expect(container.textContent).toContain(t(PASSKEY_KEYS.successRemove));
+    expect(container.textContent).toContain(t(PASSKEY_KEYS.unavailable));
+    expect(container.querySelector("table")).not.toBeNull();
+
+    await click(buttonByText(container, t(PASSKEY_KEYS.retry)));
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(container.textContent).not.toContain(t(PASSKEY_KEYS.unavailable));
+    cleanup(root, container);
+  });
+});

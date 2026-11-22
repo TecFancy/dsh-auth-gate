@@ -178,3 +178,38 @@ describe("registerPasskey: 失败与取消", () => {
     expect(result.kind).toBe("failure");
   });
 });
+
+describe("registerPasskey: AbortSignal wiring (C6)", () => {
+  const VALUES = { label: "MacBook", password: "pw", code: "" };
+
+  it("passes the request AbortSignal to navigator.credentials.create (C6)", async () => {
+    const create = vi.fn<(options: CredentialCreationOptions) => Promise<unknown>>(() =>
+      Promise.resolve({
+        id: "cred-id",
+        rawId: new Uint8Array([1, 2, 3]).buffer,
+        response: {
+          clientDataJSON: new Uint8Array([4, 5]).buffer,
+          attestationObject: new Uint8Array([6, 7]).buffer,
+          getTransports: () => ["internal"],
+        },
+      }),
+    );
+    vi.stubGlobal("PublicKeyCredential", class PublicKeyCredential {});
+    Object.defineProperty(globalThis.navigator, "credentials", {
+      configurable: true,
+      value: { create },
+    });
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      requests.push([url, init]);
+      return Promise.resolve(
+        url === "/auth/passkey/register/options"
+          ? jsonResponse(200, OPTIONS)
+          : jsonResponse(200, {}),
+      );
+    });
+    const controller = new AbortController();
+    await registerPasskey(VALUES, controller.signal, t);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith(expect.objectContaining({ signal: controller.signal }));
+  });
+});

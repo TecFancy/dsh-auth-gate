@@ -10,14 +10,14 @@
 
 | 任务 | 命令 |
 | --- | --- |
-| 类型检查 | `npm run type-check`（`tsc -p tsconfig.json --noEmit`） |
+| 类型检查 | `npm run type-check`（`tsc -p tsconfig.json --noEmit`、client 项目，以及 `tsconfig.scripts.json` 的 `checkJs` 脚本通道） |
 | Lint | `npm run lint`（flat ESLint，带类型检查） |
 | FSD 分层 | `npm run lint:fsd`（Steiger 跑 `src/host` 和 `src/client`；层序、同层隔离、公共 API、命名） |
 | 格式化 | `npm run format` / `npm run format:check` |
 | 测试 | `npm run test`（Vitest，`vitest run`） |
 | 监听测试 | `npm run test:watch` |
-| 覆盖率 | `npm run test:coverage`（v8，分支/函数/行/语句 80%） |
-| 构建 | `npm run build`（先清空 `lib/`，再 tsc emit + client bundle；LF 换行，声明文件 + source map） |
+| 覆盖率 | `npm run test:coverage`（v8，分支/函数/行/语句 80%，外加安全关键 slice 的按路径下限——guard、session、password，见 `vitest.config.ts`） |
+| 构建 | `npm run build`（先清空 `lib/`，再 tsc emit + client bundle；LF 换行，只发声明文件：tarball 只带 `lib/`、不带 `src/`，所以没有 source/declaration map） |
 | 场景门禁 | `npm run gates`（自动检测改动面；pre-push 跑这个） |
 | 完整门禁 | `npm run verify`（门禁 runner 跑每个登记的门禁，加上门禁自测；完整集合是 CI 的事，不是每次本地跑） |
 | 宿主契约 | `npm run host:check`（先自测，再查：包名 = Loader 行 = client 注册 id = 宿主 `name`；manifest 目标存在；client 的 `require` 是宿主播种的模块；`src/protocol/` 外无路由字面量，每个协议路径都被注册，README 里的路由存在） |
@@ -47,7 +47,7 @@
 
 - 从 git 安装这个包的消费者（`dsh plugin add <git-url>`）拿到一个不需要构建工具就能用的包；
 - `npm pack`/`npm publish` 发布完全相同的树（`prepack` 会先重建）；
-- CI 校验一致性：全新构建后 `git diff --exit-code -- lib`，有人提交了过期的产物就失败。
+- CI 在全新构建后校验一致性：`git diff --exit-code -- lib` 对提交了过期产物的树失败；`git status --porcelain -- lib` 还会对未被跟踪的构建产物失败——那是 `git diff` 看不见的。
 
 `tsconfig.build.json` 固定 `newLine: "lf"`，让产物在 Windows/Linux 构建器之间字节稳定。
 
@@ -74,7 +74,7 @@
 
 `.github/workflows/ci.yml` 在每次推送到 `main` 和每个 PR 上跑，**ubuntu-latest 和 windows-latest 两个平台**（fail-fast 关闭）：`npm ci`、格式检查、lint、no-emdash、slice 边界、FSD 分层（Steiger）、门禁 runner（`gates:check` + `gates:self-test`）、类型检查、覆盖率测试、构建、bundle 检查、宿主契约检查，然后两道一致性门禁：
 
-1. **提交产物一致性**：全新构建后 `git diff --exit-code -- lib`，提交的 `lib/` 必须等于一次干净构建。
+1. **提交产物一致性**：全新构建后 `git diff --exit-code -- lib`，提交的 `lib/` 必须等于一次干净构建；`git status --porcelain -- lib` 会抓住 `git diff` 看不见的未跟踪构建产物。
 2. **消费者安装模拟**：全新 clone + `npm install --omit=dev`，被守卫的 `prepare` 脚本（husky 是 devDependency）不能失败，这是 `dsh plugin add <git-url>` 运行的环境。
 
 ## 发版（release-please）
@@ -85,6 +85,8 @@
 - 合并那个 PR 会创建 git tag + GitHub Release；
 - 永不手改 `version`、`CHANGELOG.md` 或 manifest，只能本地重跑 release-please（或让 PR 拥有它们）；
 - 发版 PR 合并后，Release workflow（`release.yml`）还会发布到 npm（`dsh-auth-gate`，MIT 许可）；消费者也可以从 git 或本地 tarball（`npm pack`）安装。
+
+**发布前先验证。** workflow 里有一个 `verify` job，在要发布的那个提交上跑与 CI 相同的 `npm run verify` 链；`publish` 在 `npm publish` 之前重建 `lib/` 并重新校验一致性，所以一次发布不可能发出未经验证或已经漂移的树。
 
 **npm 认证是 Trusted Publishing（OIDC），不是 token。** `publish` job 持有 `id-token: write`，不存在 `NPM_TOKEN` secret。npm 用这个 job 的 GitHub 签名身份换一个短期发布 token，所以没有长期凭据可泄漏或轮换。三件事必须保持成立，否则发布会以裸 `ENEEDAUTH` 失败：
 
@@ -129,4 +131,4 @@ gh release edit v<version> --notes-file notes.md
 - 笔记记录决定，不记录工作令：不放整份文件内容、不放编号步骤、不放命令配方。
 - `npm run notes:check` 执行树形和文件内格式；`npm run notes:links` 执行链接；`npm run bilingual:check` 保持配对诚实。
 
-旧的编号 ADR（D1-D38）已迁进这棵树；每条笔记保留 `Legacy ID: D<n>` 行，所以代码注释里引用 `D31` 仍然能解析。
+旧的编号 ADR（D1-D40）已迁进这棵树；每条笔记保留 `Legacy ID: D<n>` 行，所以代码注释里引用 `D31` 仍然能解析。

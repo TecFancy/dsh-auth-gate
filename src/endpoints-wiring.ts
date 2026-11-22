@@ -99,6 +99,8 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
       sessionTtl: config.sessionTtl,
       logoutOrder: config.logoutOrder,
       passkeyEnabled: input.passkeyEnabled,
+      limiter,
+      clientIp,
       // token 模式没有口令登录，`required` 在那里不关闭任何东西（wirePasskey 已归零）。
       passwordLoginDisabled: input.passwordLoginDisabled,
       publicHost: config.publicHost,

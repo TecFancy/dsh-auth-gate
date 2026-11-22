@@ -3,5 +3,5 @@
  * Explicit export list: register new exports here.
  */
 export { LoginRateLimiter } from "./rate-limit.js";
-export type { RateLimitCheck, RateLimitOptions } from "./rate-limit.js";
-//# sourceMappingURL=index.d.ts.map
+export { combineAdmissions } from "./types.js";
+export type { Admission, AdmissionResult, RateLimitCheck, RateLimitOptions, RateLimitScope, } from "./types.js";

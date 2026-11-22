@@ -127,6 +127,14 @@ describe("makeBootstrapWiring: password mode", () => {
     expect(record?.role).toBe("admin");
     expect(record?.disabled).toBe(false);
     expect(record?.passwordHash).not.toContain("Sup3r-secret-pw");
+    // L5 同一套语义：建号即一次口令变更（供会话扫描器兜底）。
+    expect(typeof record?.passwordChangedAt).toBe("string");
+    expect(Number.isNaN(Date.parse(record?.passwordChangedAt ?? ""))).toBe(false);
+    // 向导签发的正式会话必须带同一个版本，否则首轮扫描会把它当旧凭证吊掉（P1）。
+    const sessionToken = res.headers["set-cookie"]?.match(/dsh_auth=([^;]+)/)?.[1];
+    expect(harness.store.getByToken(sessionToken ?? "")?.credentialVersion).toBe(
+      record?.passwordChangedAt,
+    );
     expect(harness.wiring.markedConfigured.value).toBe(true);
   });
 
@@ -135,6 +143,9 @@ describe("makeBootstrapWiring: password mode", () => {
     const cases = [
       { username: "root", password: "short" },
       { username: "-bad name", password: "Sup3r-secret-pw" },
+      // G12：预留名不能作为新用户名（CLI / 锁内写入同一判定）。
+      { username: "bootstrap", password: "Sup3r-secret-pw" },
+      { username: "BootStrap", password: "Sup3r-secret-pw" },
     ];
     for (const testCase of cases) {
       const harness = makeWiringHarness({ mode: "password", usersPath });

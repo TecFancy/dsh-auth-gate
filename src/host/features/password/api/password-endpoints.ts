@@ -21,11 +21,14 @@ import {
 import {
   authCatchAll,
   methodNotAllowed,
+  mountRoutes,
   parseCookieHeader,
   queryOf,
   resolvePublicHost,
   setPasskeyPermissionsPolicy,
   validateNext,
+  type MountedRoute,
+  type RouteRegister,
 } from "../../../shared/http/index.js";
 import { handlePasswordLogin, type PasswordLoginDeps } from "../model/password-login.js";
 import { handlePasswordChange, type PasswordChangeDeps } from "./password-change.js";
@@ -119,7 +122,7 @@ export interface AdminRouteSet {
 
 export interface PasswordEndpointsDeps extends PasswordLoginDeps {
   /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
-  register(route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): () => void;
+  register: RouteRegister;
   /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
   logoutOrder: number;
   /**
@@ -145,35 +148,33 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
  * `req.method` 分发。
  */
 export function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => void {
-  const disposers: (() => void)[] = [];
-  const track = (route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): void => {
-    disposers.push(deps.register(route));
-  };
-  track({ kind: "prefix", path: AUTH_PATH_PREFIX, handler: authCatchAll });
-  track({ kind: "exact", path: LOGIN_PATH, handler: (req, res) => handleLogin(deps, req, res) });
-  track({
-    kind: "exact",
-    path: LOGOUT_PATH,
-    handler: (req, res) => handleLogout(deps, req, res),
-  });
-  track({
-    kind: "exact",
-    path: STATUS_PATH,
-    handler: (req, res) =>
-      handleStatus(
-        {
-          ...deps,
-          passkeyEnabled: deps.passkey?.().enabled === true,
-          passwordLoginDisabled: deps.passwordLoginDisabled === true,
-        },
-        req,
-        res,
-      ),
-  });
+  const routes: MountedRoute[] = [
+    { kind: "prefix", path: AUTH_PATH_PREFIX, handler: authCatchAll },
+    { kind: "exact", path: LOGIN_PATH, handler: (req, res) => handleLogin(deps, req, res) },
+    {
+      kind: "exact",
+      path: LOGOUT_PATH,
+      handler: (req, res) => handleLogout(deps, req, res),
+    },
+    {
+      kind: "exact",
+      path: STATUS_PATH,
+      handler: (req, res) =>
+        handleStatus(
+          {
+            ...deps,
+            passkeyEnabled: deps.passkey?.().enabled === true,
+            passwordLoginDisabled: deps.passwordLoginDisabled === true,
+          },
+          req,
+          res,
+        ),
+    },
+  ];
   if (deps.passwordChange !== undefined) {
     const change = toPasswordChangeDeps(deps, deps.passwordChange);
     // 405（allow: GET, POST）在 handlePasswordChange 内（§1 处理顺序第 1 步）；此处是薄委托。
-    track({
+    routes.push({
       kind: "exact",
       path: PASSWORD_PATH,
       handler: (req, res) => handlePasswordChange(change, req, res),
@@ -181,12 +182,10 @@ export function registerPasswordEndpoints(deps: PasswordEndpointsDeps): () => vo
   }
   if (deps.admin !== undefined) {
     // P2：405/401/403/... 顺序全在各自 handler 内（契约 §1、§2）；此处只挂两条 exact。
-    track({ kind: "exact", path: USERS_PATH, handler: deps.admin.users });
-    track({ kind: "exact", path: USERS_PASSWORD_PATH, handler: deps.admin.resetPassword });
+    routes.push({ kind: "exact", path: USERS_PATH, handler: deps.admin.users });
+    routes.push({ kind: "exact", path: USERS_PASSWORD_PATH, handler: deps.admin.resetPassword });
   }
-  return () => {
-    for (const disposer of [...disposers].reverse()) disposer();
-  };
+  return mountRoutes(deps.register, routes);
 }
 
 /** 端点 deps → 改密 deps：登录侧已有的字段直接复用，只有 4 个字段来自接线。 */

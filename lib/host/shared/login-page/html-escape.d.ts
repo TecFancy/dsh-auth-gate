@@ -6,4 +6,3 @@
  */
 /** HTML 文本/属性转义（五个字符）；只用于拼接进页面的动态值。 */
 export declare function escapeHtml(value: string): string;
-//# sourceMappingURL=html-escape.d.ts.map

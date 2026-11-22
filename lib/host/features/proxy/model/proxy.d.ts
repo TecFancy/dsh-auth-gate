@@ -29,4 +29,3 @@ export interface ProxyListen {
 export declare function validateProxyOptions(options: ProxyOptions): ProxyListen;
 /** 创建代理服务器（不启动监听；listen/close 由调用方控制，便于测试）。 */
 export declare function createProxyServer(options: ProxyOptions, log?: (line: string) => void): Server;
-//# sourceMappingURL=proxy.d.ts.map

@@ -29,4 +29,3 @@ export interface ConfiguredProbe {
  *   错误 → `unknown`。
  */
 export declare function makeConfiguredProbe(deps: ConfiguredProbeDeps): ConfiguredProbe;
-//# sourceMappingURL=probe.d.ts.map

@@ -9,13 +9,14 @@
  * 不跑最贵的 scrypt 比较（长度不过不跑旧哈希是契约明写的下界，字符类同理）。
  * 不做 trim、不做截断、不做 NFKC：口令按用户输入的原始码点判定。
  */
-import type { PasswordRule } from "../../../shared/protocol/index.js";
+import {
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
+  type PasswordRule,
+} from "../../../shared/protocol/index.js";
 
-/** 最短长度（P1）。 */
-export const PASSWORD_MIN_LENGTH = 14;
-
-/** 最长长度（P1）：防超长输入拖 scrypt，413 只是请求级兜底。 */
-export const PASSWORD_MAX_LENGTH = 256;
+// 边界值住在跨半边契约（`src/protocol/`）：host 判定与 client 文案同源，不再各写一份。
+export { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH };
 
 /** 未通过项枚举（值即线上 `rules` 数组元素，定义在跨半边契约 D31）。 */
 export type { PasswordRule };

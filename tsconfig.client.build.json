@@ -4,7 +4,9 @@
     "noEmit": false,
     "emitDeclarationOnly": true,
     "declaration": true,
-    "declarationMap": true,
+    // Same reason as tsconfig.build.json: `src/` is not shipped, so a
+    // declaration map would reference files the consumer cannot open.
+    "declarationMap": false,
     "newLine": "lf",
     "rootDir": "src",
     "outDir": "lib"

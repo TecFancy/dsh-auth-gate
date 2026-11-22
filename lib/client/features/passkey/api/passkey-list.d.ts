@@ -6,4 +6,3 @@ export declare function parsePasskeyList(body: unknown): PasskeySummaryView[] | 
  * 非 200 / 形状非法 / 网络抛错 → `failure`；中止 → `aborted`。
  */
 export declare function fetchPasskeys(signal: AbortSignal): Promise<PasskeyListResult>;
-//# sourceMappingURL=passkey-list.d.ts.map

@@ -12,4 +12,3 @@ export declare function singleTokenParam(params: URLSearchParams): string | unde
  * 签发都在 `GET /auth/bootstrap` 里完成，被冻结的守卫词表因此一行不用改。
  */
 export declare function bootstrapRedirectPath(req: GuardRequest): string | undefined;
-//# sourceMappingURL=bootstrap-hint.d.ts.map

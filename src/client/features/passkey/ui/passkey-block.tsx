@@ -46,6 +46,7 @@ function PasskeyListArea({
   t,
   state,
   removing,
+  addBusy,
   pendingRemove,
   onRequestRemove,
   renderConfirm,
@@ -54,6 +55,7 @@ function PasskeyListArea({
   t: AccountTranslate;
   state: ReturnType<typeof usePasskeyList>["state"];
   removing: string | null;
+  addBusy: boolean;
   pendingRemove: string | null;
   onRequestRemove: (idPrefix: string) => void;
   renderConfirm: (
@@ -79,14 +81,25 @@ function PasskeyListArea({
   }
   if (state.passkeys.length === 0) return null;
   return (
-    <PasskeyTable
-      t={t}
-      passkeys={state.passkeys}
-      removing={removing}
-      pendingRemove={pendingRemove}
-      onRequestRemove={onRequestRemove}
-      renderConfirm={renderConfirm}
-    />
+    <>
+      {state.refreshFailed === true ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <p style={ERROR_TEXT_STYLE}>{t(PASSKEY_KEYS.unavailable)}</p>
+          <ActionButton variant="ghost" onClick={onRetry}>
+            {t(PASSKEY_KEYS.retry)}
+          </ActionButton>
+        </div>
+      ) : null}
+      <PasskeyTable
+        t={t}
+        passkeys={state.passkeys}
+        removing={removing}
+        addBusy={addBusy}
+        pendingRemove={pendingRemove}
+        onRequestRemove={onRequestRemove}
+        renderConfirm={renderConfirm}
+      />
+    </>
   );
 }
 
@@ -108,6 +121,14 @@ function PasskeyBody({
     return (
       <div style={EMPTY_STATE_STYLE}>
         <p style={HINT_STYLE}>{t(PASSKEY_KEYS.empty)}</p>
+        {state.refreshFailed === true ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <p style={ERROR_TEXT_STYLE}>{t(PASSKEY_KEYS.unavailable)}</p>
+            <ActionButton variant="ghost" onClick={onRetry}>
+              {t(PASSKEY_KEYS.retry)}
+            </ActionButton>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -116,6 +137,7 @@ function PasskeyBody({
       t={t}
       state={state}
       removing={actions.removing}
+      addBusy={actions.adding}
       pendingRemove={actions.pendingRemove}
       onRequestRemove={actions.requestRemove}
       onRetry={onRetry}
@@ -186,7 +208,8 @@ export function PasskeyBlock({ t, totpEnabled }: PasskeyBlockProps) {
             <ActionButton
               ref={addTriggerRef}
               variant="ghost"
-              aria-expanded={false}
+              // 删除在飞时置灰：同一个状态机只允许一个写动作（C6）。
+              disabled={actions.removing !== null}
               onClick={() => setAdding(true)}
             >
               {isEmpty ? t(PASSKEY_KEYS.emptyAction) : t(PASSKEY_KEYS.add)}

@@ -13,9 +13,13 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { AccountTranslate } from "../../../shared/i18n/index.ts";
+import { focusFailureTarget } from "../../../shared/ui/index.ts";
 import {
   EMPTY_PASSKEY_FORM,
   EMPTY_PASSKEY_REAUTH,
+  PASSKEY_STATUS_ID,
+  passkeyFieldId,
+  passkeyReauthFieldId,
   validatePasskeyForm,
   validatePasskeyReauth,
   type PasskeyFailureView,
@@ -54,29 +58,6 @@ const ADD_FIELD_ORDER = ["label", "password", "code"] as const;
 
 /** 删除确认区的字段顺序。 */
 const REAUTH_FIELD_ORDER = ["password", "code"] as const;
-
-/** 字段 id（与 passkey-fields.tsx / passkey-remove-form.tsx 的 id 同形）。 */
-function addFieldId(field: string): string {
-  return `dsh-auth-gate-passkey-${field}`;
-}
-
-/** 删除确认区的字段 id（与添加表单分开，避免同 id 冲突）。 */
-function reauthFieldId(field: string): string {
-  return `dsh-auth-gate-passkey-remove-${field}`;
-}
-
-/** 失败落点：有字段错误聚焦第一个，否则聚焦状态位。 */
-function focusFailure(
-  view: PasskeyFailureView,
-  order: readonly string[],
-  idOf: (field: string) => string,
-  statusId: string,
-): void {
-  const first = order.find((field) => view.fields.includes(field as never));
-  const target =
-    first === undefined ? document.getElementById(statusId) : document.getElementById(idOf(first));
-  target?.focus();
-}
 
 /** 反馈互斥的依赖。 */
 interface FeedbackDeps {
@@ -191,7 +172,12 @@ function usePasskeySubmit(deps: SubmitDeps): {
       if (problem !== null) {
         fail(problem);
         setInvalid(problem.fields);
-        focusFailure(problem, ADD_FIELD_ORDER, addFieldId, "dsh-auth-gate-passkey-status");
+        focusFailureTarget({
+          fields: problem.fields,
+          order: ADD_FIELD_ORDER,
+          elementId: passkeyFieldId,
+          statusId: PASSKEY_STATUS_ID,
+        });
         return;
       }
       await runAdd(values, context, { setValues: deps.setValues });
@@ -202,7 +188,12 @@ function usePasskeySubmit(deps: SubmitDeps): {
       if (problem !== null) {
         fail(problem);
         setInvalid(problem.fields);
-        focusFailure(problem, REAUTH_FIELD_ORDER, reauthFieldId, "dsh-auth-gate-passkey-status");
+        focusFailureTarget({
+          fields: problem.fields,
+          order: REAUTH_FIELD_ORDER,
+          elementId: passkeyReauthFieldId,
+          statusId: PASSKEY_STATUS_ID,
+        });
         return;
       }
       await runRemove(pendingRemove, reauth, context, {

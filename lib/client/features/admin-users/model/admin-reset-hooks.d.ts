@@ -8,7 +8,7 @@
  * - `useResetSubmit`：确认页的显式确认，真正发请求（双锁 + abort + mounted）；
  * - `useFormHandlers`：Enter 只在编辑阶段推进，确认阶段不触发危险动作。
  */
-import type { MutableRefObject } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import { type AdminTranslate } from "../lib/admin-copy.ts";
 import { type AdminFailureView, type AdminField, type AdminResetValues } from "./admin-reset.ts";
 import type { AdminSuccessView } from "../ui/admin-fields.tsx";
@@ -23,7 +23,8 @@ interface ResetEditingDeps {
     t: AdminTranslate;
     actorTotpEnabled: boolean;
     lock: MutableRefObject<boolean>;
-    setValues: (values: AdminResetValues) => void;
+    /** React setter 原样传入：`setValue` 必须用函数式更新，不能写回渲染闭包里的旧 values（C5）。 */
+    setValues: Dispatch<SetStateAction<AdminResetValues>>;
     setStage: (stage: AdminResetStage) => void;
     setFailure: (view: AdminFailureView | null) => void;
     setSuccess: (view: AdminSuccessView | null) => void;
@@ -51,7 +52,7 @@ interface ResetSubmitDeps {
     setStage: (stage: AdminResetStage) => void;
     setFailure: (view: AdminFailureView | null) => void;
     setSuccess: (view: AdminSuccessView | null) => void;
-    setValues: (values: AdminResetValues) => void;
+    setValues: Dispatch<SetStateAction<AdminResetValues>>;
     onReset?: (() => void) | undefined;
 }
 /**
@@ -79,4 +80,3 @@ export declare function useFormHandlers({ composing, stage, review, }: {
     }) => void;
 };
 export {};
-//# sourceMappingURL=admin-reset-hooks.d.ts.map

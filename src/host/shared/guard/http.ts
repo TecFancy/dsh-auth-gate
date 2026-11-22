@@ -1,7 +1,7 @@
 import type { ServerResponse } from "node:http";
 import { isSafeRelativeTarget } from "../http/index.js";
-import { LOGIN_PATH } from "../protocol/index.js";
-import type { GateDeny, GuardKind, GuardRequest } from "./gate.js";
+import { LOGIN_PATH, SETUP_PATH } from "../protocol/index.js";
+import type { GateDecision, GateDeny, GuardKind, GuardRequest } from "./gate.js";
 
 /**
  * 浏览器导航判定（P2 §3）：只认 `Sec-Fetch-Mode: navigate` / `Sec-Fetch-Dest: document`。
@@ -60,8 +60,26 @@ const PROXY_DENIED_METHODS = new Set([
 /** 是否命中"代理标记 + 禁行方法"：`/api/<method>` 路径上带 `X-Dsh-Proxy: 1`。 */
 export function isProxyDeniedRequest(req: GuardRequest, pathname: string): boolean {
   if (req.headers[PROXY_MARKER_HEADER] !== "1") return false;
-  if (!pathname.startsWith("/api/")) return false;
-  return PROXY_DENIED_METHODS.has(pathname.slice(5));
+  const method = proxyMethodOf(pathname);
+  return method !== undefined && PROXY_DENIED_METHODS.has(method);
+}
+
+/**
+ * 方法名的比对口径（G7）：宿主（dsh-host-webserver）按 `new URL(req.url).pathname`
+ * 原样建键与取前缀，不做百分号解码，所以守卫面对的是同一条原始 pathname。
+ * 代理链路里可能有客户端或中间件先做解码/折叠，因此这里先折叠重复斜杠、再对方法段
+ * 做一次安全解码后比对：`/api//host.openPath`、`/api/%68ost.openPath` 这类变体宁可
+ * 多拒 403，也不放过。多拒的失败方向是安全的（宿主对这些变体本来也不认作禁行方法）。
+ */
+function proxyMethodOf(pathname: string): string | undefined {
+  const collapsed = pathname.replace(/\/{2,}/g, "/");
+  if (!collapsed.startsWith("/api/")) return undefined;
+  const segment = collapsed.slice("/api/".length);
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment; // 畸形百分号编码：按原样比对（不解析、不抛错）
+  }
 }
 
 /**
@@ -147,6 +165,14 @@ export function denyReply(req: GuardRequest, decision: GateDeny = "deny"): Guard
     return redirectReply(`${LOGIN_PATH}?next=${encodeURIComponent(pathname)}`);
   }
   return statusReply(401, "unauthorized");
+}
+
+/**
+ * bootstrap 会话被拒时的宿主路径（G11）：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。
+ * token 门与 password 门共用这一份，避免两处各写一遍后语义漂移。
+ */
+export function denyBootstrap(req: GuardRequest): GateDecision {
+  return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }
 
 /** 把拒绝模型写进 node:http 响应。`body === null`（302）时只结束响应。 */

@@ -42,6 +42,12 @@ export interface Session {
    * 缺省 = `full`（旧行无此字段仍解析）。
    */
   kind?: SessionKind | undefined;
+  /**
+   * 签发时读到的 `password_changed_at`（credential version）。扫描器据此吊销"用旧口令
+   * 认证出来的会话"：签发时刻可能晚于改密时间戳（校验跨越了等待），时间戳比较漏掉的
+   * 正是这条竞态。旧行没有该字段 → 视为旧凭证。
+   */
+  credentialVersion?: string | undefined;
 }
 
 export interface IssuedSession {
@@ -66,6 +72,7 @@ const sessionRowSchema = z.object({
   // 注意：本仓库的 zod 是 v4（`z.enum`/`z.literal`），没有 `z.const`
   // （后者是 @deepseek-ai/schemastery 的 API，见 src/index.ts 的 Config）。
   kind: z.enum(["full", "password-change-only", "bootstrap"]).optional(),
+  credentialVersion: z.string().optional(),
 });
 
 /** 键 = digest（sha256 hex），不进 row；row 只存以上四字段。 */
@@ -76,24 +83,47 @@ export const sessionDomainSpec = defineDomain({
   tables: { sessions: domainTable(sessionRowSchema) },
 });
 
+/** 缺省过期行清扫间隔（毫秒）：`create` 至多每 60s 触发一次全表扫描。 */
+export const DEFAULT_PRUNE_INTERVAL_MS = 60_000;
+
+/** 会话存储的可选项（时钟注入供测试钉住清扫节奏）。 */
+export interface SessionStoreOptions {
+  /** 过期行清扫的最小间隔（毫秒）；缺省 `DEFAULT_PRUNE_INTERVAL_MS`。 */
+  pruneIntervalMs?: number;
+  /** 时钟（epoch ms）；缺省 `Date.now`。 */
+  now?: () => number;
+}
+
 /** 对一张 KvTable 编程的会话存储；domain 的 open/close 由 index.ts 接线。 */
 export class SessionStore {
   private readonly table: KvTable<string, Session>;
+  private readonly pruneIntervalMs: number;
+  private readonly now: () => number;
+  /** 上次清扫时刻；`-Infinity` = 还没扫过（首次 create 必扫）。 */
+  private lastPruneAt = Number.NEGATIVE_INFINITY;
 
-  constructor(table: KvTable<string, Session>) {
+  constructor(table: KvTable<string, Session>, options: SessionStoreOptions = {}) {
     this.table = table;
+    this.pruneIntervalMs = options.pruneIntervalMs ?? DEFAULT_PRUNE_INTERVAL_MS;
+    this.now = options.now ?? Date.now;
   }
 
-  async create(subject: string, ttlMs: number, kind: SessionKind = "full"): Promise<IssuedSession> {
-    await this.pruneExpired();
+  async create(
+    subject: string,
+    ttlMs: number,
+    kind: SessionKind = "full",
+    credentialVersion?: string,
+  ): Promise<IssuedSession> {
+    const now = this.now();
+    await this.pruneIfDue(now);
     const token = randomBytes(32).toString("base64url");
-    const now = Date.now();
     const session: Session = {
       subject,
       createdAt: now,
       expiresAt: now + ttlMs,
       revoked: false,
       kind,
+      ...(credentialVersion === undefined ? {} : { credentialVersion }),
     };
     await this.table.put(digestToken(token), session);
     return { token, session };
@@ -102,7 +132,7 @@ export class SessionStore {
   /** 同步内存读 + 校验；有效则返回行（不修改），否则 undefined。 */
   getByToken(token: string): Session | undefined {
     const row = this.table.get(digestToken(token));
-    if (row === undefined || row.revoked || row.expiresAt <= Date.now()) {
+    if (row === undefined || row.revoked || row.expiresAt <= this.now()) {
       return undefined;
     }
     return row;
@@ -119,13 +149,21 @@ export class SessionStore {
    * 行内没有主体索引，故按 row.subject 全表扫描（会话量级为单机用户数，成本可忽略）。
    */
   async revokeBySubject(subject: string): Promise<number> {
-    let count = 0;
-    for (const [key, row] of this.table.entries()) {
-      if (row.subject !== subject) continue;
-      await this.table.delete(key);
-      count += 1;
-    }
-    return count;
+    return this.deleteWhere((row) => row.subject === subject);
+  }
+
+  /**
+   * 吊销某 subject 下**凭证版本不等于** `currentVersion` 的会话行（口令变更后调用）。
+   *
+   * 判定不看 `createdAt`：登录的哈希校验跨越 await，可能在改密之后才签发会话：按时间
+   * 比较会把它当成"新会话"留下。记录签发时读到的版本才能精确吊销"用旧口令认证出来的"
+   * 那一条，同时保留改密后重新登录签发的会话（版本已是最新）。旧行没有版本字段，
+   * 视为旧凭证，一并吊销。返回吊销条数。
+   */
+  async revokeByCredentialVersion(subject: string, currentVersion: string): Promise<number> {
+    return this.deleteWhere(
+      (row) => row.subject === subject && row.credentialVersion !== currentVersion,
+    );
   }
 
   /**
@@ -134,24 +172,41 @@ export class SessionStore {
    * 行内没有类别索引，故按 row.kind 全表扫描（与 `revokeBySubject` 同款理由）。
    */
   async revokeByKind(kind: SessionKind): Promise<number> {
-    let count = 0;
-    for (const [key, row] of this.table.entries()) {
-      if (row.kind !== kind) continue;
-      await this.table.delete(key);
-      count += 1;
+    return this.deleteWhere((row) => row.kind === kind);
+  }
+
+  /**
+   * 出现过**非引导**会话的 subject 去重集合（无序）。供扫描器找出已从 users.yaml
+   * 删除的用户的残留会话；bootstrap 引导会话不属于任何用户，故按 kind 排除。
+   */
+  subjects(): string[] {
+    const seen = new Set<string>();
+    for (const [, row] of this.table.entries()) {
+      if (row.kind === BOOTSTRAP_SESSION_KIND) continue;
+      seen.add(row.subject);
     }
-    return count;
+    return [...seen];
   }
 
   /** 全表扫描删除过期行，返回删除数。 */
-  async pruneExpired(now: number = Date.now()): Promise<number> {
-    let count = 0;
+  async pruneExpired(now: number = this.now()): Promise<number> {
+    return this.deleteWhere((row) => row.expiresAt <= now);
+  }
+
+  /** 距上次清扫不足 `pruneIntervalMs` → 0；否则记下本次时刻并清扫（并发 create 只有一个真扫）。 */
+  private async pruneIfDue(now: number): Promise<number> {
+    if (now - this.lastPruneAt < this.pruneIntervalMs) return 0;
+    this.lastPruneAt = now;
+    return this.pruneExpired(now);
+  }
+
+  /** 先收集键再单批删除：不在迭代中删除，且整批只占一个写槽。 */
+  private async deleteWhere(predicate: (row: Session) => boolean): Promise<number> {
+    const keys: string[] = [];
     for (const [key, row] of this.table.entries()) {
-      if (row.expiresAt <= now) {
-        await this.table.delete(key);
-        count += 1;
-      }
+      if (predicate(row)) keys.push(key);
     }
-    return count;
+    if (keys.length === 0) return 0;
+    return this.table.deleteMany(keys);
   }
 }

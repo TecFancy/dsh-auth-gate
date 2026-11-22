@@ -83,7 +83,7 @@ describe("TOTP: challenge submit path (session issuing & limits)", () => {
 
   it("locked TOTP stage: 429 challenge card, retry-after header and seconds in the copy (D20)", async () => {
     const h = makeHarness();
-    for (let i = 0; i < 5; i++) h.deps.limiter.recordFailure("127.0.0.1", "alice");
+    for (let i = 0; i < 5; i++) h.deps.limiter.recordFailure("127.0.0.1", "alice", "totp");
     const res = await post(h, "POST", "code=123456", aliceChallengeCookie());
     expect(res.status).toBe(429);
     expect(res.headers["retry-after"]).toBe("30");
@@ -92,6 +92,19 @@ describe("TOTP: challenge submit path (session issuing & limits)", () => {
     expect(res.body).toContain("Signing in as alice");
     expect(res.body).toContain("Try again in 30 seconds.");
     expect(res.body).toContain('<button type="submit">Verify</button>');
+  });
+
+  it("a fresh password success does not reset the TOTP attempt counter (P1)", async () => {
+    const h = makeHarness();
+    const cookie = aliceChallengeCookie();
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      expect((await post(h, "POST", "code=000000", cookie)).status).toBe(401);
+    }
+    // 口令段成功一次：旧实现会在这里 recordSuccess 清掉共享桶
+    expect((await post(h, "POST", "username=alice&password=pw")).status).toBe(302);
+    // 第 5 次错码仍按 TOTP 域计数（401 但已触发锁定），第 6 次必须 429
+    expect((await post(h, "POST", "code=000000", cookie)).status).toBe(401);
+    expect((await post(h, "POST", "code=000000", cookie)).status).toBe(429);
   });
 
   it("expired challenge cookie: treated as absent (password page)", async () => {

@@ -19,4 +19,3 @@ export interface AdminResetFormProps {
 }
 /** 管理重置表单：目标下拉（排除本人）+ 新口令 ×2 + 条件式动态码；成功后清空四字段、不跳转。 */
 export declare function AdminResetForm({ t, users, actorName, actorTotpEnabled, onReset, }: AdminResetFormProps): import("react").JSX.Element;
-//# sourceMappingURL=admin-form.d.ts.map

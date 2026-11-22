@@ -134,4 +134,3 @@ export declare function buildPayload(input: {
  * @returns 交给守卫放行钩子的对象。
  */
 export declare function makeTelemetry(options: TelemetryOptions): Telemetry;
-//# sourceMappingURL=telemetry.d.ts.map

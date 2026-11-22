@@ -80,9 +80,12 @@ export function locatePasskeySession(
   return session === undefined ? { kind: "no-cookie" } : { kind: "session", session };
 }
 
-/** 受限会话（`password-change-only`）与 bootstrap 会话一律不得进管理面。 */
+/**
+ * 管理面只收正式会话（G12 allow-list）：`full` 或缺省 `kind` 的旧行。受限会话
+ * （`password-change-only`）、bootstrap 会话与将来新增的 kind 一律不得进管理面。
+ */
 export function isRestrictedSession(session: Session): boolean {
-  return session.kind === "password-change-only" || session.kind === "bootstrap";
+  return session.kind !== undefined && session.kind !== "full";
 }
 
 /** 同源校验（fail-closed：`publicHost` 未配置时只信 `Sec-Fetch-Site`）。 */

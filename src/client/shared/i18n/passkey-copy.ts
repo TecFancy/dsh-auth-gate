@@ -48,6 +48,8 @@ export const PASSKEY_KEYS = {
   badRequest: "account.passkey.badRequest",
   locked: "account.passkey.locked",
   lockedPlain: "account.passkey.lockedPlain",
+  /** 另一个通行密钥操作在飞时再发起的动作：明确说「等一下」，不静默丢弃（C6）。 */
+  busy: "account.passkey.busy",
   generic: "account.passkey.generic",
   settingsTitle: "account.passkey.settingsTitle",
   settingsIntro: "account.passkey.settingsIntro",
@@ -111,6 +113,7 @@ export const PASSKEY_DICT_ZH: Record<string, string> = {
   [PASSKEY_KEYS.badRequest]: "请求不合法，请检查填写内容。",
   [PASSKEY_KEYS.locked]: "尝试次数过多，请在 {seconds} 秒后重试。",
   [PASSKEY_KEYS.lockedPlain]: "尝试次数过多，请稍后重试。",
+  [PASSKEY_KEYS.busy]: "另一个通行密钥操作正在进行，请等它完成后再试。",
   [PASSKEY_KEYS.generic]: "操作失败，请稍后重试。",
   [PASSKEY_KEYS.settingsTitle]: "登录页通行密钥自动填充",
   [PASSKEY_KEYS.settingsIntro]: "开启后，登录页会把通行密钥放进浏览器自动填充，用户无需先点按钮。",
@@ -176,6 +179,7 @@ export const PASSKEY_DICT_EN: Record<string, string> = {
   [PASSKEY_KEYS.badRequest]: "The request is invalid. Check the values you entered.",
   [PASSKEY_KEYS.locked]: "Too many attempts. Try again in {seconds} seconds.",
   [PASSKEY_KEYS.lockedPlain]: "Too many attempts. Try again later.",
+  [PASSKEY_KEYS.busy]: "Another passkey operation is in progress. Wait for it to finish.",
   [PASSKEY_KEYS.generic]: "The operation failed. Please try again later.",
   [PASSKEY_KEYS.settingsTitle]: "Passkey autofill on the sign-in page",
   [PASSKEY_KEYS.settingsIntro]:

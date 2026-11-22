@@ -48,4 +48,3 @@ export declare function auditDenied(logger: AdminAuditLogger, ctx: AdminAuditCon
  * 仍只发一条事件：事件名保持成功，字段 `sessionsRevoked:false`（§5 / 验收 14）。
  */
 export declare function auditSuccess(logger: AdminAuditLogger, ctx: AdminAuditContext, sessionsRevoked: boolean): void;
-//# sourceMappingURL=audit.d.ts.map

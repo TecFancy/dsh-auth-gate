@@ -1,5 +1,6 @@
 export type { AuthContext, AuthSlotRegisterOptions } from "./context.ts";
 export { encodeForm } from "./form.ts";
+export { isRecord, readJsonSafe } from "./json.ts";
 export {
   LOGOUT_URL,
   PASSKEY_LOGIN_PATH,
@@ -10,10 +11,13 @@ export {
   PASSKEY_REMOVE_PATH,
   PASSKEY_SETTINGS_PATH,
   PASSWORD_CHANGED_LOGIN_URL,
+  PASSWORD_MAX_LENGTH,
+  PASSWORD_MIN_LENGTH,
   PASSWORD_PATH,
   STATUS_PATH,
   USERS_PASSWORD_PATH,
   USERS_PATH,
+  loginPath,
 } from "./protocol.ts";
 export type {
   AdminResetErrorBody,

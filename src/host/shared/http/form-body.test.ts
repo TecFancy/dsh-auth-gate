@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import type { IncomingMessage } from "node:http";
 import { describe, expect, it } from "vitest";
 import { FORM_BODY_LIMIT, formField, parseFormBody } from "./form-body.js";
@@ -86,5 +87,44 @@ describe("formField", () => {
 
   it("returns an empty string for an absent field", () => {
     expect(formField<SampleRequest>(new URLSearchParams(""), "code")).toBe("");
+  });
+});
+
+describe("parseFormBody over a real HTTP connection (G13)", () => {
+  it("makes the 413 client-visible instead of resetting the socket", async () => {
+    // 真实 node:http 连接（不是同步生成器夹具）：超限后服务器写 413 + connection: close 并结束，
+    // 客户端必须读到响应本身；若连接被重置，fetch 会 reject（ECONNRESET）而不是 resolve 413。
+    const server = createServer((req, res) => {
+      void (async () => {
+        try {
+          await parseFormBody(req);
+          res.writeHead(200, { "content-type": "text/plain" });
+          res.end("ok");
+        } catch (error) {
+          const status = statusOf(error) ?? 500;
+          res.setHeader("cache-control", "no-store");
+          if (status === 413) res.setHeader("connection", "close");
+          res.writeHead(status, { "content-type": "text/plain" });
+          res.end(error instanceof Error ? error.message : "bad request");
+        }
+      })();
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string")
+        throw new Error("expected a TCP address");
+      const response = await fetch(`http://127.0.0.1:${address.port}/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/x-www-form-urlencoded" },
+        body: "a".repeat(FORM_BODY_LIMIT + 1),
+      });
+      expect(response.status).toBe(413);
+      await expect(response.text()).resolves.toBe("request body too large");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error === undefined ? resolve() : reject(error)));
+      });
+    }
   });
 });

@@ -7,4 +7,3 @@ export { buildSetCookie, COOKIE_FLAGS, digestToken, isBootstrapSession, sessionD
 export type { IssuedSession, Session } from "./model/session-store.js";
 export { handleLogout, handleStatus } from "./api/session-endpoints.js";
 export type { AuthHttpDeps } from "./api/session-endpoints.js";
-//# sourceMappingURL=index.d.ts.map

@@ -1,6 +1,7 @@
-import { type LaunchTokenBridge } from "../../../shared/http/index.js";
-import type { HttpHandler } from "../../../shared/guard/index.js";
+import type { IncomingMessage } from "node:http";
+import { type LaunchTokenBridge, type RouteRegister } from "../../../shared/http/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
+import type { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 /**
  * 错 token 的唯一常量文案（D21）：所有拒绝共用同一响应形态，且绝不读 query、绝不反射
  * 请求文本（与密码段 `INVALID_CREDENTIALS` / P9 / D20 同一条纪律）。令牌模式只有一个
@@ -9,11 +10,7 @@ import { type SessionStore } from "../../../entities/session/index.js";
 export declare const INVALID_TOKEN = "Invalid access token.";
 export interface AuthEndpointsDeps {
     /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
-    register(route: {
-        kind: "exact" | "prefix";
-        path: string;
-        handler: HttpHandler;
-    }): () => void;
+    register: RouteRegister;
     /** 会话访问器（M16）：domain 异步就绪，端点内每次现取。 */
     sessions: () => SessionStore | undefined;
     cookieName: string;
@@ -32,6 +29,10 @@ export interface AuthEndpointsDeps {
      */
     passwordLoginDisabled?: boolean | undefined;
     validateToken: (token: string) => Promise<boolean>;
+    /** 与服务端其它登录路径共用的限速器（P1：token 模式此前完全没有限速）。 */
+    limiter: LoginRateLimiter;
+    /** 客户端标识（D19）：受信反代头解析器；token 模式原先直接读 socket，容易在反代后全实例共桶。 */
+    clientIp: (req: IncomingMessage) => string;
     /**
      * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
      * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
@@ -55,7 +56,6 @@ export interface AuthEndpointsDeps {
  * 注册 prefix `/auth` 兜底 + 三个 exact 端点（M15：webserver 无 method 路由，exact
  * 表只按 pathname 建键、重复 path 抛错，故 GET/POST `/auth/login` 不能注册两条路由，
  * 由 handler 内部按 `req.method` 分发）。返回合并 disposer（内部收集每个 register 的
- * disposer）。
+ * disposer；部分失败按注册逆序回滚，见 `mountRoutes`）。
  */
 export declare function registerAuthEndpoints(deps: AuthEndpointsDeps): () => void;
-//# sourceMappingURL=auth-endpoints.d.ts.map

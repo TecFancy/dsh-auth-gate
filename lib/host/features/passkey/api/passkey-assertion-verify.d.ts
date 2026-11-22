@@ -39,4 +39,3 @@ export declare function runDummyVerification(input: {
     readonly assertion: PasskeyAssertion;
     readonly challenge: string;
 }): Promise<void>;
-//# sourceMappingURL=passkey-assertion-verify.d.ts.map

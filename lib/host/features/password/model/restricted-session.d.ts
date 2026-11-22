@@ -22,4 +22,3 @@ export declare const RESTRICTED_REDIRECT_PATH = "/auth/password";
  * 会被静默升成 full（隐式提权）。缺字段/`full` 一律按正式会话处理（旧行兼容）。
  */
 export declare function isRestrictedSession(session: Session | undefined): boolean;
-//# sourceMappingURL=restricted-session.d.ts.map

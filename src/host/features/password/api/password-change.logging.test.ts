@@ -147,7 +147,8 @@ describe("audit log redaction (§0/§1)", () => {
 
   it("logs rate limiting with the existing constant and never the plaintext", async () => {
     const limiter = new LoginRateLimiter();
-    for (let attempt = 0; attempt < 5; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     const { deps, logs } = makeHarness({ limiter });
     expect(await send(deps, form({ current: CURRENT, password: NEW_PASSWORD, code: CODE }))).toBe(
       429,

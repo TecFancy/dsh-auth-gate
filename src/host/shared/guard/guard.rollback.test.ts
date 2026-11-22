@@ -125,6 +125,30 @@ describe("wrapServer: unwrap 逐条回滚", () => {
   });
 });
 
+describe("wrapServer: 注册方法还原 (G2)", () => {
+  const allow: Gate = { decide: () => "allow" };
+
+  it("restores the register methods only while they are still this wrap's wrapper", () => {
+    const server = makeFakeServer();
+    const unwrap = wrapServer(server, () => allow, log);
+    // 第三方 wrapper 叠在守卫 wrapper 之上：它的 unwrap 还没跑，不能被我们整层丢掉。
+    const guardedRegister = server.register.bind(server);
+    const foreignRegister = (route: Parameters<WrappableServer["register"]>[0]): (() => void) =>
+      guardedRegister(route);
+    server.register = foreignRegister;
+
+    unwrap();
+    expect(Reflect.get(server, "register")).toBe(foreignRegister);
+
+    // 当前值仍是本次 wrapper 时正常还原。
+    const server2 = makeFakeServer();
+    const unwrap2 = wrapServer(server2, () => allow, log);
+    expect(isGuarded(Reflect.get(server2, "register"))).toBe(true);
+    unwrap2();
+    expect(isGuarded(Reflect.get(server2, "register"))).toBe(false);
+  });
+});
+
 describe("wrapServer: resource 路由回滚", () => {
   const allow: Gate = { decide: () => "allow" };
   const resource = (): Promise<Response> => Promise.resolve(new Response("x"));

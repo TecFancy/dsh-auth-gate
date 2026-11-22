@@ -19,4 +19,3 @@ export declare function parseProxyArgs(argv: string[], env: Record<string, strin
  */
 export declare function isInvokedEntry(entryUrl: string, argvPath: string | undefined): boolean;
 export declare function main(argv: string[], io: CliIo): number;
-//# sourceMappingURL=proxy-cli.d.ts.map

@@ -32,7 +32,7 @@ describe("setup endpoints when the instance becomes configured", () => {
       },
       createAdmin: () => {
         admins += 1;
-        return Promise.resolve("ok");
+        return Promise.resolve({ outcome: "ok", credentialVersion: "2026-11-22T00:00:00.000Z" });
       },
     });
     const cookie = await harness.cookie();

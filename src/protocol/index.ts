@@ -47,6 +47,15 @@ export const AUTH_PATH_PREFIX = "/auth";
 /** 登录页（GET 渲染、POST 提交）。 */
 export const LOGIN_PATH = "/auth/login";
 
+/**
+ * 口令策略边界（跨半边契约）：host 的判定与 client 的提示文案必须同源。
+ * 改这两个值等于改对外策略（已存口令可能突然不合规），与路径常量同一纪律。
+ */
+export const PASSWORD_MIN_LENGTH = 14;
+
+/** 口令最长长度（防超长输入拖 scrypt；请求级 413 只是兜底）。 */
+export const PASSWORD_MAX_LENGTH = 256;
+
 /** 登出（POST-only，`next` 只从 query 取）。 */
 export const LOGOUT_PATH = "/auth/logout";
 

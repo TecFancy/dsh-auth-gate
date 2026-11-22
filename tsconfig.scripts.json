@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true
+  },
+  // The gate scripts are plain ESM and are not part of the shipped src/ project.
+  // Type-checking them under `checkJs` catches the class of defect a script gate
+  // is most exposed to (a wrong property, a missing null guard, a drifted helper
+  // signature) without demanding full JSDoc on 10k lines at once.
+  //
+  // The list is the starting set: scripts that are already clean under the full
+  // strict preset. A script that gains `@param`/`@returns` annotations until it
+  // is clean gets added here, so coverage grows one file per change instead of
+  // one sweeping annotation pass.
+  "include": [
+    "scripts/check-lockfile-registry.mjs",
+    "scripts/check-no-emdash.mjs",
+    "scripts/clean-lib.mjs",
+    "scripts/lib/gate-registry.mjs",
+    "scripts/verify-screenshots.mjs"
+  ]
+}

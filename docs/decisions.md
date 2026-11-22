@@ -2,7 +2,7 @@
 
 [中文](decisions_zh.md)
 
-The numbered decisions this plugin made, D1 through D38. **This page is a
+The numbered decisions this plugin made, D1 through D40. **This page is a
 compatibility table, not a live index.** The decisions themselves live in
 [`.agents/notes/`](../.agents/notes/), one note per decision, and the notes
 tree is the index: browse its lifecycle and class folders, or search the
@@ -13,8 +13,8 @@ decision by number (`D31`), and that citation has to keep resolving. Each
 note carries the same number on its `Legacy ID:` line, so `git grep D31`
 finds both the citation and the note.
 
-New decisions do not get a number. They get a note in the lifecycle folder
-that matches their status, and the note's path is its identity.
+New decisions do not normally get a number. They get a note in the lifecycle
+folder that matches their status, and the note's path is its identity.
 
 | # | Decision | Status | Note |
 | --- | --- | --- | --- |
@@ -56,6 +56,8 @@ that matches their status, and the note's path is its identity.
 | D36 | 市场卡片截图由仓库根 `screenshots.json` 声明，并挂一道门禁 | implemented | [note](../.agents/notes/implemented/process/2026-11-16-market-card-screenshots.md) |
 | D37 | 放行后问一次宿主，不认就重铸它的浏览器 cookie | implemented | [note](../.agents/notes/implemented/bug-fix/2026-11-16-host-cookie-rebridge.md) |
 | D38 | 只允许通行密钥登录（passkey-only）是实例级配置，不是账号级开关 | implemented | [note](../.agents/notes/implemented/feature/2026-11-16-passkey-only-login.md) |
+| D39 | 登录限速改为受理制：同步预留名额、按认证域分桶、退避跨锁升级 | implemented | [note](../.agents/notes/implemented/architecture/2026-11-22-admission-based-rate-limiting.md) |
+| D40 | 凭证变更撤销会话，含 CLI 改密路径（`password_changed_at` + 周期扫描） | implemented | [note](../.agents/notes/implemented/bug-fix/2026-11-22-credential-change-session-revocation.md) |
 
 The note system's rules (lifecycles, classes, the body skeleton, archiving) are in
 [`.agents/notes/README.md`](../.agents/notes/README.md).

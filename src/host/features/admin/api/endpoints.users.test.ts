@@ -48,6 +48,15 @@ describe("GET /auth/users: 鉴权（验收 1）", () => {
     expect(res.status).toBe(403);
   });
 
+  it("bootstrap / 未来新增的会话类别 → 403（G12 allow-list，不看角色）", async () => {
+    const harness = makeHarness();
+    // 主体是 admin：角色/禁用检查先过，403 必须来自 kind allow-list。
+    const bootstrap = await harness.store.create("admin", 60_000, "bootstrap");
+    expect((await get(harness, { cookie: `dsh_auth=${bootstrap.token}` })).status).toBe(403);
+    const future = await harness.store.create("admin", 60_000, "future" as unknown as "full");
+    expect((await get(harness, { cookie: `dsh_auth=${future.token}` })).status).toBe(403);
+  });
+
   it("被禁用的 admin → 403（每请求现读 yaml）", async () => {
     const harness = makeHarness();
     harness.users.set("admin", { ...harness.users.get("admin")!, disabled: true });

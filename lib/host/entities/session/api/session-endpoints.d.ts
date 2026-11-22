@@ -51,4 +51,3 @@ export declare function handleLogout(deps: AuthHttpDeps, req: IncomingMessage, r
  * 3. 授权判定不读这里：管理端点每请求现读 users.yaml，禁止信 status 或会话快照。
  */
 export declare function handleStatus(deps: AuthHttpDeps, req: IncomingMessage, res: ServerResponse): void | Promise<void>;
-//# sourceMappingURL=session-endpoints.d.ts.map

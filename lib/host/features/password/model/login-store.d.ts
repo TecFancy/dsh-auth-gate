@@ -19,4 +19,3 @@ export interface LoginStoreDeps {
 export declare function requireStore(deps: LoginStoreDeps, res: ServerResponse): SessionStore | undefined;
 /** 读取用户文件；失败 → 503 + error 日志并返回 undefined（不计失败）。 */
 export declare function loadUsersOr503(deps: LoginStoreDeps, res: ServerResponse): Promise<UsersLoadResult | undefined>;
-//# sourceMappingURL=login-store.d.ts.map

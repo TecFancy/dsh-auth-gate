@@ -29,4 +29,3 @@ export interface AdminWiringInput {
     };
 }
 export declare function makeAdminWiring(input: AdminWiringInput): AdminRoutes;
-//# sourceMappingURL=admin-wiring.d.ts.map

@@ -11,4 +11,3 @@ export interface SettingsLogoutActionProps {
  * 水平居中的醒目 CTA；文案随界面语言在「退出登录」/ "Sign out" 间切换。
  */
 export declare function SettingsLogoutAction({ t }: SettingsLogoutActionProps): import("react").JSX.Element | null;
-//# sourceMappingURL=logout-action.d.ts.map

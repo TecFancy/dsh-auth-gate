@@ -2,12 +2,12 @@
 
 [English](decisions.md)
 
-这个插件做过的编号决策，D1 到 D38。**这一页是兼容表，不是活索引。** 决策本身在
+这个插件做过的编号决策，D1 到 D40。**这一页是兼容表，不是活索引。** 决策本身在
 [`.agents/notes/`](../.agents/notes/) 里，一条决策一条笔记，笔记树就是索引：按 lifecycle 和 class 目录浏览，或在仓库里搜索。
 
 这张表只为一件事存在：代码注释和更早的文档按编号引用决策（`D31`），那个引用必须一直能解析。每条笔记在 `Legacy ID:` 行带着同一个编号，所以 `git grep D31` 同时找到引用和笔记。
 
-新决策不再编号。它得到一条笔记，放在与它状态匹配的 lifecycle 目录里，笔记的路径就是它的身份。
+新决策通常不再编号。它得到一条笔记，放在与它状态匹配的 lifecycle 目录里，笔记的路径就是它的身份。
 
 | # | 决策 | 状态 | 笔记 |
 | --- | --- | --- | --- |
@@ -49,5 +49,7 @@
 | D36 | 市场卡片截图由仓库根 `screenshots.json` 声明，并挂一道门禁 | implemented | [note](../.agents/notes/implemented/process/2026-11-16-market-card-screenshots.zh.md) |
 | D37 | 放行后问一次宿主，不认就重铸它的浏览器 cookie | implemented | [note](../.agents/notes/implemented/bug-fix/2026-11-16-host-cookie-rebridge.zh.md) |
 | D38 | 只允许通行密钥登录（passkey-only）是实例级配置，不是账号级开关 | implemented | [note](../.agents/notes/implemented/feature/2026-11-16-passkey-only-login.zh.md) |
+| D39 | 登录限速改为受理制：同步预留名额、按认证域分桶、退避跨锁升级 | implemented | [note](../.agents/notes/implemented/architecture/2026-11-22-admission-based-rate-limiting.zh.md) |
+| D40 | 凭证变更撤销会话，含 CLI 改密路径（`password_changed_at` + 周期扫描） | implemented | [note](../.agents/notes/implemented/bug-fix/2026-11-22-credential-change-session-revocation.zh.md) |
 
 笔记系统的规则（生命周期、分类、正文骨架、归档）见 [`.agents/notes/README.md`](../.agents/notes/README.zh.md)。

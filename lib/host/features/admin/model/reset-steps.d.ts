@@ -7,8 +7,13 @@ import type { AdminDeps, ResetInput } from "./deps.js";
 export declare function originAccepted(deps: AdminDeps, req: IncomingMessage): boolean;
 /** 会话定位：只认 cookie（M5 同口径），Bearer 不参与；store/token 无效一律 undefined。 */
 export declare function locateSession(deps: AdminDeps, req: IncomingMessage): Session | undefined;
-/** 管理桶门（key = actor subject + clientIp）：锁定 → retry-after 秒数；放行 → undefined。 */
-export declare function lockoutSeconds(deps: AdminDeps, ctx: AdminAuditContext): number | undefined;
+/**
+ * 管理桶门（key = actor subject + clientIp）：受理一次尝试并寄存句柄；
+ * 锁定/并发满 → retry-after 秒数，放行 → undefined。检查与占位同一同步段（P2）。
+ */
+export declare function admitAttempt(deps: AdminDeps, ctx: AdminAuditContext): number | undefined;
+/** 结算本次请求的受理；没有受理（门前的 deny）是空操作，重复结算由 Admission 挡住。 */
+export declare function settleAttempt(ctx: AdminAuditContext, outcome: "success" | "failure" | "abandon"): void;
 /**
  * 现读 users.yaml。失败 → 503（读失败**不计失败**，与 P1 端点同口径）；
  * 带 `ctx` 时记审计 `io`（已认证拒绝必须留痕，§5）。
@@ -36,10 +41,10 @@ export declare class ActorNotAdminError extends Error {
 }
 /**
  * 锁内 RMW（唯一变更入口）：**先复核 actor 仍是 admin 且未禁用**（TOCTOU，grok #5），
- * 再设 `must_change_password: true` + 新哈希。`totpSecret` / `role` / `disabled` 一律不动（验收 8）；
- * 只改这两个字段，last-admin 判定不会误触发。目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
+ * 再设 `must_change_password: true` + 新哈希 + `password_changed_at`。`totpSecret` / `role` /
+ * `disabled` 一律不动（验收 8）；只改这三个字段，last-admin 判定不会误触发。
+ * 目标在锁内消失 → 抛错 → 503（不静默写幽灵用户）。
  */
 export declare function writeReset(deps: AdminDeps, res: ServerResponse, ctx: AdminAuditContext, hashed: string, secrets?: readonly string[]): Promise<boolean>;
 /** 撤销目标全部会话（`self` 已挡掉 ⇒ 天然不含 actor）；注入方保证不抛，这里仍兜底。 */
 export declare function revokeTarget(deps: AdminDeps, ctx: AdminAuditContext, secrets?: readonly string[]): Promise<boolean>;
-//# sourceMappingURL=reset-steps.d.ts.map

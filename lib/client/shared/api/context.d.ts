@@ -43,4 +43,3 @@ export interface AuthContext {
     locale: AuthLocaleService;
     effect(setup: () => (() => void) | Iterable<() => void>, label?: string): unknown;
 }
-//# sourceMappingURL=context.d.ts.map

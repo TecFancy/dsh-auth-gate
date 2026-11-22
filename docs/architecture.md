@@ -25,23 +25,29 @@ Rationale: [the FSD note](../.agents/notes/implemented/architecture/2026-10-12-f
 src/
 ├── index.ts               # plugin entry + auth service wiring (mode picks the password or token flow)
 ├── cli.ts                 # dsh-auth user-management CLI (bin entry)
+├── cli-usage.ts           # dsh-auth usage text (kept out of cli.ts for the file-length cap)
 ├── proxy-cli.ts           # dsh-auth-proxy (bin entry)
-├── admin-wiring.ts        # root-side assembly of the admin routes (P2)
-├── bootstrap-wiring.ts    # root-side assembly of the bootstrap routes (M2)
-├── endpoints-wiring.ts    # root-side assembly of the /auth endpoint registration (P26)
+├── auth-routes.ts         # root-side mount of the /auth endpoint table (passkey + password/token groups)
+├── admin-wiring.ts        # root-side assembly of the admin routes
+├── bootstrap-wiring.ts    # root-side assembly of the first-run routes (/auth/bootstrap, /auth/setup, /auth/continue)
+├── endpoints-wiring.ts    # root-side assembly of the /auth endpoint registration
 ├── telemetry-wiring.ts    # root-side assembly of the anonymous ping (config fragment -> guard admit hook)
+├── passkey-wiring.ts      # passkey config fragment, WebAuthn self-check and endpoint wiring
+├── rebridge-wiring.ts     # post-admit host-cookie rebridge hook (guard-side half: `guard/rebridge.ts`)
 ├── token-resolver.ts      # shared-token credential resolver (token mode)
-├── launch-token-bridge.ts # 0.1.2-alpha launch-token compatibility layer (M2)
+├── launch-token-bridge.ts # reads dsh's launch token: post-login /?token= bridge and bootstrap comparison
 ├── cli-skill.ts           # `dsh-auth skill install`
 ├── *.test.ts              # root tests: entry points, CLI, manifest checks (host-corridor, manifest-*)
-├── protocol/              # cross-half contract (D31): /auth paths, login URL builders (index.ts) and
+├── protocol/              # cross-half contract: /auth paths, login URL builders (index.ts) and
 │                          # request/response/error payload types (payloads.ts); imports nothing
 ├── host/                  # host half: three FSD layers, analysed by Steiger (`npm run lint:fsd`)
 │   ├── shared/            #   layer without slices: segments only, each with its own index.ts
-│   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, startup self-check
-│   │   ├── http/          #     cookie / form body (+ typed `formField`) / Origin / Host / client IP / `next` / login redirect,
-│   │   │                  #     plus the session-independent authCatchAll, queryOf, methodNotAllowed
-│   │   ├── login-page/    #     self-contained login page (token, password and TOTP challenge variants)
+│   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, cross-site bounce,
+│   │   │                  #     post-admit rebridge, caller-admitted resource reads, startup self-check
+│   │   ├── http/          #     cookie / form body (+ typed `formField`) / Origin / Host / client IP / `next` /
+│   │   │                  #     login redirect / `Permissions-Policy`, plus the session-independent authCatchAll,
+│   │   │                  #     queryOf, methodNotAllowed and the launch-token bootstrap shape probe
+│   │   ├── login-page/    #     self-contained login page (token, password, TOTP challenge and passkey variants)
 │   │   ├── protocol/      #     bridge to src/protocol: the host half's only way in
 │   │   ├── rate-limit/    #     two-bucket login rate limiter
 │   │   ├── skill/         #     `dsh-auth skill install`
@@ -49,14 +55,20 @@ src/
 │   │   └── lib/           #     leaf helpers (`dshHomeDir`)
 │   ├── entities/
 │   │   ├── session/       #     model/ session-store; api/ logout and /auth/status (AuthHttpDeps)
-│   │   └── user/          #     model/ users-file (users.yaml), password-policy;
+│   │   └── user/          #     model/ users-file (users.yaml), atomic write, password policy, passkey records;
 │   │                      #     @x/session.ts exposes only `UsersLoadResult` to the session entity
 │   └── features/          #     slices never import each other; cross-slice goes through index.ts
 │       ├── token/         #       api/ /auth endpoints; model/ TokenGate
-│       ├── password/      #       api/ endpoints + password change; model/ gate, login, session issue,
-│       │                  #       restricted session, challenge cookie, disabled-user sweeper, login notice;
-│       │                  #       lib/ scrypt; ui/ server-rendered failure and password-change pages
+│       ├── password/      #       api/ endpoints + password change; model/ gate, login (including the
+│       │                  #       passkey-only refusal), session issue, restricted session, challenge cookie,
+│       │                  #       disabled-user sweeper, login notice; lib/ scrypt;
+│       │                  #       ui/ server-rendered failure and password-change pages
+│       ├── passkey/       #       api/ login, registration, management and settings endpoints; model/ ceremony
+│       │                  #       store and cookie, WebAuthn parameter resolution, counter policy;
+│       │                  #       cli/ list and remove
 │       ├── totp/          #       lib/ RFC 6238; model/ replay guard; cli/ enable and disable subcommands
+│       ├── bootstrap/     #       api/ /auth/bootstrap, /auth/setup, /auth/continue; model/ configured probe
+│       │                  #       and the server-rendered setup page
 │       ├── admin/         #       api/ endpoints and responses; model/ audit, reset steps, user list, deps
 │       └── proxy/         #       model/ local reverse proxy and header filtering
 └── client/                # client half: five FSD layers, analysed by Steiger, never imports the host half
@@ -73,10 +85,13 @@ src/
     │   ├── change-password/      # ui/ form and fields; model/ validation and submit; lib/ redirect
     │   ├── admin-users/          # api/ list and reset requests; model/ form and result types;
     │   │                         # lib/ copy and failure mapping; ui/ form
+    │   ├── passkey/              # api/ status, list and mutations; model/ form, actions and copy;
+    │   │                         # ui/ add form, credential table and settings toggle
     │   ├── logout/               # ui/ logout settings action
     │   └── nav-icon/             # ui/ settings-nav icon shim (DOM)
     └── widgets/
-        └── account-section/      # ui/ the "Account security" section; composes password change and user management
+        └── account-section/      # ui/ the "Account security" section; composes password change,
+                                  # user management and the passkey block
 ```
 
 Unit tests live next to their source file, inside the same segment.

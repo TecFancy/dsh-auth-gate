@@ -4,7 +4,7 @@
  * 线上形状（列表行、请求体、响应体、错误体）在跨半边契约 `src/protocol/`（D31），经
  * `shared/api` 进来；这里只剩表单状态与解析后的结果，它们不上线，host 不认识。
  */
-import type { PasskeyAdminErrorBody, Unchecked } from "../../../shared/api/index.ts";
+import { isRecord, type PasskeyAdminErrorBody, type Unchecked } from "../../../shared/api/index.ts";
 import { PASSKEY_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 
 /** 添加表单字段（`label` / 当前口令 / 可选 TOTP 码）。 */
@@ -29,6 +29,19 @@ export const EMPTY_PASSKEY_REAUTH: PasskeyReauthValues = { password: "", code: "
 
 /** 名称长度上限（与 host 侧 `label` ≤ 64 字符的校验一致）。 */
 export const PASSKEY_LABEL_MAX = 64;
+
+/** 状态播报位 id：aria-live 落点，也是错误字段 `aria-describedby` 与焦点兜底的落点。 */
+export const PASSKEY_STATUS_ID = "dsh-auth-gate-passkey-status";
+
+/** 添加表单的字段 id（label htmlFor / aria 关联 / 失败聚焦共用）。 */
+export function passkeyFieldId(field: PasskeyField): string {
+  return `dsh-auth-gate-passkey-${field}`;
+}
+
+/** 删除确认区的字段 id（与添加表单分开，避免同 id 冲突）。 */
+export function passkeyReauthFieldId(field: "password" | "code"): string {
+  return `dsh-auth-gate-passkey-remove-${field}`;
+}
 
 /** 失败视图：已翻译消息 + 需标红的字段。 */
 export interface PasskeyFailureView {
@@ -107,26 +120,6 @@ function isError(value: unknown, code: PasskeyAdminErrorBody["error"]): boolean 
 }
 
 /**
- * 再认证的 TOTP 失败码。契约的 `PasskeyAdminErrorBody["error"]` 联合里没有它（与口令改密
- * 端点同形，401 下用 `invalid_totp` 区分「码错」与「口令错」），所以这里按字面量比较，
- * 不扩契约类型（`src/protocol/` 不在本 PR 的写域）。
- */
-const INVALID_TOTP = "invalid_totp";
-
-function isRecord(value: unknown): value is Unchecked<PasskeyAdminErrorBody> {
-  return typeof value === "object" && value !== null;
-}
-
-/** 读错误体字段：`Unchecked<T>` 的索引签名在 `noPropertyAccessFromIndexSignature` 下要方括号，
- * 但 ESLint 又要求点号；这里统一收口成一个取值函数，两处规则都不再打架。 */
-function fieldOf(
-  record: Unchecked<PasskeyAdminErrorBody>,
-  name: keyof PasskeyAdminErrorBody,
-): unknown {
-  return record[name];
-}
-
-/**
  * 状态码矩阵 → 文案键（与 host 的 `PasskeyAdminErrorBody` 对齐）：
  * 400 bad_request、401 unauthorized、403 forbidden、404 not_found、429 locked(+retryAfter)、
  * 503 unavailable，其余一律 generic。`reason` 只用于区分「最后一枚凭据」这类策略拒绝。
@@ -136,8 +129,10 @@ export function describePasskeyFailure(
   body: unknown,
   t: AccountTranslate,
 ): PasskeyFailureView {
-  const record = isRecord(body) ? body : {};
-  const error = fieldOf(record, "error");
+  const record: Unchecked<PasskeyAdminErrorBody> = isRecord<PasskeyAdminErrorBody>(body)
+    ? body
+    : {};
+  const error = record.error;
   if (status === 400) {
     return { message: t(PASSKEY_KEYS.badRequest), fields: [] };
   }
@@ -145,7 +140,7 @@ export function describePasskeyFailure(
     if (isError(error, "unauthorized")) {
       return { message: t(PASSKEY_KEYS.unauthorized), fields: [] };
     }
-    if (error === INVALID_TOTP) {
+    if (isError(error, "invalid_totp")) {
       return { message: t(PASSKEY_KEYS.invalidTotp), fields: ["code"] };
     }
     return { message: t(PASSKEY_KEYS.invalidCredentials), fields: ["password"] };
@@ -153,7 +148,7 @@ export function describePasskeyFailure(
   if (status === 403) return { message: t(PASSKEY_KEYS.forbidden), fields: [] };
   if (status === 404) return { message: t(PASSKEY_KEYS.notFound), fields: [] };
   if (status === 429) {
-    const retryAfter = fieldOf(record, "retryAfter");
+    const retryAfter = record.retryAfter;
     return typeof retryAfter === "number"
       ? { message: t(PASSKEY_KEYS.locked, { seconds: retryAfter }), fields: [] }
       : { message: t(PASSKEY_KEYS.lockedPlain), fields: [] };
@@ -164,5 +159,6 @@ export function describePasskeyFailure(
 
 /** 401 且错误码是 `invalid_totp` 时把焦点指向验证码框（口令正确、码错）。 */
 export function isInvalidTotp(status: number, body: unknown): boolean {
-  return status === 401 && isRecord(body) && fieldOf(body, "error") === INVALID_TOTP;
+  if (!isRecord<PasskeyAdminErrorBody>(body)) return false;
+  return status === 401 && isError(body.error, "invalid_totp");
 }

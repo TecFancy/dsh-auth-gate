@@ -61,4 +61,3 @@ export declare const ACCOUNT_CONTEXT_NAME_STYLE: CSSProperties;
 export declare const CREDENTIAL_META_STYLE: CSSProperties;
 /** 屏幕阅读器专用（表格 caption 这类需要语义但不需要视觉的文本）。 */
 export declare const VISUALLY_HIDDEN_STYLE: CSSProperties;
-//# sourceMappingURL=redesign-styles.d.ts.map

@@ -86,7 +86,8 @@ export declare class PasskeyCounterStore {
     private readonly counters;
     /** 当前生效值：进程内更新优先，否则用读盘快照。 */
     stored(record: PasskeyRecord): number;
+    /** 当前进程内值与期望一致？（并发断言的 compare 步骤：判定与推进必须同一同步段）。 */
+    isCurrent(record: PasskeyRecord, expected: number): boolean;
     /** 只在前进时更新进程内值；返回更新后的生效值。 */
     advance(record: PasskeyRecord, reported: number): number;
 }
-//# sourceMappingURL=passkey-login.d.ts.map

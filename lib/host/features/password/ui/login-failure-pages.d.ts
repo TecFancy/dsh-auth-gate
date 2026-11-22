@@ -47,4 +47,3 @@ export declare function sendPasswordLoginDisabled(res: ServerResponse, ctx: {
     host: string;
     next: string;
 }): void;
-//# sourceMappingURL=login-failure-pages.d.ts.map

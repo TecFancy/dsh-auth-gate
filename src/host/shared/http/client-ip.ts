@@ -131,8 +131,10 @@ export function resolveClientIp(
   if (policy === undefined || policy.header === "" || policy.trusted.length === 0) {
     return { ip: peer, warning: undefined };
   }
-  // 非 TCP 传输（Unix socket）没有对端地址：只可能来自本机，按与回环同级的本机信任处理。
-  const localTransport = raw === undefined || raw === "";
+  // 非 TCP 传输（Unix socket / pipe）没有对端地址。只认「监听在 pipe 上」的服务器 socket：
+  // 缺 remoteAddress 本身不是本机证据（畸形/伪造的 socket 也会缺），必须由监听地址正向证明；
+  // 认错方向的代价是把一个远端来源当成受信代理，进而让它自选限速桶 key。
+  const localTransport = (raw === undefined || raw === "") && listensOnPipe(req.socket);
   const trustedPeer = localTransport || policy.trusted.some((n) => cidrContains(n, peer));
   if (!trustedPeer) {
     const origin = peer === "" ? "unknown" : peer;
@@ -156,6 +158,21 @@ export function resolveClientIp(
     };
   }
   return { ip: client, warning: undefined };
+}
+
+/**
+ * 已知的本机传输（G8）：服务器监听在 Unix domain socket 时（`server.address()` 返回
+ * 路径字符串），连接没有 TCP 对端地址。这是「缺失 remoteAddress 且确实来自本机」的
+ * 正向证据；只凭 `remoteAddress === undefined` 不足以信任，畸形 socket 同样会缺。
+ */
+function listensOnPipe(socket: IncomingMessage["socket"]): boolean {
+  // `net.Socket.server` 不在 IncomingMessage["socket"] 的 public 类型里：按结构读取，
+  // 缺失/非服务器 socket 一律 false（fail-closed：不因缺失字段就信任）。
+  const server = (socket as { server?: { address?: () => unknown } | null }).server;
+  if (server === null || server === undefined || typeof server.address !== "function") {
+    return false;
+  }
+  return typeof server.address() === "string";
 }
 
 /** 同名头重复出现时 Node 会给数组；超长直接当不可用（回退），不截断解析。 */

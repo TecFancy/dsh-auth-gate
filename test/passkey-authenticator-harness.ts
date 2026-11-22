@@ -173,7 +173,7 @@ export const TEST_SESSION_COOKIE = "dsh_auth=fake-session";
 
 /** 一条注册到假 server 的 exact 路由。 */
 export interface PasskeyRoute {
-  readonly kind: "exact";
+  readonly kind: "exact" | "prefix";
   readonly path: string;
   readonly handler: HttpHandler;
 }

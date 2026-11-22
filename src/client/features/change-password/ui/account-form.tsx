@@ -9,11 +9,12 @@ import {
 import { ACCOUNT_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
   ActionButton,
+  focusFailureTarget,
   FORM_STYLE,
   PANEL_STYLE,
   SUCCESS_TEXT_STYLE,
 } from "../../../shared/ui/index.ts";
-import { redirectToLogin } from "../lib/account-redirect.ts";
+import { redirectToLogin, redirectToSignIn } from "../lib/account-redirect.ts";
 import { ACCOUNT_STATUS_ID, PasswordFields, StatusLine } from "./account-fields.tsx";
 import { AccountHeader } from "./account-header.tsx";
 import {
@@ -36,6 +37,8 @@ interface PasswordChangeController {
   submit: () => Promise<void>;
   /** 兜底的「重新登录」动作：跳到登录页（幂等，允许连点）。 */
   relogin: () => void;
+  /** 会话失效（401 unauthorized）后的重新登录：登录页，不带改密 notice。 */
+  signIn: () => void;
 }
 
 /** 字段的文档顺序：失败后按这个顺序找第一个错误字段聚焦。 */
@@ -74,12 +77,12 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
 
   /** 失败落点：有字段错误聚焦第一个，否则聚焦状态位（tabIndex=-1）。 */
   const focusFailure = (view: FailureView): void => {
-    const first = FIELD_ORDER.find((field) => view.fields.includes(field));
-    const target =
-      first === undefined
-        ? document.getElementById(ACCOUNT_STATUS_ID)
-        : document.getElementById(fieldElementId(first));
-    target?.focus();
+    focusFailureTarget({
+      fields: view.fields,
+      order: FIELD_ORDER,
+      elementId: fieldElementId,
+      statusId: ACCOUNT_STATUS_ID,
+    });
   };
 
   const setValue = (field: FieldName, value: string): void => {
@@ -141,6 +144,7 @@ function usePasswordChange(t: AccountTranslate): PasswordChangeController {
     setValue,
     submit,
     relogin: redirectToLogin,
+    signIn: redirectToSignIn,
   };
 }
 
@@ -218,6 +222,11 @@ export function AccountPasswordForm({ t, totpEnabled }: AccountPasswordFormProps
           totpEnabled={totpEnabled}
         />
         <StatusLine failure={form.failure} />
+        {form.failure?.relogin === true ? (
+          <ActionButton variant="ghost" onClick={() => form.signIn()}>
+            {t(ACCOUNT_KEYS.relogin)}
+          </ActionButton>
+        ) : null}
         <ActionButton type="submit" busy={form.submitting}>
           {form.submitting ? t(ACCOUNT_KEYS.submitting) : t(ACCOUNT_KEYS.submit)}
         </ActionButton>

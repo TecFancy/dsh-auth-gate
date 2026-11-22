@@ -41,4 +41,3 @@ export interface RemoveCallbacks {
 export declare function runAdd(values: PasskeyFormValues, context: ActionContext, callbacks: AddCallbacks): Promise<void>;
 /** 删除：调用方已确认目标并校验过再认证值，这里只负责请求与结果落 UI。 */
 export declare function runRemove(idPrefix: string, values: PasskeyReauthValues, context: ActionContext, callbacks: RemoveCallbacks): Promise<void>;
-//# sourceMappingURL=passkey-action-runners.d.ts.map

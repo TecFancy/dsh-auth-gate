@@ -23,7 +23,10 @@ export declare function sendPasskeyStoreUnavailable(res: ServerResponse): void;
 export declare function respondPasskeyFormError(res: ServerResponse, error: unknown): void;
 /** 只认 cookie 的会话定位（Bearer 不参与，与 `/auth/status` 同口径）。 */
 export declare function locatePasskeySession(deps: PasskeyManagementDeps, req: IncomingMessage): SessionLookup;
-/** 受限会话（`password-change-only`）与 bootstrap 会话一律不得进管理面。 */
+/**
+ * 管理面只收正式会话（G12 allow-list）：`full` 或缺省 `kind` 的旧行。受限会话
+ * （`password-change-only`）、bootstrap 会话与将来新增的 kind 一律不得进管理面。
+ */
 export declare function isRestrictedSession(session: Session): boolean;
 /** 同源校验（fail-closed：`publicHost` 未配置时只信 `Sec-Fetch-Site`）。 */
 export declare function passkeyOriginAccepted(deps: PasskeyManagementDeps, req: IncomingMessage): boolean;
@@ -46,4 +49,3 @@ export interface ReauthInput {
  * 校验与防重放。任何一项失败都返回 false（调用方回同一个 401，原因只进日志）。
  */
 export declare function reauthenticate(deps: PasskeyManagementDeps, username: string, user: UserRecord, input: ReauthInput): Promise<boolean>;
-//# sourceMappingURL=passkey-management-http.d.ts.map

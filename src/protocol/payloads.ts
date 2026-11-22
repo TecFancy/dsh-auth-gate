@@ -248,9 +248,22 @@ export interface PasskeySettingsRequest {
   conditionalUi: string;
 }
 
-/** passkey 管理端点的 JSON 错误体。 */
+/**
+ * passkey 管理端点的 JSON 错误体。
+ *
+ * 401 用 `unauthorized`（无会话）与 `invalid_totp`（再认证的动态码错/已被使用）区分
+ * 「会话失效」与「码错」，与口令改密端点同形；403 `forbidden`（非 admin / 受限会话），
+ * 429 `locked`（带 `retryAfter`）。
+ */
 export interface PasskeyAdminErrorBody {
-  error: "unauthorized" | "forbidden" | "locked" | "unavailable" | "bad_request" | "not_found";
+  error:
+    | "unauthorized"
+    | "invalid_totp"
+    | "forbidden"
+    | "locked"
+    | "unavailable"
+    | "bad_request"
+    | "not_found";
   /** 400 `policy` 类错误的细分原因（如 `last-credential`）。 */
   reason?: string;
   retryAfter?: number;

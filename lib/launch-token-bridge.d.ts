@@ -18,4 +18,3 @@ export declare function readLaunchToken(ctx: Context): string | undefined;
 export declare function makeLaunchTokenBridge(ctx: Context, log: {
     warn(message: unknown): void;
 }): () => Promise<string | undefined>;
-//# sourceMappingURL=launch-token-bridge.d.ts.map

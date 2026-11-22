@@ -1,5 +1,7 @@
 import {
   encodeForm,
+  isRecord,
+  readJsonSafe,
   USERS_PASSWORD_PATH,
   USERS_PATH,
   type AdminResetErrorBody,
@@ -31,11 +33,6 @@ export { describeAdminFailure };
 const USERS_TARGET = USERS_PATH;
 const RESET_TARGET = USERS_PASSWORD_PATH;
 
-/** 对象守卫：键按契约形状 `T` 读（读错键编译不过），值仍是未校验的 `unknown`。 */
-function isRecord<T>(value: unknown): value is Unchecked<T> {
-  return typeof value === "object" && value !== null;
-}
-
 /** 单行形状校验：任一必需字段类型不符即丢弃该行（不整表失败，契约 §1.2）。 */
 function asRow(value: unknown): AdminUserRow | undefined {
   if (!isRecord<AdminUserRow>(value)) return undefined;
@@ -59,14 +56,10 @@ function parseUsers(body: unknown): AdminUserRow[] | undefined {
 /** 重置端点的全部 JSON 形状（成功体 + 错误体），按契约读键。 */
 type ResetBody = AdminResetResponse | AdminResetErrorBody;
 
-/** 读 JSON；非对象或解析失败统一回空体（映射只看状态码）。 */
-async function readJsonSafe(res: Response): Promise<Unchecked<ResetBody>> {
-  try {
-    const body: unknown = await res.json();
-    return isRecord<ResetBody>(body) ? body : {};
-  } catch {
-    return {};
-  }
+/** 读 JSON 并收窄成契约记录；解析失败回空体（映射只看状态码）。 */
+async function readResetBody(res: Response): Promise<Unchecked<ResetBody>> {
+  const body = await readJsonSafe(res);
+  return isRecord<ResetBody>(body) ? body : {};
 }
 
 /**
@@ -152,7 +145,7 @@ export async function submitAdminReset(
   try {
     const res = await postAdminReset(values, options);
     if (options.signal.aborted) return { kind: "aborted" };
-    const body = await readJsonSafe(res);
+    const body = await readResetBody(res);
     if (options.signal.aborted) return { kind: "aborted" };
     if (res.status === 200 && body.ok === true) {
       return { kind: "ok", sessionsRevoked: body.sessionsRevoked === true };

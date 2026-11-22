@@ -28,7 +28,7 @@ describe("dsh-auth user totp", () => {
   beforeEach(async () => {
     dir = await fs.mkdtemp(path.join(os.tmpdir(), "dsh-auth-totp-cli-"));
     file = path.join(dir, "users.yaml");
-    const { io } = makeIo(["pw"]);
+    const { io } = makeIo(["Cli-Password-Ok!23"]);
     await main(["user", "add", "alice", "--password-stdin", "--file", file], io);
   });
 

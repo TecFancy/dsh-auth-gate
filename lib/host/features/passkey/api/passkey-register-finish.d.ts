@@ -9,4 +9,3 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { PasskeyManagementDeps } from "./passkey-management-deps.js";
 /** 注册 finish：门禁 → consume ceremony → 校验 → 写盘 → 200。 */
 export declare function handleRegisterFinish(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=passkey-register-finish.d.ts.map

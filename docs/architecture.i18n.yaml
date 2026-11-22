@@ -2,5 +2,5 @@
 # of the last confirmed-consistent state. Both languages carry equal
 # authority; after editing either side, bring the other along and re-record
 # with:  npm run bilingual:re-record -- docs/architecture
-architecture.md: ea8db89b6dd6ff9e609a5f5948765ac2f5cdfc76
-architecture_zh.md: ebcf6d1cab3b8b3cca3b4ee227a2133558f1026e
+architecture.md: efa57cacec9f7bab53a6b99d2c8851e883c20c05
+architecture_zh.md: b94f6addfdedf7c503bf303f6f681a9f7ca14931

@@ -141,7 +141,7 @@ for (const path of enImages)
   if (!zhImages.has(path)) note(`${zh.file}: missing shared image ${path}`);
 for (const path of zhImages)
   if (!enImages.has(path)) note(`${en.file}: missing shared image ${path}`);
-for (const [locale, data] of Object.entries(parsed)) {
+for (const data of Object.values(parsed)) {
   for (const path of data.images) {
     if (!existsSync(join(ROOT, path))) note(`${data.file}: missing image ${path}`);
     if (path.includes(".zh."))
@@ -163,7 +163,7 @@ for (const target of enTargets)
 for (const target of zhTargets)
   if (!enTargets.has(target)) note(`only in ${zh.file}: link ${target}`);
 
-for (const [locale, data] of Object.entries(parsed)) {
+for (const data of Object.values(parsed)) {
   const contents = data.sections.find((section) => anchorsOf(section.body).length > 1);
   if (contents === undefined) {
     note(`${data.file}: no table of contents found`);

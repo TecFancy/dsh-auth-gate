@@ -6,4 +6,3 @@
  */
 export { buildPayload, defaultFetch, makeTelemetry, PING_INTERVAL_MS, PING_TIMEOUT_MS, TELEMETRY_ENDPOINT, TELEMETRY_VERSION, usersBucket, } from "./telemetry.js";
 export type { HostFacts, PackageManifest, SettingsService, Telemetry, TelemetryFetch, TelemetryMetrics, TelemetryOptions, TelemetryPayload, UsersBucket, } from "./telemetry.js";
-//# sourceMappingURL=index.d.ts.map

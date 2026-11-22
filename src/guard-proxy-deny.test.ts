@@ -123,3 +123,35 @@ describe("proxy marker deny-list", () => {
     expect(socket.state.destroyed).toBeUndefined();
   });
 });
+
+describe("proxy marker deny-list: path normalisation (G7)", () => {
+  const gate: Gate = { decide: () => "allow" };
+
+  it("normalises percent-encoded and doubled-slash method variants before comparing (G7)", async () => {
+    const guarded = guardHttp(
+      () => gate,
+      "prefix",
+      () => undefined,
+    );
+    for (const path of ["/api/%68ost.openPath", "/api//host.openPath", "/api/host%2EopenPath"]) {
+      const res = makeRes();
+      await guarded(makeReq(path, "POST", { "x-dsh-proxy": "1" }), res);
+      expect(res.state.status, path).toBe(403);
+      expect(res.state.body).toBe("forbidden");
+    }
+
+    // 畸形百分号编码不抛错，也不误判成禁行方法（按原始串比对后放行）。
+    let calls = 0;
+    const lenient = guardHttp(
+      () => gate,
+      "prefix",
+      () => {
+        calls += 1;
+      },
+    );
+    const res = makeRes();
+    await lenient(makeReq("/api/%zz", "POST", { "x-dsh-proxy": "1" }), res);
+    expect(res.state.status).toBeUndefined();
+    expect(calls).toBe(1);
+  });
+});

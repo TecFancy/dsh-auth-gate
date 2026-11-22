@@ -16,9 +16,11 @@ import { SettingsAccountSection } from "./account-section.tsx";
 
 const redirectApi = vi.hoisted(() => ({
   redirectToLogin: vi.fn(),
+  redirectToSignIn: vi.fn(),
 }));
 vi.mock("../../../features/change-password/lib/account-redirect.ts", () => ({
   LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
+  SIGN_IN_URL: "/auth/login?next=%2F",
   ...redirectApi,
 }));
 

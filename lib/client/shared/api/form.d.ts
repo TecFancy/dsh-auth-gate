@@ -6,4 +6,3 @@
 export declare function encodeForm<T extends {
     [K in keyof T]?: string | undefined;
 }>(fields: T): URLSearchParams;
-//# sourceMappingURL=form.d.ts.map

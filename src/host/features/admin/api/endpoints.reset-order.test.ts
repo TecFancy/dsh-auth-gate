@@ -59,14 +59,14 @@ describe("POST /auth/users/password: 单条管道上的顺序（验收 6）", ()
     expect(probe.status).toBe(403);
     // 429：限流桶在 404 之前
     for (let attempt = 0; attempt < 5; attempt += 1)
-      harness.limiter.recordFailure("127.0.0.1", "admin");
+      harness.limiter.recordFailure("127.0.0.1", "admin", "admin");
     const locked = await post(harness, {
       ...SAME_ORIGIN,
       body: form({ target: "ghost", password: NEW_PASSWORD }),
     });
     expect(locked.status).toBe(429);
     expect(locked.headers["retry-after"]).toBeDefined();
-    harness.limiter.recordSuccess("127.0.0.1", "admin");
+    harness.limiter.recordSuccess("127.0.0.1", "admin", "admin");
     // 404：桶已清、admin 通过、目标仍不存在
     const ghost = await post(harness, {
       ...SAME_ORIGIN,

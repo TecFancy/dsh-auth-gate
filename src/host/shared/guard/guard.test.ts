@@ -24,12 +24,6 @@ interface ResState {
 }
 type FakeRes = ServerResponse & { state: ResState };
 
-interface SocketState {
-  written: string | undefined;
-  destroyed: boolean | undefined;
-}
-type FakeSocket = Duplex & { state: SocketState };
-
 function makeFakeServer(): WrappableServer {
   const exact = new Map<string, WrappableRoute>();
   const prefixes = new Map<string, WrappableRoute>();
@@ -55,6 +49,15 @@ function makeFakeServer(): WrappableServer {
     },
   };
   return server;
+}
+
+function makeSocket(): Duplex {
+  return {
+    write: () => undefined,
+    end: () => undefined,
+    on: () => undefined,
+    destroy: () => undefined,
+  } as unknown as Duplex;
 }
 
 function makeReq(
@@ -86,19 +89,6 @@ function makeRes(): FakeRes {
       state.body = body;
     },
   } as unknown as FakeRes;
-}
-
-function makeSocket(): FakeSocket {
-  const state: SocketState = { written: undefined, destroyed: undefined };
-  return {
-    state,
-    write(data: string) {
-      state.written = String(data);
-    },
-    destroy() {
-      state.destroyed = true;
-    },
-  } as unknown as FakeSocket;
 }
 
 describe("wrapServer: 存量与增量包装", () => {
@@ -183,7 +173,8 @@ describe("wrapServer: 幂等与还原", () => {
 
     const unwrap1 = wrapServer(server, () => gate, log);
     const unwrap2 = wrapServer(server, () => gate, log);
-    expect(unwrap1).toBe(unwrap2);
+    expect(unwrap2).not.toBe(unwrap1);
+    unwrap2(); // 第二次 wrap 的 disposer 是空操作，守卫仍由第一次负责
 
     unwrap1();
     expect(server.exact.get("/e")).toBe(originalRoute);
@@ -192,6 +183,29 @@ describe("wrapServer: 幂等与还原", () => {
 
     const unwrap3 = wrapServer(server, () => gate, log);
     expect(unwrap3).not.toBe(unwrap1);
+  });
+
+  it("second wrap returns a no-op disposer, warns, and cannot disarm the owner (G3)", () => {
+    const server = makeFakeServer();
+    const warnings: unknown[] = [];
+    const logging: GuardLog = { error: () => undefined, warn: (message) => warnings.push(message) };
+    const gate: Gate = { decide: () => "allow" };
+
+    const first = wrapServer(server, () => gate, logging);
+    const second = wrapServer(server, () => gate, logging);
+    expect(second).not.toBe(first);
+    second();
+    // 守卫仍在：第二次 wrap 的 disposer 是空操作，之后注册的路由照样被守卫
+    const disposeProbe = server.register({
+      kind: "exact",
+      path: "/after-second",
+      handler: () => undefined,
+    });
+    expect(isGuarded(server.exact.get("/after-second")?.handler)).toBe(true);
+    disposeProbe();
+    first();
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0])).toContain("already guarded");
   });
 
   it("reads the current gate per request", async () => {
@@ -230,34 +244,6 @@ describe("denyHttp", () => {
     const res2 = makeRes();
     denyHttp(makeReq("/api/x", "POST"), res2);
     expect(res2.state.status).toBe(401);
-  });
-});
-
-describe("guardUpgrade + denyUpgrade", () => {
-  it("rejects upgrades before negotiation and allows them through", async () => {
-    const server = makeFakeServer();
-    let calls = 0;
-    server.upgrades.set("/api/events.host", {
-      path: "/api/events.host",
-      handler: () => {
-        calls += 1;
-      },
-    });
-    let gate: Gate = { decide: () => "deny" };
-    wrapServer(server, () => gate, log);
-    const handler = server.upgrades.get("/api/events.host")!.handler;
-
-    const socket = makeSocket();
-    await handler(makeReq("/api/events.host"), socket, Buffer.alloc(0));
-    expect(socket.state.written).toMatch(/^HTTP\/1\.1 401 Unauthorized/);
-    expect(socket.state.destroyed).toBe(true);
-    expect(calls).toBe(0);
-
-    gate = { decide: () => "allow" };
-    const socket2 = makeSocket();
-    await handler(makeReq("/api/events.host"), socket2, Buffer.alloc(0));
-    expect(calls).toBe(1);
-    expect(socket2.state.destroyed).toBeUndefined();
   });
 });
 

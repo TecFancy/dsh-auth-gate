@@ -11,4 +11,3 @@ import type { PasskeyManagementDeps } from "./passkey-management-deps.js";
 export declare function handlePasskeySettingsGet(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
 /** `POST /auth/passkey/settings`：门禁（POST + 表单）→ admin 校验 → 取值校验 → 写回 → 200。 */
 export declare function handlePasskeySettingsPost(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=passkey-settings-endpoints.d.ts.map

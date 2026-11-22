@@ -1,6 +1,6 @@
 import type { Gate, GateDecision, GuardKind, GuardRequest } from "../../../shared/guard/index.js";
-import { isNavigationRequest, isPublicStaticPath } from "../../../shared/guard/index.js";
-import { isAuthPath, SETUP_PATH } from "../../../shared/protocol/index.js";
+import { denyBootstrap, isPublicStaticPath } from "../../../shared/guard/index.js";
+import { isAuthPath } from "../../../shared/protocol/index.js";
 import { safeEqual } from "../../../shared/crypto/index.js";
 import {
   isBootstrapSession,
@@ -65,9 +65,4 @@ export class TokenGate implements Gate {
     const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
     return cookie === undefined || cookie === "" ? undefined : store.getByToken(cookie);
   }
-}
-
-/** bootstrap 会话被拒的宿主路径：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。 */
-function denyBootstrap(req: GuardRequest): GateDecision {
-  return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }

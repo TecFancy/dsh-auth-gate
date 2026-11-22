@@ -27,4 +27,3 @@ export declare class TokenGate implements Gate {
     /** 会话行（只认会话 cookie，与既有 token 通道一致）：无 store/无 cookie/失效 → undefined。 */
     private sessionOf;
 }
-//# sourceMappingURL=token-gate.d.ts.map

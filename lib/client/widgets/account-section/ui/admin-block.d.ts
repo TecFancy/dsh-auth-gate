@@ -12,4 +12,3 @@ export interface AdminUsersBlockProps {
  * 「只有本人」时显示 `admin.empty` 且**不渲染重置入口**（§3.6）。
  */
 export declare function AdminUsersBlock({ t, actorName, actorTotpEnabled }: AdminUsersBlockProps): import("react").JSX.Element | null;
-//# sourceMappingURL=admin-block.d.ts.map

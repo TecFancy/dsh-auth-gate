@@ -30,4 +30,3 @@ export type AdmitRebridge = (req: GuardRequest, kind: GuardKind, pathname: strin
  * 交给 `denyReply`，是因为后者的兜底是登录页-把已认证用户送去登录页比不重铸更糟。
  */
 export declare function rebridgeDecision(rebridge: AdmitRebridge | undefined, req: GuardRequest, kind: GuardKind, pathname: string): RebridgeDecision | undefined;
-//# sourceMappingURL=rebridge.d.ts.map

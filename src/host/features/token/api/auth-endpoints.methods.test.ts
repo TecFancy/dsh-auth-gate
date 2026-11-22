@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { describe, expect, it } from "vitest";
+import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { registerAuthEndpoints, type AuthEndpointsDeps } from "./auth-endpoints.js";
 import { loginPageHtml } from "../../../shared/login-page/index.js";
 import { SessionStore, type Session } from "../../../entities/session/index.js";
@@ -109,6 +110,8 @@ function makeHarness(publicHost?: string): {
       logoutOrder: 1000,
       publicHost,
       validateToken: (token) => Promise.resolve(token === "good-token"),
+      limiter: new LoginRateLimiter(),
+      clientIp: () => "203.0.113.7",
       logger: {
         error: () => undefined,
         info: () => undefined,

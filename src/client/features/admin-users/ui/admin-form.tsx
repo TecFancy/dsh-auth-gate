@@ -44,14 +44,12 @@ function TargetSelect({
   targets,
   value,
   invalid,
-  disabled,
   onChange,
 }: {
   t: AdminTranslate;
   targets: AdminUserRow[];
   value: string;
   invalid: boolean;
-  disabled: boolean;
   onChange: (value: string) => void;
 }) {
   return (
@@ -64,7 +62,6 @@ function TargetSelect({
           id={adminFieldId("target")}
           name="target"
           value={value}
-          disabled={disabled}
           aria-invalid={invalid ? "true" : undefined}
           aria-describedby={invalid ? ADMIN_STATUS_ID : undefined}
           style={invalid ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
@@ -121,7 +118,6 @@ export function AdminResetForm({
     <form
       style={{ display: "flex", flexDirection: "column", gap: 8 }}
       noValidate
-      aria-busy={false}
       onSubmit={form.onSubmit}
       onKeyDown={form.onKeyDown}
       onCompositionStart={form.onCompositionStart}
@@ -134,7 +130,6 @@ export function AdminResetForm({
           targets={targets}
           value={form.values.target}
           invalid={targetInvalid}
-          disabled={false}
           onChange={(value) => form.setValue("target", value)}
         />
         {fields.map((item) => (

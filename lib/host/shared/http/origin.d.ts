@@ -44,4 +44,3 @@ export interface OriginCheckRequest {
  * 通道会 403（浏览器不受影响：它们恒带 `Sec-Fetch-Site: same-origin`）。
  */
 export declare function checkRequestOrigin(req: OriginCheckRequest, publicHost: string): OriginVerdict;
-//# sourceMappingURL=origin.d.ts.map

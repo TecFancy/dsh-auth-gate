@@ -148,6 +148,19 @@ describe("passkey management: session gate", () => {
     }
   });
 
+  it("rejects a future session kind without a code change (G12 allow-list)", async () => {
+    const harness = makeManagementHarness();
+    mount(harness);
+    harness.users.set("alice", makeUser());
+    // 模拟将来新增的 kind：allow-list 必须默认拒绝，而不是漏进管理面。
+    const cookie = await harness.issueSessionCookie(
+      "alice",
+      "some-future-kind" as unknown as "full",
+    );
+    const res = await send(harness, PASSKEY_PATH, { method: "GET", cookie });
+    expect(res.status).toBe(403);
+  });
+
   it("answers 401 when the session subject is gone or disabled", async () => {
     const harness = makeManagementHarness();
     mount(harness);

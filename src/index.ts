@@ -12,7 +12,7 @@ import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 import { defaultUsersFilePath, loadUsersFile } from "./host/entities/user/index.js";
 import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeRebridge } from "./rebridge-wiring.js";
-import { makeTokenResolver } from "./token-resolver.js";
+import { makeTokenResolver, DEFAULT_TOKEN_MIN_LENGTH } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
 import { passkeyConfigFields, wirePasskey, type PasskeyFields } from "./passkey-wiring.js";
@@ -32,6 +32,12 @@ export interface AuthConfig extends TelemetryFields, PasskeyFields {
   cookieName: string;
   /** 共享 token 的 credentials 引用名（环境变量名）；password 模式忽略。 */
   tokenRef: string;
+  /**
+   * 共享访问令牌的最小长度（字符数，token 模式）：默认 32，schema 下限 32。
+   * 解析到的令牌短于该值时按「无凭证」处理：登录 401、Bearer 门拒绝（fail-closed）。
+   * 只做长度校验、不做熵估计；`""`/未配置的令牌走首次引导通道，不受此限。口令模式忽略。
+   */
+  tokenMinLength: number;
   /** cookie 是否带 `; Secure`（http 测试/开发可关，M7）。 */
   cookieSecure: boolean;
   /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
@@ -88,6 +94,8 @@ export const Config = z.object({
     .string()
     .pattern(/^[A-Za-z_][A-Za-z0-9_]*$/)
     .default("DSH_AUTH_TOKEN"),
+  // 熵下限（L4）：不低于 32 字符。schema 下限即推荐值，配置只能调高不能调低。
+  tokenMinLength: z.natural().min(DEFAULT_TOKEN_MIN_LENGTH).default(DEFAULT_TOKEN_MIN_LENGTH),
   cookieSecure: z.boolean().default(true),
   usersFile: z.string().default(""),
   publicHost: z.string().default(""),
@@ -118,6 +126,11 @@ declare module "@deepseek-ai/cordis" {
  * 会话层软接（M1 逻辑不变）：storageDomain 缺失 → error 日志后守卫照常挂载；
  * 存在 → effect 内 open domain，就绪后把 SessionStore 挂到 auth.sessions，再通知 `onReady`
  * （首次引导的启动清扫要等这一刻）。
+ *
+ * 异步就绪与释放的竞态由 `closed` 旗标收口：释放之后解析出来的 domain 只关闭、不发布
+ * （`auth.sessions` 不再被赋值、`onReady` 不再触发）。成功路径本身也可能抛错（`table()`
+ * 或 `SessionStore` 构造），此时同样只记 error、不发布：失败必须让操作员看见，且守卫
+ * 保持挂载（fail-closed：没有会话存储 = 会话通道拒绝，而不是放行）。
  */
 function mountSessionDomain(
   ctx: Context,
@@ -134,31 +147,63 @@ function mountSessionDomain(
   }
   return () => {
     let closed = false;
+    let published: SessionStore | undefined;
     const opening = storageDomain.open(sessionDomainSpec);
     const ready = opening.then(
       (domain) => {
         if (closed) {
-          void domain.close();
+          void Promise.resolve(domain.close()).catch(() => undefined);
           return;
         }
-        const store = new SessionStore(domain.table("sessions"));
-        auth.sessions = store;
-        onReady?.(store);
-        log.info("session domain opened: dsh_auth_sessions");
+        try {
+          const store = new SessionStore(domain.table("sessions"));
+          published = store;
+          auth.sessions = store;
+          onReady?.(store);
+          log.info("session domain opened: dsh_auth_sessions");
+        } catch (error) {
+          log.error(
+            `session domain setup failed: ${reasonOf(error)} (every session-gated request is denied)`,
+          );
+          void Promise.resolve(domain.close()).catch(() => undefined);
+        }
       },
       (error: unknown) => {
         log.error(
-          `session domain open failed: ${error instanceof Error ? error.message : String(error)}`,
+          `session domain open failed: ${reasonOf(error)} (every session-gated request is denied until the plugin restarts)`,
         );
       },
     );
     return async () => {
       closed = true;
       await ready.catch(() => undefined);
+      // 只清自己发布的 store：插件的下一次 apply 可能已经换了新的。
+      if (published !== undefined && auth.sessions === published) auth.sessions = undefined;
       const domain = await opening.catch(() => undefined);
       await domain?.close();
     };
   };
+}
+
+/** 错误 → 单行原因（日志用）。 */
+function reasonOf(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * 硬依赖 `webServer`（G5）：缺失时**大声失败**。静默返回 = 守卫根本没挂上而进程看起来
+ * 正常，这是最危险的失败形态（security.md §1：宁可启动失败，不可假放行）。
+ */
+function requireWebServer(
+  ctx: Context,
+  log: { error(message: unknown): void },
+): guard.WrappableServer {
+  const server = ctx.get("webServer") as unknown as guard.WrappableServer | undefined;
+  if (server !== undefined) return server;
+  log.error(
+    "webServer is unavailable: dsh-auth-gate cannot mount the guard or the /auth endpoints",
+  );
+  throw new Error("dsh-auth-gate: webServer is unavailable");
 }
 
 /**
@@ -168,9 +213,8 @@ function mountSessionDomain(
  * apply 内无 await；password 模式不访问 credentials 服务。
  */
 export function apply(ctx: Context, config: AuthConfig): void {
-  const server = ctx.get("webServer") as unknown as guard.WrappableServer | undefined;
-  if (server === undefined) return;
   const log = ctx.logger("dsh-auth-gate");
+  const server = requireWebServer(ctx, log);
   const passkey = wirePasskey({ ...config, log });
   // 条件 UI 的运行期值：初始来自配置，admin 可在设置页改写（写回宿主 settings 服务）。
   let passkeyConditionalUi = passkey.settings.enabled ? passkey.settings.conditionalUi : false;

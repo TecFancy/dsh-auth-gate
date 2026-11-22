@@ -17,4 +17,3 @@ export declare function setupPageHtml(input: SetupPageInput): string;
 export declare function setupResultHtml(input: SetupResultInput): string;
 /** 已有正式会话访问向导：实例已经配置过，说明去哪儿。 */
 export declare function setupConfiguredHtml(): string;
-//# sourceMappingURL=setup-page.d.ts.map

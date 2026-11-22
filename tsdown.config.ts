@@ -18,7 +18,9 @@ export default [
     format: "cjs",
     platform: "browser",
     dts: false,
-    sourcemap: true,
+    // 不发 sourcemap（E7）：npm tarball 只带 lib/、不带 src/，map 指向不存在的源文件，
+    // 却占 310 KiB。需要调试时本地临时改回 true 即可。
+    sourcemap: false,
     clean: false,
     external: CLIENT_EXTERNALS,
     define: {

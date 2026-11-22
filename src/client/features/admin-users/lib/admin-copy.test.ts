@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { PASSWORD_MIN_LENGTH } from "../../../shared/api/index.ts";
 import { ADMIN_DICT_EN, ADMIN_DICT_ZH, ADMIN_KEYS, translateAdminFrom } from "./admin-copy.ts";
 
 /**
@@ -81,5 +82,14 @@ describe("translateAdminFrom", () => {
 
   it("never renders a raw key when both dictionaries miss it", () => {
     expect(translateAdminFrom({})("admin.not.in.the.table")).toBe("");
+  });
+});
+
+/** C12：策略提示里的长度下界来自跨半边契约，不是文案自己写死的 14。 */
+describe("password policy copy (C12)", () => {
+  it("renders the contract minimum in both languages", () => {
+    for (const dict of [ADMIN_DICT_ZH, ADMIN_DICT_EN]) {
+      expect(dict[ADMIN_KEYS.policyHint]).toContain(String(PASSWORD_MIN_LENGTH));
+    }
   });
 });

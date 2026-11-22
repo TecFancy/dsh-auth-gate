@@ -17,4 +17,3 @@ export { PASSWORD_CHANGED_NOTICE };
 export declare const PASSWORD_CHANGED_TEXT = "Your password was changed. Sign in with your new password.";
 /** 白名单解析：命中返回常量文案，否则 undefined（缺省时卡片不渲染 notice 槽）。 */
 export declare function resolveLoginNotice(value: string | null | undefined): string | undefined;
-//# sourceMappingURL=login-notice.d.ts.map

@@ -63,4 +63,3 @@ export interface NewPasskeyInput {
 }
 /** 组装 `users.yaml` 的 `passkeys[]` 元素；`lastUsedAt` 恒 0（从未使用）。 */
 export declare function buildPasskeyRecord(input: NewPasskeyInput): PasskeyRecord;
-//# sourceMappingURL=passkey-management.d.ts.map

@@ -12,8 +12,12 @@ import { cidrContains } from "./ip-address.js";
 function reqOf(
   remoteAddress: string | undefined,
   headers: Record<string, string | string[]> = {},
+  options: { pipe?: boolean } = {},
 ): IncomingMessage {
-  return { headers, socket: { remoteAddress } } as unknown as IncomingMessage;
+  // pipe = 监听在 Unix domain socket 上的服务器连接（Node 的 net.Socket.server 是它所属的
+  // net.Server；`address()` 返回路径字符串）。只有这种 socket 缺 remoteAddress 才是本机。
+  const server = options.pipe === true ? { address: (): string => "/tmp/dsh-auth.sock" } : null;
+  return { headers, socket: { remoteAddress, server } } as unknown as IncomingMessage;
 }
 
 function policyOf(header: string, cidrs?: readonly string[]): ClientIpPolicy {
@@ -141,10 +145,28 @@ describe("resolveClientIp: trusted peer (D19)", () => {
     expect(resolveClientIp(reqOf("::1", { "x-forwarded-for": "8.8.8.8" }), policy).ip).toBe(
       "8.8.8.8",
     );
-    // 非 TCP（Unix socket）没有对端地址：只可能来自本机，按本机信任处理
-    expect(resolveClientIp(reqOf(undefined, { "x-forwarded-for": "8.8.8.8" }), policy).ip).toBe(
-      "8.8.8.8",
+    // 非 TCP（Unix socket）没有对端地址：监听地址是本机 pipe 时按本机信任处理。
+    expect(
+      resolveClientIp(reqOf(undefined, { "x-forwarded-for": "8.8.8.8" }, { pipe: true }), policy)
+        .ip,
+    ).toBe("8.8.8.8");
+  });
+
+  it("does not trust a missing remoteAddress without pipe-server evidence (G8)", () => {
+    const policy = policyOf("x-forwarded-for");
+    // 缺 remoteAddress 不等于本机：没有「服务器监听在 pipe 上」的证据时，头值不可信。
+    const result = resolveClientIp(reqOf(undefined, { "x-forwarded-for": "8.8.8.8" }), policy);
+    expect(result.ip).toBe("");
+    expect(result.warning?.key).toContain("untrusted-peer");
+  });
+
+  it("falls back to the peer on a pipe transport when the header is missing", () => {
+    const result = resolveClientIp(
+      reqOf(undefined, {}, { pipe: true }),
+      policyOf("x-forwarded-for"),
     );
+    expect(result.ip).toBe("");
+    expect(result.warning?.key).toBe("header-unusable");
   });
 
   it("takes the rightmost address that is not a trusted hop", () => {

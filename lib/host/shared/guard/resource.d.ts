@@ -35,4 +35,3 @@ export declare function toGuardRequest(request: Request): GuardRequest;
  * 这种读不计数；代理标记、跨站弹回、重铸都只对浏览器请求有意义，一并跳过。
  */
 export declare function guardResource(gate: () => Gate, kind: GuardKind, resource: ResourceHandler, onAdmit?: AdmitHook, rebridgeHook?: AdmitRebridge): ResourceHandler;
-//# sourceMappingURL=resource.d.ts.map

@@ -44,7 +44,11 @@ export async function runAdd(
   callbacks: AddCallbacks,
 ): Promise<void> {
   const { t, lock, abort, mounted, setAdding, setFailure, setInvalid, setSuccess } = context;
-  if (lock.current) return;
+  // 另一个动作在飞：明确告知「等一下」，不静默丢弃这次点击（C6）。
+  if (lock.current) {
+    setFailure({ message: t(PASSKEY_KEYS.busy), fields: [] });
+    return;
+  }
   lock.current = true;
   setAdding(true);
   context.clearFeedback();
@@ -85,7 +89,10 @@ export async function runRemove(
   callbacks: RemoveCallbacks,
 ): Promise<void> {
   const { t, lock, abort, mounted, setRemoving, setFailure, setInvalid, setSuccess } = context;
-  if (lock.current) return;
+  if (lock.current) {
+    setFailure({ message: t(PASSKEY_KEYS.busy), fields: [] });
+    return;
+  }
   lock.current = true;
   setRemoving(idPrefix);
   context.clearFeedback();

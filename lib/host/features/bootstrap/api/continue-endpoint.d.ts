@@ -19,4 +19,3 @@ export interface ContinueEndpointDeps {
  * 会话，所以不会和数据面形成循环。桥缺失 / 抛错 → 回落到 `/`。
  */
 export declare function makeContinueEndpoint(deps: ContinueEndpointDeps): HttpHandler;
-//# sourceMappingURL=continue-endpoint.d.ts.map
