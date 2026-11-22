@@ -192,7 +192,6 @@ Rationale: [the example-domain note](../.agents/notes/implemented/process/2026-0
 package without build tooling, and nobody can hand-edit the shipped code.
 
 ## 14. An in-process read carrying a Peer is admitted by its caller
-
 `webServer.readResource(request, peer)` is how one part of the host reads what an
 HTTP request for the same URL would receive. The caller has already admitted the
 reader, and the `peer` is that admission. The guard must not re-authenticate such
@@ -204,7 +203,6 @@ process. LiveShare serves the owner's viewer page through the gate on this path.
 Rationale: [the peer-read note](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.md).
 
 ## 15. What is deliberately not defended
-
 These are known and accepted, not oversights. Each has a note explaining the
 trade-off:
 

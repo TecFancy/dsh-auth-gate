@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.0...v0.23.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* pass peer-carrying resource reads through the guard ([#156](https://github.com/TecFancy/dsh-auth-gate/issues/156)) ([2887845](https://github.com/TecFancy/dsh-auth-gate/commit/2887845fedec4d672f918a42c0e11bccc2a87f81))
+
 ## [0.23.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.22.0...v0.23.0) (2026-11-17)
 
 

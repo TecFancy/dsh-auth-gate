@@ -112,13 +112,11 @@ dsh 还有一层浏览器 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=St
 `lib/` 提交进仓库，CI 在全新构建与它不一致时失败（`git diff --exit-code -- lib`）。从 git 安装的消费者拿到一个不需要构建工具就能用的包，也没有人能手改发布出去的代码。
 
 ## 14. 带 Peer 的进程内读由调用方放行
-
 `webServer.readResource(request, peer)` 是宿主内部读取「同一 URL 经 HTTP 会收到什么」的入口。调用方已经放行这个读者，`peer` 就是那次放行。守卫不能对这样的读再认证一次：它不带 cookie，浏览器门只能回 `401`，而读者的权限来自 `Peer`，不是会话。这条旁路不会给进程内调用方任何它本来没有的东西——它已经在宿主进程里。LiveShare 能隔着门提供 owner 的 viewer 页面，靠的就是这条路径。
 
 依据：[peer 读笔记](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.zh.md)。
 
 ## 15. 刻意不防的东西
-
 这些是已知且接受的，不是疏漏。每一条都有笔记解释取舍：
 
 - **没有登录 CSRF token。** 单门模型没有用户间隔离，唯一影响是会话主体审计值被污染。`SameSite=Lax` 加上现代浏览器的第三方 `Set-Cookie` 限制进一步收窄它。
