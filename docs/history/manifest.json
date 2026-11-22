@@ -19,6 +19,8 @@
     "plans/pr53-login-page-fix-plan_zh.md": "sha256:9dcec07abc0295b3f87ab57b654d85d4d06b550b50c7c4be8efd65d3aa456e5b",
     "reviews/claude-code-0.23-full-repo-review.md": "sha256:c4261146da1aa965e96b583be7021ff033a5563db84fe76dd77fa71023479a8f",
     "reviews/claude-code-0.23-full-repo-review_zh.md": "sha256:40e39870f24a11df4e4574d34ead05658ca384e1c6d6f0d34b810cb1ae4418c7",
+    "reviews/claude-kimi-grok-0.23-fix-review-rounds.md": "sha256:139fe64743a62d05dbc1b3948ade15a088ea152fe2c975e4c8763de51ea1798b",
+    "reviews/claude-kimi-grok-0.23-fix-review-rounds_zh.md": "sha256:898a2340626e1a812e731bbee7dd6bb495d924dcf18adc69aa39d18b4b357197",
     "reviews/grok46-d21-token-failure-card-review.md": "sha256:0d7182935a2b8e891f3392151f829cb9ad249e9b5a37fcf514952c3dfc24ef8f",
     "reviews/grok46-d21-token-failure-card-review_zh.md": "sha256:eba9d63b6110281527f855db0f683a5d3dd060c482c912ec645c505d869b1f83",
     "reviews/grok46-dsh-020-host-corridor-review.md": "sha256:a4bed3e9a16b630e1dd66e0095b7273483481de6e1a1e19a1acfcf5c5f3893ab",

@@ -56,6 +56,7 @@ Every file here, so the tree is reachable from this page.
 - [grok46-d21-token-failure-card-review](reviews/grok46-d21-token-failure-card-review.md)
 - [kimi-k3.1-passkey-review](reviews/kimi-k3.1-passkey-review.md)
 - [claude-code-0.23-full-repo-review](reviews/claude-code-0.23-full-repo-review.md) - four Claude Code agents over 0.23: guard, auth flows, client, engineering system (eleven P1, no P0)
+- [claude-kimi-grok-0.23-fix-review-rounds](reviews/claude-kimi-grok-0.23-fix-review-rounds.md)
 
 ### evidence
 
