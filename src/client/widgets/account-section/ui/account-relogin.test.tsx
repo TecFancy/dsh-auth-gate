@@ -16,9 +16,11 @@ import { SettingsAccountSection } from "./account-section.tsx";
 
 const redirectApi = vi.hoisted(() => ({
   redirectToLogin: vi.fn(),
+  redirectToSignIn: vi.fn(),
 }));
 vi.mock("../../../features/change-password/lib/account-redirect.ts", () => ({
   LOGIN_REDIRECT_URL: "/auth/login?next=%2F&notice=password-changed",
+  SIGN_IN_URL: "/auth/login?next=%2F",
   ...redirectApi,
 }));
 
@@ -148,6 +150,58 @@ describe("SettingsAccountSection post-success wiring", () => {
     });
     expect(redirectApi.redirectToLogin).not.toHaveBeenCalled();
     expect(container.querySelector("form")).not.toBeNull();
+    act(() => {
+      root.unmount();
+    });
+    container.remove();
+  });
+});
+
+describe("C1：会话失效的改密视图", () => {
+  it("offers a re-login entry instead of blaming the password when the session expired", async () => {
+    // C1：401 unauthorized = 会话失效，不是当前口令错。
+    fetchMock.mockImplementation((input: unknown) => {
+      if (String(input) === "/auth/status") {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ authenticated: true, name: "bob", role: "user" }),
+        });
+      }
+      return Promise.resolve({
+        ok: false,
+        status: 401,
+        json: () => Promise.resolve({ error: "unauthorized" }),
+      });
+    });
+    const { root, container } = await renderPanel();
+    setValue(container, "current", "old pass");
+    setValue(container, "password", "NewPassw0rd");
+    setValue(container, "confirm", "NewPassw0rd");
+    act(() => {
+      container
+        .querySelector("form")
+        ?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    await act(async () => {
+      await flushMicrotasks();
+    });
+    expect(container.textContent).toContain("登录状态已失效");
+    expect(container.textContent).not.toContain("当前密码不正确");
+    // 会话失效没有「哪个字段错」：当前口令框不能标红。
+    expect(
+      container
+        .querySelector<HTMLInputElement>('input[name="current"]')
+        ?.getAttribute("aria-invalid"),
+    ).toBeNull();
+    const signIn = [...container.querySelectorAll("button")].find(
+      (item) => item.textContent === "重新登录",
+    );
+    expect(signIn).toBeDefined();
+    act(() => {
+      signIn?.click();
+    });
+    expect(redirectApi.redirectToSignIn).toHaveBeenCalledTimes(1);
     act(() => {
       root.unmount();
     });

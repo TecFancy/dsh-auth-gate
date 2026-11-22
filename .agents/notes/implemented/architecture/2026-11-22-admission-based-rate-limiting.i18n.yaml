@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-11-22-admission-based-rate-limiting
+2026-11-22-admission-based-rate-limiting.md: 833c3985f22cb6c5de516f482257ea433f8f0e5a
+2026-11-22-admission-based-rate-limiting.zh.md: 074651055b71b861d4b6ad85c8e491601bd27ea2

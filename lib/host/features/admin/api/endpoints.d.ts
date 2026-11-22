@@ -12,4 +12,3 @@ export declare function handleUsers(deps: AdminDeps, req: IncomingMessage, res: 
  * `target` **只认 body**（query 里的同名字段一律忽略）；`confirm` 由客户端校验，服务端不读。
  */
 export declare function handleResetPassword(deps: AdminDeps, req: IncomingMessage, res: ServerResponse): Promise<void>;
-//# sourceMappingURL=endpoints.d.ts.map

@@ -2,12 +2,8 @@ import { ACCOUNT_DICT_EN, ACCOUNT_DICT_ZH, ACCOUNT_KEYS } from "./shared/i18n/in
 import { installAccountNavIcon } from "./features/nav-icon/index.ts";
 import { SettingsAccountSection } from "./widgets/account-section/index.ts";
 import { ADMIN_DICT_EN, ADMIN_DICT_ZH } from "./features/admin-users/index.ts";
-import {
-  STATUS_PATH,
-  type AuthContext,
-  type StatusResponse,
-  type Unchecked,
-} from "./shared/api/index.ts";
+import { requestAccountStatus } from "./entities/account/index.ts";
+import type { AuthContext } from "./shared/api/index.ts";
 import { SettingsLogoutAction } from "./features/logout/index.ts";
 
 /** 本插件文案的词典命名域（locale 服务按 (ns, locale) 分开注册）。 */
@@ -97,29 +93,24 @@ export function apply(ctx: AuthContext): void {
         SettingsLogoutAction,
       );
     let dispose: (() => void) | undefined = mount(DEFAULT_LOGOUT_ORDER);
-    // 与 SettingsLogoutAction 相同的 status 探针：读 host 的 logoutOrder 配置并在
-    // 不同时重注册。探针抛错（如测试环境无 fetch）保持默认，绝不吞掉注册。
-    try {
-      void fetch(STATUS_PATH)
-        .then((res) => res.json() as Promise<Unchecked<StatusResponse>>)
-        .then((body: Unchecked<StatusResponse>) => {
-          const order = body.logoutOrder;
-          if (
-            typeof order !== "number" ||
-            !Number.isInteger(order) ||
-            order === DEFAULT_LOGOUT_ORDER
-          ) {
-            return;
-          }
-          const previous = dispose;
-          dispose = mount(order);
-          previous?.();
-        })
-        .catch(() => undefined);
-    } catch {
-      // fetch 不可用（测试环境/旧浏览器）：保持默认 order。
-    }
-    return () => dispose?.();
+    // 与账户区、登出按钮共用同一个 /auth/status 探针：读 host 的 `logoutOrder` 配置，
+    // 与默认不同则按配置值重注册。探针失败/卸载/返回非整数时保持默认，绝不吞掉注册。
+    // 卸载即 abort 并置 disposed：迟到的响应不能在这里再 mount 一个没人释放的条目（C2）。
+    const probe = new AbortController();
+    let disposed = false;
+    void requestAccountStatus(probe.signal).then((result) => {
+      if (disposed || result.kind !== "ok") return;
+      const order = result.status.logoutOrder;
+      if (order === undefined || order === DEFAULT_LOGOUT_ORDER) return;
+      const previous = dispose;
+      dispose = mount(order);
+      previous?.();
+    });
+    return () => {
+      disposed = true;
+      probe.abort();
+      dispose?.();
+    };
   });
 
   // 「账号安全」设置页：注册 `settings.section`（root 作用域、可追加列表槽，导航按

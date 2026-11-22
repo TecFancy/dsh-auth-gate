@@ -16,4 +16,3 @@ export { buildChallengeValue, CHALLENGE_COOKIE, CHALLENGE_TTL_SECONDS, parseChal
 export { PASSWORD_CHANGED_NOTICE, PASSWORD_CHANGED_TEXT, resolveLoginNotice, } from "./model/login-notice.js";
 export { issueLoginSession, issueSession } from "./model/session-issue.js";
 export type { IssueSessionDeps, IssueSessionOptions } from "./model/session-issue.js";
-//# sourceMappingURL=index.d.ts.map

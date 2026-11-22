@@ -197,7 +197,7 @@ describe("integration: password rate limiting (isolated instance)", () => {
     }
   });
 
-  it("clears the failure buckets on a successful login (recordSuccess)", async () => {
+  it("clears the account bucket on success but keeps the IP bucket (P2)", async () => {
     const { port, fibers, root } = await mountPasswordStack();
     try {
       const base = `http://127.0.0.1:${port}`;
@@ -205,10 +205,11 @@ describe("integration: password rate limiting (isolated instance)", () => {
         const res = await postLogin(base, loginBody("admin", "wrong"));
         expect(res.status).toBe(401);
       }
+      // 账号桶清零 → 正确口令能登录（若未清，第 5 次失败已把它锁住）
       expect((await postLogin(base, loginBody("admin", TEST_PASSWORD))).status).toBe(302);
-      // 成功登录已清零失败桶：再失败一次仍为 401，且随后正确口令能登录（未清零则触发 30s 锁 → 429）。
+      // IP 桶保留那 4 次失败（P2：成功登录不是 IP 级的免死金牌）：再失败一次就到 5 → 锁定。
       expect((await postLogin(base, loginBody("admin", "wrong"))).status).toBe(401);
-      expect((await postLogin(base, loginBody("admin", TEST_PASSWORD))).status).toBe(302);
+      expect((await postLogin(base, loginBody("admin", TEST_PASSWORD))).status).toBe(429);
     } finally {
       await unmountStack(fibers, root);
     }

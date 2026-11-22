@@ -126,7 +126,7 @@ describe("POST /auth/passkey/login: ceremony and store preconditions", () => {
     registerPasskeyLoginEndpoints(harness.deps);
     const opened = await begin(harness);
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      harness.limiter.recordFailure(TEST_CLIENT_IP, undefined);
+      harness.limiter.recordFailure(TEST_CLIENT_IP, undefined, "passkey");
     }
     const res = await post(
       harness,

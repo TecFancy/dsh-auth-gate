@@ -6,7 +6,12 @@ export type { BootstrapEndpointDeps } from "./api/bootstrap-endpoint.js";
 export { makeContinueEndpoint } from "./api/continue-endpoint.js";
 export type { ContinueEndpointDeps } from "./api/continue-endpoint.js";
 export { makeSetupHandlers } from "./api/setup-endpoint.js";
-export type { SetupEndpointDeps, SetupHandlers, SetupTokenOutcome } from "./api/setup-endpoint.js";
+export type {
+  CreateAdminResult,
+  SetupEndpointDeps,
+  SetupHandlers,
+  SetupTokenOutcome,
+} from "./api/setup-endpoint.js";
 export { makeConfiguredProbe } from "./model/probe.js";
 export type { ConfiguredProbe, ConfiguredProbeDeps, ConfiguredState } from "./model/probe.js";
 export {

@@ -220,20 +220,23 @@ describe("counter replay and bucket reset", () => {
     expect(res.body).toContain(PASSKEY_LOGIN_FAILED_MESSAGE);
   });
 
-  it("clears the failure bucket on success", async () => {
+  it("clears the account bucket on success but keeps the IP bucket (P2)", async () => {
     const harness = makePasskeyLoginHarness();
     registerPasskeyLoginEndpoints(harness.deps);
     const authenticator = freshAuthenticator();
     harness.users.set("alice", makeUserRecord(authenticator));
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      harness.limiter.recordFailure(TEST_CLIENT_IP, "alice");
+      harness.limiter.recordFailure(TEST_CLIENT_IP, "alice", "passkey");
     }
-    expect(harness.limiter.check(TEST_CLIENT_IP, "alice").allowed).toBe(true);
+    expect(harness.limiter.check(TEST_CLIENT_IP, "alice", "passkey").allowed).toBe(true);
     expect((await login(harness, authenticator)).status).toBe(302);
-    // 成功清桶后，再攒 4 次失败仍不应锁定（若未清桶，第 5 次就会锁）。
+    // 账号桶已清：换一个 IP 用同一账号从头计数，再攒 4 次仍不锁。
     for (let attempt = 0; attempt < 4; attempt += 1) {
-      harness.limiter.recordFailure(TEST_CLIENT_IP, "alice");
+      harness.limiter.recordFailure("198.51.100.9", "alice", "passkey");
     }
-    expect(harness.limiter.check(TEST_CLIENT_IP, "alice").allowed).toBe(true);
+    expect(harness.limiter.check("198.51.100.9", "alice", "passkey").allowed).toBe(true);
+    // IP 桶保留：原 IP 已 4 次，再来一次就锁整台 NAT。
+    harness.limiter.recordFailure(TEST_CLIENT_IP, "bob", "passkey");
+    expect(harness.limiter.check(TEST_CLIENT_IP, "carol", "passkey").allowed).toBe(false);
   });
 });

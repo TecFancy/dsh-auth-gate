@@ -9,6 +9,7 @@ import {
   PASSKEY_REGISTER_OPTIONS_PATH,
   PASSKEY_REGISTER_PATH,
   PASSKEY_REMOVE_PATH,
+  readJsonSafe,
   type PasskeyRegistrationRequest,
   type PasskeyRemoveRequest,
 } from "../../../shared/api/index.ts";
@@ -27,7 +28,6 @@ import {
   toCreationOptions,
   transportsOf,
 } from "./passkey-codec.ts";
-import { readJsonSafe } from "./passkey-http.ts";
 
 const REGISTER_OPTIONS_TARGET = PASSKEY_REGISTER_OPTIONS_PATH;
 const REGISTER_TARGET = PASSKEY_REGISTER_PATH;
@@ -106,8 +106,10 @@ export async function registerPasskey(
     if (publicKey === undefined) {
       return { kind: "failure", message: t(PASSKEY_KEYS.generic), fields: [] };
     }
+    // signal 交给浏览器：组件卸载/切走时中止等待中的认证器交互（C6）。
     const credential = (await navigator.credentials.create({
       publicKey,
+      signal,
     })) as PublicKeyCredential | null;
     if (signal.aborted) return { kind: "aborted" };
     if (credential === null) return { kind: "aborted" };

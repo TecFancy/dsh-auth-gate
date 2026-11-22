@@ -6,4 +6,3 @@
  * 只回答「两个字符串是否相等」，不区分失败原因；调用方一律把假当作拒绝。
  */
 export declare function safeEqual(input: string, stored: string): boolean;
-//# sourceMappingURL=safe-equal.d.ts.map

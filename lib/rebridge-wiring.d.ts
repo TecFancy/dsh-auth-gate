@@ -48,4 +48,3 @@ export interface RebridgeLog {
  * @returns 交给 `wrapServer` 的放行后钩子。
  */
 export declare function makeRebridge(ctx: Context, config: RebridgeConfig, log: RebridgeLog): AdmitRebridge;
-//# sourceMappingURL=rebridge-wiring.d.ts.map

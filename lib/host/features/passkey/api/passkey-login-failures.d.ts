@@ -8,8 +8,9 @@
  * `passkey: "required"` 时失败卡换成 passkey-only 变体：那张卡上没有口令表单，文案也不能
  * 再写「改用密码」 - 那条路已经被策略关掉了。
  */
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 import type { UsersLoadResult } from "../../../entities/user/index.js";
+import type { CeremonyRecord } from "../model/ceremony-store.js";
 /** 401 的唯一常量文案：未知凭据与各类校验失败共用。 */
 export declare const PASSKEY_LOGIN_FAILED_MESSAGE = "Passkey sign-in failed. Try again or use your password.";
 /** 429 固定文案（不插值秒数）：只陈述「这个网络」被限速。 */
@@ -39,4 +40,7 @@ export declare function loadUsersOr503(deps: {
         error(message: unknown): void;
     };
 }, res: ServerResponse): Promise<UsersLoadResult | undefined>;
-//# sourceMappingURL=passkey-login-failures.d.ts.map
+/** 失败页上下文：反钓鱼 host 来自配置（回退请求头 Host）+ 消毒后的 next。 */
+export declare function failureContext(publicHost: string, req: IncomingMessage, params: URLSearchParams, passwordLoginDisabled: boolean | undefined): PasskeyFailureContext;
+/** ceremony 的 32 字节 challenge → 库要的 base64url（与 options 响应里的值逐字一致）。 */
+export declare function challengeOf(ceremony: CeremonyRecord): string;

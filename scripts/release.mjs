@@ -60,7 +60,7 @@ function gh(args) {
 function sh(cmd) {
   try {
     return execSync(cmd, { encoding: "utf8", stdio: ["pipe", "pipe", "inherit"] }).trim();
-  } catch (error) {
+  } catch {
     process.stderr.write(`command failed: ${cmd}\n`);
     process.exit(1);
     return undefined;
@@ -82,18 +82,18 @@ const bumpHint = (title) =>
       ? "patch (fix)"
       : /^(docs|chore|test|ci|style|refactor|build|perf|revert)(\(|:)/.test(title)
         ? "none (docs/chore family)"
-        : "UNKNOWN TYPE — check the title";
+        : "UNKNOWN TYPE - check the title";
 
 function check() {
   const branch = sh("git branch --show-current");
   const npmName = pkgName() ?? "(no package.json)";
   if (branch !== BASE) {
-    console.error(`✗ must be on '${BASE}' (on '${branch}') — use --branch to override`);
+    console.error(`✗ must be on '${BASE}' (on '${branch}') - use --branch to override`);
     process.exit(1);
   }
   const dirty = sh("git status --porcelain");
   if (dirty !== "") {
-    console.error(`✗ working tree is dirty — commit or stash first:\n${dirty}`);
+    console.error(`✗ working tree is dirty - commit or stash first:\n${dirty}`);
     process.exit(1);
   }
   gh(["auth", "status"]);
@@ -102,7 +102,7 @@ function check() {
   console.log(
     `✓ npm package: ${npmName}, gh authenticated, origin = ${sh("git remote get-url origin")}`,
   );
-  if (ahead === 0) console.log("  (nothing to release — did you commit?)");
+  if (ahead === 0) console.log("  (nothing to release - did you commit?)");
 }
 
 function openPr(title) {
@@ -165,7 +165,7 @@ async function releasePr() {
     }
     await sleep(15_000);
   }
-  console.error("✗ no release PR appeared within 5 min — check the Release workflow");
+  console.error("✗ no release PR appeared within 5 min - check the Release workflow");
   process.exit(1);
   return "";
 }
@@ -178,7 +178,7 @@ async function waitPublish(version) {
   }
   if (!pkg) {
     console.error(
-      "✗ cannot read package.json name here — run from the repo root or pass --package",
+      "✗ cannot read package.json name here - run from the repo root or pass --package",
     );
     process.exit(1);
   }
@@ -196,13 +196,13 @@ async function waitPublish(version) {
     }
     await sleep(15_000);
   }
-  console.error(`✗ ${version} not on npm within 5min — check the Release workflow`);
+  console.error(`✗ ${version} not on npm within 5min - check the Release workflow`);
   process.exit(1);
 }
 
 function syncBack() {
   if (BASE === "main") {
-    console.log("  (main-based repo — nothing to sync back)");
+    console.log("  (main-based repo - nothing to sync back)");
     return;
   }
   sh("git fetch origin main");
@@ -240,7 +240,7 @@ async function main() {
       const version = await releasePr();
       await waitPublish(version);
       syncBack();
-      console.log(`🎉 shipped: ${version} — PR #${pr} → main → npm`);
+      console.log(`🎉 shipped: ${version} - PR #${pr} → main → npm`);
       break;
     }
     default:

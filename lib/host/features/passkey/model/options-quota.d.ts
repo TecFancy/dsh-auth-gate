@@ -45,4 +45,3 @@ export declare class PasskeyOptionsQuota {
     /** 已达上限时给出最早一条命中滑出窗口所需秒数；未达上限返回 undefined。 */
     private blockedFor;
 }
-//# sourceMappingURL=options-quota.d.ts.map

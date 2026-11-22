@@ -11,4 +11,3 @@ export declare function authCatchAll(_req: IncomingMessage, res: ServerResponse)
 /** 只取 query（M22：logout 的 next 不走 body），node:http 无内置 req.query。 */
 export declare function queryOf(req: IncomingMessage): URLSearchParams;
 export declare function methodNotAllowed(res: ServerResponse, allow: string): void;
-//# sourceMappingURL=endpoints.d.ts.map

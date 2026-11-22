@@ -77,4 +77,3 @@ export type PasskeySettings = {
  * `passwordLoginDisabled` 先于所有 WebAuthn 检查算出：它是策略，不随参数校验结果变化。
  */
 export declare function resolvePasskeySettings(input: PasskeySettingsInput): PasskeySettings;
-//# sourceMappingURL=passkey-config.d.ts.map

@@ -47,4 +47,3 @@ export interface TelemetryWiringConfig extends TelemetryFields {
  * @returns 交给 `wrapServer` 的放行钩子；`telemetry: false` 时为 undefined（不挂钩子）。
  */
 export declare function wireTelemetry(ctx: Context, config: TelemetryWiringConfig): AdmitHook | undefined;
-//# sourceMappingURL=telemetry-wiring.d.ts.map

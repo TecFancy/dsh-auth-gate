@@ -25,4 +25,3 @@ export interface BootstrapEndpointDeps {
  * `/auth/login?next=%2F` 且不下发 cookie，绝不放行未认证请求给 dsh。
  */
 export declare function makeBootstrapEndpoint(deps: BootstrapEndpointDeps): HttpHandler;
-//# sourceMappingURL=bootstrap-endpoint.d.ts.map

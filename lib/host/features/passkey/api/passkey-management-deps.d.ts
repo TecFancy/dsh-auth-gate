@@ -87,4 +87,3 @@ export type PasskeyManagementJsonBody = {
 } | PasskeyListResponse | PasskeySettingsResponse | PasskeyAdminErrorBody;
 /** 管理端点 handler 的形状（与 `HttpHandler` 同形，单独命名便于路由表声明）。 */
 export type PasskeyManagementHandler = (req: IncomingMessage, res: ServerResponse) => void | Promise<void>;
-//# sourceMappingURL=passkey-management-deps.d.ts.map

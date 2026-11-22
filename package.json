@@ -61,7 +61,7 @@
     "lib",
     "deploy",
     "docs/demo",
-    ".agents/skills",
+    ".agents/skills/dsh-auth-gate-config",
     "cordis.patch.yml",
     "icon.svg",
     "locale/*.json"
@@ -77,7 +77,8 @@
   },
   "scripts": {
     "build": "node scripts/clean-lib.mjs && tsc -p tsconfig.build.json && tsdown && tsc -p tsconfig.client.build.json",
-    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit",
+    "type-check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.scripts.json",
+    "type-check:scripts": "tsc -p tsconfig.scripts.json --noEmit",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -103,7 +104,6 @@
     "skills:check": "node scripts/sync-skills.mjs --check",
     "skills:frontmatter": "node scripts/check-skill-frontmatter.mjs",
     "skills:links": "node scripts/check-skill-links.mjs",
-    "skills:updates": "node scripts/check-skill-updates.mjs",
     "readme:parity": "node scripts/verify-readme-parity.mjs",
     "screenshots:check": "node scripts/verify-screenshots.mjs",
     "bundle:check": "node scripts/verify-bundle.mjs",

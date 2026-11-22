@@ -44,7 +44,9 @@ const GITHUB_HOSTS = new Set([
 /** Extensions the market renders. SVG is deliberately absent. */
 const RASTER = new Set([".png", ".jpg", ".jpeg", ".webp"]);
 
+/** @type {string[]} */
 const errors = [];
+/** @param {string} message */
 const note = (message) => errors.push(`${FILE}: ${message}`);
 
 const path = join(ROOT, FILE);
@@ -57,7 +59,9 @@ let doc;
 try {
   doc = JSON.parse(readFileSync(path, "utf8"));
 } catch (error) {
-  console.error(`${FILE} is not valid JSON: ${error.message}`);
+  console.error(
+    `${FILE} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`,
+  );
   process.exit(1);
 }
 
@@ -82,7 +86,7 @@ for (const [index, raw] of list.entries()) {
   seen.add(entry);
 
   if (/^https?:\/\//i.test(entry)) {
-    let parsed = null;
+    let parsed;
     try {
       parsed = new URL(entry);
     } catch {

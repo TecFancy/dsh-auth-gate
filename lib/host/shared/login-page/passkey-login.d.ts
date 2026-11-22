@@ -25,4 +25,3 @@ export declare function passkeyLoginScript(conditionalUi: boolean): string;
  * 表单字段名与协议类型 `PasskeyAssertionRequest` 一一对应；`next` 走 escapeHtml。
  */
 export declare function passkeyLoginFragment(next: string, options: PasskeyLoginOptions): string;
-//# sourceMappingURL=passkey-login.d.ts.map

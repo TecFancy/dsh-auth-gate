@@ -1,10 +1,5 @@
-import { isGuarded } from "./mark.js";
-import type { WrappableRoute, WrappableServer, WrappableUpgradeRoute } from "./guard.js";
-
-/** 路由条目上实际应带守卫标记的函数（handler 或 0.2.2 的 resource）。 */
-function routeTarget(route: WrappableRoute | WrappableUpgradeRoute): unknown {
-  return "resource" in route && route.resource !== undefined ? route.resource : route.handler;
-}
+import type { WrappableServer } from "./guard.js";
+import { isGuarded, routeTarget } from "./mark.js";
 
 /**
  * 启动自检：返回未被守卫标记覆盖的入口清单，形如 "exact /api"、"fallback"、

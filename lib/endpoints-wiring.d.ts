@@ -65,4 +65,3 @@ export interface EndpointsWiringInput {
  * 当作 disposer 存起来，注册永不发生，实测 404）。
  */
 export declare function makeEndpointsWiring(input: EndpointsWiringInput): () => void;
-//# sourceMappingURL=endpoints-wiring.d.ts.map

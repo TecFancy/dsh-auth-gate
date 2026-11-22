@@ -3,6 +3,7 @@ import { loginPageHtml } from "../../../shared/login-page/index.js";
 import {
   authCatchAll,
   methodNotAllowed,
+  mountRoutes,
   parseFormBody,
   queryOf,
   resolvePostLoginLocation,
@@ -10,8 +11,8 @@ import {
   resolvePublicHost,
   validateNext,
   type LaunchTokenBridge,
+  type RouteRegister,
 } from "../../../shared/http/index.js";
-import type { HttpHandler } from "../../../shared/guard/index.js";
 import {
   AUTH_PATH_PREFIX,
   LOGIN_PATH,
@@ -24,6 +25,7 @@ import {
   handleStatus,
   type SessionStore,
 } from "../../../entities/session/index.js";
+import type { Admission, LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 
 /**
  * 错 token 的唯一常量文案（D21）：所有拒绝共用同一响应形态，且绝不读 query、绝不反射
@@ -34,7 +36,7 @@ export const INVALID_TOKEN = "Invalid access token.";
 
 export interface AuthEndpointsDeps {
   /** 注册路由（index.ts 传入包装后的 server.register；被守卫包装但被 gate 白名单放行）。 */
-  register(route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): () => void;
+  register: RouteRegister;
   /** 会话访问器（M16）：domain 异步就绪，端点内每次现取。 */
   sessions: () => SessionStore | undefined;
   cookieName: string;
@@ -53,6 +55,10 @@ export interface AuthEndpointsDeps {
    */
   passwordLoginDisabled?: boolean | undefined;
   validateToken: (token: string) => Promise<boolean>; // 恒时校验（index.ts 注入 safeEqual 闭包）
+  /** 与服务端其它登录路径共用的限速器（P1：token 模式此前完全没有限速）。 */
+  limiter: LoginRateLimiter;
+  /** 客户端标识（D19）：受信反代头解析器；token 模式原先直接读 socket，容易在反代后全实例共桶。 */
+  clientIp: (req: IncomingMessage) => string;
   /**
    * 反钓鱼身份块的 host（D14）：配置优先，缺省/空串回退请求头 Host。
    * 半外壳反代（Caddy `header_up Host 127.0.0.1:3080`）下必须显式配置，否则会渲染回环地址。
@@ -77,28 +83,27 @@ export interface AuthEndpointsDeps {
  * 注册 prefix `/auth` 兜底 + 三个 exact 端点（M15：webserver 无 method 路由，exact
  * 表只按 pathname 建键、重复 path 抛错，故 GET/POST `/auth/login` 不能注册两条路由，
  * 由 handler 内部按 `req.method` 分发）。返回合并 disposer（内部收集每个 register 的
- * disposer）。
+ * disposer；部分失败按注册逆序回滚，见 `mountRoutes`）。
  */
 export function registerAuthEndpoints(deps: AuthEndpointsDeps): () => void {
-  const disposers: (() => void)[] = [];
-  const track = (route: { kind: "exact" | "prefix"; path: string; handler: HttpHandler }): void => {
-    disposers.push(deps.register(route));
-  };
-  track({ kind: "prefix", path: AUTH_PATH_PREFIX, handler: authCatchAll });
-  track({ kind: "exact", path: LOGIN_PATH, handler: (req, res) => handleLogin(deps, req, res) });
-  track({
-    kind: "exact",
-    path: LOGOUT_PATH,
-    handler: (req, res) => handleLogout(deps, req, res),
-  });
-  track({
-    kind: "exact",
-    path: STATUS_PATH,
-    handler: (req, res) => handleStatus(deps, req, res),
-  });
-  return () => {
-    for (const disposer of [...disposers].reverse()) disposer();
-  };
+  return mountRoutes(deps.register, [
+    { kind: "prefix", path: AUTH_PATH_PREFIX, handler: authCatchAll },
+    {
+      kind: "exact",
+      path: LOGIN_PATH,
+      handler: (req, res) => handleLogin(deps, req, res),
+    },
+    {
+      kind: "exact",
+      path: LOGOUT_PATH,
+      handler: (req, res) => handleLogout(deps, req, res),
+    },
+    {
+      kind: "exact",
+      path: STATUS_PATH,
+      handler: (req, res) => handleStatus(deps, req, res),
+    },
+  ]);
 }
 
 function handleLogin(
@@ -119,7 +124,6 @@ function handleLogin(
 /** GET：恒渲染登录页（不查会话、不重定向，M20）。 */
 function serveLoginPage(deps: AuthEndpointsDeps, req: IncomingMessage, res: ServerResponse): void {
   const next = validateNext(queryOf(req).get("next") ?? "/");
-  res.setHeader("cache-control", "no-store");
   res.setHeader("cache-control", "no-store");
   setPasskeyPermissionsPolicy(res);
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
@@ -148,6 +152,31 @@ async function loginAttempt(
   }
   const token = params.get("token") ?? "";
   const next = validateNext(params.get("next") ?? "/");
+  const admitted = deps.limiter.admit(deps.clientIp(req), undefined, "token");
+  if (!admitted.admitted) {
+    res.setHeader("cache-control", "no-store");
+    res.setHeader("retry-after", String(admitted.retryAfterSeconds));
+    res.writeHead(429, { "content-type": "text/plain" });
+    res.end("too many sign-in attempts");
+    deps.logger.info("rate limit exceeded");
+    return;
+  }
+  try {
+    await completeLogin(deps, req, res, token, next, admitted.admission);
+  } finally {
+    admitted.admission.settle("abandon"); // 已结算时是空操作
+  }
+}
+
+/** 受理之后的校验与签发；失败计 token 域，成功清该域。 */
+async function completeLogin(
+  deps: AuthEndpointsDeps,
+  req: IncomingMessage,
+  res: ServerResponse,
+  token: string,
+  next: string,
+  admission: Admission,
+): Promise<void> {
   if (!(await deps.validateToken(token))) {
     // D21：401 保持，body 换成登录卡片（error slot），否则浏览器导航只看到空白纯文本页。
     res.setHeader("cache-control", "no-store");
@@ -157,6 +186,7 @@ async function loginAttempt(
         host: resolvePublicHost(deps.publicHost, req.headers.host),
       }),
     );
+    admission.settle("failure");
     deps.logger.info("login rejected");
     return;
   }
@@ -169,6 +199,7 @@ async function loginAttempt(
     deps.logger.error("login failed: session store unavailable");
     return;
   }
+  admission.settle("success");
   const { token: sessionToken } = await store.create("token", deps.sessionTtl * 1000);
   res.setHeader("cache-control", "no-store");
   // 抑制发往 `/?token=` 那一跳的 Referer：登录页 URL 不作为下游 Referer 传播（与 dsh 303 同形）。

@@ -6,4 +6,3 @@ import type { WrappableServer } from "./guard.js";
  * handler 与 resource 两种路由都检查；fallback 既认函数也认 `{ resource }` 对象。
  */
 export declare function assertGuarded(server: WrappableServer): string[];
-//# sourceMappingURL=self-check.d.ts.map

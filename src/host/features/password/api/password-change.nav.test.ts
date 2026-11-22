@@ -151,3 +151,35 @@ describe("Location never reflects request data (contract 35)", () => {
     expect(res.headers["location"]).not.toContain("evil");
   });
 });
+
+describe("session kind allow-list (G12)", () => {
+  /** 把夹具里唯一的正式会话改成指定 kind（其余字段保持有效）。 */
+  function harnessWithKind(kind: string): ReturnType<typeof makeHarness> {
+    const h = makeHarness();
+    const session = h.store.store.getByToken("good");
+    if (session === undefined) throw new Error("harness session missing");
+    session.kind = kind as unknown as "full";
+    return h;
+  }
+
+  it("rejects a bootstrap-kind session with 401 and writes nothing", async () => {
+    const h = harnessWithKind("bootstrap");
+    const res = await post(h.deps, NAV_BODY);
+    expect(res.status).toBe(401);
+    expect(jsonBody(res)).toEqual({ error: "unauthorized" });
+    expect(h.state.writes).toBe(0);
+    expect(h.store.has("good")).toBe(true);
+  });
+
+  it("rejects a future session kind without a code change", async () => {
+    const h = harnessWithKind("some-future-kind");
+    const res = await post(h.deps, NAV_BODY);
+    expect(res.status).toBe(401);
+    expect(h.state.writes).toBe(0);
+  });
+
+  it("still allows the restricted (password-change-only) session", async () => {
+    const res = await post(restrictedHarness().deps, NAV_BODY);
+    expect(res.status).toBe(302);
+  });
+});

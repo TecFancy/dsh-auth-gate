@@ -7,4 +7,3 @@ import type { AdminUserRow } from "../../../shared/protocol/index.js";
  * 保证键集合恒定、不出现 `undefined` 值被 JSON 丢掉）。
  */
 export declare function projectUsers(snapshot: UsersSnapshot): AdminUserRow[];
-//# sourceMappingURL=users-list.d.ts.map

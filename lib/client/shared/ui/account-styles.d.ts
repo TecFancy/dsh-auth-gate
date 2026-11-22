@@ -29,4 +29,3 @@ export declare const ADMIN_TH_STYLE: CSSProperties;
 export declare const ADMIN_TD_STYLE: CSSProperties;
 /** 只读徽标（角色 / 状态 / 两步验证 / 本人）：浅底 + 次级文字色，随主题切换。 */
 export declare const ADMIN_BADGE_STYLE: CSSProperties;
-//# sourceMappingURL=account-styles.d.ts.map

@@ -8,6 +8,7 @@ import type { UserRecord, UsersSnapshot } from "../../../entities/user/index.js"
 import { handlePasswordChange, type PasswordChangeDeps } from "./password-change.js";
 import {
   CURRENT,
+  FIXED_NOW,
   GOOD_BODY,
   NEW_HASH,
   NEW_PASSWORD,
@@ -85,7 +86,8 @@ describe("rate limit and store invariants", () => {
     const verify = vi.fn(() => Promise.resolve(true));
     const limiter = new LoginRateLimiter();
     const { deps } = makeHarness({ limiter, verify });
-    for (let attempt = 0; attempt < 5; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 5; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     const res = await send(deps, { body: GOOD_BODY });
     expect(res.status).toBe(429);
     expect(verify).not.toHaveBeenCalled();
@@ -97,18 +99,20 @@ describe("rate limit and store invariants", () => {
       limiter,
       mutateUsers: () => Promise.reject(new Error("users file is locked")),
     });
-    for (let attempt = 0; attempt < 4; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 4; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     await send(deps, { body: GOOD_BODY }); // 写盘失败计第 5 次失败
-    expect(limiter.check("127.0.0.1", "alice").allowed).toBe(false);
+    expect(limiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(false);
   });
 
   it("clears the bucket on success (the user is not locked out by their own change)", async () => {
     const limiter = new LoginRateLimiter();
     const { deps } = makeHarness({ limiter });
-    for (let attempt = 0; attempt < 4; attempt += 1) limiter.recordFailure("127.0.0.1", "alice");
+    for (let attempt = 0; attempt < 4; attempt += 1)
+      limiter.recordFailure("127.0.0.1", "alice", "password-change");
     await send(deps, { body: GOOD_BODY }); // recordSuccess 清桶
-    limiter.recordFailure("127.0.0.1", "alice"); // 若未清桶这里就是第 5 次 → 锁定
-    expect(limiter.check("127.0.0.1", "alice").allowed).toBe(true);
+    limiter.recordFailure("127.0.0.1", "alice", "password-change"); // 若未清桶这里就是第 5 次 → 锁定
+    expect(limiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(true);
   });
 
   it("does not touch the store on a policy rejection", async () => {
@@ -152,7 +156,7 @@ describe("locked snapshot semantics (A7 §4.2)", () => {
 });
 
 describe("must_change_password clearing (B1 §10)", () => {
-  it("clears the flag on disk after a self-service change", async () => {
+  it("records password_changed_at on disk after a self-service change", async () => {
     const root = mkdtempSync(join(tmpdir(), "dsh-pwchange-flag-"));
     const usersPath = join(root, "users.yaml");
     try {
@@ -166,13 +170,15 @@ describe("must_change_password clearing (B1 §10)", () => {
       const text = readFileSync(usersPath, "utf8");
       expect(text).not.toContain("must_change_password");
       expect(text).toContain(NEW_HASH);
+      // L5：改密落 password_changed_at，供扫描器在立即吊销失败/插件重启后兜底。
+      expect(text).toContain("password_changed_at");
       expect(text).toBe(await controlBytes(root)); // 默认值不落盘：与「无该字段」对照逐字节一致
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
   });
 
-  it("does not add the field when it was absent (write-back stays byte-identical)", async () => {
+  it("keeps the other default fields off disk (write-back stays byte-identical)", async () => {
     const root = mkdtempSync(join(tmpdir(), "dsh-pwchange-noflag-"));
     const usersPath = join(root, "users.yaml");
     try {
@@ -199,11 +205,20 @@ function realFileDeps(usersPath: string): Partial<PasswordChangeDeps> {
   };
 }
 
-/** 对照文件：由 writeUsersFile 直接序列化「改密后应有的快照」（role/false 不落盘）。 */
+/** 对照文件：由 writeUsersFile 直接序列化「改密后应有的快照」（role/false 不落盘，含改密时刻）。 */
 async function controlBytes(root: string): Promise<string> {
   const control = join(root, "control.yaml");
   await writeUsersFile(control, {
-    users: new Map([["alice", { passwordHash: NEW_HASH, disabled: false }]]),
+    users: new Map([
+      [
+        "alice",
+        {
+          passwordHash: NEW_HASH,
+          disabled: false,
+          passwordChangedAt: new Date(FIXED_NOW).toISOString(),
+        },
+      ],
+    ]),
   });
   return readFileSync(control, "utf8");
 }

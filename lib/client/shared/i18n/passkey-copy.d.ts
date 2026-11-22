@@ -47,6 +47,8 @@ export declare const PASSKEY_KEYS: {
     readonly badRequest: "account.passkey.badRequest";
     readonly locked: "account.passkey.locked";
     readonly lockedPlain: "account.passkey.lockedPlain";
+    /** 另一个通行密钥操作在飞时再发起的动作：明确说「等一下」，不静默丢弃（C6）。 */
+    readonly busy: "account.passkey.busy";
     readonly generic: "account.passkey.generic";
     readonly settingsTitle: "account.passkey.settingsTitle";
     readonly settingsIntro: "account.passkey.settingsIntro";
@@ -68,4 +70,3 @@ export declare const PASSKEY_KEYS: {
 export declare const PASSKEY_DICT_ZH: Record<string, string>;
 /** 英文词典（键集合与中文一致）。 */
 export declare const PASSKEY_DICT_EN: Record<string, string>;
-//# sourceMappingURL=passkey-copy.d.ts.map

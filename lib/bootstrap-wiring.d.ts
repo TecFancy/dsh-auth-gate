@@ -1,8 +1,8 @@
 import type { Context } from "@deepseek-ai/cordis";
+import { type ConfiguredProbe } from "./host/features/bootstrap/index.js";
 import type { WrappableServer } from "./host/shared/guard/index.js";
 import type { LaunchTokenBridge } from "./host/shared/http/index.js";
 import { type SessionStore } from "./host/entities/session/index.js";
-import { type ConfiguredProbe } from "./host/features/bootstrap/index.js";
 /** 只看 bootstrap 需要的启动期配置（结构兼容 `AuthConfig`，根文件传整个 config 即可）。 */
 export interface BootstrapConfig {
     mode: "token" | "password";
@@ -51,4 +51,3 @@ export interface BootstrapWiring {
  * 甚至让向导覆盖掉已存在的 DSH_AUTH_TOKEN。这里用严格读取器，失败一律上抛成 `unknown`。
  */
 export declare function makeBootstrapWiring(input: BootstrapWiringInput): BootstrapWiring;
-//# sourceMappingURL=bootstrap-wiring.d.ts.map

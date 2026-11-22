@@ -3,10 +3,10 @@
  *
  * `index.tsx` 把两套词典注册进 `auth` 命名域（与 logout 同一 ns），
  * `account-section.tsx` 只通过槽位注入的 `t` 读取本文件的键，不自己拼字符串。
- * 策略文案里的 14/256 字符镜像契约 §2（`PASSWORD_MIN_LENGTH` / `PASSWORD_MAX_LENGTH`）：
- * client bundle 不 import 服务端 shared 模块，半边保持解耦。
+ * 策略文案里的长度边界来自跨半边契约（`PASSWORD_MIN_LENGTH` / `PASSWORD_MAX_LENGTH`，D31）：
+ * 不在这里写字面量，口径随契约一起变（C12）。
  */
-import type { PasswordRule } from "../api/index.ts";
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH, type PasswordRule } from "../api/index.ts";
 import { PASSKEY_DICT_EN, PASSKEY_DICT_ZH } from "./passkey-copy.ts";
 
 /** 槽位注入的标准 `t` seat（host locale translate 的形）。 */
@@ -40,6 +40,12 @@ export const ACCOUNT_KEYS = {
   mismatch: "account.mismatch",
   invalidCredentials: "account.invalidCredentials",
   invalidTotp: "account.invalidTotp",
+  /** 401 `unauthorized`：会话失效（不是当前口令错），要带「重新登录」入口（C1）。 */
+  expired: "account.expired",
+  /** 403 `bad_origin`：跨源提交被拒，与「口令错」无关（C1）。 */
+  badOrigin: "account.badOrigin",
+  /** 渲染期异常的错误边界兜底文案（C7）。 */
+  loadFailed: "account.loadFailed",
   policyIntro: "account.policyIntro",
   locked: "account.locked",
   lockedPlain: "account.lockedPlain",
@@ -115,8 +121,7 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.confirm]: "确认新密码",
   [ACCOUNT_KEYS.code]: "动态验证码",
   [ACCOUNT_KEYS.codeHint]: "已开启两步验证时填写 6 位动态码，否则留空。",
-  [ACCOUNT_KEYS.policyHint]:
-    "新密码至少 14 个字符，且包含大写字母、小写字母、数字和特殊字符，不能与当前密码相同。",
+  [ACCOUNT_KEYS.policyHint]: `新密码至少 ${PASSWORD_MIN_LENGTH} 个字符，且包含大写字母、小写字母、数字和特殊字符，不能与当前密码相同。`,
   [ACCOUNT_KEYS.submit]: "修改密码",
   [ACCOUNT_KEYS.submitting]: "提交中...",
   [ACCOUNT_KEYS.success]: "密码已改，请重新登录。当前设备也已登出。",
@@ -126,13 +131,16 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.mismatch]: "两次输入的新密码不一致。",
   [ACCOUNT_KEYS.invalidCredentials]: "当前密码不正确。",
   [ACCOUNT_KEYS.invalidTotp]: "动态验证码不正确，或该验证码已被使用，请等待下一枚验证码后重试。",
+  [ACCOUNT_KEYS.expired]: "登录状态已失效，请重新登录后重试。",
+  [ACCOUNT_KEYS.badOrigin]: "请求来源未被允许，请回到本实例的页面重试。",
+  [ACCOUNT_KEYS.loadFailed]: "账号安全设置加载失败，请刷新页面后重试。",
   [ACCOUNT_KEYS.policyIntro]: "新密码不符合以下要求：",
   [ACCOUNT_KEYS.locked]: "尝试次数过多，请在 {seconds} 秒后重试。",
   [ACCOUNT_KEYS.lockedPlain]: "尝试次数过多，请稍后重试。",
   [ACCOUNT_KEYS.unavailable]: "服务暂时不可用，请稍后重试。",
   [ACCOUNT_KEYS.generic]: "修改失败，请稍后重试。",
-  [ACCOUNT_KEYS.ruleMinLength]: "至少 14 个字符",
-  [ACCOUNT_KEYS.ruleMaxLength]: "不超过 256 个字符",
+  [ACCOUNT_KEYS.ruleMinLength]: `至少 ${PASSWORD_MIN_LENGTH} 个字符`,
+  [ACCOUNT_KEYS.ruleMaxLength]: `不超过 ${PASSWORD_MAX_LENGTH} 个字符`,
   [ACCOUNT_KEYS.ruleUppercase]: "包含大写字母",
   [ACCOUNT_KEYS.ruleLowercase]: "包含小写字母",
   [ACCOUNT_KEYS.ruleDigit]: "包含数字",
@@ -170,8 +178,7 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
   [ACCOUNT_KEYS.code]: "Verification code",
   [ACCOUNT_KEYS.codeHint]:
     "Enter the 6-digit code when two-factor authentication is on, otherwise leave it empty.",
-  [ACCOUNT_KEYS.policyHint]:
-    "At least 14 characters with an uppercase letter, a lowercase letter, a digit and a special character; it must differ from the current password.",
+  [ACCOUNT_KEYS.policyHint]: `At least ${PASSWORD_MIN_LENGTH} characters with an uppercase letter, a lowercase letter, a digit and a special character; it must differ from the current password.`,
   [ACCOUNT_KEYS.submit]: "Change password",
   [ACCOUNT_KEYS.submitting]: "Submitting...",
   [ACCOUNT_KEYS.success]:
@@ -183,13 +190,16 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
   [ACCOUNT_KEYS.invalidCredentials]: "The current password is incorrect.",
   [ACCOUNT_KEYS.invalidTotp]:
     "The verification code is incorrect or already used; wait for the next code and try again.",
+  [ACCOUNT_KEYS.expired]: "Your session has expired. Sign in again and retry.",
+  [ACCOUNT_KEYS.badOrigin]: "This request came from an unallowed origin. Retry from this page.",
+  [ACCOUNT_KEYS.loadFailed]: "Could not load account security settings. Refresh the page to retry.",
   [ACCOUNT_KEYS.policyIntro]: "The new password does not meet these requirements:",
   [ACCOUNT_KEYS.locked]: "Too many attempts. Try again in {seconds} seconds.",
   [ACCOUNT_KEYS.lockedPlain]: "Too many attempts. Try again later.",
   [ACCOUNT_KEYS.unavailable]: "The service is temporarily unavailable. Please try again later.",
   [ACCOUNT_KEYS.generic]: "Could not change the password. Please try again later.",
-  [ACCOUNT_KEYS.ruleMinLength]: "at least 14 characters",
-  [ACCOUNT_KEYS.ruleMaxLength]: "at most 256 characters",
+  [ACCOUNT_KEYS.ruleMinLength]: `at least ${PASSWORD_MIN_LENGTH} characters`,
+  [ACCOUNT_KEYS.ruleMaxLength]: `at most ${PASSWORD_MAX_LENGTH} characters`,
   [ACCOUNT_KEYS.ruleUppercase]: "an uppercase letter",
   [ACCOUNT_KEYS.ruleLowercase]: "a lowercase letter",
   [ACCOUNT_KEYS.ruleDigit]: "a digit",

@@ -1,5 +1,6 @@
-import { useEffect, useState, type CSSProperties } from "react";
-import { LOGOUT_URL, STATUS_PATH } from "../../../shared/api/index.ts";
+import { useState, type CSSProperties } from "react";
+import { useAccountStatus } from "../../../entities/account/index.ts";
+import { LOGOUT_URL } from "../../../shared/api/index.ts";
 
 /** 登出目标：POST-only（M22：next 仅从 query 取，校验回落 /）。 */
 const LOGOUT_TARGET = LOGOUT_URL;
@@ -62,29 +63,6 @@ const formStyle: CSSProperties = {
   display: "contents",
 };
 
-/**
- * 会话状态门控：挂载时 fetch /auth/status 一次（只认 cookie）。
- * @returns authenticated：null = 未知（第一次请求前），true/false。
- */
-function useAuthenticated(): boolean | null {
-  const [authenticated, setAuthenticated] = useState<boolean | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch(STATUS_PATH)
-      .then((res) => res.json())
-      .then((body: { authenticated?: unknown }) => {
-        if (!cancelled) setAuthenticated(body.authenticated === true);
-      })
-      .catch(() => {
-        if (!cancelled) setAuthenticated(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return authenticated;
-}
-
 /** 槽位渲染器按注册 `locale` 注入的 translate 形（本插件 `auth` 词典的 `logout` 键）。 */
 export type LogoutTranslate = (key: string, params?: Record<string, unknown>) => string;
 
@@ -100,9 +78,10 @@ export interface SettingsLogoutActionProps {
  * 水平居中的醒目 CTA；文案随界面语言在「退出登录」/ "Sign out" 间切换。
  */
 export function SettingsLogoutAction({ t }: SettingsLogoutActionProps) {
-  const authenticated = useAuthenticated();
+  // 与账户区共用同一个 /auth/status 探针（C9：一次页面加载只发一个请求）。
+  const { state } = useAccountStatus();
   const [hovered, setHovered] = useState(false);
-  if (authenticated !== true) return null;
+  if (state.kind !== "ok" || state.status.authenticated !== true) return null;
   const label = typeof t === "function" ? t("logout") : "Sign out";
   return (
     <form method="post" action={LOGOUT_TARGET} style={formStyle}>

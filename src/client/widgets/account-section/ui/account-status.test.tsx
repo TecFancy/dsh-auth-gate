@@ -48,14 +48,25 @@ function cleanup(root: Root, container: HTMLElement): void {
   container.remove();
 }
 
-/** 探针组件：把 status 原样序列化出来，便于断言守卫后的字段集合。 */
+/** 探针组件：把 hook 的 state 原样序列化出来，便于断言守卫后的字段集合与失败态。 */
 function StatusProbe(): ReactElement {
-  const status = useAccountStatus();
-  return createElement("pre", { "data-testid": "status" }, JSON.stringify(status));
+  const { state } = useAccountStatus();
+  return createElement("pre", { "data-testid": "status" }, JSON.stringify(state));
 }
 
+/** hook 的 state（序列化在探针节点里）。 */
 function probeOf(container: HTMLElement): unknown {
-  return JSON.parse(container.querySelector('[data-testid="status"]')?.textContent ?? "null");
+  const raw: unknown = JSON.parse(
+    container.querySelector('[data-testid="status"]')?.textContent ?? "null",
+  );
+  return raw;
+}
+
+/** 其中已解析的 status 视图（失败态的 state 没有该字段）。 */
+function statusViewOf(container: HTMLElement): unknown {
+  const state = probeOf(container);
+  if (typeof state !== "object" || state === null) return undefined;
+  return "status" in state ? state.status : undefined;
 }
 
 function adminBlockOf(container: HTMLElement): HTMLElement | null {
@@ -123,7 +134,7 @@ describe("useAccountStatus", () => {
     const init = requests[0]![1]!;
     expect(init.credentials).toBe("same-origin");
     expect(init.signal).toBeInstanceOf(AbortSignal);
-    expect(probeOf(container)).toEqual({ authenticated: false });
+    expect(statusViewOf(container)).toEqual({ authenticated: false, logoutOrder: 1000 });
     cleanup(root, container);
   });
 
@@ -134,8 +145,9 @@ describe("useAccountStatus", () => {
       ),
     );
     const { root, container } = await render(createElement(StatusProbe));
-    expect(probeOf(container)).toEqual({
+    expect(statusViewOf(container)).toEqual({
       authenticated: true,
+      logoutOrder: 1000,
       name: "alice",
       role: "admin",
       disabled: false,
@@ -148,7 +160,7 @@ describe("useAccountStatus", () => {
   it("keeps additive fields undefined for an old server and for illegal values", async () => {
     routeFetch(() => statusBody({ authenticated: true, logoutOrder: 1000 }));
     const old = await render(createElement(StatusProbe));
-    expect(probeOf(old.container)).toEqual({ authenticated: true });
+    expect(statusViewOf(old.container)).toEqual({ authenticated: true, logoutOrder: 1000 });
     cleanup(old.root, old.container);
 
     routeFetch(() =>
@@ -162,19 +174,19 @@ describe("useAccountStatus", () => {
       }),
     );
     const illegal = await render(createElement(StatusProbe));
-    expect(probeOf(illegal.container)).toEqual({ authenticated: true });
+    expect(statusViewOf(illegal.container)).toEqual({ authenticated: true });
     cleanup(illegal.root, illegal.container);
   });
 
-  it("treats a failed or malformed probe as unauthenticated", async () => {
+  it("surfaces a transient probe failure instead of collapsing to unauthenticated (C9)", async () => {
     routeFetch(() => Promise.reject(new Error("network")));
     const failed = await render(createElement(StatusProbe));
-    expect(probeOf(failed.container)).toEqual({ authenticated: false });
+    expect(probeOf(failed.container)).toEqual({ kind: "failure" });
     cleanup(failed.root, failed.container);
 
     routeFetch(() => ({ ok: false, status: 503, json: () => Promise.reject(new Error("html")) }));
     const malformed = await render(createElement(StatusProbe));
-    expect(probeOf(malformed.container)).toEqual({ authenticated: false });
+    expect(probeOf(malformed.container)).toEqual({ kind: "failure" });
     cleanup(malformed.root, malformed.container);
   });
 

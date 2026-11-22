@@ -14,4 +14,3 @@
 export declare const ACCOUNT_ICON_VIEW_BOX = "0 0 16 16";
 /** 图标路径（两个 `d`：盾牌外框 + 钥匙孔圆与柄）。 */
 export declare const ACCOUNT_ICON_PATHS: readonly string[];
-//# sourceMappingURL=account-icon.d.ts.map

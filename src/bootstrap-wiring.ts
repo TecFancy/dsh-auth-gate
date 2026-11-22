@@ -1,9 +1,18 @@
 import type { Context } from "@deepseek-ai/cordis";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import {
+  makeBootstrapEndpoint,
+  makeConfiguredProbe,
+  makeContinueEndpoint,
+  makeSetupHandlers,
+  type ConfiguredProbe,
+  type CreateAdminResult,
+  type SetupTokenOutcome,
+} from "./host/features/bootstrap/index.js";
 import { randomBytes } from "node:crypto";
 import type { WrappableServer } from "./host/shared/guard/index.js";
 import type { LaunchTokenBridge } from "./host/shared/http/index.js";
-import { methodNotAllowed } from "./host/shared/http/index.js";
+import { methodNotAllowed, mountRoutes } from "./host/shared/http/index.js";
 import {
   BOOTSTRAP_PATH,
   BOOTSTRAP_SESSION_KIND,
@@ -11,16 +20,12 @@ import {
   SETUP_PATH,
 } from "./host/shared/protocol/index.js";
 import { buildSetCookie, type SessionStore } from "./host/entities/session/index.js";
-import { checkPasswordPolicy, mutateUsersFile, USERNAME_RE } from "./host/entities/user/index.js";
-import { hashPassword } from "./host/features/password/index.js";
 import {
-  makeBootstrapEndpoint,
-  makeConfiguredProbe,
-  makeContinueEndpoint,
-  makeSetupHandlers,
-  type ConfiguredProbe,
-  type SetupTokenOutcome,
-} from "./host/features/bootstrap/index.js";
+  checkPasswordPolicy,
+  isValidUsername,
+  mutateUsersFile,
+} from "./host/entities/user/index.js";
+import { hashPassword } from "./host/features/password/index.js";
 import { readLaunchToken } from "./launch-token-bridge.js";
 
 /** `ctx.get("credentials")` 的结构镜像（dsh ≥ 0.2 的 `CredentialProvider` 的子集）。 */
@@ -104,7 +109,8 @@ export function makeBootstrapWiring(input: BootstrapWiringInput): BootstrapWirin
     usersPath: input.usersPath,
     saveToken: () => saveToken(input, markConfigured),
     createAdmin: (username, password) => createAdmin(input, markConfigured, username, password),
-    issueFullSession: (subject, res) => issueFullSession(input, subject, res),
+    issueFullSession: (subject, res, credentialVersion) =>
+      issueFullSession(input, subject, res, credentialVersion),
     logger: input.log,
   });
   const bootstrap = makeBootstrapEndpoint({
@@ -131,14 +137,14 @@ export function makeBootstrapWiring(input: BootstrapWiringInput): BootstrapWirin
     probe,
     markedConfigured,
     mount(): () => void {
-      const disposers = [
-        input.server.register({ kind: "exact", path: BOOTSTRAP_PATH, handler: bootstrap }),
-        input.server.register({ kind: "exact", path: SETUP_PATH, handler: setupRoute }),
-        input.server.register({ kind: "exact", path: CONTINUE_PATH, handler: continueHandler }),
-      ];
-      return () => {
-        for (const dispose of [...disposers].reverse()) dispose();
-      };
+      return mountRoutes(
+        (route) => input.server.register(route),
+        [
+          { kind: "exact", path: BOOTSTRAP_PATH, handler: bootstrap },
+          { kind: "exact", path: SETUP_PATH, handler: setupRoute },
+          { kind: "exact", path: CONTINUE_PATH, handler: continueHandler },
+        ],
+      );
     },
     onSessionsReady: (store: SessionStore): void => {
       void probe
@@ -214,18 +220,26 @@ async function createAdmin(
   markConfigured: () => void,
   username: string,
   password: string,
-): Promise<"ok" | "conflict" | "invalid" | "failed"> {
+): Promise<CreateAdminResult> {
   try {
-    if (!USERNAME_RE.test(username)) return "invalid";
+    // 预留名（如 `bootstrap`）不可作为新用户名：与 CLI `user add` / 锁内写入同一判定。
+    if (!isValidUsername(username)) return "invalid";
     if (!(await checkPasswordPolicy(password)).ok) return "invalid";
     const passwordHash = await hashPassword(password);
+    const changedAt = new Date().toISOString();
     const outcome = await mutateUsersFile(input.usersPath, (snapshot) => {
       if (snapshot.users.has(username)) return "conflict" as const;
-      snapshot.users.set(username, { passwordHash, disabled: false, role: "admin" });
+      snapshot.users.set(username, {
+        passwordHash,
+        disabled: false,
+        role: "admin",
+        // 与 CLI / 自助改密 / 管理重置同一套 users.yaml 语义：建号即一次口令变更。
+        passwordChangedAt: changedAt,
+      });
       return "ok" as const;
     });
     if (outcome === "ok") markConfigured();
-    return outcome;
+    return outcome === "ok" ? { outcome: "ok" as const, credentialVersion: changedAt } : outcome;
   } catch {
     return "failed";
   }
@@ -236,6 +250,7 @@ async function issueFullSession(
   input: BootstrapWiringInput,
   subject: string,
   res: ServerResponse,
+  credentialVersion?: string,
 ): Promise<void> {
   const store = input.auth.sessions;
   if (store === undefined) {
@@ -243,7 +258,7 @@ async function issueFullSession(
     return;
   }
   const ttl = input.config.sessionTtl;
-  const issued = await store.create(subject, ttl * 1000, "full");
+  const issued = await store.create(subject, ttl * 1000, "full", credentialVersion);
   res.setHeader("cache-control", "no-store");
   res.setHeader("referrer-policy", "no-referrer");
   res.setHeader(

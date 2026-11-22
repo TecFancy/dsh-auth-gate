@@ -6,4 +6,3 @@ export { registerAuthEndpoints } from "./api/auth-endpoints.js";
 export type { AuthEndpointsDeps } from "./api/auth-endpoints.js";
 export { safeEqual, TokenGate } from "./model/token-gate.js";
 export type { TokenGateOptions } from "./model/token-gate.js";
-//# sourceMappingURL=index.d.ts.map

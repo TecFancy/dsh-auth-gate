@@ -3,11 +3,17 @@ import { type AccountTranslate } from "../../../shared/i18n/index.ts";
 export type FieldName = "current" | "password" | "confirm" | "code";
 export type FormValues = Record<FieldName, string>;
 export declare const EMPTY_VALUES: FormValues;
-/** 失败视图：消息 + 逐条策略规则 + 需要标红的字段。 */
+/**
+ * 失败视图：消息 + 逐条策略规则 + 需要标红的字段。
+ *
+ * `relogin` 表示「当前口令未必错，是会话没了」：客户端据此渲染「重新登录」入口，
+ * 而不是把用户钉在口令框上反复试（C1）。
+ */
 export interface FailureView {
     message: string;
     rules: string[];
     fields: FieldName[];
+    relogin?: boolean | undefined;
 }
 /** 客户端校验：两次新密码一致只在这里判（契约 §1：不进请求体）。值不 trim。 */
 export declare function validate(values: FormValues, t: AccountTranslate): FailureView | null;
@@ -22,4 +28,3 @@ export type PasswordSubmitResult = {
 };
 /** 发一次改密请求并按响应矩阵翻译；中途 abort 则立刻收手。 */
 export declare function submitPassword(values: FormValues, signal: AbortSignal, t: AccountTranslate): Promise<PasswordSubmitResult>;
-//# sourceMappingURL=account-submit.d.ts.map

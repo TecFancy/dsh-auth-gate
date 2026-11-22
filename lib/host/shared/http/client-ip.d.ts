@@ -56,4 +56,3 @@ export declare function makeClientIpResolver(policy: ClientIpPolicy, logger?: Cl
  * （历史行为）。不写日志（告警交给 `makeClientIpResolver`），便于直接断言。
  */
 export declare function resolveClientIp(req: IncomingMessage, policy: ClientIpPolicy | undefined): ClientIpResult;
-//# sourceMappingURL=client-ip.d.ts.map

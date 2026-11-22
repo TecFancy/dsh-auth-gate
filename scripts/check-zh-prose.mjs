@@ -47,7 +47,7 @@
  *   node scripts/check-zh-prose.mjs --self-test
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -138,7 +138,7 @@ const CJK = "\\u4e00-\\u9fff";
  * gate reports a green verdict about a tree it never read.
  */
 function collectCorpus() {
-  let listed = null;
+  let listed;
   try {
     listed = execFileSync("git", ["ls-files", "-z", "--cached", "--others", "--exclude-standard"], {
       cwd: ROOT,

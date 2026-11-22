@@ -11,4 +11,3 @@ export declare function redirectTo(res: ServerResponse, location: string): void;
 export declare function sendHtml(res: ServerResponse, status: number, html: string): void;
 /** 纯文本拒绝（禁缓存）：固定句子，绝不回显请求内容。 */
 export declare function sendText(res: ServerResponse, status: number, body: string, headers?: Record<string, string>): void;
-//# sourceMappingURL=respond.d.ts.map

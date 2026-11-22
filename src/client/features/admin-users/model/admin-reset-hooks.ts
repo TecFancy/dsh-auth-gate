@@ -8,7 +8,8 @@
  * - `useResetSubmit`：确认页的显式确认，真正发请求（双锁 + abort + mounted）；
  * - `useFormHandlers`：Enter 只在编辑阶段推进，确认阶段不触发危险动作。
  */
-import type { MutableRefObject } from "react";
+import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import { focusFailureTarget } from "../../../shared/ui/index.ts";
 import { submitAdminReset, validateAdminReset } from "../api/admin-api.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "../lib/admin-copy.ts";
 import {
@@ -33,12 +34,12 @@ function fieldElementId(field: AdminField): string {
 
 /** 失败落点：有字段错误聚焦第一个，否则聚焦状态位。 */
 export function focusFailure(view: AdminFailureView): void {
-  const first = FIELD_ORDER.find((field) => view.fields.includes(field));
-  const target =
-    first === undefined
-      ? document.getElementById(STATUS_ID)
-      : document.getElementById(fieldElementId(first));
-  target?.focus();
+  focusFailureTarget({
+    fields: view.fields,
+    order: FIELD_ORDER,
+    elementId: fieldElementId,
+    statusId: STATUS_ID,
+  });
 }
 
 /** 成功视图（A8）：`sessionsRevoked:false` 是安全失败，文案与样式都换一套。 */
@@ -90,7 +91,8 @@ interface ResetEditingDeps {
   t: AdminTranslate;
   actorTotpEnabled: boolean;
   lock: MutableRefObject<boolean>;
-  setValues: (values: AdminResetValues) => void;
+  /** React setter 原样传入：`setValue` 必须用函数式更新，不能写回渲染闭包里的旧 values（C5）。 */
+  setValues: Dispatch<SetStateAction<AdminResetValues>>;
   setStage: (stage: AdminResetStage) => void;
   setFailure: (view: AdminFailureView | null) => void;
   setSuccess: (view: AdminSuccessView | null) => void;
@@ -111,7 +113,7 @@ export function useResetEditing(deps: ResetEditingDeps): {
   const { values, t, actorTotpEnabled, lock } = deps;
   return {
     setValue: (field, value) => {
-      deps.setValues({ ...values, [field]: value });
+      deps.setValues((previous) => ({ ...previous, [field]: value }));
       // 编辑即清错：改正后红框不能还在。
       deps.setFailure(null);
     },
@@ -120,8 +122,8 @@ export function useResetEditing(deps: ResetEditingDeps): {
       if (lock.current) return;
       const invalid = validateAdminReset(values, t, actorTotpEnabled);
       if (invalid !== null) {
+        // 焦点由状态机的 effect 在页面稳定后统一落（C4）：这里只记失败。
         deps.setFailure(invalid);
-        focusFailure(invalid);
         return;
       }
       deps.setFailure(null);
@@ -152,7 +154,7 @@ interface ResetSubmitDeps {
   setStage: (stage: AdminResetStage) => void;
   setFailure: (view: AdminFailureView | null) => void;
   setSuccess: (view: AdminSuccessView | null) => void;
-  setValues: (values: AdminResetValues) => void;
+  setValues: Dispatch<SetStateAction<AdminResetValues>>;
   onReset?: (() => void) | undefined;
 }
 
@@ -181,8 +183,8 @@ export function useResetSubmit(deps: ResetSubmitDeps): () => Promise<void> {
         deps.onReset?.(); // A7：成功后重拉列表刷新徽标；失败路径不动行
         return;
       }
+      // 焦点由状态机在阶段落回 editing 后的 effect 统一落（C4）：此刻编辑区还没渲染回来。
       deps.setFailure(outcome.failure);
-      focusFailure(outcome.failure);
     } finally {
       lock.current = false;
       if (mounted.current) deps.setStage("editing");

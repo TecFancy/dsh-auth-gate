@@ -1,5 +1,6 @@
 import { bootstrapRedirectPath, parseCookieHeader } from "../../../shared/http/index.js";
 import {
+  denyBootstrap,
   isNavigationRequest,
   isPublicStaticPath,
   type Gate,
@@ -7,7 +8,7 @@ import {
   type GuardKind,
   type GuardRequest,
 } from "../../../shared/guard/index.js";
-import { isAuthPath, LOGIN_PATH, loginPath, SETUP_PATH } from "../../../shared/protocol/index.js";
+import { isAuthPath, LOGIN_PATH, loginPath } from "../../../shared/protocol/index.js";
 import {
   isBootstrapSession,
   type Session,
@@ -92,11 +93,6 @@ function denyRestricted(req: GuardRequest, kind: GuardKind): GateDecision {
   return isNavigationRequest(req)
     ? { deny: { redirect: RESTRICTED_REDIRECT_PATH } }
     : { deny: { status: 401 } };
-}
-
-/** 首次引导会话被拒的宿主路径：导航 → 302 向导页；WS → 拒握手；其余（API）→ 401。 */
-function denyBootstrap(req: GuardRequest): GateDecision {
-  return isNavigationRequest(req) ? { deny: { redirect: SETUP_PATH } } : "deny";
 }
 
 /** 未认证（无会话/会话失效）：导航 → 302 登录页 + next；其余 → 字符串 deny（401）。 */

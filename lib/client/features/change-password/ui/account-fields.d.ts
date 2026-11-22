@@ -37,4 +37,3 @@ export declare function StatusLine({ failure }: {
     failure: FailureView | null;
 }): import("react").JSX.Element;
 export {};
-//# sourceMappingURL=account-fields.d.ts.map

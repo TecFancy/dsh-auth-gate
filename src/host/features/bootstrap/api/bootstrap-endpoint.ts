@@ -10,6 +10,13 @@ import { redirectTo, redirectToLogin } from "../model/respond.js";
 /** bootstrap 会话的最长寿命：窗口再长也没有意义，且它只放行 `/auth/*`。 */
 const BOOTSTRAP_TTL_CAP_SECONDS = 3600;
 
+/**
+ * bootstrap 会话的 `subject` 哨兵值（G12）：`@` 开头不满足用户名规则
+ * （USERNAME_RE 要求字母/数字开头），所以不可能与真实用户重名；会话类别仍用
+ * `BOOTSTRAP_SESSION_KIND`，这个值只进审计与存储，不进任何鉴权判定。
+ */
+const BOOTSTRAP_SESSION_SUBJECT = "@bootstrap";
+
 export interface BootstrapEndpointDeps {
   /** 未配置探针（每次请求现算）。 */
   probe: ConfiguredProbe;
@@ -58,7 +65,7 @@ export function makeBootstrapEndpoint(deps: BootstrapEndpointDeps): HttpHandler 
       }
       const ttlSeconds = Math.min(deps.sessionTtlSeconds, BOOTSTRAP_TTL_CAP_SECONDS);
       const issued = await store.create(
-        BOOTSTRAP_SESSION_KIND,
+        BOOTSTRAP_SESSION_SUBJECT,
         ttlSeconds * 1000,
         BOOTSTRAP_SESSION_KIND,
       );

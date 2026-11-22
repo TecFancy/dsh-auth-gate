@@ -16,4 +16,3 @@ export interface SettingsAccountSectionProps {
  * 不引入 tabs：管理员不是换一套页面，而是同一页面上多一段。
  */
 export declare function SettingsAccountSection({ t }: SettingsAccountSectionProps): import("react").JSX.Element;
-//# sourceMappingURL=account-section.d.ts.map

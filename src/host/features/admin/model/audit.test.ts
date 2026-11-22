@@ -137,7 +137,7 @@ async function denyCase(
     await post(harness, { ...SAME_ORIGIN, body: form({ target: "alice", password: WEAK }) });
   } else if (reason === "rate_limited") {
     for (let attempt = 0; attempt < 5; attempt += 1) {
-      harness.limiter.recordFailure("127.0.0.1", "admin");
+      harness.limiter.recordFailure("127.0.0.1", "admin", "admin");
     }
     await post(harness, { ...SAME_ORIGIN, body });
   } else if (reason === "io") {

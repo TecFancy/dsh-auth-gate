@@ -43,3 +43,15 @@ describe("formatPasskeyDate", () => {
     expect(formatPasskeyDate(CROSS_DAY)).toBe(expected);
   });
 });
+describe("formatPasskeyDate: 线上脏数据不炸渲染 (C7)", () => {
+  it("renders a placeholder for non-finite and out-of-range epoch values", () => {
+    for (const value of [
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.NEGATIVE_INFINITY,
+      8.64e15 + 1,
+    ]) {
+      expect(formatPasskeyDate(value)).toBe("-");
+    }
+  });
+});

@@ -378,7 +378,7 @@ function isExcluded(rel) {
  */
 function collectCorpus() {
   // `null` marks a failed enumeration; `[]` a successful empty one.
-  let listed = null;
+  let listed;
   try {
     // Tracked files *and* untracked-but-not-ignored ones. The untracked half is
     // what makes the gate usable on the change that introduces a document: a
@@ -500,10 +500,6 @@ function storeBlob(abs) {
     // Best-effort; see above.
   }
   return hash;
-}
-
-function relOf(abs) {
-  return path.relative(ROOT, abs).split(path.sep).join("/");
 }
 
 function readRecord(enAbs) {

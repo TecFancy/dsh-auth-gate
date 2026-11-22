@@ -12,4 +12,3 @@ export type LaunchTokenBridge = () => Promise<string | undefined>;
 export declare function resolvePostLoginLocation(bridge: LaunchTokenBridge | undefined, next: string, logger: {
     warn?(message: unknown): void;
 }): Promise<string>;
-//# sourceMappingURL=login-redirect.d.ts.map

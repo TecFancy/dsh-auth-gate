@@ -7,4 +7,3 @@ export { base32Decode, base32Encode, generateTotpSecret, totpCodeAt, verifyTotpC
 export { TotpReplayGuard } from "./model/replay-guard.js";
 export { handleUserTotp, totpUri } from "./cli/cli.js";
 export type { TotpCliIo } from "./cli/cli.js";
-//# sourceMappingURL=index.d.ts.map

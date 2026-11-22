@@ -147,7 +147,7 @@ describe("POST /auth/password: ordering and side effects", () => {
   it("does not count a rejected origin as a rate-limit failure", async () => {
     const h = makeHarness();
     await post(h.deps, {});
-    expect(h.limiter.check("127.0.0.1", "alice").allowed).toBe(true);
+    expect(h.limiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(true);
     expect(h.state.revokes).toBe(0);
   });
 

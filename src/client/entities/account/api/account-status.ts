@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import {
+  isRecord,
+  readJsonSafe,
   STATUS_PATH,
   type SessionKind,
   type StatusResponse,
@@ -9,7 +11,7 @@ import {
 
 /**
  * `GET /auth/status` 的「关于我」视图：线上形状 `StatusResponse`（跨半边契约 D31）去掉本视图
- * 不用的 `logoutOrder`（由 client 入口单独读）与 `mustChangePassword`。
+ * 不消费的 `mustChangePassword`。
  *
  * **加法兼容**：身份字段是 PR1 才有的（旧服务端只回 `authenticated`/`logoutOrder`），
  * 任一身份字段缺失即视为「不渲染管理块」，其余行为一字不变（契约 §1.1 / §3.3）。
@@ -20,13 +22,20 @@ export type AccountStatusView = Omit<
   StatusResponse,
   "logoutOrder" | "mustChangePassword" | "passkeyEnabled" | "passwordLoginDisabled"
 > & {
+  /** 「退出登录」按钮的槽位 order；缺失/非整数为 `undefined`（入口保留默认值）。 */
+  logoutOrder?: number | undefined;
   passkeyEnabled?: boolean | undefined;
   /** 口令登录是否被策略关闭（`passkey: "required"`）；旧服务端缺该键 → `undefined`。 */
   passwordLoginDisabled?: boolean | undefined;
 };
 
-/** 会话探针（只认 cookie，语义同 `/auth/status`，契约 §1.1）。 */
-const STATUS_TARGET = STATUS_PATH;
+/** 会话探针结果：`ok`（200 体，含未认证）/ `failure`（网络、5xx、非 JSON）/ `aborted`。 */
+export type AccountStatusResult =
+  { kind: "ok"; status: AccountStatusView } | { kind: "failure" } | { kind: "aborted" };
+
+/** hook 的状态：首次响应前 loading；探针失败是**独立**的 failure，不塌缩成「未登录」。 */
+export type AccountStatusState =
+  { kind: "loading" } | { kind: "ok"; status: AccountStatusView } | { kind: "failure" };
 
 /** 字符串字段守卫：非字符串一律 `undefined`（旧服务端/异常形状都不渲染管理块）。 */
 function optionalString(value: unknown): string | undefined {
@@ -36,6 +45,11 @@ function optionalString(value: unknown): string | undefined {
 /** 布尔字段守卫。 */
 function optionalBoolean(value: unknown): boolean | undefined {
   return typeof value === "boolean" ? value : undefined;
+}
+
+/** 整数字段守卫（槽位 order 必须是整数；非整数/缺失都退回 `undefined`）。 */
+function optionalInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) ? value : undefined;
 }
 
 /** role 白名单：只认 `admin` / `user`，其余（含非法字符串）留 `undefined`。 */
@@ -49,17 +63,15 @@ function optionalSessionKind(value: unknown): SessionKind | undefined {
 }
 
 /**
- * `/auth/status` 响应体 → 视图对象。**加法兼容**（契约 §1.1/§3.3）：
- * 身份字段缺失、类型不符或取值不在白名单内，一律留 `undefined`；只有
- * `authenticated === true` 才可能让调用方继续渲染登录后的 UI。
- * `passkeyEnabled` 同理：旧服务端没有该键、或值不是布尔 → `undefined`（不推断为关闭）。
+ * `/auth/status` 响应体 → 视图对象。**逐字段白名单解析**（C8）：身份字段缺失、类型不符或
+ * 取值不在白名单内，一律留 `undefined`；只有 `authenticated === true` 才可能让调用方继续渲染
+ * 登录后的 UI。`passkeyEnabled` 同理：旧服务端没有该键、或值不是布尔 → `undefined`（不推断关闭）。
  */
 export function parseAccountStatus(body: unknown): AccountStatusView {
-  const source = (
-    typeof body === "object" && body !== null ? body : {}
-  ) as Unchecked<StatusResponse>;
+  const source: Unchecked<StatusResponse> = isRecord<StatusResponse>(body) ? body : {};
   return {
     authenticated: source.authenticated === true,
+    logoutOrder: optionalInteger(source.logoutOrder),
     passkeyEnabled: optionalBoolean(source.passkeyEnabled),
     passwordLoginDisabled: optionalBoolean(source.passwordLoginDisabled),
     name: optionalString(source.name),
@@ -70,26 +82,89 @@ export function parseAccountStatus(body: unknown): AccountStatusView {
   };
 }
 
+/** 一次在飞的探针请求；多个消费方共享同一个 promise。 */
+interface ProbeFlight {
+  controller: AbortController;
+  promise: Promise<AccountStatusResult>;
+  subscribers: number;
+}
+
+let flight: ProbeFlight | null = null;
+
+/** 发一次真实的探针请求；永远 resolve（失败映射成 `failure`），不抛给消费方。 */
+async function probe(signal: AbortSignal): Promise<AccountStatusResult> {
+  try {
+    const res = await fetch(STATUS_PATH, { signal, credentials: "same-origin" });
+    if (signal.aborted) return { kind: "aborted" };
+    // 401 = 会话没了，等同「未认证」（host 的正常路径是 200 + authenticated:false）；
+    // 网络/5xx/非 JSON 才是探针失败，绝不能塌缩成「请先登录」（C9）。
+    if (res.status === 401) return { kind: "ok", status: parseAccountStatus({}) };
+    if (!res.ok) return { kind: "failure" };
+    const body = await readJsonSafe(res);
+    if (signal.aborted) return { kind: "aborted" };
+    // 200 也要验证形状：非 JSON 或缺少布尔 `authenticated` 说明这是坏响应（代理页、未来格式），
+    // 不能塌缩成「未登录」：那会把 5xx/损坏响应伪装成正常登出（P2）。
+    if (!isRecord(body) || typeof body["authenticated"] !== "boolean") return { kind: "failure" };
+    return { kind: "ok", status: parseAccountStatus(body) };
+  } catch {
+    return signal.aborted ? { kind: "aborted" } : { kind: "failure" };
+  }
+}
+
+/** 每个消费方都带自己的 signal；最后一个退订者负责 abort 底层请求。 */
+function subscribe(
+  current: ProbeFlight,
+  signal: AbortSignal | undefined,
+): Promise<AccountStatusResult> {
+  current.subscribers += 1;
+  return new Promise<AccountStatusResult>((resolve) => {
+    let settled = false;
+    const settle = (result: AccountStatusResult): void => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", onAbort);
+      current.subscribers -= 1;
+      if (current.subscribers === 0) {
+        if (flight === current) flight = null;
+        // 没有消费者还在等：别让一个迟到的响应拖住下一个探针。
+        current.controller.abort();
+      }
+      resolve(result);
+    };
+    const onAbort = (): void => settle({ kind: "aborted" });
+    signal?.addEventListener("abort", onAbort, { once: true });
+    current.promise.then(settle, () => settle({ kind: "failure" }));
+  });
+}
+
 /**
- * 会话状态探针：`null` = 首次响应返回前（调用方自己渲染 loading）。
- * `credentials: "same-origin"` 保证带 cookie；卸载即 abort，回调里再看一眼 signal，
- * 避免卸载后 setState。任何失败（网络/解析/中止之外的异常）→ `{authenticated:false}`。
+ * 共享的 `/auth/status` 探针（C9）：插件入口的 logout-order 探针、账户区状态 hook 与登出按钮
+ * 在**同一次页面加载**里只发一个请求；每个调用方的 signal 只退订自己（最后一个退订才 abort）。
  */
-export function useAccountStatus(): AccountStatusView | null {
-  const [status, setStatus] = useState<AccountStatusView | null>(null);
+export function requestAccountStatus(signal?: AbortSignal): Promise<AccountStatusResult> {
+  if (signal?.aborted === true) return Promise.resolve({ kind: "aborted" });
+  flight ??= (() => {
+    const controller = new AbortController();
+    return { controller, promise: probe(controller.signal), subscribers: 0 };
+  })();
+  return subscribe(flight, signal);
+}
+
+/** 会话状态探针：挂载/重试时经共享探针读一次；卸载即退订（不会卸载后 setState）。 */
+export function useAccountStatus(): { state: AccountStatusState; retry: () => void } {
+  const [state, setState] = useState<AccountStatusState>({ kind: "loading" });
+  const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(STATUS_TARGET, { signal: controller.signal, credentials: "same-origin" })
-      .then((res) => res.json() as Promise<unknown>)
-      .then((body) => {
-        if (!controller.signal.aborted) setStatus(parseAccountStatus(body));
-      })
-      .catch(() => {
-        if (!controller.signal.aborted) setStatus({ authenticated: false });
-      });
+    let live = true;
+    void requestAccountStatus(controller.signal).then((result) => {
+      if (!live || result.kind === "aborted") return;
+      setState(result.kind === "ok" ? { kind: "ok", status: result.status } : { kind: "failure" });
+    });
     return () => {
+      live = false;
       controller.abort();
     };
-  }, []);
-  return status;
+  }, [attempt]);
+  return { state, retry: () => setAttempt((value) => value + 1) };
 }

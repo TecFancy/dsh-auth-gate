@@ -186,7 +186,9 @@ describe("route /auth/password registration (anti-regression, §1)", () => {
     const res = makeRes();
     await routeOf(captured)(makeReq("POST", "dsh_auth=good", BODY), res.res);
     expect(res.status).toBe(429);
-    expect(captured.changeLimiter.check("127.0.0.1", "alice").allowed).toBe(false);
-    expect(captured.loginLimiter.check("127.0.0.1", "alice").allowed).toBe(true);
+    expect(captured.changeLimiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(
+      false,
+    );
+    expect(captured.loginLimiter.check("127.0.0.1", "alice", "password-change").allowed).toBe(true);
   });
 });

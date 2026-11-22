@@ -1,4 +1,8 @@
-import type { AdminResetErrorBody, Unchecked } from "../../../shared/api/index.ts";
+import {
+  isRecord,
+  type AdminResetErrorBody,
+  type Unchecked,
+} from "../../../shared/api/index.ts";
 import { ruleText } from "../../../shared/i18n/index.ts";
 import { ADMIN_KEYS, type AdminTranslate } from "./admin-copy.ts";
 import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
@@ -13,10 +17,6 @@ import type { AdminFailureView, AdminField } from "../model/admin-reset.ts";
 
 function view(message: string, rules: string[] = [], fields: AdminField[] = []): AdminFailureView {
   return { message, rules, fields };
-}
-
-function isRecord(value: unknown): value is Unchecked<AdminResetErrorBody> {
-  return typeof value === "object" && value !== null;
 }
 
 /** 错误码比较：码的字面量受契约（D31）约束，写错码编译不过；值本身仍是未校验的 `unknown`。 */
@@ -70,7 +70,7 @@ export function describeAdminFailure(
   body: unknown,
   t: AdminTranslate,
 ): AdminFailureView {
-  const record = isRecord(body) ? body : {};
+  const record: Unchecked<AdminResetErrorBody> = isRecord<AdminResetErrorBody>(body) ? body : {};
   const error = record.error;
   if (status === 400) return describeBadRequest(error, record.rules, t);
   if (status === 401) return describeUnauthorized(error, t);

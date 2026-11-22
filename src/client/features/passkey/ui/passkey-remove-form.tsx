@@ -10,7 +10,14 @@
  * 安全细节：安全动作（取消）在左、危险动作（确认删除）在右，避免双击在同一坐标直接完成
  * 破坏；打开时焦点落在口令框，不是危险按钮。
  */
-import { useEffect, useRef, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  type FormEvent,
+  type KeyboardEvent,
+  type MutableRefObject,
+  type Ref,
+} from "react";
 import { PASSKEY_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
   ActionButton,
@@ -25,18 +32,14 @@ import {
   ROW_INPUT_STYLE,
   ROW_INVALID_INPUT_STYLE,
 } from "../../../shared/ui/index.ts";
-import type { PasskeyReauthValues } from "../model/passkey-form.ts";
-
-/** 删除确认区的字段 id（与添加表单分开，避免同 id 冲突）。 */
-export function reauthFieldId(field: "password" | "code"): string {
-  return `dsh-auth-gate-passkey-remove-${field}`;
-}
+import {
+  PASSKEY_STATUS_ID,
+  passkeyReauthFieldId,
+  type PasskeyReauthValues,
+} from "../model/passkey-form.ts";
 
 /** 动态码提示 id。 */
 const CODE_HINT_ID = "dsh-auth-gate-passkey-remove-code-hint";
-
-/** 状态播报位 id（与添加表单共用同一个 passkey 状态位）。 */
-const STATUS_ID = "dsh-auth-gate-passkey-status";
 
 export interface PasskeyRemoveFormProps {
   t: AccountTranslate;
@@ -78,8 +81,8 @@ function ReauthField({
   inputMode?: "numeric" | undefined;
   onChange: (value: string) => void;
 }) {
-  const id = reauthFieldId(field);
-  const described = [invalid ? STATUS_ID : undefined, hintId].filter(
+  const id = passkeyReauthFieldId(field);
+  const described = [invalid ? PASSKEY_STATUS_ID : undefined, hintId].filter(
     (item): item is string => item !== undefined,
   );
   return (
@@ -110,6 +113,66 @@ function ReauthField({
   );
 }
 
+/** 表单提交：IME 组合期内的确认键是「确认候选词」，不是提交（C6）。 */
+function submitHandler(
+  event: FormEvent<HTMLFormElement>,
+  composing: MutableRefObject<boolean>,
+  onConfirm: () => void | Promise<void>,
+): void {
+  event.preventDefault();
+  if (composing.current) return;
+  void onConfirm();
+}
+
+/** Enter 键路径：组合期内直接忽略，其余等同提交。 */
+function keyDownHandler(
+  event: KeyboardEvent<HTMLFormElement>,
+  composing: MutableRefObject<boolean>,
+  onConfirm: () => void | Promise<void>,
+): void {
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  if (composing.current || event.nativeEvent.isComposing === true) return;
+  void onConfirm();
+}
+
+/** 口令行：打开确认区时聚焦的第一个字段（不落在危险按钮上）。 */
+function ReauthPasswordField({
+  t,
+  value,
+  invalid,
+  inputRef,
+  onChange,
+}: {
+  t: AccountTranslate;
+  value: string;
+  invalid: boolean;
+  inputRef: Ref<HTMLInputElement>;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div style={FIELD_ROW_STYLE}>
+      <label htmlFor={passkeyReauthFieldId("password")} style={FIELD_LABEL_STYLE}>
+        {t(PASSKEY_KEYS.password)}
+      </label>
+      <div style={FIELD_CONTROL_STYLE}>
+        <input
+          ref={inputRef}
+          id={passkeyReauthFieldId("password")}
+          name="password"
+          type="password"
+          autoComplete="current-password"
+          value={value}
+          aria-invalid={invalid ? "true" : undefined}
+          aria-describedby={invalid ? PASSKEY_STATUS_ID : undefined}
+          style={invalid ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
 /** 删除确认区：标题（含凭据名）+ 后果说明 + 再认证字段 + 取消/确认。 */
 export function PasskeyRemoveForm({
   t,
@@ -123,6 +186,7 @@ export function PasskeyRemoveForm({
   onConfirm,
 }: PasskeyRemoveFormProps) {
   const passwordRef = useRef<HTMLInputElement | null>(null);
+  const composing = useRef(false);
 
   // 打开即聚焦口令框：键盘用户不用自己找，焦点也不落在危险按钮上。
   useEffect(() => {
@@ -134,34 +198,30 @@ export function PasskeyRemoveForm({
     totpEnabled === undefined
       ? t(PASSKEY_KEYS.codeHint)
       : t(totpEnabled ? PASSKEY_KEYS.codeHintOn : PASSKEY_KEYS.codeHintOff);
-  const submit = (event: FormEvent<HTMLFormElement>): void => {
-    event.preventDefault();
-    void onConfirm();
-  };
   return (
-    <form style={CONFIRM_PANEL_STYLE} noValidate aria-busy={busy} onSubmit={submit}>
+    <form
+      style={CONFIRM_PANEL_STYLE}
+      noValidate
+      aria-busy={busy}
+      onSubmit={(event) => submitHandler(event, composing, onConfirm)}
+      onKeyDown={(event) => keyDownHandler(event, composing, onConfirm)}
+      onCompositionStart={() => {
+        composing.current = true;
+      }}
+      onCompositionEnd={() => {
+        composing.current = false;
+      }}
+    >
       <h4 style={CONFIRM_TITLE_STYLE}>{t(PASSKEY_KEYS.removeTitle, { label })}</h4>
       <p style={CONFIRM_WARNING_STYLE}>{t(PASSKEY_KEYS.removeWarning)}</p>
       <div>
-        <div style={FIELD_ROW_STYLE}>
-          <label htmlFor={reauthFieldId("password")} style={FIELD_LABEL_STYLE}>
-            {t(PASSKEY_KEYS.password)}
-          </label>
-          <div style={FIELD_CONTROL_STYLE}>
-            <input
-              ref={passwordRef}
-              id={reauthFieldId("password")}
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              value={values.password}
-              aria-invalid={isInvalid("password") ? "true" : undefined}
-              aria-describedby={isInvalid("password") ? STATUS_ID : undefined}
-              style={isInvalid("password") ? ROW_INVALID_INPUT_STYLE : ROW_INPUT_STYLE}
-              onChange={(event) => onChange("password", event.target.value)}
-            />
-          </div>
-        </div>
+        <ReauthPasswordField
+          t={t}
+          value={values.password}
+          invalid={isInvalid("password")}
+          inputRef={passwordRef}
+          onChange={(value) => onChange("password", value)}
+        />
         <ReauthField
           field="code"
           label={t(PASSKEY_KEYS.code)}

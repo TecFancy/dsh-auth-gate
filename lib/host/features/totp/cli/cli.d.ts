@@ -11,4 +11,3 @@ export interface TotpCliIo {
 export declare function handleUserTotp(file: string, command: string | undefined, name: string | undefined, io: TotpCliIo): Promise<number>;
 /** otpauth://totp/<issuer>:<name>?secret=<BASE32>&issuer=<issuer>（label 与 secret 均 URL 编码）。 */
 export declare function totpUri(name: string, secret: string): string;
-//# sourceMappingURL=cli.d.ts.map

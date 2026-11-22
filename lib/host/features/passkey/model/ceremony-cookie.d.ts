@@ -15,4 +15,3 @@ export declare function clearCeremonyCookie(secure: boolean): string;
  * 不做格式校验：未知或伪造的 id 在 `CeremonyStore.consume` 里统一按无效处理。
  */
 export declare function readCeremonyId(cookieHeader: string | undefined): string | undefined;
-//# sourceMappingURL=ceremony-cookie.d.ts.map

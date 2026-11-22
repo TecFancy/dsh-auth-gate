@@ -41,7 +41,7 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
 - CLI 二进制**不会**进 `PATH`——`dsh plugin add` 只是在 profile 目录里跑 pnpm，
   `dsh-auth` 只能从 `$DSH_HOME/profiles/web/node_modules/.bin` 解析。正确的调用方式见 §2。
 - 升级：重跑同一命令（pnpm 拉新版本）。
-- 卸载：`dsh plugin --profile web remove dsh-auth-gate`（0.4.1 起插件声明了
+- 卸载：`dsh plugin --profile web remove dsh-auth-gate`（插件声明了
   `dsh.bundle`，`dsh plugin add` 会在 `dsh.profile.bundles` 里注册挂载，`remove`
   也会一并移除；`$DSH_HOME/cordis.patch.yml` 里残留的 `- id: dsh-auth-gate`
   配置覆盖行会变成空操作并带启动警告，可删除）。
@@ -64,9 +64,12 @@ dsh plugin --profile web add dsh-auth-gate   # 转发 pnpm，从公共 npm 解�
    通道（建号时另有 `user add --admin`）；禁用或降级最后一个在用的 admin 会被拒绝。CLI 的
    全部写操作与插件走同一把锁文件与写前 CAS，实例运行中执行也安全。
 2. **配置覆盖**：把仓库 `deploy/cordis.patch.yml` 复制为 `$DSH_HOME/cordis.patch.yml`
-   ——0.4.1 起该模板是纯配置覆盖（无 `insert`；挂载本身由 `dsh plugin add` 通过
-   `dsh.bundle` manifest 注册）。按需调整（`cookieSecure` 必须与 TLS 环境一致；
-   非默认路径才设 `usersFile`；反代改写了 `Host` 时必须设 `publicHost` 为公网域名，见 D14）。
+   ——该模板是纯配置覆盖（无 `insert`；挂载本身由 `dsh plugin add` 通过 `dsh.bundle`
+   manifest 注册）。按需调整（`cookieSecure` 必须与 TLS 环境一致；
+   非默认路径才设 `usersFile`；反代改写了 `Host` 时必须设 `publicHost` 为公网域名，见
+   [public host 笔记](../../.agents/notes/implemented/feature/2026-09-22-public-host-identity.zh.md)）。
+   token 模式下 `tokenMinLength`（默认值也是最小值 32）是共享 token 可接受的最短长度：
+   要用 CSPRNG 生成 token，绝不要用人手编的短语。
 3. 确认无其他行占用 `dsh-auth-gate` id（patch 栈按 id 覆盖）。
 
 ### 2.1 打开 passkey-only（`passkey: "required"`）
@@ -153,10 +156,10 @@ curl -s -i -d "username=admin&password=<口令>" http://127.0.0.1:3081/auth/logi
 
 # I. 浏览器通路（可选，须 https 环境）：无痕窗口访问 → 302 到 /auth/login →
 #    登录 → 进入实例；设置面板里有醒目的「退出登录 / Sign out」按钮
-#    （设置 → 通用设置 页最下方；client 半边，0.6.5+），
+#    （设置 → 通用设置 页最下方），
 #    也可 URL 访问 /auth/logout?next=/ 登出。
 
-# J. 自助改密（仅 password 模式；D22）。放最后：它会改掉口令。
+# J. 自助改密（仅 password 模式）。放最后：它会改掉口令。
 curl -s -i -b jar -X POST http://127.0.0.1:3081/auth/password \
   -d "current=<口令>&password=<新口令>&code=<启用 TOTP 时的验证码>" | head -3   # 200 {"ok":true} + 清 cookie
 curl -s -o /dev/null -w "%{http_code}\n" -b jar http://127.0.0.1:3081/__dsh_api   # 401：该用户全部会话被吊销，含这里用的那条
@@ -199,23 +202,59 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
    `launch-token bridge inactive` 只应在「dsh 无 `authenticatedUrl`」时出现（旧版
    dsh 属预期），`launch-token bridge unavailable` 出现则需排查 connection 服务。
 
-### 5.1 升级 dsh-auth-gate（0.11.0 → 0.11.1，TOTP 加固）
-
-实测踩坑（2026-08-30，web-test 验证）：
+### 5.1 升级 dsh-auth-gate（0.23.x 走廊）
 
 1. **新发布版本会被 pnpm 的 `minimumReleaseAge` 拦截**——普通 `pnpm up dsh-auth-gate`
    可能静默不升。显式钉版本，并用与 profile 的 `node_modules` 匹配的 pnpm 主版本
    （profile 声明 `packageManager: pnpm@11.22.0`；系统 pnpm 9.x 会因 store 不匹配失败）：
    ```sh
-   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.11.1
+   corepack pnpm@11.22.0 --dir "$DSH_HOME/profiles/<profile>" up dsh-auth-gate@0.23.1
    # 验证：grep '"version"' "$DSH_HOME/profiles/<profile>/node_modules/dsh-auth-gate/package.json"
    ```
-2. **重启使在途 TOTP 挑战失效**（挑战 cookie 带进程级 HMAC 签名，ADR D10）：验证码页上的
-   用户需重新输入密码（窗口 ≤ 5 分钟）。旧明文 cookie 格式升级后也不再有效（视为无挑战，
-   用户看到密码页）。
-3. 升级后至少跑一轮 TOTP 验收：密码阶段 → 挑战 cookie（三段式签名值）→ 验证码页 →
-   正确码 → 会话；错码 → 401 + 挑战页错误槽位；带会话 cookie 访问 `/auth/status` →
-   `authenticated: true`。
+   把版本换成当前的 `0.23.x` 发布即可；命令形状是钉死的精确版本，不是范围。
+2. **为重启做计划。** 新版本从全新的进程状态开始：在途 TOTP 挑战（HMAC 签名的挑战 cookie
+   绑定签发进程）与 passkey 仪式（进程内 map）都会丢失，验证码页上或注册到一半的用户重试一次
+   即可；登录限速器与 TOTP 防重放记录清零。持久化的会话会存活，已登录的浏览器保持登录（§8.3）。
+3. **`users.yaml` 不需要重写，但先备份。** 它仍然是 `version: 1`；较新的每用户键
+   （`passkeyUserHandle`、`passkeys`、`password_changed_at`）都是可选的，旧文件按默认值
+   加载。升级前复制 `users.yaml` 与 `users.yaml.bak`，并按 §5.2 操作。新键写入之后不要降级
+   插件：用户文件的 schema 是严格的。
+4. **升级后跑一遍** `dsh-auth user list`、一次口令登录、一轮 TOTP（口令阶段 → 挑战 cookie →
+   验证码页 → 会话；错码返回 `401`）、`passkey` 启用时的一次通行密钥登录，以及一次管理员
+   重置口令。
+
+### 5.2 备份 `users.yaml`
+
+`$DSH_HOME/auth/users.yaml` 是 password 模式部署唯一必须保留的状态：一个小 YAML 文件，
+`version: 1`，每用户一条记录，权限 `0600`。token 模式的秘密在 `$DSH_HOME/.credentials.yaml`，
+需要同样处理。
+
+```yaml
+version: 1
+users:
+  admin:
+    passwordHash: <scrypt value; parameters are stored beside the hash>
+    role: admin # omitted means "user"
+    # Optional per-user keys, all omitted until used:
+    # disabled, must_change_password, totpSecret, password_changed_at,
+    # passkeyUserHandle, passkeys[]
+```
+
+每次变更（CLI、自助改密、管理员重置、passkey 注册）都会先把上一份复制成 `users.yaml.bak`
+（同样 `0600`），再在锁内原子替换 `users.yaml`，所以写入失败或升级失败都留下可用的上一份。
+全新实例的第一次写入没有上一份可复制，因此此时还没有 `.bak`。
+
+**备份：** 把 `users.yaml` 与 `users.yaml.bak` 都复制出主机，副本保持 `0600`。会话存储
+（`$DSH_HOME/storages/dsh_auth_sessions.json`）是派生状态：备不备都行，删掉它等于把所有人登出。
+
+**恢复：** 停掉 dsh，把保存的文件复制回 `$DSH_HOME/auth/users.yaml`（保持 `0600` 权限），
+重启，然后检查 `dsh-auth user list` 和一次登录。要撤销某一次坏写入，优先用活文件旁边的
+`.bak`。
+
+**跨版本迁移：** 加载器接受更早版本写的文件——`role`、`must_change_password`、
+`password_changed_at`、`passkeyUserHandle` 和 `passkeys` 都是可选的、带默认值——第一次写入会
+补上当前版本使用的键。丢了 `.bak` 不是灾难：管理员可以用 `dsh-auth user add` 重建文件，但
+口令哈希无法恢复，所以每个用户都得重新设一次口令。
 
 ## 6. 故障诊断
 
@@ -239,13 +278,12 @@ cookie jar 不检查 `Secure`，验收序列照常）；H 组的锁定次数会�
 - [ ] 限速内存态重启清零。同主机反代部署必须显式配置 `clientIpHeader`（`x-forwarded-for`；
       Cloudflare 在边缘时用 `cf-connecting-ip`）：不配就是所有客户端共用一个桶，任何人错 5 次
       密码全家都登不上（issue #74）。只有 `trustedProxyCidrs`（默认回环）内的受信 peer 才有
-      资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。自助改密（D22）用的是独立
+      资格提供该头，且反代必须覆盖写入，不能透传客户端带来的值。自助改密用的是独立
       限速桶，但同样按这个头取客户端地址：未配受信反代客户端 IP 头时，同一主机上所有客户端
       也会共用一个改密桶。
 - [ ] 面板里的用户管理块与改密端点会拒绝 `Origin` 与实例不匹配的已认证 POST，因此生产必须配置
       `publicHost`（TLS 终止在反代后面时写成带 scheme 的 `https://host`）：`publicHost` 留空时
-      只认 `Sec-Fetch-Site: same-origin`，不带 `Origin` 的脚本调用一律 `403`（D25 管理面新增的
-      要求）。
+      只认 `Sec-Fetch-Site: same-origin`，不带 `Origin` 的脚本调用一律 `403`（管理面的要求）。
 - [ ] 给每个管理员启用 TOTP（`dsh-auth user totp enable <name>`）：未启用时，仅凭一枚被盗的管理员
       cookie 就能重置他人口令，而且面板不会对此给出提示；条件式再认证是刻意的设计，此时审计是
       仅存的控制手段。

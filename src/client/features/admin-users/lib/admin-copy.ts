@@ -1,3 +1,4 @@
+import { PASSWORD_MIN_LENGTH } from "../../../shared/api/index.ts";
 import { formatCopy, type AccountTranslate } from "../../../shared/i18n/index.ts";
 
 /**
@@ -98,7 +99,7 @@ export const ADMIN_DICT_ZH: Record<string, string> = {
   [ADMIN_KEYS.confirm]: "确认新密码",
   [ADMIN_KEYS.code]: "动态验证码",
   [ADMIN_KEYS.codeHint]: "你已开启两步验证，重置他人密码需填写动态码。",
-  [ADMIN_KEYS.policyHint]: "新密码至少 14 个字符，且含大写字母、小写字母、数字和特殊字符。",
+  [ADMIN_KEYS.policyHint]: `新密码至少 ${PASSWORD_MIN_LENGTH} 个字符，且含大写字母、小写字母、数字和特殊字符。`,
   [ADMIN_KEYS.submit]: "检查重置",
   [ADMIN_KEYS.submitting]: "提交中...",
   [ADMIN_KEYS.successRevoked]: "已重置，该用户的会话已全部吊销。",
@@ -161,8 +162,7 @@ export const ADMIN_DICT_EN: Record<string, string> = {
   [ADMIN_KEYS.code]: "Verification code",
   [ADMIN_KEYS.codeHint]:
     "Two-factor is on for your account, so resetting another user needs a code.",
-  [ADMIN_KEYS.policyHint]:
-    "At least 14 characters with an uppercase letter, a lowercase letter, a digit and a special character.",
+  [ADMIN_KEYS.policyHint]: `At least ${PASSWORD_MIN_LENGTH} characters with an uppercase letter, a lowercase letter, a digit and a special character.`,
   [ADMIN_KEYS.submit]: "Review reset",
   [ADMIN_KEYS.submitting]: "Submitting...",
   [ADMIN_KEYS.successRevoked]: "Reset done. All of that user's sessions were revoked.",

@@ -166,7 +166,8 @@ describe("dsh-auth user passwd - TTY branch (injected stream)", () => {
     const code = await withTty(async () => main(["user", "passwd", "alice", "--file", file], h.io));
     expect(code).toBe(0);
     expect(h.prompts).toEqual(["New password: ", "Confirm new password: "]);
-    expect(h.out).toEqual(["user alice password changed"]);
+    expect(h.out[0]).toBe("user alice password changed");
+    expect(h.out.join("\n")).toContain("old sessions are revoked on the plugin's next sweep");
     await expect(verifyPassword(NEW_PASSWORD, await hashOf(file, "alice"))).resolves.toBe(true);
   });
 

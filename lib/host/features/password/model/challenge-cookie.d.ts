@@ -15,4 +15,3 @@ export declare function buildChallengeValue(username: string, expiresEpochMs: nu
  * 字符，长度不等即非法，先返回避免 timingSafeEqual 抛错）。
  */
 export declare function parseChallengeValue(value: string | undefined, nowMs: number, key: Uint8Array): string | undefined;
-//# sourceMappingURL=challenge-cookie.d.ts.map

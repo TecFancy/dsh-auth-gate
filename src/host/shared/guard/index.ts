@@ -48,7 +48,13 @@ export type {
   WrappableServer,
   WrappableUpgradeRoute,
 } from "./guard.js";
-export { denyReply, guardReplyToResponse, rebridgeReply, writeGuardReply } from "./http.js";
+export {
+  denyBootstrap,
+  denyReply,
+  guardReplyToResponse,
+  rebridgeReply,
+  writeGuardReply,
+} from "./http.js";
 export type { GuardReply } from "./http.js";
 export { rebridgeDecision } from "./rebridge.js";
 export type { AdmitRebridge, RebridgeDecision } from "./rebridge.js";

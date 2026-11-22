@@ -28,6 +28,12 @@ export declare const ACCOUNT_KEYS: {
     readonly mismatch: "account.mismatch";
     readonly invalidCredentials: "account.invalidCredentials";
     readonly invalidTotp: "account.invalidTotp";
+    /** 401 `unauthorized`：会话失效（不是当前口令错），要带「重新登录」入口（C1）。 */
+    readonly expired: "account.expired";
+    /** 403 `bad_origin`：跨源提交被拒，与「口令错」无关（C1）。 */
+    readonly badOrigin: "account.badOrigin";
+    /** 渲染期异常的错误边界兜底文案（C7）。 */
+    readonly loadFailed: "account.loadFailed";
     readonly policyIntro: "account.policyIntro";
     readonly locked: "account.locked";
     readonly lockedPlain: "account.lockedPlain";
@@ -66,4 +72,3 @@ export declare function translateFrom(dict: Record<string, string>): AccountTran
 export declare const ACCOUNT_DICT_ZH: Record<string, string>;
 /** 英文词典。 */
 export declare const ACCOUNT_DICT_EN: Record<string, string>;
-//# sourceMappingURL=account-copy.d.ts.map

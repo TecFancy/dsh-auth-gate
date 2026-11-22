@@ -18,9 +18,13 @@ export declare function AdminTextField({ field, label, value, invalid, onChange,
     hint?: string | undefined;
     hintId?: string | undefined;
 }): import("react").JSX.Element;
-/** 状态区：失败消息 + 已翻译规则列表 + 就地成功/警告文案（契约 §3.8 / A8）。 */
+/**
+ * 状态区：失败消息 + 已翻译规则列表 + 就地成功/警告文案（契约 §3.8 / A8）。
+ *
+ * 播报位先渲染空、再由 effect 填内容（C4）：这块会和编辑区一起重新挂载（确认页 → 编辑页），
+ * 节点插入时就带着内容的话，aria-live 不会触发播报。
+ */
 export declare function AdminStatus({ failure, success, }: {
     failure: AdminFailureView | null;
     success: AdminSuccessView | null;
 }): import("react").JSX.Element;
-//# sourceMappingURL=admin-fields.d.ts.map

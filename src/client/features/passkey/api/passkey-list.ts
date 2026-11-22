@@ -4,9 +4,8 @@
  * 逐字段白名单解析：任一必需字段类型不符即丢弃该行，`passkeys` 不是数组则整表 failure。
  * 保持服务端顺序（createdAt 升序），client 不重排。
  */
-import { PASSKEY_PATH } from "../../../shared/api/index.ts";
+import { isRecord, PASSKEY_PATH, readJsonSafe } from "../../../shared/api/index.ts";
 import type { PasskeyListResult, PasskeySummaryView } from "../model/passkey-form.ts";
-import { isRecord, readJsonSafe } from "./passkey-http.ts";
 
 const LIST_TARGET = PASSKEY_PATH;
 

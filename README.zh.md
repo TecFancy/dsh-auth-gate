@@ -20,11 +20,12 @@
 
 ## 目录
 
+- [快速开始](#快速开始)
+- [首次运行](#首次运行)
+- [环境要求](#环境要求)
 - [它能做什么](#它能做什么)
 - [它不做什么](#它不做什么)
 - [市场的「会用你的密钥」徽章](#市场的会用你的密钥徽章)
-- [快速开始](#快速开始)
-- [首次运行](#首次运行)
 - [效果预览](#效果预览)
 - [配置](#配置)
 - [匿名使用统计](#匿名使用统计)
@@ -34,10 +35,69 @@
 - [故障排查](#故障排查)
 - [部署](#部署)
 - [认证本地代理（可选）](#认证本地代理可选)
-- [环境要求](#环境要求)
 - [注意事项与局限](#注意事项与局限)
 - [开发](#开发)
 - [许可证](#许可证)
+
+## 快速开始
+
+装上插件、重启 dsh，然后打开 dsh 启动时打印的那条链接。全新安装的实例还没有任何配置，所以这条链接
+会直接进入首次配置向导：整个过程不需要开 shell，也不需要改配置文件。
+
+```sh
+# 1. Install the plugin from npm into your dsh profile. The package declares a
+#    `dsh.bundle` manifest, so `dsh plugin add` also registers the mount
+#    (dsh.profile.bundles) automatically:
+dsh plugin --profile web add dsh-auth-gate
+
+# 2. Restart dsh, then open the URL it prints at startup
+#    (http://<host>:<port>/?token=<launch token>).
+dsh --profile web
+```
+
+向导给出的选项跟随当前模式：token 模式（出厂默认）生成并保存共享访问令牌，password 模式创建第一个
+管理员。新令牌只在结果页显示一次，点一下就能继续进入 dsh。从下次访问起，那条启动链接又只是一条普通 URL：
+在登录页用刚设好的令牌或密码登录即可。其余的事（加用户、开 TOTP、改 `mode`）仍然在 shell 里做：
+见 [首次运行](#首次运行)、[配置](#配置) 和 [命令行工具](#命令行工具)。
+
+## 首次运行
+
+启动链接会不会打开向导，每次请求都会重新判一次，判据只有一个：这个实例配置好了没有？
+
+- **默认模式是 `mode: "token"`。** 没有 `DSH_AUTH_TOKEN` 时，未配置的 token 模式实例会拒绝所有人，
+  所以启动链接是唯一的入口。只有读取成功且值为空才算未配置；credentials 服务缺失或读取抛错，一律按
+  已配置处理，不会打开向导。`password` 模式在 `users.yaml` 缺失或零用户时同理。
+- **`?token=` 是什么。** 它是 dsh 自己的启动令牌，dsh 每次启动打印一次，只在这个进程活着的时候有效。
+  插件把它当成「你能读服务器控制台」的凭证，随后签一张 bootstrap 会话：最长 1 小时，除了插件自己的
+  `/auth/*` 页面什么都打不开。
+- **向导能改什么。** 它生成并保存共享令牌（token 模式）或创建第一个管理员（password 模式），两者一旦
+  存在，窗口立刻关闭。它改不了 `mode`、`totp`、`cookieSecure`、`sessionTtl` 和 `proxy`：这些要改
+  `$DSH_HOME/cordis.patch.yml` 再重启 dsh。
+- **之后启动链接会怎样。** 它不再放你进来，而且要走两跳：门先把请求转到
+  `/auth/bootstrap?token=...`，端点判定实例已配置，再回 `302 /auth/login?next=%2F`。两跳都不下发
+  cookie、都不放行，所以启动令牌不是第二把钥匙。
+- **怎么再打开向导。** 删掉已保存的令牌（或者让 `users.yaml` 没有用户），然后重启 dsh。如果 credentials
+  服务返回的是缓存值，正是这次重启让它看到变化。
+
+## 环境要求
+
+- 服务器上需要 Node ≥ 22.19 和 pnpm。
+- dsh `0.1.x`、`0.2.x` 以及之后的每一条线（`engines.dsh` 声明为
+  `^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`）。前面三个 caret 替代项记录验过的宿主线；末尾的
+  `>=0.2.0-rc.1` 下界把当前 `next` 线及其之后的所有宿主一并接住，未来的 `0.3.x` 与 `1.x` 也在内。
+  声明滞后于新宿主线的代价大于它带来的保护，因为不兼容的插件包会被静默跳过，登录门随之消失。
+  运行时验证过的版本是 `0.1.5-rc.2` 与 `0.1.7-rc.2`（生产，按此顺序），以及
+  `0.1.7-alpha.1`、`0.2.0-rc.2`、`0.2.2-rc.1`（隔离实例）；完整测试套件跑在 `0.2.2-rc.1` 的宿主包上，
+  集成套件会在真实 webserver 上跑它们的 `resource` 路由（`/plugins` 前缀与 SPA 兜底）；`0.1.6-*` 预发布版没有列入枚举，因为没有针对它们的版本验证（稳定版
+  `0.1.6` 由 `^0.1.5-rc.2` 覆盖）。插件使用的是宿主自带的
+  `@deepseek-ai/dsh-storage-domain` 和 `@deepseek-ai/cordis`（两者都是 peer 依赖，不会打进包），
+  所以只要 profile 由 dsh 基础包启动，依赖就是齐的。dsh `0.2.0-rc.2`（已在 `next` 线上）会拒绝安装、并在启动时**静默跳过**那些
+  `@deepseek-ai/dsh*` peer 范围不覆盖当前宿主版本的插件；这条判定**只读 peer**，不读
+  `engines.dsh`，而完全没有这类 peer 的插件根本不会被检查。所以这一条下界在
+  `engines.dsh` 和 storage-domain peer **两处**都声明。
+- dsh 的 `web` profile 处于运行状态（`dsh --profile web`）。
+- 如果 `cookieSecure` 为 `true`，站点必须通过 https 提供服务（浏览器会拒绝在纯 http 下使用安全
+  cookie）。
 
 ## 它能做什么
 
@@ -85,9 +145,10 @@
 
 - **不等于服务器级安全。** 操作系统账号和配置文件仍需要你自己看管（`auth/users.yaml` 和
   `.credentials.yaml` 生成时权限即为 `0600`）；本插件只守住 dsh 的 **Web** 入口。
-- **不是每个改密码入口都会让会话失效。** `dsh-auth user disable` 会阻止该用户今后登录，并吊销其
+- **CLI 改密会让会话延迟失效。** `dsh-auth user disable` 会阻止该用户今后登录，并吊销其
   已签发的会话（默认 5 秒内生效，见 `revokeSweepMs`）；设置面板里的自助改密会吊销该用户的全部
-  会话，管理员在面板里重置他人口令同样如此；CLI 的 `dsh-auth user passwd` 只重写存储的密码哈希。
+  会话，管理员在面板里重置他人口令同样如此。CLI 的 `dsh-auth user passwd` 是独立进程：它记录
+  这次变更，插件的会话扫描器在同一个时间窗内吊销该用户此前的会话（或在插件下次重启时）。
 - **不能替代 HTTPS。** 配置了 `cookieSecure: true`，站点就必须通过 https 提供服务。
 - **不是完整的身份提供方（IdP）。** 没有 OAuth/OIDC，没有自助注册，也没有邮件重置；用户一律由
   管理员通过 CLI 创建和管理。
@@ -111,46 +172,6 @@ _读凭据的同时还能联网_。这是披露，不是判决；对本插件来
 
 如果你希望实例完全不读凭据，用密码模式即可。
 
-## 快速开始
-
-装上插件、重启 dsh，然后打开 dsh 启动时打印的那条链接。全新安装的实例还没有任何配置，所以这条链接
-会直接进入首次配置向导：整个过程不需要开 shell，也不需要改配置文件。
-
-```sh
-# 1. 从 npm 装进你的 dsh profile。
-#    自 0.4.1 起，包里声明了 dsh.bundle manifest，`dsh plugin add` 会顺带自动注册挂载
-#    （dsh.profile.bundles），不需要再手动添加挂载行：
-dsh plugin --profile web add dsh-auth-gate
-
-# 2. 重启 dsh，然后打开它启动时打印的链接
-#    （http://<host>:<port>/?token=<launch token>）。
-dsh --profile web
-```
-
-向导给出的选项跟随当前模式：token 模式（出厂默认）生成并保存共享访问令牌，password 模式创建第一个
-管理员。新令牌只在结果页显示一次，点一下就能继续进入 dsh。从下次访问起，那条启动链接又只是一条普通 URL：
-在登录页用刚设好的令牌或密码登录即可。其余的事（加用户、开 TOTP、改 `mode`）仍然在 shell 里做：
-见 [首次运行](#首次运行)、[配置](#配置) 和 [命令行工具](#命令行工具)。
-
-## 首次运行
-
-启动链接会不会打开向导，每次请求都会重新判一次，判据只有一个：这个实例配置好了没有？
-
-- **默认模式是 `mode: "token"`。** 没有 `DSH_AUTH_TOKEN` 时，未配置的 token 模式实例会拒绝所有人，
-  所以启动链接是唯一的入口。只有读取成功且值为空才算未配置；credentials 服务缺失或读取抛错，一律按
-  已配置处理，不会打开向导。`password` 模式在 `users.yaml` 缺失或零用户时同理。
-- **`?token=` 是什么。** 它是 dsh 自己的启动令牌，dsh 每次启动打印一次，只在这个进程活着的时候有效。
-  插件把它当成「你能读服务器控制台」的凭证，随后签一张 bootstrap 会话：最长 1 小时，除了插件自己的
-  `/auth/*` 页面什么都打不开。
-- **向导能改什么。** 它生成并保存共享令牌（token 模式）或创建第一个管理员（password 模式），两者一旦
-  存在，窗口立刻关闭。它改不了 `mode`、`totp`、`cookieSecure`、`sessionTtl` 和 `proxy`：这些要改
-  `$DSH_HOME/cordis.patch.yml` 再重启 dsh。
-- **之后启动链接会怎样。** 它不再放你进来，而且要走两跳：门先把请求转到
-  `/auth/bootstrap?token=...`，端点判定实例已配置，再回 `302 /auth/login?next=%2F`。两跳都不下发
-  cookie、都不放行，所以启动令牌不是第二把钥匙。
-- **怎么再打开向导。** 删掉已保存的令牌（或者让 `users.yaml` 没有用户），然后重启 dsh。如果 credentials
-  服务返回的是缓存值，正是这次重启让它看到变化。
-
 ## 效果预览
 
 本节的截图统一使用**英文界面**：插件自己的面板跟随 GUI 语言，服务端渲染的页面在任何语言下都是
@@ -168,17 +189,17 @@ dsh --profile web
 
 ![dsh 实例](docs/demo/dashboard.en.png)
 
-在 dsh 0.1.2-alpha 及更高版本上（这些版本的页面带有 launch token 校验），登录会自动跨过这道校验：
-登录跳转会先经过一次相对地址 `/?token=…` 换取 dsh cookie，然后进入 `/`（细节见
+在带 launch token 页面校验的 dsh 版本上（0.1.2-alpha 及更高），登录会自动跨过这道校验：登录
+跳转会先经过一次相对地址 `/?token=…` 换取 dsh cookie，然后进入 `/`（细节见
 `docs/history/specs/impl-launch-token-bridge_zh.md`）。
 
 那张 dsh cookie 是**独立的第二层**：名字取自请求的 authority（`dsh-auth-<sha256(host)>`），
 用 dsh 自己的密钥签名，有效期 30 天。本插件的门只检查自己的 `dsh_auth` 会话，所以会话有效时
 仍可能撞上 dsh 那句 `401 dsh web authentication required`——反代开始或停止改写 `Host` 之后、
-换域名或端口之后、dsh cookie 过期之后，以及清过站点数据之后都会这样。守卫现在放行一次到 `/`
-的顶层导航之后会问一次 dsh 文档化的 `connection.requestRejection` 接缝，dsh 回 401 就回
-`302 /?token=…` 重新签发。一次性标记 cookie 把这件事限制在最多多一跳，所以重铸不成功时
-留下的是 dsh 自己的 401，而不是重定向环（D37）。
+换域名或端口之后、dsh cookie 过期之后，以及清过站点数据之后都会这样。放行一次到 `/` 的顶层导航之后，守卫会问一次 dsh
+文档化的 `connection.requestRejection` 接缝，dsh 回 401 就回 `302 /?token=…` 重新签发。
+一次性标记 cookie 把这件事限制在最多多一跳，所以重铸不成功时留下的是 dsh 自己的 401，而不是
+重定向环（[重铸笔记](.agents/notes/implemented/bug-fix/2026-11-16-host-cookie-rebridge.zh.md)）。
 
 设置面板里有一个醒目的**「Sign out」（退出登录）**按钮，位置在**Settings → General
 （设置 → 通用设置）**页最后一行设置项的下方。它是居中、危险色的实心按钮（16px 门形图标加
@@ -192,7 +213,7 @@ dsh --profile web
 设置导航里那一枚图标同样来自本插件：宿主目前没有给单个设置分区配图标的接口（`settings.section`
 只有 `id`/`order`/`label` 三个字段，导航图标由宿主硬编码的 `navIcon(id)` 决定，第三方分区一律
 回退到默认齿轮），所以插件用一层**临时 DOM 垫片**（stopgap）只替换自己那一行，匹配不到时静默
-退回齿轮。等 dsh 官方支持 `icon` 选项，这层垫片和它的代码会整体删除（迁移条件见 ADR D24.1）。
+退回齿轮。等 dsh 官方支持 `icon` 选项，这层垫片和它的代码会整体删除。
 
 ![设置导航里的「账号安全」行](docs/demo/account-nav-icon.en.png)
 
@@ -256,27 +277,36 @@ bundle 挂载行（id 为 `dsh-auth-gate`，由 `dsh plugin add` 自动插入）
     cookieSecure: true # 使用 https 时保持 true
 ```
 
-| 选项                    | 默认值                       | 作用                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `mode`                  | `"token"`                    | `"password"` 为用户名密码登录；`"token"` 为全实例共用一个密钥                                                                                                                                                                                                                                                                                                                                                                              |
-| `totp`                  | `"off"`                      | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录时需要密码加验证码；`"required"`：所有用户都必须绑定密钥（没有密钥的用户在密码阶段就得到统一的 401，响应体与密码错误相同，避免暴露账号是否存在）                                                                                                                                                                                                                                       |
-| `sessionTtl`            | `604800`                     | 一次登录的有效时长（秒），到期后需要重新登录                                                                                                                                                                                                                                                                                                                                                                                               |
-| `cookieName`            | `dsh_auth`                   | 会话 cookie 的名称（一般不需要修改）                                                                                                                                                                                                                                                                                                                                                                                                       |
-| `tokenRef`              | `"DSH_AUTH_TOKEN"`           | 仅令牌模式：共享密钥存放在哪个环境变量里                                                                                                                                                                                                                                                                                                                                                                                                   |
-| `cookieSecure`          | `true`                       | 只在纯 http 测试环境下设为 `false`                                                                                                                                                                                                                                                                                                                                                                                                         |
-| `usersFile`             | `""`                         | 密码模式：用户列表文件的位置，默认 `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                                                                                                                                                                             |
-| `publicHost`            | `""`                         | 登录页身份区显示的域名（用于防钓鱼，让用户确认"这是哪个实例"）。留空则使用请求头里的 `Host`；反向代理改写了 `Host` 时必须显式配置（例如 Caddy 的 `header_up Host 127.0.0.1:3080`），否则卡片上显示的是回环地址而不是你的公网域名。自 D25 起，它还决定管理与改密端点能否校验 `Origin` 头：`publicHost` 留空时这些端点只接受 `Sec-Fetch-Site: same-origin`，生产部署应当配置它；TLS 终止在反代后面时请写成带 scheme 的形式（`https://host`） |
-| `revokeSweepMs`         | `5000`                       | 密码模式：被 `dsh-auth user disable` 禁用的用户，其**已签发**的会话会在多长时间（毫秒）内被吊销。`0` 表示不清理已有会话（此时禁用只拦新登录）                                                                                                                                                                                                                                                                                              |
-| `clientIpHeader`        | `""`                         | 限速用的客户端真实 IP 请求头（`x-forwarded-for`；Cloudflare 后面可用 `cf-connecting-ip`）。留空表示完全不读取请求头。只有当请求的对端落在 `trustedProxyCidrs` 内时才会读取；不配置时，同机反代会造成所有客户端共用一个锁定桶（issue #74）                                                                                                                                                                                                  |
-| `trustedProxyCidrs`     | `["127.0.0.0/8", "::1/128"]` | 哪些对端有权提供 `clientIpHeader`（默认只信任回环；没有地址的对端，例如 Unix socket，视为本地）。无效条目会被丢弃并记 error 日志，信任范围收窄为回环；显式写成 `[]` 表示谁都不信任；`0.0.0.0/0` 和 `::/0` 一律拒绝                                                                                                                                                                                                                         |
-| `logoutOrder`           | `1000`                       | 「退出登录」按钮在 设置 → 通用设置 页里的排序值（数值越大越靠下）。如果其他插件注册了更大的值，可以调大这个数                                                                                                                                                                                                                                                                                                                              |
-| `passkey`               | `"off"`                      | 仅密码模式。`"optional"` 打开通行密钥登录与注册；`"required"` 把实例切成 passkey-only（口令与「口令 + TOTP」都不能建立会话，登录页只渲染通行密钥入口）；`"off"` 关闭（端点不注册，`/auth/passkey/*` 返回 404）。依赖 `publicHost` 与 HTTPS，配置不成立时记 error 日志并按 off 处理，不影响口令登录——**`"required"` 除外**：那时口令登录保持关闭，登录页显示固定原因码（改回 `"optional"` 并重启即可恢复）                                  |
-| `passkeyRpName`         | `"DeepSeek Harness"`         | 浏览器通行密钥弹窗里显示的站点名（不参与校验）                                                                                                                                                                                                                                                                                                                                                                                             |
-| `passkeyRpId`           | `""`                         | RP ID 覆盖值；留空取 `publicHost` 的 hostname。必须是域名（不能是 IP、不能带端口或 scheme）                                                                                                                                                                                                                                                                                                                                                |
-| `passkeyOrigins`        | `[]`                         | 允许的 origin 精确白名单；留空取 `publicHost` 的 origin。域名迁移或换端口时把新旧 origin 都列上                                                                                                                                                                                                                                                                                                                                            |
-| `passkeyEnforceCounter` | `false`                      | 认证器计数器回退时是否拒绝。默认只记 warn（同步 passkey 恒为 0，回退是信号不是证据）；设为 `true` 时只对设备绑定凭据（`be=false && bs=false`）拒绝                                                                                                                                                                                                                                                                                         |
-| `passkeyConditionalUi`  | `false`                      | 登录页是否启用通行密钥自动填充（条件 UI）。默认关；管理员可以在「账号安全」设置页打开，立即生效并写回宿主 settings 服务。它是设置页唯一能写的 passkey 字段，所以声明成 `.volatile()`；`passkey` 本身是部署级开关，仍然只能改配置文件                                                                                                                                                                                                       |
-| `telemetry`             | `true`                       | 匿名使用统计：每进程每 24 小时最多一次，且只在请求通过门之后。`false` 完全不发。发什么见[匿名使用统计](#匿名使用统计)                                                                                                                                                                                                                                                                                                                      |
+| 选项                    | 默认值                       | 作用                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`                  | `"token"`                    | `"password"` 为用户名密码登录；`"token"` 为全实例共用一个密钥                                                                                                                                                                                                                                                                                                                                                                     |
+| `totp`                  | `"off"`                      | 仅密码模式。`"optional"`：绑定了 TOTP 密钥的用户登录时需要密码加验证码；`"required"`：所有用户都必须绑定密钥（没有密钥的用户在密码阶段就得到统一的 401，响应体与密码错误相同，避免暴露账号是否存在）                                                                                                                                                                                                                              |
+| `sessionTtl`            | `604800`                     | 一次登录的有效时长（秒），到期后需要重新登录                                                                                                                                                                                                                                                                                                                                                                                      |
+| `cookieName`            | `dsh_auth`                   | 会话 cookie 的名称（一般不需要修改）                                                                                                                                                                                                                                                                                                                                                                                              |
+| `tokenMinLength`        | `32`                         | 仅 token 模式：存储的共享 token 可接受的最短长度（字符数）。schema 拒绝小于 32 的值；比下界更短的已存 token 永远不会通过认证，并每进程只记一次日志。这是长度下界，不是熵估计                                                                                                                                                                                                                                                      |
+| `tokenRef`              | `"DSH_AUTH_TOKEN"`           | 仅令牌模式：共享密钥存放在哪个环境变量里                                                                                                                                                                                                                                                                                                                                                                                          |
+| `cookieSecure`          | `true`                       | 只在纯 http 测试环境下设为 `false`                                                                                                                                                                                                                                                                                                                                                                                                |
+| `usersFile`             | `""`                         | 密码模式：用户列表文件的位置，默认 `$DSH_HOME/auth/users.yaml`                                                                                                                                                                                                                                                                                                                                                                    |
+| `publicHost`            | `""`                         | 登录页身份区显示的域名（用于防钓鱼，让用户确认"这是哪个实例"）。留空则使用请求头里的 `Host`；反向代理改写了 `Host` 时必须显式配置（例如 Caddy 的 `header_up Host 127.0.0.1:3080`），否则卡片上显示的是回环地址而不是你的公网域名。它还会决定管理与改密端点能否校验 `Origin` 头：`publicHost` 留空时这些端点只接受 `Sec-Fetch-Site: same-origin`，生产部署应当配置它；TLS 终止在反代后面时请写成带 scheme 的形式（`https://host`） |
+| `revokeSweepMs`         | `5000`                       | 密码模式：被 `dsh-auth user disable` 禁用的用户，其**已签发**的会话会在多长时间（毫秒）内被吊销。`0` 表示不清理已有会话（此时禁用只拦新登录）                                                                                                                                                                                                                                                                                     |
+| `clientIpHeader`        | `""`                         | 限速用的客户端真实 IP 请求头（`x-forwarded-for`；Cloudflare 后面可用 `cf-connecting-ip`）。留空表示完全不读取请求头。只有当请求的对端落在 `trustedProxyCidrs` 内时才会读取；不配置时，同机反代会造成所有客户端共用一个锁定桶（issue #74）                                                                                                                                                                                         |
+| `trustedProxyCidrs`     | `["127.0.0.0/8", "::1/128"]` | 哪些对端有权提供 `clientIpHeader`（默认只信任回环；没有地址的对端，例如 Unix socket，视为本地）。无效条目会被丢弃并记 error 日志，信任范围收窄为回环；显式写成 `[]` 表示谁都不信任；`0.0.0.0/0` 和 `::/0` 一律拒绝                                                                                                                                                                                                                |
+| `logoutOrder`           | `1000`                       | 「退出登录」按钮在 设置 → 通用设置 页里的排序值（数值越大越靠下）。如果其他插件注册了更大的值，可以调大这个数                                                                                                                                                                                                                                                                                                                     |
+| `passkey`               | `"off"`                      | 仅密码模式。`"optional"` 打开通行密钥登录与注册；`"required"` 把实例切成 passkey-only（口令与「口令 + TOTP」都不能建立会话，登录页只渲染通行密钥入口）；`"off"` 关闭（端点不注册，`/auth/passkey/*` 返回 404）。依赖 `publicHost` 与 HTTPS，配置不成立时记 error 日志并按 off 处理，不影响口令登录——**`"required"` 除外**：那时口令登录保持关闭，登录页显示固定原因码（改回 `"optional"` 并重启即可恢复）                         |
+| `passkeyRpName`         | `"DeepSeek Harness"`         | 浏览器通行密钥弹窗里显示的站点名（不参与校验）                                                                                                                                                                                                                                                                                                                                                                                    |
+| `passkeyRpId`           | `""`                         | RP ID 覆盖值；留空取 `publicHost` 的 hostname。必须是域名（不能是 IP、不能带端口或 scheme）                                                                                                                                                                                                                                                                                                                                       |
+| `passkeyOrigins`        | `[]`                         | 允许的 origin 精确白名单；留空取 `publicHost` 的 origin。域名迁移或换端口时把新旧 origin 都列上                                                                                                                                                                                                                                                                                                                                   |
+| `passkeyEnforceCounter` | `false`                      | 认证器计数器回退时是否拒绝。默认只记 warn（同步 passkey 恒为 0，回退是信号不是证据）；设为 `true` 时只对设备绑定凭据（`be=false && bs=false`）拒绝                                                                                                                                                                                                                                                                                |
+| `passkeyConditionalUi`  | `false`                      | 登录页是否启用通行密钥自动填充（条件 UI）。默认关；管理员可以在「账号安全」设置页打开，立即生效并写回宿主 settings 服务。它是设置页唯一能写的 passkey 字段，所以声明成 `.volatile()`；`passkey` 本身是部署级开关，仍然只能改配置文件                                                                                                                                                                                              |
+| `telemetry`             | `true`                       | 匿名使用统计：每进程每 24 小时最多一次，且只在请求通过门之后。`false` 完全不发。发什么见[匿名使用统计](#匿名使用统计)                                                                                                                                                                                                                                                                                                             |
+
+**共享 token 要生成，不要自己选。** token 模式下 `tokenMinLength`（默认值也是最小值 32）是
+共享 token 可接受的最短长度：比下界更短的已存 token 会被登录端点和 Bearer token 守卫拒绝，
+每进程只记一次日志，永远不会通过认证；在 token 变短之前签发的 cookie 会话会一直有效到
+TTL 到期。这个检查只看长度，不做熵估计，所以要用 CSPRNG 生成——
+`openssl rand -base64 32`，或者用向导内置的随机 token——绝不要用人手编的短语。完全解析不出来
+的 token 仍然让门保持关闭；而非空但过短的 token 仍会被当作已配置，首次配置向导不会为它
+重新打开：替换或删掉这个值再重启。
 
 给用户启用 TOTP：运行 `dsh-auth user totp enable <name>`，把打印出的密钥录入验证器应用，或扫描
 `otpauth://` URI 二维码（Google Authenticator、1Password 等）。验证码每 30 秒变化一次，前一个和
@@ -334,9 +364,15 @@ dsh-auth passkey rm admin --all             # 删除该用户全部通行密钥
 全局安装后，`dsh-auth` 会直接出现在 PATH 里；通过 `dsh plugin add` 安装时，可执行文件位于
 profile 内，需要经由 profile 调用，详见[快速开始](#快速开始)。
 
-`dsh-auth user passwd` 只重写存储的密码哈希，**不会吊销该用户已经登录的会话**。需要让会话立即
-失效时，请使用设置面板里的自助改密；`dsh-auth user disable` 也能阻止今后登录，但已签发的会话要等
-周期扫描（`revokeSweepMs`，默认约 5 秒）才会被吊销。
+`dsh-auth user passwd` 是独立进程，够不到会话存储：它记录这次变更，插件的会话扫描器在
+`revokeSweepMs`（默认约 5 秒）内吊销该用户此前的会话，插件下次重启时同样生效。Web 面的改密
+（设置面板、管理员重置）立即吊销；`dsh-auth user disable` 也会阻止今后登录，并在同一个扫描周期内
+吊销已签发的会话。
+
+- **备份用户列表。** `$DSH_HOME/auth/users.yaml` 是 password 模式部署唯一必须保留的状态
+  （`version: 1`，每用户一条记录，权限 `0600`）；每次写入前，上一份会被保留为
+  `users.yaml.bak`（同样 `0600`）。两件都备份；恢复流程和升级会如何改动这个文件见部署指南的
+  [备份、恢复与迁移一节](docs/deployed/deployment_zh.md)。
 
 ## 管理工具：列出用户与重置密码
 
@@ -367,7 +403,7 @@ curl -s -H "Origin: https://dsh.example.com" -b jar \
 （零外链、无脚本）；提交时仍然要求当前口令，成功后清除标记并把该用户登出，之后即可正常登录。
 重置**不会**改动目标的 TOTP 密钥；重置一个仍处于禁用状态的账号也不会让它登得进来（登录路径恒拒
 禁用用户），需要先执行 `dsh-auth user enable <name>`。完整契约见
-[D25](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.zh.md)。
+[管理员重置口令笔记](.agents/notes/implemented/feature/2026-09-24-admin-password-reset.zh.md)。
 
 ## 内置配置技能
 
@@ -456,8 +492,8 @@ dsh 打开启动链接时，credentials 服务可能还没就绪。在它应答�
 
 - [反向代理部署指南](docs/deployed/reverse-proxy_zh.md)：Caddy/nginx 配置、浏览器信任栅栏的坑
   （放在反代后面时设置页返回 `403`，以及为什么只加认证修不好），以及推荐的半外壳拓扑。
-- [`docs/deployed/deployment_zh.md`](docs/deployed/deployment_zh.md)：运维清单、验收步骤（A–I）
-  和故障诊断。
+- [`docs/deployed/deployment_zh.md`](docs/deployed/deployment_zh.md)：运维清单、验收步骤（A–J）、
+  备份与恢复，以及故障诊断。
 
 ## 认证本地代理（可选）
 
@@ -489,29 +525,9 @@ dsh-auth-proxy --listen 127.0.0.1:8443 --target https://your-domain.example --ma
 
 systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 
-## 环境要求
-
-- 服务器上需要 Node ≥ 22.19 和 pnpm。
-- dsh `0.1.x`、`0.2.x` 以及之后的每一条线（`engines.dsh` 声明为
-  `^0.1.0-rc.6 || ^0.1.5-rc.2 || ^0.1.7-alpha.1 || >=0.2.0-rc.1`）。前面三个 caret 替代项记录验过的宿主线；末尾的
-  `>=0.2.0-rc.1` 下界把当前 `next` 线及其之后的所有宿主一并接住，未来的 `0.3.x` 与 `1.x` 也在内。
-  声明滞后于新宿主线的代价大于它带来的保护，因为不兼容的插件包会被静默跳过，登录门随之消失。
-  运行时验证过的版本是 `0.1.5-rc.2` 与 `0.1.7-rc.2`（生产，按此顺序），以及
-  `0.1.7-alpha.1`、`0.2.0-rc.2`、`0.2.2-rc.1`（隔离实例）；完整测试套件跑在 `0.2.2-rc.1` 的宿主包上，
-  集成套件会在真实 webserver 上跑它们的 `resource` 路由（`/plugins` 前缀与 SPA 兜底）；`0.1.6-*` 预发布版没有列入枚举，因为没有针对它们的版本验证（稳定版
-  `0.1.6` 由 `^0.1.5-rc.2` 覆盖）。插件使用的是宿主自带的
-  `@deepseek-ai/dsh-storage-domain` 和 `@deepseek-ai/cordis`（两者都是 peer 依赖，不会打进包），
-  所以只要 profile 由 dsh 基础包启动，依赖就是齐的。dsh `0.2.0-rc.2`（已在 `next` 线上）会拒绝安装、并在启动时**静默跳过**那些
-  `@deepseek-ai/dsh*` peer 范围不覆盖当前宿主版本的插件；这条判定**只读 peer**，不读
-  `engines.dsh`，而完全没有这类 peer 的插件根本不会被检查。所以这一条下界在
-  `engines.dsh` 和 storage-domain peer **两处**都声明（D28）。
-- dsh 的 `web` profile 处于运行状态（`dsh --profile web`）。
-- 如果 `cookieSecure` 为 `true`，站点必须通过 https 提供服务（浏览器会拒绝在纯 http 下使用安全
-  cookie）。
-
 ## 注意事项与局限
 
-这里只列用户最需要知道的部分；完整清单（含机制和对应的 ADR）见
+这里只列用户最需要知道的部分；完整清单（含机制和对应的决策记录）见
 `docs/deployed/known-limitations_zh.md`。
 
 - 禁用用户只阻止**今后**的登录；已签发的会话由插件周期扫描吊销（`revokeSweepMs`，默认 5 秒内
@@ -537,9 +553,9 @@ systemd 示例：`deploy/systemd/dsh-auth-proxy.service.example`。
 ## 开发
 
 本仓库遵循 [dsh-plugin-framework](https://github.com/TecFancy/dsh-plugin-framework) 的工程约定：
-跨 slice 只通过 barrel 引用（Feature-Sliced Design 分层，由 Steiger 检查），以 `npm run verify` 作为门禁链，并保留决策记录（ADR）。`verify`
-依次运行 format / lint / no-emdash / slice / fsd / lock / decisions / docs / readme-parity / type-check /
-覆盖率 80% / build / bundle / 宿主契约；测试、构建和发版流程见 `docs/conventions_zh.md`。
+跨 slice 只通过 barrel 引用（Feature-Sliced Design 分层，由 Steiger 检查），以 `npm run verify` 作为门禁链，并保留决策记录。`verify`
+依次运行 format / lint / no-emdash / slice / fsd / lock / notes / docs / readme-parity / type-check /
+覆盖率（全局 80% 外加按路径的安全下限）/ build / bundle / 宿主契约；测试、构建和发版流程见 `docs/conventions_zh.md`。
 
 ## 许可证
 

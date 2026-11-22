@@ -6,6 +6,7 @@ import {
   makeSetupHandlers,
   type ConfiguredProbe,
   type ConfiguredState,
+  type CreateAdminResult,
   type SetupEndpointDeps,
   type SetupTokenOutcome,
 } from "../src/host/features/bootstrap/index.js";
@@ -70,10 +71,7 @@ export interface SetupHarnessOptions {
   /** 未配置探针的结论（默认未配置）。 */
   probe?: ConfiguredProbe;
   saveToken?: () => Promise<SetupTokenOutcome>;
-  createAdmin?: (
-    username: string,
-    password: string,
-  ) => Promise<"ok" | "conflict" | "invalid" | "failed">;
+  createAdmin?: (username: string, password: string) => Promise<CreateAdminResult>;
   publicHost?: string;
   sessionTtlSeconds?: number;
   store?: SessionStore | undefined;
@@ -84,6 +82,8 @@ export interface SetupHarness {
   store: SessionStore;
   /** 每次 `issueFullSession` 收到的 subject（顺序即调用顺序）。 */
   issued: string[];
+  /** 与 `issued` 对齐的凭证版本（建号时写下的 `password_changed_at`）。 */
+  issuedVersions: (string | undefined)[];
   logs: { level: string; message: unknown }[];
   cookie(kind?: SessionKind): Promise<string>;
 }
@@ -92,6 +92,7 @@ export interface SetupHarness {
 export function makeSetupHarness(options: SetupHarnessOptions = {}): SetupHarness {
   const store = options.store ?? new SessionStore(new MemTable());
   const issued: string[] = [];
+  const issuedVersions: (string | undefined)[] = [];
   const logs: { level: string; message: unknown }[] = [];
   const deps: SetupEndpointDeps = {
     mode: options.mode ?? "token",
@@ -105,9 +106,12 @@ export function makeSetupHarness(options: SetupHarnessOptions = {}): SetupHarnes
     usersPath: "/tmp/dsh-auth-test/users.yaml",
     saveToken:
       options.saveToken ?? (() => Promise.resolve({ status: "saved", token: "new-token" })),
-    createAdmin: options.createAdmin ?? (() => Promise.resolve("ok")),
-    issueFullSession: (subject, res) => {
+    createAdmin:
+      options.createAdmin ??
+      (() => Promise.resolve({ outcome: "ok", credentialVersion: "2026-11-22T00:00:00.000Z" })),
+    issueFullSession: (subject, res, credentialVersion) => {
       issued.push(subject);
+      issuedVersions.push(credentialVersion);
       res.setHeader("set-cookie", "dsh_auth=full-session; Max-Age=604800; Path=/; HttpOnly");
       return Promise.resolve();
     },
@@ -117,7 +121,14 @@ export function makeSetupHarness(options: SetupHarnessOptions = {}): SetupHarnes
       warn: (message) => logs.push({ level: "warn", message }),
     },
   };
-  return { deps, store, issued, logs, cookie: (kind) => cookieFor(store, "dsh_auth", kind) };
+  return {
+    deps,
+    store,
+    issued,
+    issuedVersions,
+    logs,
+    cookie: (kind) => cookieFor(store, "dsh_auth", kind),
+  };
 }
 
 /** setup 端点的两个处理函数（测试里省掉把 deps 再包一层的样板）。 */

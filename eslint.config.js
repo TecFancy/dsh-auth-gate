@@ -96,8 +96,28 @@ export default defineConfig([
     },
   },
   // Build/config scripts are Node tooling, not shipped logic: console allowed.
+  //
+  // The type-aware channel above only parses `*.ts` (it is rooted at
+  // tsconfig.json, which excludes JavaScript), so an `.mjs` gate script was
+  // never linted at all. This block gives the JavaScript tooling the plain
+  // recommended rule set. It is deliberately not type-aware: types for the
+  // shared helpers come from `tsc -p tsconfig.scripts.json` (checkJs), and the
+  // remaining scripts are plain ESM with no dependency on the TypeScript
+  // projects.
   {
-    files: ["*.config.{ts,js,mjs}", "scripts/**/*.{js,mjs,cjs,ts}"],
+    files: ["scripts/**/*.{js,mjs,cjs}", "*.config.{js,mjs}"],
+    extends: [js.configs.recommended],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+    rules: {
+      "no-console": "off",
+    },
+  },
+  // TypeScript build/config files are covered by the type-aware channel; keep
+  // the console exemption they had.
+  {
+    files: ["*.config.ts", "scripts/**/*.ts"],
     languageOptions: {
       globals: { ...globals.node },
     },

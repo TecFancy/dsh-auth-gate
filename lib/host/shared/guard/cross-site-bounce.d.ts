@@ -18,4 +18,3 @@ export declare function isCrossSiteDocumentNavigation(req: GuardRequest): boolea
 export declare function serveCrossSiteBounce(res: ServerResponse): void;
 /** 同一张弹回页的 Fetch `Response` 形态，供 resource 路由的守卫使用。 */
 export declare function crossSiteBounceResponse(): Response;
-//# sourceMappingURL=cross-site-bounce.d.ts.map

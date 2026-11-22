@@ -17,6 +17,12 @@ export interface AuthConfig extends TelemetryFields, PasskeyFields {
     cookieName: string;
     /** 共享 token 的 credentials 引用名（环境变量名）；password 模式忽略。 */
     tokenRef: string;
+    /**
+     * 共享访问令牌的最小长度（字符数，token 模式）：默认 32，schema 下限 32。
+     * 解析到的令牌短于该值时按「无凭证」处理：登录 401、Bearer 门拒绝（fail-closed）。
+     * 只做长度校验、不做熵估计；`""`/未配置的令牌走首次引导通道，不受此限。口令模式忽略。
+     */
+    tokenMinLength: number;
     /** cookie 是否带 `; Secure`（http 测试/开发可关，M7）。 */
     cookieSecure: boolean;
     /** users.yaml 路径；`""` = 按 P6 解析默认路径。password 模式专用。 */
@@ -74,6 +80,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;
     tokenRef: z<string, string, "defined">;
+    tokenMinLength: z<number, number, "defined">;
     cookieSecure: z<boolean, boolean, "defined">;
     usersFile: z<string, string, "defined">;
     publicHost: z<string, string, "defined">;
@@ -95,6 +102,7 @@ export declare const Config: z<Schemastery.ObjectS<NoInfer<{
     sessionTtl: z<number, number, "defined">;
     cookieName: z<string, string, "defined">;
     tokenRef: z<string, string, "defined">;
+    tokenMinLength: z<number, number, "defined">;
     cookieSecure: z<boolean, boolean, "defined">;
     usersFile: z<string, string, "defined">;
     publicHost: z<string, string, "defined">;
@@ -123,4 +131,3 @@ declare module "@deepseek-ai/cordis" {
  * apply 内无 await；password 模式不访问 credentials 服务。
  */
 export declare function apply(ctx: Context, config: AuthConfig): void;
-//# sourceMappingURL=index.d.ts.map

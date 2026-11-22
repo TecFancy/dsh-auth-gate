@@ -42,11 +42,12 @@ type UsersState =
   | { kind: "denied" }
   | { kind: "unauthorized" }
   | { kind: "failure" }
-  | { kind: "ok"; users: AdminUserRow[] };
+  | { kind: "ok"; users: AdminUserRow[]; refreshFailed?: boolean };
 
 /**
  * 挂载后拉一次列表（契约 §3.4：非 admin 根本不会挂载本组件，这里不判断角色）；
- * `reload` 供 A7 成功后静默刷新徽标：刷新失败**不改行**（首拉才降级），同一 abort 规则。
+ * `reload` 供 A7 成功后重拉徽标。刷新失败也落到 failure 态（C3）：静默保留旧数据会让
+ * 「成功」播报与过期列表同屏，重试按钮也无事可做。同一 abort 规则。
  */
 function useAdminUsers(): { state: UsersState; reload: () => void } {
   const [state, setState] = useState<UsersState>({ kind: "loading" });
@@ -54,15 +55,24 @@ function useAdminUsers(): { state: UsersState; reload: () => void } {
   useEffect(() => {
     const controller = new AbortController();
     let live = true;
-    const first = attempt === 0;
     void fetchAdminUsers(controller.signal)
       .then((result) => {
         if (!live || result.kind === "aborted") return;
         if (result.kind === "ok") setState({ kind: "ok", users: result.users });
-        else if (first) setState({ kind: result.kind });
+        else if (result.kind === "denied" || result.kind === "unauthorized") {
+          setState({ kind: result.kind });
+        } else {
+          // 刷新失败：保留上一份可用列表与成功播报，只在旁边挂一条错误（C3）。
+          setState((previous) =>
+            previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+          );
+        }
       })
       .catch(() => {
-        if (live && first) setState({ kind: "failure" });
+        if (!live) return;
+        setState((previous) =>
+          previous.kind === "ok" ? { ...previous, refreshFailed: true } : { kind: "failure" },
+        );
       });
     return () => {
       live = false;
@@ -183,6 +193,14 @@ function AdminBody({
   const targets = state.users.filter((user) => user.name !== actorName);
   return (
     <>
+      {state.refreshFailed === true ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <AdminNotice text={t(ADMIN_KEYS.unavailable)} error />
+          <ActionButton variant="ghost" onClick={onRetry}>
+            {t(ADMIN_KEYS.retry)}
+          </ActionButton>
+        </div>
+      ) : null}
       <AdminUsersTable t={t} users={state.users} actorName={actorName} />
       {targets.length === 0 ? (
         <p id={ADMIN_STATUS_ID} style={HINT_STYLE}>
@@ -257,12 +275,7 @@ export function AdminUsersBlock({ t, actorName, actorTotpEnabled }: AdminUsersBl
         </h3>
         <div style={SECTION_ACTIONS_STYLE}>
           {canReset && !resetting ? (
-            <ActionButton
-              ref={resetTriggerRef}
-              variant="ghost"
-              aria-expanded={false}
-              onClick={() => setResetting(true)}
-            >
+            <ActionButton ref={resetTriggerRef} variant="ghost" onClick={() => setResetting(true)}>
               {t(ADMIN_KEYS.resetOpen)}
             </ActionButton>
           ) : null}

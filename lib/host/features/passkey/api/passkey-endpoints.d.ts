@@ -10,7 +10,7 @@ export interface PasskeyEndpointsDeps extends Omit<PasskeyLoginDeps, "settings">
 }
 /**
  * 注册全部 7 条 passkey 路由并返回合并 disposer（按注册逆序释放）。
- * 登录两条由 `registerPasskeyLoginEndpoints` 注册（它自己持有计数器存储），其余五条在这里注册。
+ * 登录两条由 `makePasskeyLoginRoutes` 产出（它自己持有计数器存储），与管理五条收进同一批
+ * `mountRoutes`：任一条注册抛错时整批回滚，不留半套路由。
  */
 export declare function registerPasskeyEndpoints(deps: PasskeyEndpointsDeps): () => void;
-//# sourceMappingURL=passkey-endpoints.d.ts.map

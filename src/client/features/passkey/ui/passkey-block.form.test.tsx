@@ -161,6 +161,31 @@ describe("PasskeyBlock: 表单校验", () => {
     cleanup(root, container);
   });
 
+  it("ignores Enter while an IME composition is active (C6)", async () => {
+    mockList(200, { passkeys: [] });
+    const { root, container } = await render();
+    await openAddForm(container);
+    setValue(container, "label", "MacBook");
+    setValue(container, "password", "pw");
+    const form = container.querySelector("form");
+    if (form === null) throw new Error("missing form");
+    const before = requests.length;
+    await act(async () => {
+      form.dispatchEvent(new Event("compositionstart", { bubbles: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+    // 组合期内的确认键是「确认候选词」，不该发起注册请求。
+    expect(requests.length).toBe(before);
+    await act(async () => {
+      form.dispatchEvent(new Event("compositionend", { bubbles: true }));
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+      await flushMicrotasks();
+    });
+    expect(requests.some(([url]) => url === "/auth/passkey/register/options")).toBe(true);
+    cleanup(root, container);
+  });
+
   it("clears the error as soon as the field is edited", async () => {
     mockList(200, { passkeys: [] });
     const { root, container } = await render();

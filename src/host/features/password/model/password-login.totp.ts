@@ -4,9 +4,13 @@
  * 这条路径**不经过密码校验**：只要手里有合法的挑战 cookie（HMAC 签名、5 分钟有效）加一个正确
  * 验证码，就能直接换会话。因此它是 passkey-only 策略必须单独拦的第二条入口 - `handlePasswordLogin`
  * 在分流之前就按 `passwordLoginDisabled` 拒绝，本文件因此只在口令可用时被调用。
+ *
+ * 计数走独立的 `totp` 域（P1）：口令段成功只清 `login` 域，猜码计数跨挑战保留，
+ * 「重发正确口令换 4 次新机会」的循环不存在了。
  */
 import type { ServerResponse } from "node:http";
 import { totpChallengePageHtml } from "../../../shared/login-page/index.js";
+import type { Admission } from "../../../shared/rate-limit/index.js";
 import { loginPath } from "../../../shared/protocol/index.js";
 import { buildSetCookie } from "../../../entities/session/index.js";
 import { issueLoginSession } from "./session-issue.js";
@@ -15,7 +19,7 @@ import { CHALLENGE_COOKIE } from "./challenge-cookie.js";
 import { loadUsersOr503, requireStore } from "./login-store.js";
 import type { PasswordLoginDeps } from "./password-login.js";
 
-/** TOTP 挑战提交：限速 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
+/** TOTP 挑战提交：受理 → 用户文件 → 恒时验证 → 防重放 → 禁用检查 → 发会话。 */
 export async function handleTotpSubmit(
   deps: PasswordLoginDeps,
   host: string,
@@ -25,17 +29,41 @@ export async function handleTotpSubmit(
   next: string,
   ip: string,
 ): Promise<void> {
-  const lockout = deps.limiter.check(ip, username);
-  if (!lockout.allowed) {
-    sendTotpLockout(res, { host, next, username }, lockout.retryAfterSeconds);
+  // 第二段继承口令段的锁定（同一个客户端/账号被锁时，旧挑战也不能继续猜），
+  // 但**计数只落在 totp 域**：口令段成功清不到它（P1）。
+  const inherited = deps.limiter.check(ip, username, "login");
+  if (!inherited.allowed) {
+    sendTotpLockout(res, { host, next, username }, inherited.retryAfterSeconds);
     deps.logger.info("rate limit exceeded");
     return;
   }
+  const admitted = deps.limiter.admit(ip, username, "totp");
+  if (!admitted.admitted) {
+    sendTotpLockout(res, { host, next, username }, admitted.retryAfterSeconds);
+    deps.logger.info("rate limit exceeded");
+    return;
+  }
+  try {
+    await submitVerified(deps, host, res, username, code, next, admitted.admission);
+  } finally {
+    admitted.admission.settle("abandon"); // 已结算时是空操作；503/异常只释放占位
+  }
+}
+
+async function submitVerified(
+  deps: PasswordLoginDeps,
+  host: string,
+  res: ServerResponse,
+  username: string,
+  code: string,
+  next: string,
+  admission: Admission,
+): Promise<void> {
   const loaded = await loadUsersOr503(deps, res);
   if (loaded === undefined) return;
   const user = loaded.snapshot.users.get(username);
   if (user?.totpSecret === undefined) {
-    deps.limiter.recordFailure(ip, username);
+    admission.settle("failure");
     rejectTotp(deps, host, res, next, username);
     return;
   }
@@ -45,16 +73,15 @@ export async function handleTotpSubmit(
   const matched = deps.verifyTotp(user.totpSecret, code, deps.now());
   const replay = matched !== undefined && deps.replayCheck(username, matched, code);
   if (matched === undefined || !replay || user.disabled) {
-    deps.limiter.recordFailure(ip, username);
+    admission.settle("failure");
     rejectTotp(deps, host, res, next, username);
     return;
   }
 
-  // 先取 store 再清桶：session store 不可用（503）时不 recordSuccess，
-  // 已积累的失败计数保留（T8 限速连续）。
+  // 先取 store 再结算：session store 不可用（503）时不记成功，已积累的计数保留（T8 限速连续）。
   const store = requireStore(deps, res);
   if (store === undefined) return;
-  deps.limiter.recordSuccess(ip, username);
+  admission.settle("success");
   // 清挑战 cookie + 发会话（M4 T6：一次性，防重放再收窄）；set-cookie 用数组
   // （Node 重复 setHeader 会覆盖，必须同一次写两个 cookie）。
   // P2 ④：带 must_change_password 标记 → 受限会话（302 /auth/password，忽略 next）。

@@ -48,4 +48,3 @@ export declare function sendJson(res: ServerResponse, status: number, body: Pass
 export declare function sendUnavailable(res: ServerResponse): void;
 /** 415/413 响应（M19 复刻：413 先写 `connection: close`，不调 req.destroy）；无 status 的异常向上抛。 */
 export declare function respondFormError(res: ServerResponse, error: unknown): void;
-//# sourceMappingURL=password-change.ssr.d.ts.map

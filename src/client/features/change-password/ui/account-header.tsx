@@ -9,7 +9,6 @@
  * `container.querySelector("section")` 的第一个结果读 `minHeight`，那个第一个必须是
  * 改密面板本身。包一层 section 会让那条断言读到 undefined。
  */
-import type { CSSProperties } from "react";
 import { ACCOUNT_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
   ACCOUNT_CONTEXT_NAME_STYLE,
@@ -114,10 +113,3 @@ export function AccountHeader({ t, showIntro = true }: AccountHeaderProps) {
     </>
   );
 }
-
-/** 成功态面板的样式（标题 + 成功文案 + 重新登录按钮）。 */
-export const SUCCESS_PANEL_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 12,
-};

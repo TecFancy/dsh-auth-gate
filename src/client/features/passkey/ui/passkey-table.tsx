@@ -10,6 +10,7 @@
  * 表格保留 `<caption>`（屏幕阅读器需要知道这是「已注册的通行密钥」），视觉上隐藏。
  * 保持服务端顺序（createdAt 升序），不重排。
  */
+import { Fragment } from "react";
 import { PASSKEY_KEYS, type AccountTranslate } from "../../../shared/i18n/index.ts";
 import {
   ActionButton,
@@ -28,15 +29,23 @@ import type { PasskeySummaryView } from "../model/passkey-form.ts";
  * 不能用 `toISOString().slice(0, 10)`：那是 UTC 日期，东八区用户在 UTC 16:00 之后
  * 创建的凭据会显示成「昨天」。这里用 `Intl.DateTimeFormat` 的 `sv-SE` 区域（它天然
  * 输出 `YYYY-MM-DD`），显式传 `timeZone` 让测试可以钉住时区而不依赖运行环境。
+ *
+ * 线上 epoch ms 可能缺失/损坏（NaN、Infinity、超出 Date 范围）：`Intl` 对 Invalid Date
+ * 会抛 `RangeError`，不能让一行元数据炸掉整个面板（C7）。这类值渲染成 `-`。
  */
 export function formatPasskeyDate(value: number, timeZone?: string): string {
+  if (!Number.isFinite(value)) return "-";
   const options: Intl.DateTimeFormatOptions = {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
     ...(timeZone === undefined ? {} : { timeZone }),
   };
-  return new Intl.DateTimeFormat("sv-SE", options).format(new Date(value));
+  try {
+    return new Intl.DateTimeFormat("sv-SE", options).format(new Date(value));
+  } catch {
+    return "-";
+  }
 }
 
 /** 备份状态徽标：已备份 > 可同步 > 仅本设备（互斥，按信息量从强到弱）。 */
@@ -61,6 +70,8 @@ export interface PasskeyTableProps {
   passkeys: PasskeySummaryView[];
   /** 正在删除的 idPrefix（null = 没有删除在飞）。 */
   removing: string | null;
+  /** 添加在飞：删除按钮置灰，避免两个写动作并发（C6）。 */
+  addBusy: boolean;
   /** 已展开确认区的 idPrefix（null = 没有确认区）。 */
   pendingRemove: string | null;
   /** 点「删除」：只展开确认区，不发请求。 */
@@ -74,6 +85,7 @@ export function PasskeyTable({
   t,
   passkeys,
   removing,
+  addBusy,
   pendingRemove,
   onRequestRemove,
   renderConfirm,
@@ -92,26 +104,36 @@ export function PasskeyTable({
           const busy = removing === passkey.idPrefix;
           const confirming = pendingRemove === passkey.idPrefix;
           return (
-            <tr key={passkey.idPrefix}>
-              <th scope="row" style={{ ...ADMIN_TD_STYLE, textAlign: "left", fontWeight: 400 }}>
-                <span>{passkey.label}</span>
-                {passkey.transports.length === 0 ? null : (
-                  <span style={HINT_STYLE}> {passkey.transports.join(", ")}</span>
-                )}
-                <div style={CREDENTIAL_META_STYLE}>{metaText(passkey, t)}</div>
-                {confirming ? renderConfirm(passkey) : null}
-              </th>
-              <td style={{ ...ADMIN_TD_STYLE, textAlign: "right", verticalAlign: "top" }}>
-                <ActionButton
-                  variant="danger"
-                  busy={busy}
-                  aria-expanded={confirming}
-                  onClick={() => onRequestRemove(passkey.idPrefix)}
-                >
-                  {busy ? t(PASSKEY_KEYS.removing) : t(PASSKEY_KEYS.remove)}
-                </ActionButton>
-              </td>
-            </tr>
+            <Fragment key={passkey.idPrefix}>
+              <tr>
+                <th scope="row" style={{ ...ADMIN_TD_STYLE, textAlign: "left", fontWeight: 400 }}>
+                  <span>{passkey.label}</span>
+                  {passkey.transports.length === 0 ? null : (
+                    <span style={HINT_STYLE}> {passkey.transports.join(", ")}</span>
+                  )}
+                  <div style={CREDENTIAL_META_STYLE}>{metaText(passkey, t)}</div>
+                </th>
+                <td style={{ ...ADMIN_TD_STYLE, textAlign: "right", verticalAlign: "top" }}>
+                  <ActionButton
+                    variant="danger"
+                    busy={busy}
+                    disabled={addBusy}
+                    aria-expanded={confirming}
+                    onClick={() => onRequestRemove(passkey.idPrefix)}
+                  >
+                    {busy ? t(PASSKEY_KEYS.removing) : t(PASSKEY_KEYS.remove)}
+                  </ActionButton>
+                </td>
+              </tr>
+              {confirming ? (
+                // 确认区独立成行：表单/输入不能塞在行头 `<th>` 里（C6）。
+                <tr>
+                  <td colSpan={2} style={ADMIN_TD_STYLE}>
+                    {renderConfirm(passkey)}
+                  </td>
+                </tr>
+              ) : null}
+            </Fragment>
           );
         })}
       </tbody>

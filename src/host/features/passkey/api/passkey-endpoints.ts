@@ -13,7 +13,7 @@
  * 路径恰好注册一次」），因此这里逐个注册而不是遍历一张表。
  */
 import type { HttpHandler } from "../../../shared/guard/index.js";
-import { methodNotAllowed } from "../../../shared/http/index.js";
+import { methodNotAllowed, mountRoutes } from "../../../shared/http/index.js";
 import {
   PASSKEY_PATH,
   PASSKEY_REGISTER_OPTIONS_PATH,
@@ -22,7 +22,7 @@ import {
   PASSKEY_SETTINGS_PATH,
 } from "../../../shared/protocol/index.js";
 import type { PasskeyLoginDeps } from "./passkey-login-endpoints.js";
-import { registerPasskeyLoginEndpoints } from "./passkey-login-endpoints.js";
+import { makePasskeyLoginRoutes } from "./passkey-login-endpoints.js";
 import type { PasskeyManagementDeps } from "./passkey-management-deps.js";
 import { handlePasskeyList, handlePasskeyRemove } from "./passkey-manage-endpoints.js";
 import { handleRegisterFinish } from "./passkey-register-finish.js";
@@ -43,41 +43,38 @@ export interface PasskeyEndpointsDeps
 
 /**
  * 注册全部 7 条 passkey 路由并返回合并 disposer（按注册逆序释放）。
- * 登录两条由 `registerPasskeyLoginEndpoints` 注册（它自己持有计数器存储），其余五条在这里注册。
+ * 登录两条由 `makePasskeyLoginRoutes` 产出（它自己持有计数器存储），与管理五条收进同一批
+ * `mountRoutes`：任一条注册抛错时整批回滚，不留半套路由。
  */
 export function registerPasskeyEndpoints(deps: PasskeyEndpointsDeps): () => void {
-  const loginDisposer = registerPasskeyLoginEndpoints(deps);
-  const disposers: (() => void)[] = [
-    deps.register({
+  return mountRoutes(deps.register, [
+    ...makePasskeyLoginRoutes(deps),
+    {
       kind: "exact",
       path: PASSKEY_REGISTER_OPTIONS_PATH,
       handler: (req, res) => handleRegisterOptions(deps, req, res),
-    }),
-    deps.register({
+    },
+    {
       kind: "exact",
       path: PASSKEY_REGISTER_PATH,
       handler: (req, res) => handleRegisterFinish(deps, req, res),
-    }),
-    deps.register({
+    },
+    {
       kind: "exact",
       path: PASSKEY_PATH,
       handler: (req, res) => handlePasskeyList(deps, req, res),
-    }),
-    deps.register({
+    },
+    {
       kind: "exact",
       path: PASSKEY_REMOVE_PATH,
       handler: (req, res) => handlePasskeyRemove(deps, req, res),
-    }),
-    deps.register({
+    },
+    {
       kind: "exact",
       path: PASSKEY_SETTINGS_PATH,
       handler: (req, res) => handlePasskeySettings(deps, req, res),
-    }),
-  ];
-  return () => {
-    for (const disposer of [...disposers].reverse()) disposer();
-    loginDisposer();
-  };
+    },
+  ]);
 }
 
 /**

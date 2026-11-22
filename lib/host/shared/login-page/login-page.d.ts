@@ -74,4 +74,3 @@ export declare function loginPageHtml(next: string, error?: string, options?: Lo
 export declare function passwordLoginPageHtml(next: string, error?: string, options?: LoginPageOptions): string;
 /** TOTP 挑战页（M4 T6）：单验证码字段，两段式登录第二段。 */
 export declare function totpChallengePageHtml(next: string, error?: string, options?: LoginPageOptions): string;
-//# sourceMappingURL=login-page.d.ts.map

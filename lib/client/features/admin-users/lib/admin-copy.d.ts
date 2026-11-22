@@ -75,4 +75,3 @@ export declare const ADMIN_DICT_EN: Record<string, string>;
  * **绝不把键名当文案显示**（§4 表注）。
  */
 export declare function translateAdminFrom(dict: Record<string, string>): AdminTranslate;
-//# sourceMappingURL=admin-copy.d.ts.map

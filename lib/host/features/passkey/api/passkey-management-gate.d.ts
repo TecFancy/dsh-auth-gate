@@ -43,4 +43,3 @@ export type PasskeyGateResult = {
  * 405 用 `methodNotAllowed`（与既有端点同形：`allow` 头 + text/plain）。
  */
 export declare function passkeyManagementGate(deps: PasskeyManagementDeps, req: IncomingMessage, res: ServerResponse, options: PasskeyGateOptions): Promise<PasskeyGateResult>;
-//# sourceMappingURL=passkey-management-gate.d.ts.map
