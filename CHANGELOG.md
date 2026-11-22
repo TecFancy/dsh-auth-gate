@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.23.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.1...v0.23.2) (2026-11-22)
+
+
+### Bug Fixes
+
+* close the 0.23 four-agent review findings ([#159](https://github.com/TecFancy/dsh-auth-gate/issues/159)) ([5d4c716](https://github.com/TecFancy/dsh-auth-gate/commit/5d4c7167b30055132b1042b3a8e448230b1ee573))
+
 ## [0.23.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.0...v0.23.1) (2026-11-19)
 
 
