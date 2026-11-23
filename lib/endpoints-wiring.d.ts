@@ -6,6 +6,9 @@ import type { SessionStore } from "./host/entities/session/index.js";
  * `/auth` 端点的 root 侧装配（与 `admin-wiring.ts`、`bootstrap-wiring.ts` 同性质，从 `src/index.ts`
  * 拆出，守住 250 行文件上限）：按 mode 二选一，把包装后的 `register`、限速桶、防重放单例、
  * 挑战 cookie 密钥与日志收拢成端点 deps，root 只保留接线语义（建谁、按什么顺序建）。
+ *
+ * 两个分支都往端点 deps 里放 `mode` 与 `version`：它们是**实例事实**而不是身份事实，
+ * `/auth/status` 原样透传给客户端，设置页页脚据此渲染版本行与星标入口的受众。
  */
 /** 只看端点注册需要的配置（结构兼容 `AuthConfig`，根文件传整个 config 即可）。 */
 export interface EndpointsConfig {

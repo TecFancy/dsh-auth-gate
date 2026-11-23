@@ -61,6 +61,37 @@ describe("parseAccountStatus: passwordLoginDisabled", () => {
 });
 
 /**
+ * `mode` / `version`（2026-11-23）：设置页页脚的两个实例事实。同一套加法兼容规则 -
+ * 缺键、类型不符、取值不在白名单一律 `undefined`（"不知道"），页脚据此少渲染一行，
+ * 绝不反推实例模式、也绝不显示空版本号。
+ */
+describe("parseAccountStatus: mode and version", () => {
+  it("keeps the two known modes", () => {
+    expect(parseAccountStatus({ authenticated: true, mode: "token" }).mode).toBe("token");
+    expect(parseAccountStatus({ authenticated: true, mode: "password" }).mode).toBe("password");
+  });
+
+  it("leaves an unknown or missing mode undefined", () => {
+    for (const value of [undefined, "Token", "", "basic", 1, null]) {
+      expect(parseAccountStatus({ authenticated: true, mode: value }).mode).toBeUndefined();
+    }
+  });
+
+  it("keeps a non-empty version string verbatim", () => {
+    expect(parseAccountStatus({ authenticated: true, version: "0.24.0-rc.1" }).version).toBe(
+      "0.24.0-rc.1",
+    );
+  });
+
+  it("treats an empty or non-string version as unknown", () => {
+    // 空串 = host 读不到 package.json：显示成 `v` 比不显示更糟，这里统一归一成 undefined。
+    for (const value of [undefined, "", 24, null, {}]) {
+      expect(parseAccountStatus({ authenticated: true, version: value }).version).toBeUndefined();
+    }
+  });
+});
+
+/**
  * `logoutOrder` 也是白名单解析：只有整数才进视图，client 入口据此决定是否按 host 配置重注册；
  * 非整数/字符串/缺失一律 `undefined`（入口保留默认 order）。
  */

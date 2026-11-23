@@ -291,6 +291,13 @@ the gear). Once dsh offers an `icon` option, the stopgap and its code are remove
 
 ![The Account security panel in an administrator's settings: the change-password form and, below it, the user management block](docs/demo/account-change-password.en.png)
 
+A one-line footer at the bottom of the panel reports the version the running
+process actually loaded. The number comes from the host, not from the browser
+bundle, because after an upgrade the browser may still be running a cached copy -
+and "which version" is the first fact a bug report needs. For the instance
+operator (`token` mode, or an `admin` in password mode) the same line carries a
+link to star the repository.
+
 The panel posts to `POST /auth/password` (`current` / `password` / `code`,
 form-urlencoded) and, on success, **every session of that user is revoked,
 including the one making the change**. The client **immediately** sends the device

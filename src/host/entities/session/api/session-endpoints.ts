@@ -5,7 +5,7 @@ import {
   queryOf,
   validateNext,
 } from "../../../shared/http/index.js";
-import type { StatusResponse } from "../../../shared/protocol/index.js";
+import type { AuthMode, StatusResponse } from "../../../shared/protocol/index.js";
 import type { UsersLoadResult } from "../../user/@x/session.js";
 import { buildSetCookie, type Session, type SessionStore } from "../model/session-store.js";
 
@@ -35,6 +35,16 @@ export interface AuthHttpDeps {
    * 与 `passkeyEnabled` 正交 - WebAuthn 配置写坏时前者仍是 `true`。
    */
   readonly passwordLoginDisabled?: boolean | undefined;
+  /**
+   * 实例认证模式（`mode` 配置）：已知才写进 `/auth/status`，缺省不写该键（客户端视为"不知道"）。
+   * 客户端只用它决定设置页页脚的受众，不参与任何授权判定（授权每次现读 users.yaml）。
+   */
+  readonly mode?: AuthMode | undefined;
+  /**
+   * 本包版本号（运行中进程的 `package.json`，见 `shared/lib/version.ts`）：非空才写进
+   * `/auth/status`。与身份无关，未认证响应同样带它（报障时先问版本）。
+   */
+  readonly version?: string | undefined;
   /**
    * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
    * 缺省 = 不追加身份字段（加法兼容）。
@@ -140,19 +150,28 @@ async function writeStatusWithIdentity(
 }
 
 /**
- * 写出 `StatusResponse`（跨半边契约 D31）：`logoutOrder` 与 `passkeyEnabled` 恒由 deps 补在最后
- * （`passkeyEnabled` 缺省即 `false`，形状恒在）。
+ * 写出 `StatusResponse`（跨半边契约 D31）：`logoutOrder`/`passkeyEnabled`/`passwordLoginDisabled`
+ * 恒由 deps 补在最后（后两者缺省即 `false`，形状恒在）。
+ *
+ * `mode` 与 `version` 是**实例事实**而不是身份事实：已知才写、未知整键缺席（客户端按
+ * "不知道"处理，不反推）。两者都与账号无关，因此未认证响应照样带上。
  */
 function writeStatus(
   res: ServerResponse,
   deps: AuthHttpDeps,
-  body: Omit<StatusResponse, "logoutOrder" | "passkeyEnabled" | "passwordLoginDisabled">,
+  body: Omit<
+    StatusResponse,
+    "logoutOrder" | "passkeyEnabled" | "passwordLoginDisabled" | "mode" | "version"
+  >,
 ): void {
+  const version = deps.version ?? "";
   const payload: StatusResponse = {
     ...body,
     logoutOrder: deps.logoutOrder,
     passkeyEnabled: deps.passkeyEnabled === true,
     passwordLoginDisabled: deps.passwordLoginDisabled === true,
+    ...(deps.mode === undefined ? {} : { mode: deps.mode }),
+    ...(version === "" ? {} : { version }),
   };
   res.setHeader("cache-control", "no-store");
   res.writeHead(200, { "content-type": "application/json" });

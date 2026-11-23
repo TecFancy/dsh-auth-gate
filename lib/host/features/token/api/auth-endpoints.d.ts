@@ -1,5 +1,6 @@
 import type { IncomingMessage } from "node:http";
 import { type LaunchTokenBridge, type RouteRegister } from "../../../shared/http/index.js";
+import { type AuthMode } from "../../../shared/protocol/index.js";
 import { type SessionStore } from "../../../entities/session/index.js";
 import type { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 /**
@@ -28,6 +29,10 @@ export interface AuthEndpointsDeps {
      * `handleStatus` 按结构匹配读取它并恒写进 `/auth/status`。
      */
     passwordLoginDisabled?: boolean | undefined;
+    /** 实例认证模式：token 模式恒为 `token`，透传 `/auth/status` 供客户端判断页脚受众。 */
+    mode?: AuthMode | undefined;
+    /** 本包版本号（root 注入）：透传 `/auth/status`，空串不写该键。 */
+    version?: string | undefined;
     validateToken: (token: string) => Promise<boolean>;
     /** 与服务端其它登录路径共用的限速器（P1：token 模式此前完全没有限速）。 */
     limiter: LoginRateLimiter;

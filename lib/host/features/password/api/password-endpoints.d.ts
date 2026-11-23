@@ -1,6 +1,7 @@
 import { LoginRateLimiter } from "../../../shared/rate-limit/index.js";
 import { type UsersSnapshot } from "../../../entities/user/index.js";
 import type { HttpHandler } from "../../../shared/guard/index.js";
+import { type AuthMode } from "../../../shared/protocol/index.js";
 import { type RouteRegister } from "../../../shared/http/index.js";
 import { type PasswordLoginDeps } from "../model/password-login.js";
 import { type SessionStore } from "../../../entities/session/index.js";
@@ -48,6 +49,10 @@ export interface PasswordEndpointsDeps extends PasswordLoginDeps {
     register: RouteRegister;
     /** 「退出登录」按钮在通用设置页的槽位 order（经 /auth/status 透传 client）。 */
     logoutOrder: number;
+    /** 实例认证模式：password 模式恒为 `password`，透传 `/auth/status` 供客户端判断页脚受众。 */
+    mode?: AuthMode | undefined;
+    /** 本包版本号（root 注入）：透传 `/auth/status`，空串不写该键。 */
+    version?: string | undefined;
     /**
      * `passkey: "required"` 但 WebAuthn 配置不成立时的固定原因（`PasskeyDisabledReason`），
      * 只用于诊断卡文案。`passwordLoginDisabled` 为 true 且 `passkey` 入口不可用时才读它。

@@ -11,6 +11,7 @@ import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
+import { PACKAGE_VERSION } from "./package-version.js";
 
 type RealServer = WrappableServer & { readonly port: number };
 
@@ -131,8 +132,9 @@ describe("integration: disabling a user revokes live sessions", () => {
       expect(status).toBe(401);
 
       const statusRes = await fetch(`${base}/auth/status`, { headers: { cookie } });
+      // 逐字节钉住线上形状（含键顺序）；version 走 package.json 的现值，见 package-version.ts。
       expect(await statusRes.text()).toBe(
-        '{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
+        `{"authenticated":false,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false,"mode":"password","version":"${PACKAGE_VERSION}"}`,
       );
     } finally {
       await unmountStack(fibers, root);

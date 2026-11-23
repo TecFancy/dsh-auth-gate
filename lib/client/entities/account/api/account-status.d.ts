@@ -1,4 +1,4 @@
-import { type StatusResponse } from "../../../shared/api/index.ts";
+import { type AuthMode, type StatusResponse } from "../../../shared/api/index.ts";
 /**
  * `GET /auth/status` 的「关于我」视图：线上形状 `StatusResponse`（跨半边契约 D31）去掉本视图
  * 不消费的 `mustChangePassword`。
@@ -6,14 +6,19 @@ import { type StatusResponse } from "../../../shared/api/index.ts";
  * **加法兼容**：身份字段是 PR1 才有的（旧服务端只回 `authenticated`/`logoutOrder`），
  * 任一身份字段缺失即视为「不渲染管理块」，其余行为一字不变（契约 §1.1 / §3.3）。
  * `passkeyEnabled` 线上恒在（配置透传），但旧服务端没有它：视图里因此是可选的，
- * 缺失即 `undefined`（「不知道」，调用方不得据此推断关闭）。
+ * 缺失即 `undefined`（「不知道」，调用方不得据此推断关闭）。`mode`/`version` 同理：
+ * 缺席只是「不知道」，页脚据此少渲染一行，不反推实例是什么模式。
  */
-export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword" | "passkeyEnabled" | "passwordLoginDisabled"> & {
+export type AccountStatusView = Omit<StatusResponse, "logoutOrder" | "mustChangePassword" | "passkeyEnabled" | "passwordLoginDisabled" | "mode" | "version"> & {
     /** 「退出登录」按钮的槽位 order；缺失/非整数为 `undefined`（入口保留默认值）。 */
     logoutOrder?: number | undefined;
     passkeyEnabled?: boolean | undefined;
     /** 口令登录是否被策略关闭（`passkey: "required"`）；旧服务端缺该键 → `undefined`。 */
     passwordLoginDisabled?: boolean | undefined;
+    /** 实例认证模式；旧服务端缺该键 → `undefined`（页脚此时退回 admin-only）。 */
+    mode?: AuthMode | undefined;
+    /** 运行中 host 的版本号；读不到/旧服务端 → `undefined`（不渲染版本行）。 */
+    version?: string | undefined;
 };
 /** 会话探针结果：`ok`（200 体，含未认证）/ `failure`（网络、5xx、非 JSON）/ `aborted`。 */
 export type AccountStatusResult = {
@@ -37,6 +42,7 @@ export type AccountStatusState = {
  * `/auth/status` 响应体 → 视图对象。**逐字段白名单解析**（C8）：身份字段缺失、类型不符或
  * 取值不在白名单内，一律留 `undefined`；只有 `authenticated === true` 才可能让调用方继续渲染
  * 登录后的 UI。`passkeyEnabled` 同理：旧服务端没有该键、或值不是布尔 → `undefined`（不推断关闭）。
+ * `version` 只接受非空字符串：空串等于「读不到」，页脚据此不渲染（不显示 `v`）。
  */
 export declare function parseAccountStatus(body: unknown): AccountStatusView;
 /**

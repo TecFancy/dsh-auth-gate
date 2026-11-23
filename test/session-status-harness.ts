@@ -66,6 +66,8 @@ export interface DepsOptions {
   loadUsers?: AuthHttpDeps["loadUsers"];
   passkeyEnabled?: boolean | undefined;
   passwordLoginDisabled?: boolean | undefined;
+  mode?: AuthHttpDeps["mode"];
+  version?: AuthHttpDeps["version"];
   errors?: unknown[] | undefined;
 }
 
@@ -78,6 +80,8 @@ export function makeDeps(options: DepsOptions = {}): AuthHttpDeps {
     logoutOrder: 42,
     passkeyEnabled: options.passkeyEnabled,
     passwordLoginDisabled: options.passwordLoginDisabled,
+    mode: options.mode,
+    version: options.version,
     loadUsers: options.loadUsers,
     logger: {
       info: () => undefined,

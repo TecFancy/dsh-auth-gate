@@ -10,7 +10,7 @@
  * 改这里的值就是改对外契约（书签、反代规则、dsh 前端的跳转都认这些路径）：先改
  * `index.test.ts` 里钉住的值，再改这里。
  */
-export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasskeyAdminErrorBody, PasskeyAssertionRequest, PasskeyListResponse, PasskeyLoginErrorBody, PasskeyLoginOptionsResponse, PasskeyRegistrationOptionsResponse, PasskeyRegistrationRequest, PasskeyRemoveRequest, PasskeySettingsRequest, PasskeySettingsResponse, PasskeySummary, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
+export type { AdminResetErrorBody, AdminResetRequest, AdminResetResponse, AdminUserRow, AuthMode, LockedErrorBody, PasswordChangeErrorBody, PasswordChangeRequest, PasswordChangeResponse, PasskeyAdminErrorBody, PasskeyAssertionRequest, PasskeyListResponse, PasskeyLoginErrorBody, PasskeyLoginOptionsResponse, PasskeyRegistrationOptionsResponse, PasskeyRegistrationRequest, PasskeyRemoveRequest, PasskeySettingsRequest, PasskeySettingsResponse, PasskeySummary, PasswordRule, PolicyErrorBody, SessionKind, StatusResponse, Unchecked, UserRole, UsersErrorBody, UsersResponse, } from "./payloads.js";
 /** 本插件全部端点的前缀；`prefix` 兜底路由挂在这里，gate 白名单也按它放行。 */
 export declare const AUTH_PATH_PREFIX = "/auth";
 /** 登录页（GET 渲染、POST 提交）。 */
