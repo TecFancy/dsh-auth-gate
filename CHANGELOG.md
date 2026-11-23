@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.25.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.24.0...v0.25.0) (2026-11-23)
+
+
+### Features
+
+* report the running version in the account footer and ask operators for a star ([#164](https://github.com/TecFancy/dsh-auth-gate/issues/164)) ([b06dd1c](https://github.com/TecFancy/dsh-auth-gate/commit/b06dd1ce3f288ede74f454dcfc11bdab92fbd087))
+
 ## [0.24.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.2...v0.24.0) (2026-11-23)
 
 
