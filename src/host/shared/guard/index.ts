@@ -38,6 +38,12 @@ export {
   wrapServer,
 } from "./guard.js";
 export type {
+  FallbackAuthAdapter,
+  HostAuthPolicy,
+  HostAuthRequest,
+  HostAuthRule,
+} from "./host-auth.js";
+export type {
   GuardLog,
   HttpHandler,
   UpgradeHandler,

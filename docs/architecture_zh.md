@@ -27,6 +27,8 @@ src/
 ├── telemetry-wiring.ts    # root-side assembly of the anonymous ping (config fragment -> guard admit hook)
 ├── passkey-wiring.ts      # passkey config fragment, WebAuthn self-check and endpoint wiring
 ├── rebridge-wiring.ts     # post-admit host-cookie rebridge hook (guard-side half: `guard/rebridge.ts`)
+├── host-auth-wiring.ts    # route-auth model bridge: session -> owner Peer for host `required` routes,
+│                          # plus the SPA fallback auth adapter (0.2.3-alpha.2 and later)
 ├── token-resolver.ts      # shared-token credential resolver (token mode)
 ├── launch-token-bridge.ts # reads dsh's launch token: post-login /?token= bridge and bootstrap comparison
 ├── cli-skill.ts           # `dsh-auth skill install`
@@ -36,7 +38,8 @@ src/
 ├── host/                  # host half: three FSD layers, analysed by Steiger (`npm run lint:fsd`)
 │   ├── shared/            #   layer without slices: segments only, each with its own index.ts
 │   │   ├── guard/         #     Gate vocabulary, webServer wrapping and deny pipeline, cross-site bounce,
-│   │   │                  #     post-admit rebridge, caller-admitted resource reads, startup self-check
+│   │   │                  #     post-admit rebridge, caller-admitted resource reads, startup self-check,
+│   │   │                  #     host route-auth rule mirror (`host-auth.ts`) and entry wrappers (`wrap-routes.ts`)
 │   │   ├── http/          #     cookie / form body (+ typed `formField`) / Origin / Host / client IP / `next` /
 │   │   │                  #     login redirect / `Permissions-Policy`, plus the session-independent authCatchAll,
 │   │   │                  #     queryOf, methodNotAllowed and the launch-token bootstrap shape probe
@@ -47,7 +50,8 @@ src/
 │   │   ├── telemetry/     #     anonymous usage ping (lazy, after an admitted request; no timer)
 │   │   └── lib/           #     leaf helpers (`dshHomeDir`)
 │   ├── entities/
-│   │   ├── session/       #     model/ session-store; api/ logout and /auth/status (AuthHttpDeps)
+│   │   ├── session/       #     model/ session-store + session-request (shared cookie/Bearer lookup);
+│   │   │                  #     api/ logout and /auth/status (AuthHttpDeps)
 │   │   └── user/          #     model/ users-file (users.yaml), atomic write, password policy, passkey records;
 │   │                      #     @x/session.ts exposes only `UsersLoadResult` to the session entity
 │   └── features/          #     slices never import each other; cross-slice goes through index.ts

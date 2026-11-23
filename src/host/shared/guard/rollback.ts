@@ -4,7 +4,7 @@ import type {
   WrappableServer,
   WrappableUpgradeRoute,
 } from "./guard.js";
-import { routeTarget } from "./mark.js";
+import { fallbackTarget, routeTarget } from "./mark.js";
 
 /** 三个注册方法的一份引用（wrap 前的原方法，或 wrap 后装上去的 wrapper）。 */
 type RegisterMethods = Pick<WrappableServer, "register" | "registerUpgrade" | "registerFallback">;
@@ -31,9 +31,13 @@ export function rollbackFallback(
 ): void {
   const fallback = server.fallback;
   if (fallback === undefined) return;
-  const own = typeof fallback === "function" ? fallback : fallback.resource;
-  const origin = origins.get(own);
-  if (origin !== undefined) server.fallback = origin;
+  const own = fallbackTarget(fallback);
+  const origin = typeof own === "function" ? origins.get(own) : undefined;
+  if (origin === undefined) return;
+  // 宿主可能把「函数形注册」规范化成 `{ handler }`（0.2.3-alpha.2 的 registerFallback 就是
+  // 这么做的）。回滚必须沿用宿主当前的形状，否则写回裸函数后它自己再也分发不了兜底请求。
+  server.fallback =
+    typeof origin === "function" && typeof fallback !== "function" ? { handler: origin } : origin;
 }
 
 /** upgrade 表的逐条回滚，语义与 {@link rollbackRoutes} 相同。 */

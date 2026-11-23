@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import z from "@deepseek-ai/schemastery";
 import { TokenGate } from "./host/features/token/index.js";
 import * as guard from "./host/shared/guard/index.js";
+import type { FallbackAuthAdapter } from "./host/shared/guard/index.js";
 import { DisabledSessionSweeper, PasswordGate } from "./host/features/password/index.js";
 import { makeBootstrapWiring } from "./bootstrap-wiring.js";
 import { mountAuthRoutes } from "./auth-routes.js";
@@ -12,6 +13,7 @@ import { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 import { defaultUsersFilePath, loadUsersFile } from "./host/entities/user/index.js";
 import { makeLaunchTokenBridge } from "./launch-token-bridge.js";
 import { makeRebridge } from "./rebridge-wiring.js";
+import { wireHostAuth } from "./host-auth-wiring.js";
 import { makeTokenResolver, DEFAULT_TOKEN_MIN_LENGTH } from "./token-resolver.js";
 import { sessionDomainSpec, SessionStore } from "./host/entities/session/index.js";
 import { telemetryConfigFields, wireTelemetry, type TelemetryFields } from "./telemetry-wiring.js";
@@ -220,7 +222,6 @@ export function apply(ctx: Context, config: AuthConfig): void {
   let passkeyConditionalUi = passkey.settings.enabled ? passkey.settings.conditionalUi : false;
 
   const resolveToken = config.mode === "token" ? makeTokenResolver(ctx, config, log) : undefined;
-  const launchTokenBridge = makeLaunchTokenBridge(ctx, log);
   const usersPath = config.usersFile === "" ? defaultUsersFilePath() : config.usersFile;
   const limiter = new LoginRateLimiter();
   const replayGuard = new TotpReplayGuard();
@@ -241,6 +242,13 @@ export function apply(ctx: Context, config: AuthConfig): void {
           }),
   };
   ctx.provide("auth", auth);
+
+  // 0.2.3-alpha.2 的宿主在路由分发**之前**按路由 `auth` 策略判定：本插件的完整会话要先接成
+  // 宿主 `connection.authentication` 的 Provider，宿主 required 路由才会放行；SPA 兜底还要
+  // 一个「未登录先降级、让门 302」的鉴权适配器。旧宿主没有这套模型（newModel=false），
+  // Provider/适配器都不装，launch-token 桥也保持原样。
+  const fallbackAuth = mountHostAuth(ctx, config, auth, log);
+  const launchTokenBridge = makeLaunchTokenBridge(ctx, log);
 
   const bootstrap = makeBootstrapWiring({
     ctx,
@@ -272,12 +280,15 @@ export function apply(ctx: Context, config: AuthConfig): void {
   // 重铸钩子（D37）挂在同一个接缝上、排在统计之后：门放行只说明**外层**会话有效，宿主自己那层
   // cookie 可能已经对不上（反代改写 Host、换域名、过期、清站点数据），那时宿主会回它自己的 401。
   // 钩子问一次宿主的 `requestRejection`，不认就 302 到 `/?token=` 重铸，带一次性标记防循环。
+  // 0.2.3-alpha.2 起宿主 cookie 不再是登录的必要条件（Provider 用本插件会话换 Peer），旧的
+  // `requestRejection` 接缝也不存在；那一代不装重铸钩子，避免每次登录都打一条误导性告警。
   const unwrap = guard.wrapServer(
     server,
     () => auth.gate,
     log,
     wireTelemetry(ctx, config),
     makeRebridge(ctx, config, log),
+    fallbackAuth,
   );
   ctx.effect(() => unwrap, "dsh-auth-gate: guard unwrap");
 
@@ -308,4 +319,22 @@ export function apply(ctx: Context, config: AuthConfig): void {
     for (const failure of failures) log.error(`unwrapped entry: ${failure}`);
     throw new Error(`dsh-auth-gate: guard self-check failed: ${failures.join(", ")}`);
   }
+}
+
+/** {@link wireHostAuth} 的单行入口：apply 只留一行接线，细节（Provider/适配器）在对应模块。 */
+function mountHostAuth(
+  ctx: Context,
+  config: AuthConfig,
+  auth: AuthService,
+  log: {
+    error(message: unknown): void;
+    info(message: unknown): void;
+    warn(message: unknown): void;
+  },
+): FallbackAuthAdapter {
+  return wireHostAuth(ctx, {
+    sessions: () => auth.sessions,
+    cookieName: config.cookieName,
+    log,
+  });
 }

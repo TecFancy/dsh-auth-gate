@@ -9,6 +9,7 @@ export type { DisabledSweeperOptions } from "./model/disabled-sweeper.js";
 export { makePasswordChangeWiring, registerPasswordEndpoints } from "./api/password-endpoints.js";
 export type { PasswordChangeWiring, PasswordEndpointsDeps } from "./api/password-endpoints.js";
 export { PasswordGate } from "./model/password-gate.js";
+export { isRestrictedSession, RESTRICTED_SESSION_KIND } from "./model/restricted-session.js";
 export type { PasswordGateOptions } from "./model/password-gate.js";
 export { handlePasswordLogin } from "./model/password-login.js";
 export type { PasswordLoginDeps } from "./model/password-login.js";

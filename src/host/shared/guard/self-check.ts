@@ -1,5 +1,5 @@
 import type { WrappableServer } from "./guard.js";
-import { isGuarded, routeTarget } from "./mark.js";
+import { fallbackTarget, isGuarded, routeTarget } from "./mark.js";
 
 /**
  * 启动自检：返回未被守卫标记覆盖的入口清单，形如 "exact /api"、"fallback"、
@@ -19,10 +19,7 @@ export function assertGuarded(server: WrappableServer): string[] {
     if (!isGuarded(routeTarget(route))) failures.push(`upgrade ${path}`);
   }
   const fallback = server.fallback;
-  if (fallback !== undefined) {
-    const target = typeof fallback === "function" ? fallback : fallback.resource;
-    if (!isGuarded(target)) failures.push("fallback");
-  }
+  if (fallback !== undefined && !isGuarded(fallbackTarget(fallback))) failures.push("fallback");
   for (const method of ["register", "registerUpgrade", "registerFallback"] as const) {
     // Reflect.get 读取方法引用，避免 unbound-method 对成员访问的告警。
     const fn = Reflect.get(server, method) as (...args: never[]) => unknown;

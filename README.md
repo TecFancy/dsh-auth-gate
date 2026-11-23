@@ -60,6 +60,11 @@ dsh plugin --profile web add dsh-auth-gate
 dsh --profile web
 ```
 
+On dsh `0.2.3-alpha.2` and later the wizard cannot verify the launch token (the host
+no longer exposes it to plugins); create the first credential with
+`dsh-auth user add` or `DSH_AUTH_TOKEN` instead. See
+[Troubleshooting](#troubleshooting) and `docs/deployed/known-limitations.md`.
+
 The wizard offers what the current mode allows: `token` mode, the shipped default,
 generates and saves the shared access token, and `password` mode creates the first
 administrator. The new token is shown once on the result page, and one click continues
@@ -103,10 +108,11 @@ question: is this instance configured?
   `next` line onwards compatible, including future `0.3.x` and `1.x`. A declaration that lags
   a new host line costs more than it protects, because an incompatible bundle is skipped and
   the login gate then disappears silently. Runtime-verified against `0.1.5-rc.2` and `0.1.7-rc.2` (production, in that
-  order), plus `0.1.7-alpha.1`, `0.2.0-rc.2` and `0.2.2-rc.1` (isolated instances);
-  the full test suite runs on the `0.2.2-rc.1` host packages, and the integration
+  order), plus `0.1.7-alpha.1`, `0.2.0-rc.2`, `0.2.2-rc.1` and `0.2.3-alpha.2` (isolated instances);
+  the full test suite runs on the `0.2.3-alpha.2` host packages, and the integration
   suite exercises their `resource` routes (the `/plugins` prefix and the SPA fallback)
-  against the real webserver. The `0.1.6-*`
+  against the real webserver, including the route-level `auth` model that host line
+  introduced. The `0.1.6-*`
   prereleases are not enumerated because no plugin version was verified against
   them (stable `0.1.6` is covered by `^0.1.5-rc.2`). The plugin runs on the
   host's own `@deepseek-ai/dsh-storage-domain` and `@deepseek-ai/cordis`
@@ -131,7 +137,10 @@ question: is this instance configured?
   - **Password** (recommended): each admin gets a username and password.
   - **Token**: one shared secret token for the whole instance.
 - **Works for browsers and scripts.** Browsers use the login page; scripts and
-  curl can pass `Authorization: Bearer <token>` and skip the page entirely.
+  curl can pass `Authorization: Bearer <token>` and skip the page entirely (on dsh
+  `0.2.3-alpha.2` and later the host decides its own routes before this gate, so a
+  script signs in once through `POST /auth/login` and reuses the session cookie:
+  see `docs/deployed/known-limitations.md`).
 - **Admin tools.** In password mode an administrator can list users and reset another user's
   password, either from the **Account security** section of the Settings panel or over HTTP
   (`GET /auth/users`, `POST /auth/users/password`); a reset revokes that user's sessions and

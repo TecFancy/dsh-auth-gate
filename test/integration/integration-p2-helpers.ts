@@ -148,6 +148,7 @@ export async function mountP2Stack(options: MountP2Options = {}): Promise<P2Stac
   server.register({
     kind: "exact",
     path: "/__probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("probe");
@@ -158,6 +159,7 @@ export async function mountP2Stack(options: MountP2Options = {}): Promise<P2Stac
   server.register({
     kind: "exact",
     path: "/api/__probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
       res.end('{"ok":true}');
@@ -165,6 +167,7 @@ export async function mountP2Stack(options: MountP2Options = {}): Promise<P2Stac
   });
   server.registerUpgrade({
     path: "/events",
+    auth: "anonymous",
     handler: (_req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",

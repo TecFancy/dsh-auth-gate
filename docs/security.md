@@ -200,9 +200,50 @@ and the reader's authority is the `Peer`, not a session. The bypass gives an
 in-process caller nothing it did not have - it already runs inside the host
 process. LiveShare serves the owner's viewer page through the gate on this path.
 
+A `peer` argument alone is **not** the signal, though: from host `0.2.3-alpha.2`
+a `required` resource route also receives the admitted `Peer` on the network path
+(the SPA index render needs it). The guard therefore treats a read as in-process
+only when the request carries no header at all - the shape `readResource` builds
+with `new Request(target)`. Any header (a network request always has `Host`)
+sends the read through the gate, and a gate refusal is answered before the
+resource runs.
+
 Rationale: [the peer-read note](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.md).
 
-## 15. What is deliberately not defended
+## 15. Host route authentication only ever admits a complete session
+
+From host `0.2.3-alpha.2` the web server decides a route's authentication
+**before** it dispatches, so the gate inside the wrapped handler runs after the
+host's decision. The plugin bridges the two models in one direction only:
+
+- It registers a `connection.authentication` provider that answers with an owner
+  `Peer` only for a **complete** session (`full` kind, unrevoked, unexpired).
+  A bootstrap session, a restricted (`password-change-only`) session, an expired
+  cookie or an unknown one yields no `Peer`; the host then keeps its own `401`.
+- It downgrades a host `required` fallback route to `anonymous` **only** when the
+  request carries no `Authorization` header and no complete session, so the gate
+  keeps ownership of the login redirect. Every other policy the host declares is
+  passed through untouched, and a rule that throws is treated as `required`.
+- Neither the provider nor the adapter ever widens what the gate would allow: the
+  provider is consulted only on host `required` routes, and every route still
+  passes through the wrapped gate afterwards.
+
+Two limits follow from that ordering and are deliberate, not oversights. First,
+only the **fallback** seat is downgraded. A `required` exact/prefix route or
+upgrade (the host's `/api`, the remote-stream mux, any third-party route that
+omits `auth`) is answered by the host before the gate runs, so an unauthenticated
+browser navigation to it gets the host's `401` instead of the gate's `302`; a
+`deny` policy behaves the same way (`403`, no redirect). The gate's redirect
+behaviour therefore applies to the fallback seat and to every route the host
+marks `anonymous` - which is all of this plugin's own surface. Second, a host
+plugin that answers inside the `webserver/request` or `webserver/upgrade`
+waterfall (before or after admission) is outside both the guard and this
+invariant; that is the host's own composition, and this plugin registers no such
+listener.
+
+Rationale: [the route-auth note](../.agents/notes/implemented/architecture/2026-11-23-host-route-auth-model.md).
+
+## 16. What is deliberately not defended
 These are known and accepted, not oversights. Each has a note explaining the
 trade-off:
 
@@ -222,6 +263,7 @@ Rationale: [the M3 leftovers note](../.agents/notes/implemented/simplification/2
 | Wrap, not fork | `src/host/shared/guard/guard.ts`, `self-check.ts` |
 | Every entry guarded | `src/host/shared/guard/guard.ts`, `test/integration.*.test.ts` |
 | Caller-admitted peer reads | `src/host/shared/guard/resource.ts` |
+| Host route auth admits only complete sessions | `src/host-auth-wiring.ts`, `src/host/shared/guard/host-auth.ts` |
 | Cross-site bounce | `src/host/shared/guard/cross-site-bounce.ts` |
 | Passkey policy | `src/passkey-wiring.ts`, `src/host/features/passkey/`, `src/host/features/password/model/password-login.ts` |
 | Launch token and bootstrap | `src/host/features/bootstrap/`, `src/launch-token-bridge.ts`, `src/bootstrap-wiring.ts` |

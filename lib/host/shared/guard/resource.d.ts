@@ -23,15 +23,16 @@ export declare function toGuardRequest(request: Request): GuardRequest;
  * `rebridge` 的询问时机与顺序也与 handler 入口相同：跨站弹回在前、重铸在后（见
  * {@link AdmitRebridge}）。
  *
- * **带 `peer` 的读不进门，也不走下面的浏览器检查。** 宿主
- * `webServer.readResource(request, peer)` 的契约是"调用方已经放行这个读者再读"，
- * 而 `peer` 就是那次放行本身（见 `dsh-host-webserver` 的 `readResource` 注释）；
- * 这种读发生在进程内，没有 cookie、没有 Host/Origin，门没有可判定的事实，却会
- * 按匿名拒成 401。LiveShare 的 viewer 页面正是这样读的：owner 的分享宿主用
- * reader 的 `peer` 读首页与 shell 资源。宿主自己的 fallback 就按
- * `peer === undefined` 与否分开处理（`dsh-host-frontend-static`），守卫跟随同一条
- * 分界：`peer` 在，就直接把原 `Request`、`peer` 和原 `Response` 交回；进程内调用方
- * 本来就有进程权限，绕过门不额外扩权。`onAdmit`（匿名统计）只数浏览器请求，
- * 这种读不计数；代理标记、跨站弹回、重铸都只对浏览器请求有意义，一并跳过。
+ * **进程内的 `readResource(request, peer)` 读不进门，也不走下面的浏览器检查。** 宿主
+ * `webServer.readResource(request, peer)` 的契约是"调用方已经放行这个读者再读"，而 `peer`
+ * 就是那次放行本身；这种读没有 cookie、没有 Host/Origin，门没有可判定的事实，却会按匿名拒成
+ * 401。LiveShare 的 viewer 页面正是这样读的：owner 的分享宿主用 reader 的 `peer` 读首页与
+ * shell 资源，请求由 `new Request(target)` 构造、**不带任何请求头**。
+ *
+ * 0.2.3-alpha.2 起「带 peer」不再等于「进程内读」：required 的 resource 路由在网络分发时也把
+ * `admission.peer` 交给 resource（SPA 索引渲染需要它）。所以判定看请求事实而不是只看 peer：
+ * 没有任何请求头 → 进程内读，原样交回；有请求头 → 按浏览器请求走门（fail-closed：网络请求
+ * 至少带 Host，带头的读绝不被误放行）。`onAdmit`（匿名统计）只数浏览器请求，进程内读不计数；
+ * 代理标记、跨站弹回、重铸都只对浏览器请求有意义，一并跳过。
  */
 export declare function guardResource(gate: () => Gate, kind: GuardKind, resource: ResourceHandler, onAdmit?: AdmitHook, rebridgeHook?: AdmitRebridge): ResourceHandler;

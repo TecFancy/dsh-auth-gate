@@ -126,3 +126,30 @@ README 里只留了短清单；这里是完整版：每条已知局限、它背�
   实例维持 0.17.4 的行为，只能通过 CLI 配置。
 - 本插件只保护 dsh 的网页入口，不能替代服务器层面的安全：请保持服务器系统用户最小权限、
   配置文件私密（`.credentials.yaml` 和 `auth/users.yaml` 创建时即为 `0600` 权限）。
+
+## 宿主 `0.2.3-alpha.2` 及之后
+
+那条宿主线把鉴权搬到了路由表上（不写 `auth` 即要求会话），launch token 也只留在它自己的 token 插件内部。对这个网关的影响：
+
+- **launch-token 桥与宿主 cookie 重铸都停用。** 它们分别建立在 `connection.authenticatedUrl` 与
+  `connection.requestRejection` 上，那条线已经删除这两个接缝。登录成功后直接落到 `/`，不再经过
+  `/?token=…` 那一跳；宿主那枚 30 天 cookie 也不再由网关铸造。已登录用户照常进得来，因为插件为
+  **完整会话**注册了 `connection.authentication` 的 Provider，浏览器侧没有损失；依赖重铸去修过期宿主
+  cookie 的部署，在那条线上不再需要它。
+- **首次配置向导无法校验 launch token。** 那枚 token 没有任何公开读取接缝，所以
+  `/auth/bootstrap?token=…` 一律拒绝。请用 `dsh-auth user add <name> --password-stdin`（password 模式）
+  或设置 `DSH_AUTH_TOKEN`（token 模式）建立第一个凭据，再正常登录。`dsh web` 打印的启动链接仍然可用，
+  但它只铸宿主自己的 cookie。
+- **裸的共享 token `Authorization: Bearer <token>` 在宿主路由上不再放行。** 宿主在包装的 handler
+  之前就判完那些路由，而 Provider 只认会话 cookie 与会话 Bearer（共享 token 不是会话，且解析是异步的）。
+  脚本应先通过 `POST /auth/login` 登录一次并复用会话 cookie；带 `Authorization` 的请求永远不会被降级成
+  匿名，所以失败方向是关闭。
+- 插件为 `/auth/*` 注册的路由**刻意**声明 `anonymous`：登录页、向导页与改密页必须在没有宿主会话时可达，
+  而它们每一个仍由插件自己的门判定。
+- **宿主自己的 Host/Origin 围栏现在跑在所有路由之前，登录页也不例外。** 它只接受宿主
+  `trustedHosts`（`dsh web` 的 `--trusted-host`）里列出的 authority；改写 `Host` 或终结到另一个
+  域名的反代会拿到 `403`，而且这个 403 发生在门与登录表单之前。那道围栏属于宿主，不属于本插件：
+  把 `--trusted-host`（以及反代的 `header_up Host`）配成站点域名，并注意这里的 `trustedProxyCidrs`
+  只喂限速器。
+- **只有兜底座位会被降级成 `anonymous`。** 不属于本插件、被声明为（或默认）`required` 的宿主路由
+  在门之前就回 `401`，所以浏览器导航到那里看到的是宿主的提示，而不是本插件的登录跳转。

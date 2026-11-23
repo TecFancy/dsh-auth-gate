@@ -195,3 +195,44 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   server-level security: keep the server OS user locked down and the config
   files private (`.credentials.yaml` and `auth/users.yaml` are created with
   `0600` permissions).
+
+## On host `0.2.3-alpha.2` and later
+
+That host line moved authentication to the route table (a route without `auth`
+requires a session) and reads the launch token only inside its own token plugin.
+Consequences for this gateway:
+
+- **The launch-token bridge and the host-cookie rebridge are inactive.** Both were
+  built on `connection.authenticatedUrl` and `connection.requestRejection`, which
+  that line removed. Sign-in therefore lands on `/` directly instead of the
+  `/?token=…` hop, and the host's own 30-day cookie is no longer minted by the
+  gateway. The signed-in user is admitted because the plugin registers a
+  `connection.authentication` provider for complete sessions, so nothing is lost
+  at the browser; a deployment that relied on the rebridge to repair a stale host
+  cookie no longer needs it on this line.
+- **The first-run wizard cannot verify the launch token.** The token is not
+  readable through any public seam, so `/auth/bootstrap?token=…` refuses. Create
+  the first user with `dsh-auth user add <name> --password-stdin` (password mode)
+  or set `DSH_AUTH_TOKEN` (token mode), then sign in normally. The launch URL
+  printed by `dsh web` still works, but it only mints the host's own cookie.
+- **A raw shared-token `Authorization: Bearer <token>` is not admitted on host
+  routes.** The host decides those before the wrapped handler runs, and the
+  provider answers only for session cookies and session Bearer tokens (the shared
+  token is not a session, and resolving it is asynchronous). Scripts should sign
+  in once through `POST /auth/login` and reuse the session cookie; a request that
+  carries `Authorization` is never downgraded to anonymous, so it fails closed.
+- Route-level `auth` declarations the plugin registers on `/auth/*` are
+  `anonymous` on purpose: the login, wizard and password pages must be reachable
+  without a host session, and the plugin's own gate still decides every one of
+  them.
+- **The host's own Host/Origin fence now runs in front of every route, the login
+  page included.** It accepts the authorities listed in the host's
+  `trustedHosts` (`--trusted-host` for `dsh web`), and a reverse proxy that
+  rewrites `Host` or terminates a different domain gets `403` before either the
+  gate or the login form runs. That fence is the host's, not this plugin's:
+  configure `--trusted-host` (and the proxy's `header_up Host`) as the site's
+  domain, and note that `trustedProxyCidrs` here only feeds the rate limiter.
+- **Only the fallback seat is downgraded to `anonymous`.** A host route this
+  plugin does not own that is declared (or defaults to) `required` answers `401`
+  before the gate, so a browser navigation there sees the host's message rather
+  than this plugin's login redirect.
