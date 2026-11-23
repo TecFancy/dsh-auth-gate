@@ -4,6 +4,17 @@
 
 README 里只留了短清单；这里是完整版：每条已知局限、它背后的机制，以及对应的决策记录。
 
+- **登录用户之间不做隔离。** 在带路由鉴权的宿主上，一个带着有效**完整**会话、打向宿主
+  `required` 路由的请求，会用同一个共享的 `{ principal: { kind: "owner" } }` peer 准入
+  （`src/host-auth-wiring.ts`）；宿主把它 abort 之后会换上新的 peer，新 peer 仍然是 owner。
+  bootstrap 与 `password-change-only` 会话拿不到 peer，插件自己的 `/auth/*` 路由是 `anonymous`，
+  不走它。password 模式下，`PasswordGate.decide()` 放行任何「非 bootstrap、非受限」的会话，
+  且从不读 `users.yaml`（`src/host/features/password/model/password-gate.ts`）。也就是说，
+  插件给每个完整会话同一个 owner principal，自己不额外加任何按用户的分离；宿主向 owner peer
+  交出什么，是宿主的行为。`subject` 用于审计、吊销和取回调用者本人的记录，从不用于给两个用户
+  不同的 principal。`role: "admin"` 不是数据隔离边界：它的服务端检查只有用户管理端点与通行密钥
+  设置端点。见
+  [不做隔离的笔记](../../.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.zh.md)。
 - 禁用用户会阻止**新**登录；**已发**会话由插件周期扫描吊销（`revokeSweepMs`，默认 5 秒内生效；
   设成 `0` 则一直有效到过期）。
 - **CLI 改密会让会话延迟失效。** `dsh-auth user passwd` 是独立进程，够不到会话存储：它记录

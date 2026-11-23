@@ -21,7 +21,7 @@ access").
 
 The repository's model boundary also settles the scope: `docs/history/specs/dsh-auth-plan.md` §0 decision 1 says "no
 multi-user/session isolation — the gate protects the entire instance", and `role: "admin"` is not a permission
-boundary (D36 documents this). Under that model, "disable the password for one account" is meaningless: the
+boundary ([the no-isolation note](../architecture/2026-11-15-no-user-isolation.md) documents this). Under that model, "disable the password for one account" is meaningless: the
 other accounts still sign in with passwords to the same instance, and the inside of the gate is not isolated
 anyway.
 
@@ -78,7 +78,7 @@ change the policy" or "a bad state cannot be parsed, so even the CLI cannot fix 
 Instance-level rather than per-account, because this repository's threat model is a single gate: everyone who
 gets past it shares one dsh deployment. Adding per-account sign-in policy to a model without isolation
 manufactures the illusion that each account has its own security boundary — the exact kind of misleading
-omission D36 argues against.
+omission [the no-isolation note](../architecture/2026-11-15-no-user-isolation.md) argues against.
 
 The costs are written down in `docs/deployed/known-limitations.md`: an administrator password reset does
 **not** restore access under passkey-only (the reset still sets `must_change_password`, but that restricted

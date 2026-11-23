@@ -22,7 +22,7 @@ export interface PasskeyFields {
      * 仅 password 模式生效；token 模式配非 off 只记 error 并按 off 处理。
      *
      * `"required"` 是**实例级**策略，不是账号级：这道门保护的是整个实例，登录用户之间不做隔离
-     * （见 `docs/decisions/implemented/2026-11-15-no-user-isolation.zh.md`），所以「某个账号单独
+     * （见 `.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.zh.md`），所以「某个账号单独
      * 禁用口令」在这个模型里没有意义。开启前必须已经注册并验证过至少一把通行密钥，否则实例会
      * 进入谁都进不来的状态；恢复办法是改回 `"optional"` 并重启。
      */
