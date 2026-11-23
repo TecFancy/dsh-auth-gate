@@ -168,6 +168,9 @@ describe("apply registration", () => {
     for (const key of Object.values(ACCOUNT_KEYS)) {
       expect(zhDict[key]?.length).toBeGreaterThan(0);
       expect(enDict[key]?.length).toBeGreaterThan(0);
+      // 品牌串不是文案：包名 + 版本号在两种语言下一个字都不该变（`dsh-auth-gate v0.24.0`）。
+      // 显式例外，而不是把这条守卫整体放松 - 其余键仍必须真的翻译过。
+      if (key === ACCOUNT_KEYS.footerVersion) continue;
       expect(enDict[key]).not.toBe(zhDict[key]);
     }
   });

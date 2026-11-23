@@ -11,11 +11,15 @@ import { makeClientIpResolver, parseClientIpPolicy } from "./host/shared/http/in
 import type { LoginRateLimiter } from "./host/shared/rate-limit/index.js";
 import type { SessionStore } from "./host/entities/session/index.js";
 import { loadUsersFile } from "./host/entities/user/index.js";
+import { SELF_VERSION } from "./host/shared/lib/index.js";
 
 /**
  * `/auth` 端点的 root 侧装配（与 `admin-wiring.ts`、`bootstrap-wiring.ts` 同性质，从 `src/index.ts`
  * 拆出，守住 250 行文件上限）：按 mode 二选一，把包装后的 `register`、限速桶、防重放单例、
  * 挑战 cookie 密钥与日志收拢成端点 deps，root 只保留接线语义（建谁、按什么顺序建）。
+ *
+ * 两个分支都往端点 deps 里放 `mode` 与 `version`：它们是**实例事实**而不是身份事实，
+ * `/auth/status` 原样透传给客户端，设置页页脚据此渲染版本行与星标入口的受众。
  */
 
 /** 只看端点注册需要的配置（结构兼容 `AuthConfig`，根文件传整个 config 即可）。 */
@@ -87,6 +91,8 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
   } = input;
   const policy = parseClientIpPolicy(config.clientIpHeader, config.trustedProxyCidrs);
   const clientIp = makeClientIpResolver(policy, log);
+  // 实例事实（不是身份事实）：两个分支都摊进端点 deps，`/auth/status` 原样透传给客户端。
+  const instanceFacts = { mode: config.mode, version: SELF_VERSION };
   // 同一个 replayGuard 单例：登录与改密共用（D22；不同实例会放过同窗重放）。
   const replayCheck = (username: string, counter: number, code: string): boolean =>
     replayGuard.checkAndRecord(username, counter, code);
@@ -99,6 +105,7 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
       sessionTtl: config.sessionTtl,
       logoutOrder: config.logoutOrder,
       passkeyEnabled: input.passkeyEnabled,
+      ...instanceFacts,
       limiter,
       clientIp,
       // token 模式没有口令登录，`required` 在那里不关闭任何东西（wirePasskey 已归零）。
@@ -114,8 +121,7 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
       logger: log,
     });
   }
-  // P1 §5 改密接线：独立限速桶 + 锁内写盘入口 + hashPassword + 撤销会话，
-  // 装配在 password 切片内（root 只保留接线语义）。恒定注入，不存在静默不注册。
+  // P1 §5 改密接线：独立限速桶 + 锁内写盘 + hashPassword + 撤销会话，恒定注入（细节在 password 切片）。
   const passwordChange = makePasswordChangeWiring(usersPath, auth, replayCheck, log);
   const loadUsers = () => loadUsersFile(usersPath);
   return registerPasswordEndpoints({
@@ -137,13 +143,13 @@ export function makeEndpointsWiring(input: EndpointsWiringInput): () => void {
     challengeMacKey,
     launchTokenBridge,
     logoutOrder: config.logoutOrder,
+    ...instanceFacts,
     passkey: input.passkeyLogin,
     passwordLoginDisabled: input.passwordLoginDisabled,
     passkeyDisabledReason: input.passkeyDisabledReason,
     logger: log,
     passwordChange,
-    // P2 管理面：装配细节（第三个独立限流桶、锁内写盘、吊销探针、双桶清理）在
-    // `src/admin-wiring.ts`；三条已认证路径共用同一个 replayGuard 单例。
+    // P2 管理面：装配细节在 `src/admin-wiring.ts`；三条已认证路径共用同一个 replayGuard 单例。
     admin: makeAdminWiring({
       sessions: () => auth.sessions,
       cookieName: config.cookieName,

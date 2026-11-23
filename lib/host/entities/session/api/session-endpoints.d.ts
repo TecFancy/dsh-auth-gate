@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import type { AuthMode } from "../../../shared/protocol/index.js";
 import type { UsersLoadResult } from "../../user/@x/session.js";
 import { type SessionStore } from "../model/session-store.js";
 /**
@@ -27,6 +28,16 @@ export interface AuthHttpDeps {
      * 与 `passkeyEnabled` 正交 - WebAuthn 配置写坏时前者仍是 `true`。
      */
     readonly passwordLoginDisabled?: boolean | undefined;
+    /**
+     * 实例认证模式（`mode` 配置）：已知才写进 `/auth/status`，缺省不写该键（客户端视为"不知道"）。
+     * 客户端只用它决定设置页页脚的受众，不参与任何授权判定（授权每次现读 users.yaml）。
+     */
+    readonly mode?: AuthMode | undefined;
+    /**
+     * 本包版本号（运行中进程的 `package.json`，见 `shared/lib/version.ts`）：非空才写进
+     * `/auth/status`。与身份无关，未认证响应同样带它（报障时先问版本）。
+     */
+    readonly version?: string | undefined;
     /**
      * P2：`/auth/status` 的「关于我」字段来源（password 模式注入；token 模式缺省）。
      * 缺省 = 不追加身份字段（加法兼容）。

@@ -9,6 +9,7 @@ import { AccountContext, AccountPasswordForm } from "../../../features/change-pa
 import { PasskeyBlock, PasskeySettingsToggle } from "../../../features/passkey/index.ts";
 import { ActionButton, HINT_STYLE, PANEL_STYLE, TITLE_STYLE } from "../../../shared/ui/index.ts";
 import { AdminUsersBlock } from "./admin-block.tsx";
+import { AccountSectionFooter } from "./section-footer.tsx";
 import { ADMIN_DICT_EN } from "../../../features/admin-users/index.ts";
 import type { AccountStatusView } from "../../../entities/account/index.ts";
 import { useAccountStatus } from "../../../entities/account/index.ts";
@@ -148,6 +149,12 @@ function AccountSectionContent({ t }: { t: AccountTranslate }) {
           {showsPasskeyBlock(status) ? <PasskeySettingsToggle t={t} /> : null}
         </section>
       ) : null}
+      {/* 页脚恒在最后一块之后：版本对所有人（报障先问版本），星标只对运营者（见 section-footer.tsx）。 */}
+      <AccountSectionFooter
+        t={t}
+        version={status.version}
+        showStar={admin || status.mode === "token"}
+      />
     </>
   );
 }

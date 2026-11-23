@@ -55,7 +55,7 @@ src/
 │   │   ├── rate-limit/    #     two-bucket login rate limiter
 │   │   ├── skill/         #     `dsh-auth skill install`
 │   │   ├── telemetry/     #     anonymous usage ping (lazy, after an admitted request; no timer)
-│   │   └── lib/           #     leaf helpers (`dshHomeDir`)
+│   │   └── lib/           #     leaf helpers (`dshHomeDir`, `SELF_VERSION`)
 │   ├── entities/
 │   │   ├── session/       #     model/ session-store + session-request (shared cookie/Bearer lookup);
 │   │   │                  #     api/ logout and /auth/status (AuthHttpDeps)
@@ -95,7 +95,7 @@ src/
     │   └── nav-icon/             # ui/ settings-nav icon shim (DOM)
     └── widgets/
         └── account-section/      # ui/ the "Account security" section; composes password change,
-                                  # user management and the passkey block
+                                  # user management, the passkey block and the version/star footer
 ```
 
 Unit tests live next to their source file, inside the same segment.

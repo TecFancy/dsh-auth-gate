@@ -167,3 +167,34 @@ export const ADMIN_BADGE_STYLE: CSSProperties = {
   fontSize: 12,
   lineHeight: "18px",
 };
+
+/**
+ * 页脚（2026-11-23）：一条细上分隔线下的 12px 单行 - 版本号在左，星标入口推到行尾。
+ * 不新开 section 标题、不加边框底色：它是一条脚注，不是面板里的第二块内容。
+ */
+export const FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  gap: 12,
+  marginTop: 4,
+  paddingTop: 12,
+  borderTop: "1px solid var(--dsw-alias-border-l1)",
+  fontSize: 12,
+  lineHeight: "18px",
+  color: "var(--dsw-alias-label-tertiary)",
+};
+
+/** 版本号：等宽 + 不换行（`v0.24.0` 被折行比不显示更糟）。 */
+export const FOOTER_VERSION_STYLE: CSSProperties = {
+  fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+  whiteSpace: "nowrap",
+};
+
+/** 星标入口：行尾、次级文字色、无下划线；★ 本身就是可见线索。 */
+export const FOOTER_LINK_STYLE: CSSProperties = {
+  marginLeft: "auto",
+  color: "var(--dsw-alias-label-secondary)",
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};

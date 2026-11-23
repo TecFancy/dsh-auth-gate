@@ -74,6 +74,10 @@ export const ACCOUNT_KEYS = {
    * 用它登录 - 不说明的话，用户会以为改完密码就能回到登录页。
    */
   passkeyOnlyNotice: "account.passkeyOnlyNotice",
+  // 页脚（2026-11-23）：版本行 + 星标入口。版本号来自 host 的 /auth/status，不是前端常量。
+  footerVersion: "account.footer.version",
+  starCta: "account.footer.star",
+  starHint: "account.footer.starHint",
 } as const;
 
 /** 契约 §2 策略规则名 → 词典键（`satisfies` 保证与契约的 `PasswordRule` 一一对应）。 */
@@ -114,6 +118,9 @@ export const ACCOUNT_DICT_ZH: Record<string, string> = {
   [ACCOUNT_KEYS.scope]: "这里是本实例的本地登录凭据，与 DeepSeek 云账户无关。",
   [ACCOUNT_KEYS.passkeyOnlyNotice]:
     "本实例要求使用通行密钥登录。密码仍可用于在这里修改凭据，但不能用来登录。",
+  [ACCOUNT_KEYS.footerVersion]: "dsh-auth-gate v{version}",
+  [ACCOUNT_KEYS.starCta]: "给个星星鼓励一下 ★",
+  [ACCOUNT_KEYS.starHint]: "Star 是别人判断这个插件还在维护的唯一依据。谢谢！",
   [ACCOUNT_KEYS.loading]: "正在确认登录状态...",
   [ACCOUNT_KEYS.loginRequired]: "请先登录后再修改密码。",
   [ACCOUNT_KEYS.current]: "当前密码",
@@ -170,6 +177,10 @@ export const ACCOUNT_DICT_EN: Record<string, string> = {
     "These are this instance's local sign-in credentials, not your DeepSeek account.",
   [ACCOUNT_KEYS.passkeyOnlyNotice]:
     "This instance requires a passkey to sign in. Your password still works for changing credentials here, but it cannot be used to sign in.",
+  [ACCOUNT_KEYS.footerVersion]: "dsh-auth-gate v{version}",
+  [ACCOUNT_KEYS.starCta]: "Give it a star ★",
+  [ACCOUNT_KEYS.starHint]:
+    "A star is how the next person knows this plugin is still maintained. Thank you!",
   [ACCOUNT_KEYS.loading]: "Checking your session...",
   [ACCOUNT_KEYS.loginRequired]: "Sign in first to change your password.",
   [ACCOUNT_KEYS.current]: "Current password",

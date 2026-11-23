@@ -12,6 +12,14 @@
 export type UserRole = "user" | "admin";
 
 /**
+ * 实例的认证模式（配置项 `mode`）。
+ *
+ * 与「登录页渲染哪种表单」同一层次的公开事实，不是身份信息：token 模式只有一枚共享令牌，
+ * 拿到它的人就是运营者；password 模式才有角色之分。客户端只用它决定设置页页脚的受众。
+ */
+export type AuthMode = "token" | "password";
+
+/**
  * 会话类别（D25）：受限会话只能改密，不进管理面；bootstrap 会话只能访问本插件的
  * `/auth/*`，只在首次引导通道签发，向导完成后整体吊销。
  */
@@ -53,6 +61,17 @@ export interface StatusResponse {
    * 以及为什么设置页的改密表单仍然存在（口令继续作为管理再认证的秘密）。
    */
   passwordLoginDisabled: boolean;
+  /**
+   * 实例的认证模式。**可选**：旧 host 不写该键，客户端不得据此反推（缺席 = 不知道）。
+   * 不是身份信息，未认证响应同样带它：登录页本来就把「token 框还是口令框」摆在外面。
+   */
+  mode?: AuthMode | undefined;
+  /**
+   * 本插件版本号（运行中 host 进程读到的 `package.json`，不是前端构建时常量：升级后
+   * 页面可能还在跑缓存的旧 bundle）。**可选**：读不到时 host 不写该键，客户端不渲染版本行。
+   * 与身份无关，未认证响应同样带它（诊断用：报障时第一句话就是「你装的是哪个版本」）。
+   */
+  version?: string | undefined;
   name?: string | undefined;
   role?: UserRole | undefined;
   disabled?: boolean | undefined;

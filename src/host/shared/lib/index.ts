@@ -3,4 +3,5 @@
  * Explicit export list: register new exports here.
  */
 export { dshHomeDir } from "./dsh-home.js";
+export { SELF_VERSION } from "./version.js";
 export type { VolatileField } from "./volatile-field.js";

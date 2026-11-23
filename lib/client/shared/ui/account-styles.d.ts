@@ -29,3 +29,12 @@ export declare const ADMIN_TH_STYLE: CSSProperties;
 export declare const ADMIN_TD_STYLE: CSSProperties;
 /** 只读徽标（角色 / 状态 / 两步验证 / 本人）：浅底 + 次级文字色，随主题切换。 */
 export declare const ADMIN_BADGE_STYLE: CSSProperties;
+/**
+ * 页脚（2026-11-23）：一条细上分隔线下的 12px 单行 - 版本号在左，星标入口推到行尾。
+ * 不新开 section 标题、不加边框底色：它是一条脚注，不是面板里的第二块内容。
+ */
+export declare const FOOTER_STYLE: CSSProperties;
+/** 版本号：等宽 + 不换行（`v0.24.0` 被折行比不显示更糟）。 */
+export declare const FOOTER_VERSION_STYLE: CSSProperties;
+/** 星标入口：行尾、次级文字色、无下划线；★ 本身就是可见线索。 */
+export declare const FOOTER_LINK_STYLE: CSSProperties;

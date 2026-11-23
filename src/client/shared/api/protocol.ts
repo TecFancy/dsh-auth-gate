@@ -25,6 +25,7 @@ export type {
   AdminResetRequest,
   AdminResetResponse,
   AdminUserRow,
+  AuthMode,
   LockedErrorBody,
   PasskeyAdminErrorBody,
   PasskeyListResponse,

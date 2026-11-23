@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { mountStack, unmountStack, upgradeRequest } from "./integration-auth-helpers.js";
+import { PACKAGE_VERSION } from "./package-version.js";
 
 describe("integration: auth endpoints over real HTTP", () => {
   it("runs the login flow", async () => {
@@ -47,8 +48,10 @@ describe("integration: auth endpoints over real HTTP", () => {
 
       expect((await fetch(`${base}/__probe`, { headers: { cookie } })).status).toBe(200);
       const status = await fetch(`${base}/auth/status`, { headers: { cookie } });
+      // 逐字节钉住线上形状（含键顺序）；只有 version 走 package.json 的现值，
+      // 它不是文案而是"进程自己的版本"，钉字面量会让每次发版都红。
       expect(await status.text()).toBe(
-        '{"authenticated":true,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false}',
+        `{"authenticated":true,"logoutOrder":1000,"passkeyEnabled":false,"passwordLoginDisabled":false,"mode":"token","version":"${PACKAGE_VERSION}"}`,
       );
     } finally {
       await unmountStack(fibers, root);

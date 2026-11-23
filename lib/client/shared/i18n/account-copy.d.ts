@@ -61,6 +61,9 @@ export declare const ACCOUNT_KEYS: {
      * 用它登录 - 不说明的话，用户会以为改完密码就能回到登录页。
      */
     readonly passkeyOnlyNotice: "account.passkeyOnlyNotice";
+    readonly footerVersion: "account.footer.version";
+    readonly starCta: "account.footer.star";
+    readonly starHint: "account.footer.starHint";
 };
 /** 规则名翻译；未知规则原样回显（不发明契约之外的文案）。 */
 export declare function ruleText(rule: string, t: AccountTranslate): string;
