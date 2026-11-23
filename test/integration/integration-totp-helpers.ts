@@ -92,6 +92,7 @@ export async function mountTotpStack(options?: {
   server.register({
     kind: "exact",
     path: "/__probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("probe");

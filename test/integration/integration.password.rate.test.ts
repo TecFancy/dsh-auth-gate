@@ -109,6 +109,7 @@ async function mountPasswordStack(options?: {
   server.register({
     kind: "exact",
     path: "/__probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("probe");
@@ -116,6 +117,7 @@ async function mountPasswordStack(options?: {
   });
   server.registerUpgrade({
     path: "/events",
+    auth: "anonymous",
     handler: (_req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",

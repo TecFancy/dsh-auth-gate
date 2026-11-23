@@ -2,5 +2,5 @@
 # of the last confirmed-consistent state. Both languages carry equal
 # authority; after editing either side, bring the other along and re-record
 # with:  npm run bilingual:re-record -- docs/deployed/known-limitations
-known-limitations.md: b9fc2f313036d7147d5ab036f4c386a80795928d
-known-limitations_zh.md: 2b97d8851a96843c02c8ad00c032906c65ce8acc
+known-limitations.md: 99c2707f311d828897519e55aac35442b3f54591
+known-limitations_zh.md: 2be249d0012e6776462b2557ea4b608acc06451d

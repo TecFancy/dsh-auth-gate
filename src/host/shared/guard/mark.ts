@@ -3,7 +3,7 @@
  * 判断每个入口是否已经过守卫。单独一个模块是为了让 `guard.ts` 与 `resource.ts`
  * 共享它而不形成循环依赖。
  */
-import type { WrappableRoute, WrappableUpgradeRoute } from "./guard.js";
+import type { WrappableFallback, WrappableRoute, WrappableUpgradeRoute } from "./guard.js";
 
 /** 挂在被包装 handler/resource 函数上的守卫标记。全局 symbol 保证跨模块实例一致。 */
 export const GUARDED: unique symbol = Symbol.for("dsh-auth.guarded");
@@ -26,4 +26,14 @@ export function isGuarded(target: unknown): boolean {
  */
 export function routeTarget(route: WrappableRoute | WrappableUpgradeRoute): unknown {
   return "resource" in route && route.resource !== undefined ? route.resource : route.handler;
+}
+
+/**
+ * fallback 座位上的目标函数：函数形态返回自身；对象形态取 `resource` 或 `handler`
+ * （0.2.3-alpha.2 起宿主也接受 `{ handler }`）。回滚与启动自检共用，避免两处漂移。
+ */
+export function fallbackTarget(fallback: WrappableFallback | undefined): unknown {
+  if (fallback === undefined) return undefined;
+  if (typeof fallback === "function") return fallback;
+  return fallback.resource ?? fallback.handler;
 }

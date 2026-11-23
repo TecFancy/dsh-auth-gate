@@ -1,4 +1,5 @@
 import type { Context } from "@deepseek-ai/cordis";
+import { hasRouteAuthModel } from "./host-auth-wiring.js";
 import type { AdmitRebridge, GuardKind, GuardRequest } from "./host/shared/guard/index.js";
 import { buildCookie, parseCookieHeader } from "./host/shared/http/index.js";
 import { readLaunchToken } from "./launch-token-bridge.js";
@@ -83,6 +84,11 @@ export function makeRebridge(
   let warnedInactive = false;
   return (req: GuardRequest, kind: GuardKind, pathname: string) => {
     if (!isRebridgeCandidate(req, kind, pathname)) return undefined;
+    // 0.2.3-alpha.2：宿主 cookie 不再是登录的必要条件（本插件注册的
+    // `connection.authentication` Provider 用自身会话换 Peer），那张 30 天 cookie 也只影响
+    // 宿主自己的索引渲染，而索引渲染此时已被 fallback 鉴权适配器覆盖。这一代没有
+    // `requestRejection` 接缝，钩子安静停用，不打「接缝缺失」告警（那不是退化）。
+    if (hasRouteAuthModel(ctx)) return undefined;
     const probe = connectionProbe(ctx);
     if (probe === undefined) {
       if (!warnedInactive) {

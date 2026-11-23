@@ -11,6 +11,7 @@ function registerRoutes(server: RealServer): void {
   server.register({
     kind: "exact",
     path: "/probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("probe");
@@ -19,6 +20,7 @@ function registerRoutes(server: RealServer): void {
   server.register({
     kind: "prefix",
     path: "/pfx",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("pfx");
@@ -26,15 +28,19 @@ function registerRoutes(server: RealServer): void {
   });
   server.registerUpgrade({
     path: "/api/events.host",
+    auth: "anonymous",
     handler: (_req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
       );
     },
   });
-  server.registerFallback((_req, res) => {
-    res.writeHead(200);
-    res.end("spa");
+  server.registerFallback({
+    auth: "anonymous",
+    handler: (_req, res) => {
+      res.writeHead(200);
+      res.end("spa");
+    },
   });
 }
 
@@ -61,6 +67,56 @@ function requestUpgradeStatus(port: number, path = "/api/events.host"): Promise<
   });
 }
 
+/**
+ * deny 门下的四类入口断言：302 登录页（含 next 与 no-referrer）、API 401、WS 拒握手、
+ * 晚注册路由立即被守卫。抽成函数是为了守住单测函数 80 行的上限。
+ */
+async function expectEntryClassesDenied(
+  server: RealServer,
+  base: string,
+  port: number,
+): Promise<void> {
+  const nav = await fetch(`${base}/probe`, {
+    // undici 会把 sec-fetch-mode 强制改写成 "cors"，故导航标记只能用 sec-fetch-dest。
+    headers: { accept: "text/html", "sec-fetch-dest": "document" },
+    redirect: "manual",
+  });
+  expect(nav.status).toBe(302);
+  expect(nav.headers.get("location")).toBe("/auth/login?next=%2Fprobe");
+  // 被拒的 URL 可能自带 launch token：跳登录页时不给下游留 Referer。
+  expect(nav.headers.get("referrer-policy")).toBe("no-referrer");
+
+  // P2 §3：Accept 子串匹配已废除（只认 Sec-Fetch）→ 缺头时 fail-closed 按 API 401。
+  const acceptOnly = await fetch(`${base}/probe`, { headers: { accept: "text/html" } });
+  expect(acceptOnly.status).toBe(401);
+
+  const api = await fetch(`${base}/probe`, { headers: { accept: "application/json" } });
+  expect(api.status).toBe(401);
+  expect(await api.text()).toBe("unauthorized");
+  expect((await fetch(`${base}/pfx/x`)).status).toBe(401);
+
+  const fallback = await fetch(`${base}/`, {
+    headers: { accept: "text/html", "sec-fetch-dest": "document" },
+    redirect: "manual",
+  });
+  expect(fallback.status).toBe(302);
+
+  // WS upgrade: denied before negotiation (401 response, no 'upgrade' event).
+  expect(await requestUpgradeStatus(port)).toBe(401);
+
+  // A route registered after the plugin applies is guarded immediately.
+  server.register({
+    kind: "exact",
+    path: "/late",
+    auth: "anonymous",
+    handler: (_req, res) => {
+      res.writeHead(200);
+      res.end("late");
+    },
+  });
+  expect((await fetch(`${base}/late`)).status).toBe(401);
+}
+
 describe("integration: real webserver + guard", () => {
   it("guards all four entry classes over real HTTP", async () => {
     const ctx = new Context();
@@ -81,47 +137,7 @@ describe("integration: real webserver + guard", () => {
       // Swap in a deny gate: guards must enforce 302/401 on every class.
       const denyGate: Gate = { decide: () => "deny" };
       ctx.get("auth")!.gate = denyGate;
-
-      const nav = await fetch(`${base}/probe`, {
-        // undici 会把 sec-fetch-mode 强制改写成 "cors"，故导航标记只能用 sec-fetch-dest。
-        headers: { accept: "text/html", "sec-fetch-dest": "document" },
-        redirect: "manual",
-      });
-      expect(nav.status).toBe(302);
-      expect(nav.headers.get("location")).toBe("/auth/login?next=%2Fprobe");
-      // 被拒的 URL 可能自带 launch token：跳登录页时不给下游留 Referer。
-      expect(nav.headers.get("referrer-policy")).toBe("no-referrer");
-
-      // P2 §3：Accept 子串匹配已废除（只认 Sec-Fetch）→ 缺头时 fail-closed 按 API 401。
-      const acceptOnly = await fetch(`${base}/probe`, { headers: { accept: "text/html" } });
-      expect(acceptOnly.status).toBe(401);
-
-      const api = await fetch(`${base}/probe`, {
-        headers: { accept: "application/json" },
-      });
-      expect(api.status).toBe(401);
-      expect(await api.text()).toBe("unauthorized");
-      expect((await fetch(`${base}/pfx/x`)).status).toBe(401);
-
-      const fallback = await fetch(`${base}/`, {
-        headers: { accept: "text/html", "sec-fetch-dest": "document" },
-        redirect: "manual",
-      });
-      expect(fallback.status).toBe(302);
-
-      // WS upgrade: denied before negotiation (401 response, no 'upgrade' event).
-      expect(await requestUpgradeStatus(port)).toBe(401);
-
-      // A route registered after the plugin applies is guarded immediately.
-      server.register({
-        kind: "exact",
-        path: "/late",
-        handler: (_req, res) => {
-          res.writeHead(200);
-          res.end("late");
-        },
-      });
-      expect((await fetch(`${base}/late`)).status).toBe(401);
+      await expectEntryClassesDenied(server, base, port);
     } finally {
       await authFiber.dispose();
       await wsFiber.dispose();
@@ -149,6 +165,7 @@ describe("integration: real webserver + guard", () => {
       // upgrade 语义不在白名单内（注册出来给守卫拒，仍是 401）。
       server.registerUpgrade({
         path: "/manifest.webmanifest",
+        auth: "anonymous",
         handler: (_req, socket) => {
           socket.write(
             "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
@@ -175,6 +192,7 @@ function routeOwner(id: string, path: string, body: string) {
           server.register({
             kind: "exact",
             path,
+            auth: "anonymous",
             handler: (_req, res) => {
               res.writeHead(200);
               res.end(body);

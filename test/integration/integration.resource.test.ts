@@ -26,6 +26,7 @@ function registerResourceRoutes(server: RealServer): void {
   server.register({
     kind: "prefix",
     path: "/plugins",
+    auth: "anonymous",
     resource: (request) =>
       reply(BUNDLE, {
         status: 200,
@@ -36,6 +37,7 @@ function registerResourceRoutes(server: RealServer): void {
       }),
   });
   server.registerFallback({
+    auth: "anonymous",
     resource: (_request, peer) =>
       reply("<html>spa</html>", {
         status: 200,
@@ -117,6 +119,7 @@ describe("integration: real webserver + guard on resource routes", () => {
       host.server.register({
         kind: "prefix",
         path: "/late",
+        auth: "anonymous",
         resource: () => reply("late"),
       });
       expect((await fetch(`${host.base}/late/x`)).status).toBe(401);

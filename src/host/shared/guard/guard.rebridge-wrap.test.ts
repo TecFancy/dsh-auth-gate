@@ -110,7 +110,12 @@ describe("放行后重铸：wrapServer 透传", () => {
     }));
 
     const fallback = server.fallback;
-    if (fallback === null || fallback === undefined || typeof fallback === "function") {
+    if (
+      fallback === null ||
+      fallback === undefined ||
+      typeof fallback === "function" ||
+      fallback.resource === undefined
+    ) {
       throw new Error("resource fallback missing");
     }
     const response = await fallback.resource(new Request("http://127.0.0.1:3080/"));
