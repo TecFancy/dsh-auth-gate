@@ -203,6 +203,14 @@ mechanisms is in `docs/deployed/known-limitations.md`):
   over https.
 - **Not a full identity provider.** No OAuth/OIDC, no self-registration, no e-mail
   reset; users are created and managed by an administrator through the CLI.
+- **No isolation between signed-in users.** A valid full session is admitted with the
+  instance's owner principal, and the plugin never checks which user a request belongs
+  to: it adds no separation of one signed-in user's sessions or workspaces from
+  another's. `role: "admin"` is not that separation - it only authorizes user
+  management and the passkey settings endpoints. Sign-in and revocation stay per user.
+  If you need per-user isolation, add a plugin that implements it. The mechanism is in
+  `docs/deployed/known-limitations.md`; the reasoning is in
+  [the no-isolation note](.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.md).
 
 ## The market's credentials badge
 

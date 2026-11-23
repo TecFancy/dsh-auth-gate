@@ -250,10 +250,16 @@ trade-off:
 - **No login CSRF token.** The single-gate model has no inter-user isolation, so
   the only impact is a polluted session-subject audit value. `SameSite=Lax` plus
   modern third-party `Set-Cookie` restrictions narrow it further.
+- **No separation between signed-in users.** The plugin admits every complete session
+  with the same owner principal and has no per-user boundary of its own; its only
+  role-gated endpoints are user management and passkey settings. What the host serves
+  that principal is the host's decision, not this plugin's.
 - **No rate-limit persistence.** A restart clears the buckets.
 - **No `revokeBySubject`.** Sessions are revoked per user, not per subject.
 
-Rationale: [the M3 leftovers note](../.agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers.md).
+Rationale: [the M3 leftovers note](../.agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers.md)
+covers login CSRF, rate-limit persistence and `revokeBySubject`; [the no-isolation note](../.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.md)
+covers the isolation boundary.
 
 ## Where the enforcement lives
 

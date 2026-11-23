@@ -2,5 +2,5 @@
 # of the last confirmed-consistent state. Both languages carry equal
 # authority; after editing either side, bring the other along and re-record
 # with:  npm run bilingual:re-record -- .agents/notes/implemented/feature/2026-11-16-passkey-only-login
-2026-11-16-passkey-only-login.md: 198417d7cfb7f24df369025f0162c16a33db4787
-2026-11-16-passkey-only-login.zh.md: b98d254f9dcf35bc16dfc7bee873605395c08dc5
+2026-11-16-passkey-only-login.md: 2dafe68804d10b924985de1356a0e91efb088d42
+2026-11-16-passkey-only-login.zh.md: 97ca00250b7a4ef5ef172f3d32e937d6cba98b60

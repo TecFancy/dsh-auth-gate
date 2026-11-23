@@ -158,6 +158,11 @@ dsh --profile web
 - **不能替代 HTTPS。** 配置了 `cookieSecure: true`，站点就必须通过 https 提供服务。
 - **不是完整的身份提供方（IdP）。** 没有 OAuth/OIDC，没有自助注册，也没有邮件重置；用户一律由
   管理员通过 CLI 创建和管理。
+- **登录用户之间不做隔离。** 一个有效的完整会话，就以实例 owner 的身份被准入；插件从不检查请求
+  属于哪个用户，也不会把一个已登录用户的会话或工作区与另一个隔开。`role: "admin"` 不是那道隔离
+  ——它只授权用户管理与通行密钥设置端点。登录与吊销仍然按用户进行。需要按用户隔离，请另装一个
+  实现了它的插件。机制见 `docs/deployed/known-limitations_zh.md`，理由见
+  [不做隔离的笔记](.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.zh.md)。
 
 ## 市场的「会用你的密钥」徽章
 

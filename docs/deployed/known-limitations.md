@@ -5,6 +5,22 @@ English | [中文](known-limitations_zh.md)
 The README keeps the short list. This page is the full one: every known limitation of the
 plugin, with the mechanism behind it and the decision record that fixed it.
 
+- **No isolation between signed-in users.** On a host with route authentication, a
+  request to a host `required` route that carries a valid **full** session is admitted
+  with one shared `{ principal: { kind: "owner" } }` peer
+  (`src/host-auth-wiring.ts`); the peer is replaced if the host aborts it, and the
+  replacement is still owner. Bootstrap and `password-change-only` sessions get no
+  peer, and the plugin's own `/auth/*` routes are `anonymous` rather than admitted
+  through it. In password mode, `PasswordGate.decide()` allows any non-bootstrap,
+  non-restricted session without reading `users.yaml`
+  (`src/host/features/password/model/password-gate.ts`). So the plugin hands every
+  complete session the same owner principal and adds no per-user separation of its own;
+  what the host then serves an owner peer is host behaviour. `subject` is used for
+  audit, revocation and to load the caller's own record, never to give two users
+  different principals. `role: "admin"` is not a data-isolation boundary: its
+  server-side checks are the user-management endpoints and the passkey settings
+  endpoints. See
+  [the no-isolation note](../../.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.md).
 - Disabling a user stops **new** logins, and the plugin's periodic sweep revokes the
   sessions already issued within `revokeSweepMs` (default 5 s); with `0` they stay valid
   until they expire.

@@ -139,10 +139,13 @@ exact/prefix 路由与 upgrade（宿主的 `/api`、remote-stream mux，以及�
 这些是已知且接受的，不是疏漏。每一条都有笔记解释取舍：
 
 - **没有登录 CSRF token。** 单门模型没有用户间隔离，唯一影响是会话主体审计值被污染。`SameSite=Lax` 加上现代浏览器的第三方 `Set-Cookie` 限制进一步收窄它。
+- **登录用户之间不做隔离。** 插件把每个完整会话都以同一个 owner principal 准入，自己没有任何按用户的边界；它唯一按角色授权的端点是用户管理与通行密钥设置。宿主向这个 principal 交出什么，是宿主的决定，不是本插件的。
 - **限速不持久化。** 重启清空桶。
 - **没有 `revokeBySubject`。** 会话按用户撤销，不按主体。
 
-依据：[M3 遗留项笔记](../.agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers.zh.md)。
+依据：[M3 遗留项笔记](../.agents/notes/implemented/simplification/2026-08-30-totp-disposition-of-m3-leftovers.zh.md)
+解释登录 CSRF、限速不持久化与 `revokeBySubject`；[不做隔离的笔记](../.agents/notes/implemented/architecture/2026-11-15-no-user-isolation.zh.md)
+解释隔离边界。
 
 ## 执行位置
 
