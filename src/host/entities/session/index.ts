@@ -12,5 +12,6 @@ export {
   SessionStore,
 } from "./model/session-store.js";
 export type { IssuedSession, Session } from "./model/session-store.js";
+export { sessionOfRequest } from "./model/session-request.js";
 export { handleLogout, handleStatus } from "./api/session-endpoints.js";
 export type { AuthHttpDeps } from "./api/session-endpoints.js";

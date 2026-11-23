@@ -133,6 +133,7 @@ export async function mountStack(options: MountStackOptions): Promise<MountedSta
   registerProbes(server);
   server.registerUpgrade({
     path: "/events",
+    auth: "anonymous",
     handler: (_req, socket) => {
       socket.write(
         "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
@@ -199,6 +200,7 @@ function registerProbes(server: RealServer): void {
   server.register({
     kind: "exact",
     path: "/__probe",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("probe");
@@ -207,6 +209,7 @@ function registerProbes(server: RealServer): void {
   server.register({
     kind: "exact",
     path: "/",
+    auth: "anonymous",
     handler: (_req, res) => {
       res.writeHead(200);
       res.end("index");

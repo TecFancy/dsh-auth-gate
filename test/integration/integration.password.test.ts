@@ -11,17 +11,32 @@ import type { WrappableServer } from "../../src/host/shared/guard/index.js";
 import { apply, Config, inject, name } from "../../src/index.js";
 import { hashPassword } from "../../src/host/features/password/index.js";
 import { writeUsersFile } from "../../src/host/entities/user/index.js";
+import { waitFor } from "./integration-auth-helpers.js";
 
 type RealServer = WrappableServer & { readonly port: number };
 
 const TEST_PASSWORD = "s3cret-pw";
 
-async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
-  const start = Date.now();
-  while (!condition()) {
-    if (Date.now() - start > timeoutMs) throw new Error("timed out waiting for condition");
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
+/** 探针路由：宿主要求显式声明 `auth`（0.2.3-alpha.2 起省略即 required）。 */
+function registerProbes(server: RealServer): void {
+  server.register({
+    kind: "exact",
+    path: "/__probe",
+    auth: "anonymous",
+    handler: (_req, res) => {
+      res.writeHead(200);
+      res.end("probe");
+    },
+  });
+  server.registerUpgrade({
+    path: "/events",
+    auth: "anonymous",
+    handler: (_req, socket) => {
+      socket.write(
+        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
+      );
+    },
+  });
 }
 
 async function mountPasswordStack(options?: {
@@ -85,22 +100,7 @@ async function mountPasswordStack(options?: {
     ),
   );
   const server = ctx.get("webServer") as unknown as RealServer;
-  server.register({
-    kind: "exact",
-    path: "/__probe",
-    handler: (_req, res) => {
-      res.writeHead(200);
-      res.end("probe");
-    },
-  });
-  server.registerUpgrade({
-    path: "/events",
-    handler: (_req, socket) => {
-      socket.write(
-        "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n",
-      );
-    },
-  });
+  registerProbes(server);
   await waitFor(() => ctx.get("auth")!.sessions !== undefined);
   return { ctx, port: server.port, fibers, root, usersFile };
 }

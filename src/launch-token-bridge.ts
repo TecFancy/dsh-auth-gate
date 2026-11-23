@@ -1,4 +1,5 @@
 import type { Context } from "@deepseek-ai/cordis";
+import { hasRouteAuthModel } from "./host-auth-wiring.js";
 
 /** 一次 launch-token 读取的结果：成功带 token，失败带原因（原因只用于日志选择，不外泄）。 */
 type LaunchTokenProbe =
@@ -50,6 +51,12 @@ export function readLaunchToken(ctx: Context): string | undefined {
  * review F1/F2）。connection 缺失 / 无 authenticatedUrl（旧版 dsh）/ 取不到 token →
  * undefined（保持原 302(next) 行为）。桥失败绝不影响登录成功。
  * 两把闩分开告警（F4）：服务缺失与调用异常互不毒化，各 warn 一次/进程。
+ *
+ * 宿主有路由级鉴权模型（DSH 0.2.3-alpha.2 起）时不装桥、也**不告警**：那代宿主把 launch
+ * token 收在 `dsh-host-authentication-token` 内部，只经 `webserver/entry-url` 交给 `dsh web`
+ * 打印，没有给第三方插件的读取接缝；登录后的页面靠本插件注册的 `connection.authentication`
+ * Provider 放行，不再需要宿主 cookie。桥不是「失效」而是「这一代不再需要」。判定是**每次登录
+ * 现取**的：`connection` 可能晚于本插件就绪。旧宿主仍走下面的完整桥。
  */
 export function makeLaunchTokenBridge(
   ctx: Context,
@@ -58,6 +65,7 @@ export function makeLaunchTokenBridge(
   let warnedInactive = false;
   let warnedError = false;
   return (): Promise<string | undefined> => {
+    if (hasRouteAuthModel(ctx)) return Promise.resolve(undefined);
     const probe = probeLaunchToken(ctx);
     if (probe.kind === "ok") {
       return Promise.resolve(`/?token=${encodeURIComponent(probe.token)}`);

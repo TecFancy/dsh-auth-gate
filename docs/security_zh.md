@@ -114,9 +114,28 @@ dsh 还有一层浏览器 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=St
 ## 14. 带 Peer 的进程内读由调用方放行
 `webServer.readResource(request, peer)` 是宿主内部读取「同一 URL 经 HTTP 会收到什么」的入口。调用方已经放行这个读者，`peer` 就是那次放行。守卫不能对这样的读再认证一次：它不带 cookie，浏览器门只能回 `401`，而读者的权限来自 `Peer`，不是会话。这条旁路不会给进程内调用方任何它本来没有的东西——它已经在宿主进程里。LiveShare 能隔着门提供 owner 的 viewer 页面，靠的就是这条路径。
 
+带 `peer` 参数本身**不是**判据：宿主 `0.2.3-alpha.2` 起，`required` 的 resource 路由在网络路径上也会收到已放行的 `Peer`（SPA 索引渲染需要它）。所以守卫只在请求**完全不带请求头**时才把这次读当作进程内读——那正是 `readResource` 用 `new Request(target)` 构造出来的形状。只要带了任何请求头（网络请求至少有 `Host`），这次读就走门；门的拒绝发生在 resource 之前。
+
 依据：[peer 读笔记](../.agents/notes/implemented/bug-fix/2026-11-19-peer-reads-admitted-by-caller.zh.md)。
 
-## 15. 刻意不防的东西
+## 15. 宿主路由鉴权只认完整会话
+
+宿主 `0.2.3-alpha.2` 起在**分发之前**判定路由鉴权，包在 handler 外面的门是在宿主判定之后才运行的。插件只朝一个方向把两套模型接起来：
+
+- 注册 `connection.authentication` 的 Provider，只对**完整**会话（`full` 类别、未吊销、未过期）返回 owner `Peer`。bootstrap 会话、受限（`password-change-only`）会话、过期或未知 cookie 一律拿不到 `Peer`，宿主保持它自己的 `401`。
+- 只有当请求既没有 `Authorization` 头、也没有完整会话时，才把宿主 `required` 的 fallback 路由降级成 `anonymous`，让门继续掌握登录跳转。宿主声明的其它策略原样透传；规则求值抛错按 `required` 处理。
+- Provider 与适配器都不会放宽门本来会拒绝的请求：Provider 只在宿主 `required` 路由上被问到，而每个路由之后仍要穿过被包装的门。
+
+这个先后顺序带来两条刻意的边界，不是疏漏。第一，只有 **兜底** 座位会被降级：`required` 的
+exact/prefix 路由与 upgrade（宿主的 `/api`、remote-stream mux，以及任何省略 `auth` 的第三方路由）
+在门运行之前就由宿主答复，所以未认证的浏览器导航打到它们时拿到的是宿主的 `401`，而不是门的
+`302`；`deny` 策略同理（`403`，不跳转）。门那套跳转因此只覆盖兜底座位与宿主声明 `anonymous`
+的路由 - 而本插件自有面全部属于后者。第二，在 `webserver/request` 或 `webserver/upgrade`
+瀑布里自行答复的宿主插件不在守卫与本不变量之内：那是宿主自己的组合，本插件不注册这类监听器。
+
+依据：[路由级鉴权笔记](../.agents/notes/implemented/architecture/2026-11-23-host-route-auth-model.zh.md)。
+
+## 16. 刻意不防的东西
 这些是已知且接受的，不是疏漏。每一条都有笔记解释取舍：
 
 - **没有登录 CSRF token。** 单门模型没有用户间隔离，唯一影响是会话主体审计值被污染。`SameSite=Lax` 加上现代浏览器的第三方 `Set-Cookie` 限制进一步收窄它。
@@ -133,6 +152,7 @@ dsh 还有一层浏览器 cookie（`dsh-auth-<sha256(authority)>`，`SameSite=St
 | 包装不 fork | `src/host/shared/guard/guard.ts`、`self-check.ts` |
 | 每个入口都被守卫 | `src/host/shared/guard/guard.ts`、`test/integration.*.test.ts` |
 | 调用方放行的 peer 读 | `src/host/shared/guard/resource.ts` |
+| 宿主路由鉴权只认完整会话 | `src/host-auth-wiring.ts`、`src/host/shared/guard/host-auth.ts` |
 | 跨站弹回 | `src/host/shared/guard/cross-site-bounce.ts` |
 | 通行密钥策略 | `src/passkey-wiring.ts`、`src/host/features/passkey/`、`src/host/features/password/model/password-login.ts` |
 | 启动 token 与首次引导 | `src/host/features/bootstrap/`、`src/launch-token-bridge.ts`、`src/bootstrap-wiring.ts` |

@@ -1,4 +1,4 @@
-import { bootstrapRedirectPath, parseCookieHeader } from "../../../shared/http/index.js";
+import { bootstrapRedirectPath } from "../../../shared/http/index.js";
 import {
   denyBootstrap,
   isNavigationRequest,
@@ -11,6 +11,7 @@ import {
 import { isAuthPath, LOGIN_PATH, loginPath } from "../../../shared/protocol/index.js";
 import {
   isBootstrapSession,
+  sessionOfRequest,
   type Session,
   type SessionStore,
 } from "../../../entities/session/index.js";
@@ -74,16 +75,7 @@ export class PasswordGate implements Gate {
 
   /** 会话解析：cookie → Bearer；store 不可用 / 无凭证 / 已吊销 / 已过期 → undefined。 */
   private sessionOf(req: GuardRequest): Session | undefined {
-    const store = this.sessions();
-    if (store === undefined) return undefined;
-    const cookie = parseCookieHeader(req.headers.cookie, this.cookieName);
-    if (cookie !== undefined && cookie !== "") {
-      const row = store.getByToken(cookie);
-      if (row !== undefined) return row;
-    }
-    const match = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? "");
-    const bearer = match?.[1];
-    return bearer === undefined ? undefined : store.getByToken(bearer);
+    return sessionOfRequest(req, this.cookieName, this.sessions());
   }
 }
 

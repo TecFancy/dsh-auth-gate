@@ -55,6 +55,10 @@ dsh plugin --profile web add dsh-auth-gate
 dsh --profile web
 ```
 
+在 dsh `0.2.3-alpha.2` 及之后，向导无法校验 launch token（宿主不再把它暴露给插件）：请改用
+`dsh-auth user add` 或 `DSH_AUTH_TOKEN` 建立第一个凭据，详见
+`docs/deployed/known-limitations.md`。
+
 向导给出的选项跟随当前模式：token 模式（出厂默认）生成并保存共享访问令牌，password 模式创建第一个
 管理员。新令牌只在结果页显示一次，点一下就能继续进入 dsh。从下次访问起，那条启动链接又只是一条普通 URL：
 在登录页用刚设好的令牌或密码登录即可。其余的事（加用户、开 TOTP、改 `mode`）仍然在 shell 里做：
@@ -87,8 +91,9 @@ dsh --profile web
   `>=0.2.0-rc.1` 下界把当前 `next` 线及其之后的所有宿主一并接住，未来的 `0.3.x` 与 `1.x` 也在内。
   声明滞后于新宿主线的代价大于它带来的保护，因为不兼容的插件包会被静默跳过，登录门随之消失。
   运行时验证过的版本是 `0.1.5-rc.2` 与 `0.1.7-rc.2`（生产，按此顺序），以及
-  `0.1.7-alpha.1`、`0.2.0-rc.2`、`0.2.2-rc.1`（隔离实例）；完整测试套件跑在 `0.2.2-rc.1` 的宿主包上，
-  集成套件会在真实 webserver 上跑它们的 `resource` 路由（`/plugins` 前缀与 SPA 兜底）；`0.1.6-*` 预发布版没有列入枚举，因为没有针对它们的版本验证（稳定版
+  `0.1.7-alpha.1`、`0.2.0-rc.2`、`0.2.2-rc.1`、`0.2.3-alpha.2`（隔离实例）；完整测试套件跑在 `0.2.3-alpha.2` 的宿主包上，
+  集成套件会在真实 webserver 上跑它们的 `resource` 路由（`/plugins` 前缀与 SPA 兜底），
+  并覆盖该宿主线引入的路由级 `auth` 模型；`0.1.6-*` 预发布版没有列入枚举，因为没有针对它们的版本验证（稳定版
   `0.1.6` 由 `^0.1.5-rc.2` 覆盖）。插件使用的是宿主自带的
   `@deepseek-ai/dsh-storage-domain` 和 `@deepseek-ai/cordis`（两者都是 peer 依赖，不会打进包），
   所以只要 profile 由 dsh 基础包启动，依赖就是齐的。dsh `0.2.0-rc.2`（已在 `next` 线上）会拒绝安装、并在启动时**静默跳过**那些
@@ -109,7 +114,8 @@ dsh --profile web
   - **密码**（推荐）：每个管理员使用自己的用户名和密码。
   - **令牌**：整个实例共用一个密钥。
 - **浏览器和脚本都能用。** 浏览器走登录页；脚本和 curl 带上 `Authorization: Bearer <token>` 就能
-  跳过登录页。
+  跳过登录页（dsh `0.2.3-alpha.2` 及之后，宿主先于本门判定它自己的路由，所以脚本改为通过
+  `POST /auth/login` 登录一次并复用会话 cookie，见 `docs/deployed/known-limitations.md`）。
 - **管理工具。** 密码模式下，管理员可以在设置面板的**「账号安全」**分区里，或通过 HTTP
   （`GET /auth/users`、`POST /auth/users/password`）列出用户、重置他人口令；重置会吊销该用户已有的
   全部会话，并让他在下次登录时先设置新口令，之后才能访问其他任何内容。只有处于正式会话的 admin

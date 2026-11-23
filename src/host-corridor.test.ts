@@ -45,13 +45,27 @@ describe("host corridor declaration", () => {
   });
 
   it("covers every host line this plugin claims to support", () => {
-    for (const runtime of ["0.1.5-rc.2", "0.1.7-alpha.1", "0.1.7-rc.2", "0.2.0-rc.2"]) {
+    for (const runtime of [
+      "0.1.5-rc.2",
+      "0.1.7-alpha.1",
+      "0.1.7-rc.2",
+      "0.2.0-rc.2",
+      "0.2.3-alpha.2",
+    ]) {
       expect(satisfies(runtime, declared, GATE_OPTIONS), runtime).toBe(true);
     }
   });
 
   it("covers every host after the floor, so an upgrade cannot silently drop the gate", () => {
-    for (const runtime of ["0.2.0", "0.2.1", "0.2.5-rc.1", "0.3.0-rc.1", "0.3.0", "1.0.0"]) {
+    for (const runtime of [
+      "0.2.0",
+      "0.2.1",
+      "0.2.5-rc.1",
+      "0.2.3-alpha.2",
+      "0.3.0-rc.1",
+      "0.3.0",
+      "1.0.0",
+    ]) {
       expect(satisfies(runtime, declared, GATE_OPTIONS), runtime).toBe(true);
     }
   });

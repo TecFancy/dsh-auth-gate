@@ -8,6 +8,7 @@ export { crossSiteBounceResponse, isCrossSiteDocumentNavigation, serveCrossSiteB
 export { noopGate } from "./gate.js";
 export type { AdmitHook, Gate, GateDecision, GateDeny, GateRedirectDeny, GateStatusDeny, GateUpgradeDeny, GuardKind, GuardRequest, } from "./gate.js";
 export { denyForbidden, denyHttp, denyUpgrade, GUARDED, guardHttp, guardUpgrade, isGuarded, isNavigationRequest, isProxyDeniedRequest, isPublicStaticPath, isSafeLocation, PROXY_MARKER_HEADER, PUBLIC_STATIC_PATHS, wrapServer, } from "./guard.js";
+export type { FallbackAuthAdapter, HostAuthPolicy, HostAuthRequest, HostAuthRule, } from "./host-auth.js";
 export type { GuardLog, HttpHandler, UpgradeHandler, WrappableFallback, WrappableHttpRoute, WrappableResourceRoute, WrappableRoute, WrappableServer, WrappableUpgradeRoute, } from "./guard.js";
 export { denyBootstrap, denyReply, guardReplyToResponse, rebridgeReply, writeGuardReply, } from "./http.js";
 export type { GuardReply } from "./http.js";
