@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.24.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.2...v0.24.0) (2026-11-23)
+
+
+### Features
+
+* support dsh 0.2.3-alpha.2 route-level authentication ([#162](https://github.com/TecFancy/dsh-auth-gate/issues/162)) ([2010992](https://github.com/TecFancy/dsh-auth-gate/commit/201099277e4d8eb763d1aa84630f1e229c77d7cb))
+
 ## [0.23.2](https://github.com/TecFancy/dsh-auth-gate/compare/v0.23.1...v0.23.2) (2026-11-22)
 
 
