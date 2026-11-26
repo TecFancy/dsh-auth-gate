@@ -125,12 +125,6 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   `GET`/`POST /auth/password`, `GET /auth/status` and `POST /auth/logout`. Resetting a
   still-disabled account does not let it sign in: run `dsh-auth user enable <name>`
   first.
-- The admin reset bucket checks the lock state and records a failure in two
-  separate steps, so a burst of concurrent in-flight attempts can exceed the
-  failure threshold before the first failure is counted. Exploiting it needs an
-  already-signed-in admin (the attacker the bucket protects against is the one
-  holding the session), and the bucket key still follows the client-IP rule
-  above.
 - The admin reset re-reads the **actor** inside the users lock (a demoted or
   disabled actor gets `403` and no write), but the target-side decisions (the
   "new password differs from the old one" policy above all) are made from a read
