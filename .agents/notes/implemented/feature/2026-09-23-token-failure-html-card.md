@@ -33,12 +33,18 @@ body:
 - **`POST /auth/login` with an invalid token** stays **401** + `cache-control: no-store`, but becomes
   `content-type: text/html; charset=utf-8` and re-renders the existing token card with the error slot
   filled by the single constant `Invalid access token.` (`INVALID_TOKEN`, exported by
-  `src/features/token/auth-endpoints.ts`). The token field keeps `autofocus`, gains
+  `src/host/features/token/api/auth-endpoints.ts`). The token field keeps `autofocus`, gains
   `aria-invalid="true" aria-describedby="err"`, and `<title>` gains the `Error: ` prefix — the shared
   renderer already does the last two whenever `error !== undefined`. The submitted token is **never**
   echoed: the field carries no `value` attribute (D20's username echo has no analogue here — echoing a
   secret back into the page, the response cache and the browser history is a disclosure, and the
   field's content is not needed to complete the retry).
+- **A locked token bucket** keeps **429** + `retry-after` and renders the same card:
+  `loginPageHtml(next, lockoutMessage(retryAfterSeconds), { host })`. The `token` scope of
+  `LoginRateLimiter` shipped after this decision (D39, 2026-11-22), and the bare `text/plain` 429 it
+  carried reproduced exactly the blank page this note removed for 401; the card is the same fix at the
+  same place. `lockoutMessage` lives in `src/host/shared/login-page/` so the token and password slices
+  share one string without a cross-feature import (`slice:check`).
 - The anti-phishing identity block keeps rendering through
   `resolvePublicHost(publicHost, host)` exactly as the GET page does (D14), so a failure page cannot
   be mistaken for the same page on another host.
@@ -51,12 +57,13 @@ body:
   M19 response shape is frozen. This is recorded as a known residual, not silently fixed. The GET
   page and the success `302` are untouched.
 - **Deliberately not added:** D20's progressive-enhancement `SUBMIT_SCRIPT` (submit guard +
-  `history.replaceState`) on the token page. The harm it was built for does not exist in token mode:
-  there is no failure budget to spend (token mode has no rate limiter), so neither a double submit
-  nor a reload can lock anyone out. Note precisely what a reload replays: the **original POST with
-  the original token**, not the empty field of the rendered card - so a `history.replaceState` would
-  have hygiene value (keeping the secret out of a replayable history entry), but it needs a new
-  option on the shared page API. Deferred and recorded here rather than folded into this change.
+  `history.replaceState`) on the token page. D20 added it because a reload could spend a failure
+  budget; token mode had none when this decision shipped, and the `token` scope D39 added later makes a
+  reload cost exactly one strike - the same cost as retyping a wrong token - so the guard is still not
+  worth a new option on the shared page API. Note precisely what a reload replays: the **original POST
+  with the original token**, not the empty field of the rendered card - a `history.replaceState` would
+  have hygiene value (keeping the secret out of a replayable history entry), which is why the question
+  is deferred and recorded here rather than closed.
 - **TOTP second stage, same pass:** `rejectTotp` no longer renders the leftover lowercase
   `invalid credentials`; it renders `Invalid or expired code.` (`INVALID_TOTP_CODE`) — the same
   one-constant discipline, but a distinct string, because at that point the password was accepted and
@@ -94,10 +101,10 @@ It is the smallest change that removes the dead end at the same place D20 remove
 and it keeps every invariant that a frozen M2 contract actually protects: the status code, the
 one-constant rule, the no-reflection rule, the log discipline, the no-JavaScript submit path, the
 6 KB CSS budget, the slice boundaries and the dependency set. The change is confined to the token
-slice plus one constant in the password slice, and it touches no shared API. The real-entry
-integration test (`src/integration.auth.test.ts`, the cordis + webserver + storage stack) now asserts
-the HTML failure body instead of only the status, so a silent regression back to `text/plain` fails
-CI rather than being discovered by a confused user.
+slice, plus one constant in the password slice and one copy helper in `src/host/shared/login-page/`.
+The real-entry integration test (`test/integration/integration.auth.test.ts`, the cordis + webserver +
+storage stack) now asserts the HTML failure body instead of only the status, so a silent regression
+back to `text/plain` fails CI rather than being discovered by a confused user.
 
 Independent review: `docs/history/reviews/grok46-d21-token-failure-card-review.md` (grok-4.6, 2026-09-23,
 verdict **approve**); its findings F1-F3 all landed in this change.

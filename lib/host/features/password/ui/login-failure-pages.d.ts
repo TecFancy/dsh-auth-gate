@@ -18,11 +18,6 @@ export declare const PASSKEY_ONLY_DISABLED_TEXT = "This instance requires a pass
  * 手因；也不能细分重放/过期/漂移，否则等于给攻击者一个反馈探针。
  */
 export declare const INVALID_TOTP_CODE = "Invalid or expired code.";
-/**
- * 锁定文案（429）：按「这个网络」而非「你的账号」陈述，桶按客户端 IP（#82）时不会指控错人；
- * 不显示剩余次数，也不承诺自助重置（本产品没有）。
- */
-export declare function lockoutMessage(retryAfterSeconds: number): string;
 export interface FailurePageContext {
     /** 反钓鱼身份块 host（D14）。 */
     host: string;
