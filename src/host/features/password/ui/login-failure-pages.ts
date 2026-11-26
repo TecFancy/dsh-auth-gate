@@ -6,6 +6,7 @@
  */
 import type { ServerResponse } from "node:http";
 import {
+  lockoutMessage,
   passkeyOnlyLoginPageHtml,
   passwordLoginPageHtml,
   totpChallengePageHtml,
@@ -29,19 +30,6 @@ export const PASSKEY_ONLY_DISABLED_TEXT =
  * 手因；也不能细分重放/过期/漂移，否则等于给攻击者一个反馈探针。
  */
 export const INVALID_TOTP_CODE = "Invalid or expired code.";
-
-/**
- * 锁定文案（429）：按「这个网络」而非「你的账号」陈述，桶按客户端 IP（#82）时不会指控错人；
- * 不显示剩余次数，也不承诺自助重置（本产品没有）。
- */
-export function lockoutMessage(retryAfterSeconds: number): string {
-  const unit = retryAfterSeconds === 1 ? "second" : "seconds";
-  return (
-    "Too many sign-in attempts from this network. " +
-    `Try again in ${retryAfterSeconds} ${unit}. ` +
-    "There is no password reset, so ask the instance owner if you are stuck."
-  );
-}
 
 export interface FailurePageContext {
   /** 反钓鱼身份块 host（D14）。 */

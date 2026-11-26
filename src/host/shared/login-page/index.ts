@@ -14,3 +14,4 @@ export {
   passkeyOnlyUnavailablePageHtml,
 } from "./passkey-only-login-page.js";
 export { CARD_STYLE } from "./login-page-assets.js";
+export { lockoutMessage } from "./login-page-copy.js";

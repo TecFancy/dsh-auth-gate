@@ -129,4 +129,29 @@ describe("LoginRateLimiter admission accounting", () => {
     now += 1;
     expect(limiter.admit("1.2.3.4", undefined).admitted).toBe(true);
   });
+
+  it("caps the IP bucket at one probe once its failure budget is spent (P1 regression)", () => {
+    const { limiter, advance } = makeLimiter();
+    // 五个不同用户名各错一次：账号桶都是全新的，唯一刹车是共享的 IP 桶。
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const result = limiter.admit("1.2.3.4", `user${attempt}`);
+      if (!result.admitted) throw new Error("expected admission");
+      result.admission.settle("failure");
+    }
+    advance(30_001); // 锁到期
+    // 同一个出口 IP 的六条并发：只放 1 条探测，否则一次突发能贡献六次打击。
+    const probes = [];
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      probes.push(limiter.admit("1.2.3.4", `other${attempt}`));
+    }
+    const admitted = probes.filter((probe) => probe.admitted);
+    expect(admitted).toHaveLength(1);
+    if (admitted[0]?.admitted !== true) throw new Error("expected one probe");
+    // 这一条再错也只是第 6 次打击（30s → 60s），不是 32 条并发推出来的 900s。
+    admitted[0].admission.settle("failure");
+    expect(limiter.check("1.2.3.4", undefined)).toEqual({
+      allowed: false,
+      retryAfterSeconds: 60,
+    });
+  });
 });

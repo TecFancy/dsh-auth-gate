@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { loginPageHtml } from "../../../shared/login-page/index.js";
+import { lockoutMessage, loginPageHtml } from "../../../shared/login-page/index.js";
 import {
   authCatchAll,
   methodNotAllowed,
@@ -159,10 +159,16 @@ async function loginAttempt(
   const next = validateNext(params.get("next") ?? "/");
   const admitted = deps.limiter.admit(deps.clientIp(req), undefined, "token");
   if (!admitted.admitted) {
+    // D21 的同一张卡片：限速器是 D39 之后才加到 token 域的，裸文本 429 会让浏览器导航
+    // 落回 #85 要消灭的那张白页（口令段的 429 早就是 HTML 卡片）。
     res.setHeader("cache-control", "no-store");
     res.setHeader("retry-after", String(admitted.retryAfterSeconds));
-    res.writeHead(429, { "content-type": "text/plain" });
-    res.end("too many sign-in attempts");
+    res.writeHead(429, { "content-type": "text/html; charset=utf-8" });
+    res.end(
+      loginPageHtml(next, lockoutMessage(admitted.retryAfterSeconds), {
+        host: resolvePublicHost(deps.publicHost, req.headers.host),
+      }),
+    );
     deps.logger.info("rate limit exceeded");
     return;
   }

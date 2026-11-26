@@ -29,11 +29,16 @@ Issue #85，0.14.2 实测：错 token 返回 `401` + `content-type: text/plain` 
 
 - **错 token 的 `POST /auth/login`**：**保持 401** + `cache-control: no-store`，content-type 改为
   `text/html; charset=utf-8`，body 换成 token 版登录卡片、error slot 填唯一常量
-  `Invalid access token.`（`INVALID_TOKEN`，由 `src/features/token/auth-endpoints.ts` 导出）。
+  `Invalid access token.`（`INVALID_TOKEN`，由 `src/host/features/token/api/auth-endpoints.ts` 导出）。
   令牌字段保持 `autofocus`、加 `aria-invalid="true" aria-describedby="err"`，`<title>` 加
   `Error: ` 前缀（后两项由共享渲染器在 `error !== undefined` 时自动加上）。**提交的 token 永不
   回填**：字段不渲染 `value` 属性（D20 的用户名回填在这里没有对应物 —— 把秘密写回页面、响应缓存
   与浏览器历史是一次泄露，而重试并不需要它）。
+- **token 桶被锁时**：**保持 429** + `retry-after`，body 换成同一张卡片
+  `loginPageHtml(next, lockoutMessage(retryAfterSeconds), { host })`。`LoginRateLimiter` 的 `token`
+  域是在本决定之后才有的（D39，2026-11-22），它带的裸 `text/plain` 429 恰好复现了本 note 为 401
+  消灭的那张白页；同一处、同一个修法。`lockoutMessage` 住在 `src/host/shared/login-page/`，让 token
+  与 password 两个切片共用一句文案而不产生跨 feature import（`slice:check`）。
 - 反钓鱼身份块仍按 `resolvePublicHost(publicHost, host)` 渲染（D14），与 GET 页完全一致，失败页
   不会被误认成「另一个主机上的同一个页面」。
 - **刻意不改**：`415`（`parseFormBody` 对非 urlencoded body 的拒绝 —— 表单恒发
@@ -43,10 +48,11 @@ Issue #85，0.14.2 实测：错 token 返回 `401` + `content-type: text/plain` 
   自受且无可操作的状态，改成卡片要新增文案、还要动 M19 冻结的响应形状。**这里如实记为已知残留，
   而不是悄悄改掉**。GET 页与成功后的 `302` 均未触及。
 - **刻意不加**：D20 的渐进增强脚本 `SUBMIT_SCRIPT`（提交守卫 + `history.replaceState`）不注入
-  token 页。它要解决的危害在令牌模式不存在：没有可被消耗的失败预算（令牌模式没有限速器），双击或
-  刷新都锁不住任何人。但要说准**刷新到底重放什么**：F5 重放的是**原来那条 POST，带着原来的
+  token 页。D20 加它是因为一次刷新会消耗失败预算；本决定落地时令牌模式还没有预算，而 D39 后来
+  加的 `token` 域让一次刷新正好花掉一次打击 —— 与重输一次错 token 同价，因此仍不值得为它在共享
+  页面 API 上加选项。但要说准**刷新到底重放什么**：F5 重放的是**原来那条 POST，带着原来的
   token**，不是卡片上那个空字段 —— 所以 `history.replaceState` 其实有卫生价值（别让秘密留在可重放
-  的历史项里），只是它需要在共享页面 API 上加一个选项。**本次推迟并如实记录**，不塞进这次改动。
+  的历史项里），这也是这个问题被**推迟并如实记录**、而不是被关掉的原因。
 - **同一趟收尾 TOTP 第二段文案**：`rejectTotp` 不再渲染遗留的小写 `invalid credentials`，改为
   `Invalid or expired code.`（`INVALID_TOTP_CODE`）—— 同样是单一常量纪律，但**不复用**凭据常量：
   走到这一步口令已经通过，失败的手因是验证码（错码 / 重放 / 账号已无 secret）。文案刻意不区分这
@@ -67,15 +73,16 @@ Issue #85，0.14.2 实测：错 token 返回 `401` + `content-type: text/plain` 
 - **TOTP 段复用 `INVALID_CREDENTIALS`** —— 否：手因错位（口令已通过），且该常量要覆盖的语义不同。
 - **同趟把 `413`/`415`/`503` 一并改成 HTML** —— 否：它们是协议层/运维层失败，不是用户可修复状态，
   且 413 的 M19 `connection: close` 必须保持精确。记录这个决定才是重点，扩大范围不是。
-- **给 token 页加 D20 的提交守卫脚本** —— 否（见「决定了什么」）：会为一条没有锁定预算保护的流程
-  扩大共享页面 API。
+- **给 token 页加 D20 的提交守卫脚本** —— 否（见「决定了什么」）：一次刷新正好花掉一次打击，与重输
+  一次错 token 同价，不值得为此扩大共享页面 API。
 
 ## Why
 
 这是「在 D20 为密码流删掉死胡同的同一位置，为令牌流删掉死胡同」的最小改动，且保住了冻结的 M2 契约
 真正保护的全部不变量：状态码、一常量规则、不反射规则、日志纪律、无 JavaScript 提交路径、6 KB CSS
-预算、切片边界与依赖集合。改动范围限于 token 切片 + 密码切片里的一个常量，不碰任何共享 API。真实
-入口集成测试（`src/integration.auth.test.ts`，cordis + webserver + storage 全栈）现在断言的是 HTML
+预算、切片边界与依赖集合。改动范围限于 token 切片，外加密码切片里的一个常量与
+`src/host/shared/login-page/` 里的一个文案助手。真实入口集成测试
+（`test/integration/integration.auth.test.ts`，cordis + webserver + storage 全栈）现在断言的是 HTML
 失败体而不只是状态码，所以「悄悄退回 text/plain」会在 CI 就被拦住，而不是等用户撞上空白页才发现。
 
 独立评审：`docs/history/reviews/grok46-d21-token-failure-card-review.md`（grok-4.6，2026-09-23，结论

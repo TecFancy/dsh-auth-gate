@@ -48,3 +48,41 @@ describe("POST /auth/login: D21 failure card", () => {
     expect(res.body).toContain("dsh.example.com");
   });
 });
+
+/** D21 的同一张卡片覆盖 429：token 域在 D39 后有了限速器，裸文本 429 会退回白页。 */
+describe("POST /auth/login: token lockout card", () => {
+  async function burnTokens(harness: ReturnType<typeof makeHarness>, count: number): Promise<void> {
+    registerAuthEndpoints(harness.deps);
+    const handler = handlerOf(harness, "exact", "/auth/login");
+    for (let attempt = 0; attempt < count; attempt += 1) {
+      await handler(loginReq("token=wrong&next=%2Fok"), makeRes().res);
+    }
+  }
+
+  it("answers the sixth attempt with the login card instead of a bare text page", async () => {
+    const harness = makeHarness();
+    await burnTokens(harness, 5);
+    const res = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(loginReq("token=wrong&next=%2Fok"), res.res);
+    expect(res.status).toBe(429);
+    expect(res.headers["content-type"]).toBe("text/html; charset=utf-8");
+    expect(res.headers["retry-after"]).toBe("30");
+    expect(res.headers["cache-control"]).toBe("no-store");
+    expect(res.body).toContain('class="error"');
+    expect(res.body).toContain("Too many sign-in attempts from this network.");
+    expect(res.body).toContain("Try again in 30 seconds.");
+    expect(res.body).toContain('<input type="hidden" name="next" value="/ok">');
+    expect(res.body).toContain("<title>Error: Sign in");
+  });
+
+  it("keeps the token field usable on the lockout card and never echoes the submission", async () => {
+    const harness = makeHarness();
+    await burnTokens(harness, 5);
+    const res = makeRes();
+    await handlerOf(harness, "exact", "/auth/login")(loginReq("token=super-secret-token"), res.res);
+    expect(res.status).toBe(429);
+    expect(res.body).not.toContain("super-secret-token");
+    expect(res.body).toMatch(/<input id="token"[^>]*autofocus/);
+    expect(res.body).toContain('aria-invalid="true" aria-describedby="err"');
+  });
+});
