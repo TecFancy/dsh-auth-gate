@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.25.1](https://github.com/TecFancy/dsh-auth-gate/compare/v0.25.0...v0.25.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* cap the shared-egress lockout at two minutes ([#169](https://github.com/TecFancy/dsh-auth-gate/issues/169)) ([65a07e1](https://github.com/TecFancy/dsh-auth-gate/commit/65a07e156b633d131bd24bc860f701e319595160))
+* render the token lockout card and cap the IP probe after its budget ([#167](https://github.com/TecFancy/dsh-auth-gate/issues/167)) ([2430b4d](https://github.com/TecFancy/dsh-auth-gate/commit/2430b4d8b0d8789258b2354fd846ef53ae50cfce))
+
 ## [0.25.0](https://github.com/TecFancy/dsh-auth-gate/compare/v0.24.0...v0.25.0) (2026-11-23)
 
 
