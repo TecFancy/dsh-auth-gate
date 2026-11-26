@@ -1,6 +1,8 @@
 import { type AdmissionResult, type RateLimitCheck, type RateLimitOptions, type RateLimitScope } from "./types.js";
 /**
  * 登录限速器（P10）：IP + 账号双桶、分域计数、失败指数退避、窗口衰减、条目上限。
+ * IP 桶的退避单独封顶（`ipMaxDelaySeconds`，默认 120 秒）：一个地址可能是整间办公室，
+ * 比账号更早到顶才不至于把旁观者按一刻钟。
  *
  * 内存态：重启清零。三种使用方式：
  * - `admit()` 受理一次尝试并返回结算句柄：检查、占位、记账在同一同步段完成，
@@ -13,6 +15,8 @@ export declare class LoginRateLimiter {
     private readonly maxFailures;
     private readonly baseDelayMs;
     private readonly maxDelayMs;
+    /** IP 桶单独的封顶：共享出口地址上锁的是旁观者，见 `ipMaxDelaySeconds`。 */
+    private readonly ipMaxDelayMs;
     private readonly windowMs;
     private readonly maxConcurrentPerIp;
     private readonly now;
@@ -57,7 +61,10 @@ export declare class LoginRateLimiter {
     private waitOf;
     private decay;
     private recordBucket;
-    /** 指数退避：第 n 次打击（n ≥ maxFailures）锁定 base·2^(n−maxFailures)，封顶 maxDelay。 */
+    /**
+     * 指数退避：第 n 次打击（n ≥ maxFailures）锁定 base·2^(n−maxFailures)，封顶该桶的上限。
+     * IP 桶的上限更低（`ipMaxDelaySeconds`）：一个地址可能是整间办公室，升级锁只会罚到旁观者。
+     */
     private backoff;
     private entryOf;
     private clearKey;

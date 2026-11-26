@@ -1,14 +1,22 @@
 /**
  * 限速器的公共类型与键工具：从 `rate-limit.ts` 拆出守住单文件行数上限。
- * 语义文档见 `rate-limit.ts`（类）与 Agent Note D39。
+ * 语义文档见 `rate-limit.ts`（类）、Agent Note D39 与共享出口封顶那条 note。
  */
 export interface RateLimitOptions {
     /** 连续失败多少次后进入锁定。默认 5。 */
     maxFailures?: number;
     /** 首次锁定的基础时长（秒），此后按 2 的幂增长。默认 30。 */
     baseDelaySeconds?: number;
-    /** 锁定上限（秒）。默认 900。 */
+    /** 锁定上限（秒）。默认 900。账号桶用这个封顶。 */
     maxDelaySeconds?: number;
+    /**
+     * IP 桶单独的锁定上限（秒）。默认 120，且不超过 `maxDelaySeconds`。
+     *
+     * 共享出口地址（办公室 NAT、移动 CGNAT、VPN 出口）上一个地址就是一整批用户，所以对
+     * 「地址」升级锁惩罚的是旁观者而不是攻击者；账号桶仍按 `maxDelaySeconds` 升级。见
+     * Agent Note 2026-11-26-shared-egress-lockout-ceiling。
+     */
+    ipMaxDelaySeconds?: number;
     /** 失败计数衰减窗口（秒）：窗口内无新失败即清零。默认 600。 */
     windowSeconds?: number;
     /** 同一 IP 同时在途的登录尝试上限（并发突发保护，与失败阈值解耦）。默认 32。 */

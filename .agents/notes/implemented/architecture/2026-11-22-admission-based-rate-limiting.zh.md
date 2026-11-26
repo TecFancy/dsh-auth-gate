@@ -27,13 +27,15 @@ await，中间没有任何东西预留名额，所以一波并发请求可以在
 该账号在所有域里的桶。
 
 退避由 `strikes` 计数驱动，锁到期不清它，只有 `windowSeconds` 的静默窗口才清。第 n 次打击
-（n >= `maxFailures`）锁定 `baseDelaySeconds * 2^(n - maxFailures)`，封顶 `maxDelaySeconds`
-（900 秒）。条目超过 10000 上限时，驱逐按锁定最早到期、失败数最少排序，永不驱逐还有在途预留的桶，
-并把仍然有效的锁定桶排到末尾，所以轮换攻击者冲不掉它们。一次成功受理只结清账号桶，登录永远不会清
-IP 桶。
+（n >= `maxFailures`）锁定 `baseDelaySeconds * 2^(n - maxFailures)`：账号桶封顶
+`maxDelaySeconds`（900 秒），IP 桶封顶更低的 `ipMaxDelaySeconds`（120 秒）——见
+[共享出口锁定封顶](../architecture/2026-11-26-shared-egress-lockout-ceiling.zh.md)。条目超过 10000
+上限时，驱逐按锁定最早到期、失败数最少排序，永不驱逐还有在途预留的桶，并把仍然有效的锁定桶排到
+末尾，所以轮换攻击者冲不掉它们。一次成功受理只结清账号桶，登录永远不会清 IP 桶。
 
 超过 `maxConcurrentPerIp`（每个 IP 每个域 32 个在途尝试）的受理请求会得到 `retry-after: 1`；这是
-并发保护，不是锁定。状态仍在进程内，重启清零（`TODO(auth-m5)`）。
+并发保护，不是锁定。一旦某个桶的失败预算花完，它下一次受理只放一条探测——IP 桶同样如此：来自同一
+地址的一批不同用户名不能一次结掉一整个锁定量的打击。状态仍在进程内，重启清零（`TODO(auth-m5)`）。
 
 ## Alternatives considered
 
