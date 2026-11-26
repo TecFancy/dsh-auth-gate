@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record: the git blob hash of each side as
+# of the last confirmed-consistent state. Both languages carry equal
+# authority; after editing either side, bring the other along and re-record
+# with:  npm run bilingual:re-record -- .agents/notes/implemented/architecture/2026-11-26-shared-egress-lockout-ceiling
+2026-11-26-shared-egress-lockout-ceiling.md: bc5fb747045532f30d2a4df6c8fde89d7b841c2d
+2026-11-26-shared-egress-lockout-ceiling.zh.md: 55c108f8aac9290a057610da282c08ce8ae4c91a

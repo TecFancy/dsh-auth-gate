@@ -181,6 +181,9 @@ question: is this instance configured?
   re-render with an inline `Invalid username or password.`: the username is kept, the
   password must be retyped. A lockout (HTTP 429 + `retry-after`) shows the same card
   with the retry seconds and a message saying the lockout applies to "this network".
+  A locked address clears in at most two minutes while a repeatedly targeted account
+  keeps escalating up to fifteen, so one colleague's typos cannot park everyone
+  behind a shared office address for a quarter of an hour.
   The number of remaining attempts is deliberately never shown, and in password
   mode a page refresh no longer consumes another failed attempt when JavaScript is
   enabled (the token card has no such guard: a refresh replays the original POST and

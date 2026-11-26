@@ -106,6 +106,18 @@ plugin, with the mechanism behind it and the decision record that fixed it.
   the same `clientIpHeader` setup: without a trusted proxy client-IP header,
   every client on that host also shares one password-change bucket (the same
   root cause as the login case, D19).
+- A correct `clientIpHeader` fixes the proxy case, not the shared-egress one. An
+  office NAT, a mobile CGNAT pool or a VPN exit is **one** address, so five
+  mistyped passwords from one device still lock every account behind it: the
+  address bucket is the brake against spraying and against the accountless flows
+  (token, passkey), and it cannot tell one person from a hundred. What changed
+  with the shared-egress ceiling is the size of that collateral - the address
+  stops escalating at **two minutes** per lock while the targeted account keeps
+  escalating to fifteen - and a successful login clears the account bucket only,
+  never the address bucket, so signing in once does not launder an address's
+  failure history. Restarting the server clears all limiter state. There is no
+  setting that separates users who share one address; if the collateral is
+  unacceptable, give the instance an address of its own.
 - Sign out from the GUI: a prominent "Sign out / 退出登录" button sits in the
   Settings panel (Settings → General, bottom) — client half, requires the
   web app's client bundle (dsh 0.1.0-rc.6+); the direct

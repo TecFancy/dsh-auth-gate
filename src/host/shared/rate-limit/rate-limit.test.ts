@@ -99,6 +99,54 @@ describe("LoginRateLimiter lockout escalation", () => {
   });
 });
 
+describe("LoginRateLimiter shared-egress ceiling", () => {
+  it("caps the IP bucket at ipMaxDelaySeconds while the account bucket keeps escalating", () => {
+    const { limiter } = makeLimiter();
+    // 只记 IP（没有账号）：12 次打击走 30 → 60 → 120，然后停在 120。
+    for (let i = 0; i < 12; i++) fail(limiter, "1.2.3.4", undefined);
+    expect(limiter.check("1.2.3.4", undefined)).toEqual({
+      allowed: false,
+      retryAfterSeconds: 120,
+    });
+    // 同一串打击记到账号桶上仍然升到 900：升级保护的是被盯上的账号，不是地址。
+    for (let i = 0; i < 12; i++) fail(limiter, "5.6.7.8", "alice");
+    expect(limiter.check("5.6.7.8", "alice")).toEqual({
+      allowed: false,
+      retryAfterSeconds: 900,
+    });
+  });
+
+  it("releases a shared address after the capped lock, not after fifteen minutes", () => {
+    const { limiter, advance } = makeLimiter();
+    for (let i = 0; i < 12; i++) fail(limiter, "1.2.3.4", undefined);
+    // 同一个出口地址上的另一个人被连带锁住，但只等两分钟。
+    expect(limiter.check("1.2.3.4", "bob")).toEqual({ allowed: false, retryAfterSeconds: 120 });
+    advance(120_001);
+    expect(limiter.check("1.2.3.4", "bob")).toEqual({ allowed: true });
+  });
+
+  it("honours a configured ipMaxDelaySeconds and never exceeds maxDelaySeconds", () => {
+    const now = 1_000_000;
+    const shorter = new LoginRateLimiter({ now: () => now, ipMaxDelaySeconds: 60 });
+    for (let i = 0; i < 12; i++) shorter.recordFailure("1.2.3.4", undefined);
+    expect(shorter.check("1.2.3.4", undefined)).toEqual({
+      allowed: false,
+      retryAfterSeconds: 60,
+    });
+
+    const clamped = new LoginRateLimiter({
+      now: () => now,
+      maxDelaySeconds: 45,
+      ipMaxDelaySeconds: 120,
+    });
+    for (let i = 0; i < 12; i++) clamped.recordFailure("9.9.9.9", undefined);
+    expect(clamped.check("9.9.9.9", undefined)).toEqual({
+      allowed: false,
+      retryAfterSeconds: 45,
+    });
+  });
+});
+
 describe("LoginRateLimiter success semantics", () => {
   it("clears both buckets on an authenticated success (password change / admin)", () => {
     const { limiter } = makeLimiter();

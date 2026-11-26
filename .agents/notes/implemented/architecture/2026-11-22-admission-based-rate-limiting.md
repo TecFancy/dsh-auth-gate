@@ -35,15 +35,19 @@ that account's bucket in every scope.
 
 Backoff is driven by a `strikes` counter that lock expiry does not reset; only a quiet
 `windowSeconds` does. The n-th strike (n >= `maxFailures`) locks for
-`baseDelaySeconds * 2^(n - maxFailures)`, capped at `maxDelaySeconds` (900 s). Eviction under the
+`baseDelaySeconds * 2^(n - maxFailures)`, capped at `maxDelaySeconds` (900 s) for an account bucket
+and at the lower `ipMaxDelaySeconds` (120 s) for the IP bucket - see
+[the shared-egress ceiling note](2026-11-26-shared-egress-lockout-ceiling.md). Eviction under the
 10,000-entry cap ranks idle buckets by earliest lock expiry and fewest failures, never removes a
 bucket with an in-flight reservation, and pushes live lockouts to the end of that ranking so a
 rotating attacker cannot flush them. A successful admission settles the account bucket only, so a
 login never clears the IP bucket.
 
 Admission beyond `maxConcurrentPerIp` (32 in-flight attempts per IP per scope) answers
-`retry-after: 1`; this is a concurrency guard, not a lockout. State is still in-process and resets
-on restart (`TODO(auth-m5)`).
+`retry-after: 1`; this is a concurrency guard, not a lockout. Once a bucket's failure budget is
+spent, its next admission opens only one probe at a time, for the IP bucket as well: a burst of
+distinct usernames from one address must not settle a whole lockout's worth of strikes at once.
+State is still in-process and resets on restart (`TODO(auth-m5)`).
 
 ## Alternatives considered
 
